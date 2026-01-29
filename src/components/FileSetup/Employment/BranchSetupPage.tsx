@@ -18,6 +18,7 @@ export function BranchSetupPage() {
   const [branchManagerCode, setBranchManagerCode] = useState('');
   const [branchManager, setBranchManager] = useState('');
   const [deviceName, setDeviceName] = useState('');
+  const [branchId, setBranchId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   
   // Modal state
@@ -50,7 +51,7 @@ export function BranchSetupPage() {
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((branch: any) => ({
-          id: branch.braID || branch.id || '',
+          branchId: branch.braID || branch.id || '',
           code: branch.braCode || branch.code || '',
           description: branch.braDesc || branch.description || '',
           branchManager: branch.braMngr || branch.branchManager || '',
@@ -155,6 +156,7 @@ export function BranchSetupPage() {
   const handleEdit = (branch: any, index: number) => {
     setIsEditMode(true);
     setSelectedBranchIndex(index);
+    setBranchId(branch.branchId);
     setCode(branch.code);
     setDescription(branch.description);
     setBranchManagerCode(branch.branchManagerCode);
@@ -209,10 +211,27 @@ export function BranchSetupPage() {
       });
       return;
     }
-
+            // Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = branchList.some((branch, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedBranchIndex === index) {
+                return false;
+              }
+              return branch.code.toLowerCase() === code.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
     setSubmitting(true);
     try {
       const payload = {
+        braID: isEditMode && branchId ? parseInt(branchId) : 0,
         braCode: code,
         braDesc: description,
         braMngr: branchManager || null,
@@ -222,8 +241,8 @@ export function BranchSetupPage() {
 
       if (isEditMode && selectedBranchIndex !== null) {
         // Update existing record via PUT
-        const branchId = branchList[selectedBranchIndex]?.id;
-        await apiClient.put(`/Fs/Employment/BranchSetUp/${branchId}`, payload);
+        const id = branchId;
+        await apiClient.put(`/Fs/Employment/BranchSetUp/${id}`, payload);
         await Swal.fire({
           icon: 'success',
           title: 'Success',

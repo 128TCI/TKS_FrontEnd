@@ -1,110 +1,237 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
+import apiClient from '../../../services/apiClient';
 import { Footer } from '../../Footer/Footer';
+import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
+import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
+import Swal from 'sweetalert2';
 
 export function JobLevelSetupPage() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedLevelIndex, setSelectedLevelIndex] = useState<number | null>(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [selectedLevelIndex, setSelectedLevelIndex] = useState<number | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 100
   
   // Form fields
-  const [code, setCode] = useState('');
-  const [description, setDescription] = useState('');
+    const [code, setCode] = useState('');
+    const [codeError, setCodeError] = useState('');
+    const [description, setDescription] = useState('');
+    const [jobLevelId, setJobLevelId] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
   
-  // Sample data for the list
-  const [levelList, setLevelList] = useState([
-    { code: 'ASSOCSTAFF', description: 'Associate Staff' },
-    { code: 'DIRECTOR', description: 'Director' },
-    { code: 'EXECUTIVE', description: 'Executive' },
-    { code: 'INTERSTAFF', description: 'Intermediate Staff' },
-    { code: 'MANAGER', description: 'Manager' },
-    { code: 'ProjB', description: 'Installer' },
-    { code: 'SRDIR', description: 'Senior Director' },
-    { code: 'SREXEC', description: 'Senior Executive' },
-    { code: 'SRMNGR', description: 'Senior Manager' },
-    { code: 'SRSTAFF', description: 'Senior Staff' },
-  ]);
+    // Job Level List states
+    const [levelList, setLevelList] = useState<Array<{ id: string; code: string; description: string; }>>([]);
+    const [loadingJobLevels, setLoadingJobLevels] = useState(false);
+    const [jobLevelError, setJobLevelError] = useState('');
 
-  // Handle ESC key to close modals
-  useEffect(() => {
-    const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (showCreateModal) {
-          setShowCreateModal(false);
+  // Fetch division data from API
+    useEffect(() => {
+        fetchDivisionData();
+    }, []);
+
+    const fetchDivisionData = async () => {
+        setLoadingJobLevels(true);
+        setJobLevelError('');
+        try {
+            const response = await apiClient.get('/Fs/Employment/JobLevelSetUp');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((division: any) => ({
+                    id: division.jobLevelID || '',
+                    code: division.jobLevelCode || '',
+                    description: division.jobLevelDesc || '',
+                }));
+                setLevelList(mappedData);
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load divisions';
+            setJobLevelError(errorMsg);
+            console.error('Error fetching divisions:', error);
+        } finally {
+            setLoadingJobLevels(false);
         }
-      }
+    };
+  // Handle ESC key to close create modal only
+    useEffect(() => {
+        const handleEscKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && showCreateModal) {
+                setShowCreateModal(false);
+            }
+        };
+
+        if (showCreateModal) {
+            document.addEventListener('keydown', handleEscKey);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleEscKey);
+        };
+    }, [showCreateModal]);
+
+    const handleCreateNew = () => {
+        setIsEditMode(false);
+        setSelectedLevelIndex(null);
+        setJobLevelId(null);
+        // Clear form
+        setCode('');
+        setCodeError('');
+        setDescription('');
+        setShowCreateModal(true);
     };
 
-    if (showCreateModal) {
-      document.addEventListener('keydown', handleEscKey);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscKey);
+    const handleEdit = (division: any, index: number) => {
+        setIsEditMode(true);
+        setSelectedLevelIndex(index);
+        setJobLevelId(division.id || null);
+        setCode(division.code);
+        setCodeError('');
+        setDescription(division.description);
+        setShowCreateModal(true);
     };
-  }, [showCreateModal]);
 
-  const handleCreateNew = () => {
-    setIsEditMode(false);
-    setSelectedLevelIndex(null);
-    // Clear form
-    setCode('');
-    setDescription('');
-    setShowCreateModal(true);
-  };
+ const handleDelete = async (division: any) => {
+        const confirmed = await Swal.fire({
+            icon: 'warning',
+            title: 'Confirm Delete',
+            text: `Are you sure you want to delete division ${division.code}?`,
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+        });
 
-  const handleEdit = (level: any, index: number) => {
-    setIsEditMode(true);
-    setSelectedLevelIndex(index);
-    setCode(level.code);
-    setDescription(level.description);
-    setShowCreateModal(true);
-  };
+        if (confirmed.isConfirmed) {
+            try {
+                await apiClient.delete(`/Fs/Employment/DivisionSetUp/${division.divID}`);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Division deleted successfully.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                // Refresh the division list
+                await fetchDivisionData();
+            } catch (error: any) {
+                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete division';
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: errorMsg,
+                });
+                console.error('Error deleting division:', error);
+            }
+        }
+    };
 
-  const handleDelete = (levelCode: string) => {
-    if (window.confirm('Are you sure you want to delete this job level?')) {
-      setLevelList(levelList.filter(level => level.code !== levelCode));
-    }
-  };
+    const handleCodeChange = (value: string) => {
+        setCode(value);
+        if (value.length > 10) {
+            setCodeError('Code maximum 10 characters');
+        } else {
+            setCodeError('');
+        }
+    };
 
-  const handleSubmit = () => {
-    // Validate code
-    if (!code.trim()) {
-      alert('Please enter a Code.');
-      return;
-    }
+  const handleSubmit = async () => {
+        // Validate code - must not be empty and must be max 10 characters
+        if (!code.trim() || code.length > 10) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Code must be between 1 and 10 characters.',
+            });
+            return;
+        }
+// Check for duplicate code (only when creating new or changing code during edit)
+                const isDuplicate = levelList.some((level, index) => {
+                  // When editing, exclude the current record from duplicate check
+                  if (isEditMode && selectedLevelIndex === index) {
+                    return false;
+                  }
+                  return level.code.toLowerCase() === code.trim().toLowerCase();
+                });
+            
+                if (isDuplicate) {
+                  await Swal.fire({
+                    icon: 'error',
+                    title: 'Duplicate Code',
+                    text: 'This code is already in use. Please use a different code.',
+                  });
+                  return;
+                }
+        setSubmitting(true);
+        try {
+            const payload = {
+                jobLevelID: isEditMode && jobLevelId ? parseInt(jobLevelId) : 0,
+                 jobLevelCode: code,
+                  jobLevelDesc: description,
+            };
 
-    if (isEditMode && selectedLevelIndex !== null) {
-      // Update existing record
-      const updatedList = [...levelList];
-      updatedList[selectedLevelIndex] = {
-        code: code,
-        description: description
-      };
-      setLevelList(updatedList);
-    } else {
-      // Create new record
-      const newLevel = {
-        code: code,
-        description: description
-      };
-      setLevelList([...levelList, newLevel]);
-    }
+            if (isEditMode && jobLevelId) {
+                // Update existing record via PUT
+                await apiClient.put(`/Fs/Employment/JobLevelSetUp/${jobLevelId}`, payload);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Division updated successfully.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                // Refresh the division list
+                await fetchDivisionData();
+            } else {
+                // Create new record via POST
+                await apiClient.post('/Fs/Employment/JobLevelSetUp', payload);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Division created successfully.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                // Refresh the division list
+                await fetchDivisionData();
+            }
 
-    // Close modal and reset form
-    setShowCreateModal(false);
-    setCode('');
-    setDescription('');
-    setIsEditMode(false);
-    setSelectedLevelIndex(null);
-  };
+            // Close modal and reset form
+            setShowCreateModal(false);
+            setCode('');
+            setCodeError('');
+            setDescription('');
+            setJobLevelId(null);
+            setIsEditMode(false);
+            setSelectedLevelIndex(null);
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+            await Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: errorMsg,
+            });
+            console.error('Error submitting form:', error);
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
   const filteredLevels = levelList.filter(level =>
-    level.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    level.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+        level.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        level.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+        // Pagination logic
+    const totalPages = Math.ceil(filteredLevels.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedLevels = filteredLevels.slice(startIndex, endIndex);
 
+    // Reset to page 1 when search term changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Main Content */}
@@ -173,6 +300,15 @@ export function JobLevelSetupPage() {
 
             {/* Data Table */}
             <div className="overflow-x-auto">
+            {loadingJobLevels ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="text-gray-600 text-sm">Loading job levels...</div>
+                                </div>
+                            ) : jobLevelError ? (
+                                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                                    <p className="text-red-700 text-sm">{jobLevelError}</p>
+                                </div>
+                            ) : (
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-100 border-b-2 border-gray-300">
@@ -182,9 +318,9 @@ export function JobLevelSetupPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLevels.map((level, index) => (
-                    <tr
-                      key={index}
+                    {paginatedLevels.map((level, index) => (
+                                        <tr
+                                            key={index}
                       className="border-b border-gray-200 hover:bg-gray-50"
                     >
                       <td className="px-4 py-2">{level.code}</td>
@@ -212,25 +348,44 @@ export function JobLevelSetupPage() {
                   ))}
                 </tbody>
               </table>
+                )}
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-gray-600">
-                Showing 1 to {filteredLevels.length} of {filteredLevels.length} entries
-              </div>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
-                  Previous
-                </button>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
-                  Next
-                </button>
-              </div>
-            </div>
+              <div className="flex items-center justify-between mt-4">
+                            <div className="text-gray-600">
+                                Showing {filteredLevels.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredLevels.length)} of {filteredLevels.length} entries
+                            </div>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Previous
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                    <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`px-3 py-1 rounded transition-colors ${
+                                            currentPage === page
+                                                ? 'bg-blue-600 text-white'
+                                                : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
 
             {/* Create/Edit Modal */}
             {showCreateModal && (

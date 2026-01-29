@@ -1,27 +1,163 @@
-import { Upload, X, Pencil, Save, XCircle, Check } from 'lucide-react';
-import { useState } from 'react';
+import { Upload, X, Pencil, Save, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { Footer } from '../../Footer/Footer';
+import apiClient from '../../../services/apiClient';
+import Swal from 'sweetalert2';
 
 interface CompanyInformationProps {
   onBack?: () => void;
 }
 
+interface CompanyData {
+  companyID: number;
+  companyCode: string;
+  companyName: string;
+  companyLogo: string | null;
+  address: string;
+  city: string;
+  province: string;
+  zipCode: string;
+  telNo: string;
+  email: string;
+  sssNo: string;
+  philHealthNo: string;
+  pag_Ibig: string;
+  tin: string;
+  biR_BRNCode: string;
+  busFr: string;
+  busTo: string;
+  timeInTimeOutScreen: string | null;
+  militaryTime: boolean | null;
+  decPlaces: number | null;
+  webLogo: string | null;
+  webLogoType: string | null;
+  webLogoReports: string | null;
+  webLogoReportsType: string | null;
+  line1: string | null;
+  line2: string | null;
+  head: string | null;
+  chartAcct: string | null;
+  payrollPath: string;
+  hrisPath: string;
+  otPremiumFlag: boolean;
+  terminalID: boolean;
+  validateLogs: boolean;
+  readOnlyTxtDate: boolean;
+  policy: string;
+  flag: boolean;
+  gsisNo: string;
+  exportEmail: boolean;
+  siteLogo: string | null;
+  siteContent: string | null;
+  passwordHistory: boolean;
+  tksPhotoPath: string;
+  exportLateFilingDateFlag: boolean;
+  enableAutoPairingLogsFlag: boolean;
+  enableAppOTRawDataFlag: boolean;
+  enable2ndShiftRawDataFlag: boolean;
+}
+
 export function CompanyInformation({ onBack }: CompanyInformationProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+  const [formData, setFormData] = useState<CompanyData | null>(null);
+
+  // Fetch company information on component mount
+  useEffect(() => {
+    fetchCompanyInformation();
+  }, []);
+
+  const fetchCompanyInformation = async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.get('/Fs/System/CompanyInformation');
+      
+      if (response.status === 200 && response.data) {
+        // Assuming the API returns an array and we want the first item
+        const data = Array.isArray(response.data) ? response.data[0] : response.data;
+        setCompanyData(data);
+        setFormData(data);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load company information';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error fetching company information:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
   };
 
-  const handleSave = () => {
-    setIsEditing(false);
-    // Add save logic here
+  const handleSave = async () => {
+    if (!formData) return;
+
+    try {
+      setLoading(true);
+
+      const response = await apiClient.put('/Fs/System/CompanyInformation', formData);
+
+      if (response.status === 200) {
+        const updatedData = response.data;
+        setCompanyData(updatedData);
+        setFormData(updatedData);
+        setIsEditing(false);
+        
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Company information updated successfully!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to save changes';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error updating company information:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
+    setFormData(companyData);
     setIsEditing(false);
-    // Add cancel/reset logic here
   };
+
+  const handleInputChange = (field: keyof CompanyData, value: any) => {
+    if (formData) {
+      setFormData({
+        ...formData,
+        [field]: value
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US');
+  };
+
+  if (loading && !formData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading company information...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -74,21 +210,31 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
               <div className="col-span-3">
                 <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                   <div className="aspect-square bg-white border-2 border-dashed border-gray-300 rounded-lg mb-4 flex items-center justify-center">
-                    <span className="text-gray-400">Company Logo</span>
+                    {formData?.companyLogo ? (
+                      <img src={formData.companyLogo} alt="Company Logo" className="max-w-full max-h-full object-contain" />
+                    ) : (
+                      <span className="text-gray-400">Company Logo</span>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="block">
-                      <input type="file" className="hidden" />
-                      <span className="block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded cursor-pointer hover:bg-gray-300 transition-colors">
+                      <input type="file" className="hidden" disabled={!isEditing} />
+                      <span className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors ${isEditing ? 'cursor-pointer hover:bg-gray-300' : 'cursor-not-allowed opacity-50'}`}>
                         Choose File
                       </span>
                     </label>
                     <div className="flex gap-2">
-                      <button className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
+                      <button 
+                        className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
                         <Upload className="w-4 h-4" />
                         Upload
                       </button>
-                      <button className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center justify-center gap-2">
+                      <button 
+                        className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
                         <X className="w-4 h-4" />
                         Remove
                       </button>
@@ -112,6 +258,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                               : 'bg-gray-600 text-white hover:bg-gray-700'
                           }`} 
                           onClick={isEditing ? handleSave : handleEdit}
+                          disabled={loading}
                         >
                           {isEditing ? (
                             <>
@@ -126,7 +273,11 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           )}
                         </button>
                         {isEditing && (
-                          <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm" onClick={handleCancel}>
+                          <button 
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm" 
+                            onClick={handleCancel}
+                            disabled={loading}
+                          >
                             <X className="w-4 h-4" />
                             Cancel
                           </button>
@@ -135,7 +286,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     </div>
                     <input
                       type="text"
-                      defaultValue="NORI"
+                      value={formData?.companyCode || ''}
+                      onChange={(e) => handleInputChange('companyCode', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       readOnly={!isEditing}
                     />
@@ -144,7 +296,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     <label className="block text-gray-700 mb-2">Name</label>
                     <input
                       type="text"
-                      defaultValue="TIMEKEEP128_VERSION910_Test"
+                      value={formData?.companyName || ''}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       readOnly={!isEditing}
                     />
@@ -153,7 +306,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     <label className="block text-gray-700 mb-2">Address</label>
                     <input
                       type="text"
-                      defaultValue="No. 1388 DN Corporate Center, South Triangle"
+                      value={formData?.address || ''}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       readOnly={!isEditing}
                     />
@@ -162,7 +316,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     <label className="block text-gray-700 mb-2">City</label>
                     <input
                       type="text"
-                      defaultValue="Quezon City†"
+                      value={formData?.city || ''}
+                      onChange={(e) => handleInputChange('city', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       readOnly={!isEditing}
                     />
@@ -171,7 +326,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     <label className="block text-gray-700 mb-2">Province</label>
                     <input
                       type="text"
-                      defaultValue="s6"
+                      value={formData?.province || ''}
+                      onChange={(e) => handleInputChange('province', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       readOnly={!isEditing}
                     />
@@ -180,6 +336,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     <label className="block text-gray-700 mb-2">ZIP Code</label>
                     <input
                       type="text"
+                      value={formData?.zipCode || ''}
+                      onChange={(e) => handleInputChange('zipCode', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       readOnly={!isEditing}
                     />
@@ -194,7 +352,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">SSS No.</label>
                       <input
                         type="text"
-                        defaultValue="0387822943"
+                        value={formData?.sssNo || ''}
+                        onChange={(e) => handleInputChange('sssNo', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -203,7 +362,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Philhealth No</label>
                       <input
                         type="text"
-                        defaultValue="200474308458"
+                        value={formData?.philHealthNo || ''}
+                        onChange={(e) => handleInputChange('philHealthNo', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -212,7 +372,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Pagibig No :</label>
                       <input
                         type="text"
-                        defaultValue="200773700008"
+                        value={formData?.pag_Ibig || ''}
+                        onChange={(e) => handleInputChange('pag_Ibig', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -221,7 +382,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Tin No :</label>
                       <input
                         type="text"
-                        defaultValue="000-163-217"
+                        value={formData?.tin || ''}
+                        onChange={(e) => handleInputChange('tin', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -230,7 +392,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Branch Code (BIR) :</label>
                       <input
                         type="text"
-                        defaultValue="1239"
+                        value={formData?.biR_BRNCode || ''}
+                        onChange={(e) => handleInputChange('biR_BRNCode', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -239,7 +402,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">GSIS No.</label>
                       <input
                         type="text"
-                        defaultValue="GSIS"
+                        value={formData?.gsisNo || ''}
+                        onChange={(e) => handleInputChange('gsisNo', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -248,7 +412,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Business Cycle From</label>
                       <input
                         type="text"
-                        defaultValue="1/1/2018"
+                        value={formData?.busFr ? formatDate(formData.busFr) : ''}
+                        onChange={(e) => handleInputChange('busFr', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -257,7 +422,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Business Cycle To</label>
                       <input
                         type="text"
-                        defaultValue="12/31/2018"
+                        value={formData?.busTo ? formatDate(formData.busTo) : ''}
+                        onChange={(e) => handleInputChange('busTo', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -270,7 +436,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Telephone</label>
                       <input
                         type="text"
-                        defaultValue="3678335"
+                        value={formData?.telNo || ''}
+                        onChange={(e) => handleInputChange('telNo', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -279,6 +446,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Email</label>
                       <input
                         type="email"
+                        value={formData?.email || ''}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -287,6 +456,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Hrs Database Path:</label>
                       <input
                         type="text"
+                        value={formData?.hrisPath || ''}
+                        onChange={(e) => handleInputChange('hrisPath', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -295,7 +466,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">Payroll Database Path:</label>
                       <input
                         type="text"
-                        defaultValue="C5HA/C_128PAYROLL\_v890"
+                        value={formData?.payrollPath || ''}
+                        onChange={(e) => handleInputChange('payrollPath', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -304,45 +476,101 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       <label className="block text-gray-700 mb-2">TKS Photo Path:</label>
                       <input
                         type="text"
+                        value={formData?.tksPhotoPath || ''}
+                        onChange={(e) => handleInputChange('tksPhotoPath', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.otPremiumFlag || false}
+                          onChange={(e) => handleInputChange('otPremiumFlag', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Use OT Premium Breakdown</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.terminalID || false}
+                          onChange={(e) => handleInputChange('terminalID', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">With Terminal</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.validateLogs || false}
+                          onChange={(e) => handleInputChange('validateLogs', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Logs Validate</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.readOnlyTxtDate || false}
+                          onChange={(e) => handleInputChange('readOnlyTxtDate', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Read Only Textbox Date</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.exportEmail || false}
+                          onChange={(e) => handleInputChange('exportEmail', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Export with Sending Email</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.exportLateFilingDateFlag || false}
+                          onChange={(e) => handleInputChange('exportLateFilingDateFlag', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Export Late Filing Date</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.enableAutoPairingLogsFlag || false}
+                          onChange={(e) => handleInputChange('enableAutoPairingLogsFlag', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Enable Auto Pairing Logs</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.enableAppOTRawDataFlag || false}
+                          onChange={(e) => handleInputChange('enableAppOTRawDataFlag', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Enable Approved OT</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.enable2ndShiftRawDataFlag || false}
+                          onChange={(e) => handleInputChange('enable2ndShiftRawDataFlag', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Enable 2nd Shift in Raw Data</span>
                       </label>
                     </div>
@@ -368,6 +596,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         <label className="text-gray-700">Policy</label>
                         <input
                           type="text"
+                          value={formData?.policy || ''}
+                          onChange={(e) => handleInputChange('policy', e.target.value)}
                           className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
@@ -382,7 +612,13 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         />
                       </div>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={formData?.passwordHistory || false}
+                          onChange={(e) => handleInputChange('passwordHistory', e.target.checked)}
+                          disabled={!isEditing}
+                        />
                         <span className="text-gray-700">Enforce Password History</span>
                       </label>
                     </div>
@@ -428,7 +664,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                             className="w-32 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             readOnly={!isEditing}
                           />
-                          <button className="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded transition-colors">▶</button>
+                          <button className="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded transition-colors" disabled={!isEditing}>▶</button>
                         </div>
                       </div>
                     </div>
@@ -441,17 +677,23 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     <label className="block text-gray-700 mb-2">Site Logo :</label>
                     <div className="flex gap-2 mb-2">
                       <label className="flex-1">
-                        <input type="file" className="hidden" />
-                        <span className="block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded cursor-pointer hover:bg-gray-300 transition-colors">
+                        <input type="file" className="hidden" disabled={!isEditing} />
+                        <span className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors ${isEditing ? 'cursor-pointer hover:bg-gray-300' : 'cursor-not-allowed opacity-50'}`}>
                           Choose File
                         </span>
                       </label>
                     </div>
                     <div className="flex gap-2">
-                      <button className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                      <button 
+                        className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
                         Upload
                       </button>
-                      <button className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+                      <button 
+                        className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
                         Remove
                       </button>
                     </div>
@@ -460,17 +702,23 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     <label className="block text-gray-700 mb-2">Site Content :</label>
                     <div className="flex gap-2 mb-2">
                       <label className="flex-1">
-                        <input type="file" className="hidden" />
-                        <span className="block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded cursor-pointer hover:bg-gray-300 transition-colors">
+                        <input type="file" className="hidden" disabled={!isEditing} />
+                        <span className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors ${isEditing ? 'cursor-pointer hover:bg-gray-300' : 'cursor-not-allowed opacity-50'}`}>
                           Choose File
                         </span>
                       </label>
                     </div>
                     <div className="flex gap-2">
-                      <button className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                      <button 
+                        className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
                         Upload
                       </button>
-                      <button className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+                      <button 
+                        className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
                         Remove
                       </button>
                     </div>

@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, X, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
+import apiClient from '../../../../services/apiClient';
+import Swal from 'sweetalert2';
 
 interface AllowanceBracketing {
-  id: number;
-  noOfHours: string;
-  amount: string;
+  id: string;
+  dayType: string;
+  noOfHrs: number;
   earningCode: string;
+  amount: number;
+  code: string;
+  workShiftCode: string;
+  byEmploymentStatFlag: boolean;
+  employmentStatus: string;
 }
 
 interface EarningCode {
+  id: string;
   code: string;
   description: string;
 }
@@ -22,42 +30,98 @@ export function AllowanceBracketingSetupPage() {
   const [earningCodeSearchTerm, setEarningCodeSearchTerm] = useState('');
   const [allowanceBracketCode, setAllowanceBracketCode] = useState('');
   const [workshiftCode, setWorkshiftCode] = useState('');
-  const [dayType, setDayType] = useState('Regular Day');
+  const [dayType, setDayType] = useState('RegDay');
   const [includeWithinShift, setIncludeWithinShift] = useState(false);
   const [byEmploymentStatus, setByEmploymentStatus] = useState(false);
   const [formData, setFormData] = useState({ noOfHours: '', amount: '', earningCode: '' });
   const [editingItem, setEditingItem] = useState<AllowanceBracketing | null>(null);
-  const [isSelectingForEdit, setIsSelectingForEdit] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [bracketingData, setBracketingData] = useState<AllowanceBracketing[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const earningCodes: EarningCode[] = [
-    { code: 'E01', description: 'Regular Pay' },
-    { code: 'E02', description: 'Overtime' },
-    { code: 'E03', description: 'Charge SL/VL' },
-    { code: 'E04', description: 'Absences' },
-    { code: 'E05', description: 'UT/Tardiness' },
-    { code: 'E06', description: '13th Month Pay NonTax' },
-    { code: 'E07', description: 'COLA' },
-    { code: 'E08', description: 'Transportation Expense Reimbursement Allowance' },
-    { code: 'E09', description: 'Onsite Rollform Allowance' },
-    { code: 'E10', description: 'Overwithheld' }
-  ];
+  const [earningCodes, setEarningCodes] = useState<EarningCode[]>([]);
+  const [loadingEarnings, setLoadingEarnings] = useState(false);
+
+  const itemsPerPage = 100;
+
+  // Fetch allowance bracketing data from API
+  useEffect(() => {
+    fetchBracketingData();
+    fetchEarningCodes();
+  }, []);
+
+  const fetchBracketingData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp');
+      if (response.status === 200 && response.data) {
+        const mappedData = response.data.map((item: any) => ({
+          id: item.id?.toString() || '',
+          dayType: item.dayType || '',
+          noOfHrs: item.noOfHrs || 0,
+          earningCode: item.earningCode || '',
+          amount: item.amount || 0,
+          code: item.code || '',
+          workShiftCode: item.workShiftCode || '',
+          byEmploymentStatFlag: item.byEmploymentStatFlag || false,
+          employmentStatus: item.employmentStatus || '',
+        }));
+        setBracketingData(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load allowance bracketing data';
+      setError(errorMsg);
+      console.error('Error fetching allowance bracketing data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEarningCodes = async () => {
+    setLoadingEarnings(true);
+    try {
+      const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/EarningsSetUp');
+      if (response.status === 200 && response.data) {
+        const mappedData = response.data.map((earning: any) => ({
+          id: earning.earnID?.toString() || earning.id || '',
+          code: earning.earnCode || earning.code || '',
+          description: earning.earnDesc || earning.description || '',
+        }));
+        setEarningCodes(mappedData);
+      }
+    } catch (error: any) {
+      console.error('Error fetching earning codes:', error);
+    } finally {
+      setLoadingEarnings(false);
+    }
+  };
 
   const filteredEarningCodes = earningCodes.filter(item =>
     item.code.toLowerCase().includes(earningCodeSearchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(earningCodeSearchTerm.toLowerCase())
   );
 
-  const itemsPerPage = 10;
   const totalPages = Math.ceil(bracketingData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = bracketingData.slice(startIndex, startIndex + itemsPerPage);
 
   const earningCodesPerPage = 10;
   const [earningCodePage, setEarningCodePage] = useState(1);
+  const totalEarningPages = Math.ceil(filteredEarningCodes.length / earningCodesPerPage);
   const earningCodeStartIndex = (earningCodePage - 1) * earningCodesPerPage;
   const paginatedEarningCodes = filteredEarningCodes.slice(earningCodeStartIndex, earningCodeStartIndex + earningCodesPerPage);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [allowanceBracketCode, workshiftCode]);
+
+  useEffect(() => {
+    setEarningCodePage(1);
+  }, [earningCodeSearchTerm]);
 
   const handleCreateNew = () => {
     setFormData({ noOfHours: '', amount: '', earningCode: '' });
@@ -66,42 +130,153 @@ export function AllowanceBracketingSetupPage() {
 
   const handleEdit = (item: AllowanceBracketing) => {
     setEditingItem(item);
-    setFormData({ noOfHours: item.noOfHours, amount: item.amount, earningCode: item.earningCode });
+    setFormData({ 
+      noOfHours: item.noOfHrs.toString(), 
+      amount: item.amount.toString(), 
+      earningCode: item.earningCode 
+    });
     setShowEditModal(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this entry?')) {
-      setBracketingData(prev => prev.filter(item => item.id !== id));
+  const handleDelete = async (item: AllowanceBracketing) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete this entry?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+      try {
+        await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${item.id}`);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Allowance bracketing entry deleted successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        await fetchBracketingData();
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete entry';
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: errorMsg,
+        });
+        console.error('Error deleting entry:', error);
+      }
     }
   };
 
-  const handleSubmitCreate = (e: React.FormEvent) => {
+  const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newEntry: AllowanceBracketing = {
-      id: Math.max(...bracketingData.map(b => b.id), 0) + 1,
-      noOfHours: formData.noOfHours,
-      amount: formData.amount,
-      earningCode: formData.earningCode
-    };
-    setBracketingData(prev => [...prev, newEntry]);
-    setShowCreateModal(false);
-    setFormData({ noOfHours: '', amount: '', earningCode: '' });
+
+    // Validate required fields
+    if (!formData.noOfHours || !formData.amount || !formData.earningCode) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Please fill in all required fields.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: 0,
+        dayType: dayType,
+        noOfHrs: parseFloat(formData.noOfHours),
+        earningCode: formData.earningCode,
+        amount: parseFloat(formData.amount),
+        code: allowanceBracketCode,
+        workShiftCode: workshiftCode,
+        byEmploymentStatFlag: byEmploymentStatus,
+        employmentStatus: '',
+      };
+
+      await apiClient.post('/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp', payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Allowance bracketing entry created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      await fetchBracketingData();
+      setShowCreateModal(false);
+      setFormData({ noOfHours: '', amount: '', earningCode: '' });
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error creating entry:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
+  const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setBracketingData(prev =>
-        prev.map(item =>
-          item.id === editingItem.id
-            ? { ...item, noOfHours: formData.noOfHours, amount: formData.amount, earningCode: formData.earningCode }
-            : item
-        )
-      );
+
+    if (!editingItem) return;
+
+    // Validate required fields
+    if (!formData.noOfHours || !formData.amount || !formData.earningCode) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Please fill in all required fields.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: parseInt(editingItem.id),
+        dayType: editingItem.dayType,
+        noOfHrs: parseFloat(formData.noOfHours),
+        earningCode: formData.earningCode,
+        amount: parseFloat(formData.amount),
+        code: editingItem.code,
+        workShiftCode: editingItem.workShiftCode,
+        byEmploymentStatFlag: editingItem.byEmploymentStatFlag,
+        employmentStatus: editingItem.employmentStatus,
+      };
+
+      await apiClient.put(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${editingItem.id}`, payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Allowance bracketing entry updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      await fetchBracketingData();
       setShowEditModal(false);
       setEditingItem(null);
       setFormData({ noOfHours: '', amount: '', earningCode: '' });
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error updating entry:', error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -112,8 +287,7 @@ export function AllowanceBracketingSetupPage() {
     setFormData({ noOfHours: '', amount: '', earningCode: '' });
   };
 
-  const handleOpenEarningCodeSearch = (forEdit: boolean = false) => {
-    setIsSelectingForEdit(forEdit);
+  const handleOpenEarningCodeSearch = () => {
     setEarningCodeSearchTerm('');
     setShowEarningCodeModal(true);
   };
@@ -124,30 +298,51 @@ export function AllowanceBracketingSetupPage() {
     setEarningCodeSearchTerm('');
   };
 
-  // Handle ESC key press with hierarchy
+  // Handle ESC key press with proper hierarchy
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        // Close modals in hierarchical order - search modal first, then main modals
+        // Priority: Close the topmost modal first (Create/Edit have z-[60])
+        if (showCreateModal || showEditModal) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (showCreateModal) {
+            setShowCreateModal(false);
+            setFormData({ noOfHours: '', amount: '', earningCode: '' });
+          } else if (showEditModal) {
+            setShowEditModal(false);
+            setEditingItem(null);
+            setFormData({ noOfHours: '', amount: '', earningCode: '' });
+          }
+          return;
+        }
+        
+        // Then close earning code modal if it's open (has z-50)
         if (showEarningCodeModal) {
+          event.preventDefault();
           setShowEarningCodeModal(false);
-        } else if (showCreateModal) {
-          setShowCreateModal(false);
-        } else if (showEditModal) {
-          setShowEditModal(false);
-          setEditingItem(null);
+          setEarningCodeSearchTerm('');
+          return;
         }
       }
     };
 
+    // Only add listener if at least one modal is open
     if (showCreateModal || showEditModal || showEarningCodeModal) {
-      document.addEventListener('keydown', handleEscKey);
+      document.addEventListener('keydown', handleEscKey, true); // Use capture phase
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener('keydown', handleEscKey, true);
     };
   }, [showCreateModal, showEditModal, showEarningCodeModal]);
+
+  const dayTypeOptions = [
+    { value: 'RegDay', label: 'Regular Day' },
+    { value: 'SpecHol', label: 'Special Holiday' },
+    { value: 'RegHol', label: 'Regular Holiday' },
+    { value: 'RestDay', label: 'Rest Day' },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -212,10 +407,9 @@ export function AllowanceBracketingSetupPage() {
                   onChange={(e) => setDayType(e.target.value)}
                   className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
                 >
-                  <option>Regular Day</option>
-                  <option>Special Holiday</option>
-                  <option>Regular Holiday</option>
-                  <option>Rest Day</option>
+                  {dayTypeOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
 
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -249,7 +443,10 @@ export function AllowanceBracketingSetupPage() {
                     onChange={(e) => setAllowanceBracketCode(e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
-                  <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
+                  <button 
+                    onClick={fetchBracketingData}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  >
                     Search
                   </button>
                 </div>
@@ -262,7 +459,10 @@ export function AllowanceBracketingSetupPage() {
                     onChange={(e) => setWorkshiftCode(e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
-                  <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
+                  <button 
+                    onClick={fetchBracketingData}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  >
                     Search
                   </button>
                 </div>
@@ -271,251 +471,114 @@ export function AllowanceBracketingSetupPage() {
 
             {/* Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">No of Hours [hh.mm]</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Amount</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Earning Code</th>
-                    <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.noOfHours}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.amount}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.earningCode}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading allowance bracketing data...</div>
+                </div>
+              ) : error ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">No of Hours [hh.mm]</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Amount</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Earning Code</th>
+                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.noOfHrs}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.amount}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.earningCode}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
                                 onClick={() => handleEdit(item)}
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 title="Edit"
-                            >
-                            <Edit className="w-4 h-4" />
-                            </button>
-                            <span className="text-gray-300">|</span>
-                            <button
-                                onClick={() => handleDelete(item.id)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={() => handleDelete(item)}
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
-                            >
-                            <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                      </td>
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-16 text-center">
+                          <div className="text-gray-500">No data available in table</div>
+                        </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-16 text-center">
-                        <div className="text-gray-500">No data available in table</div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Pagination */}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
-                disabled={currentPage >= totalPages || bracketingData.length === 0}
-                className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                Next
-              </button>
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span className="text-gray-600">
+                Showing {bracketingData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, bracketingData.length)} of {bracketingData.length} entries
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                  disabled={currentPage >= totalPages || bracketingData.length === 0}
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Create New Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-              <h2 className="text-gray-900">Create New</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitCreate} className="p-6">
-              <h3 className="text-blue-600 mb-4">Allowance Bracketing Setup</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
-                    No of Hours :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.noOfHours}
-                    onChange={(e) => setFormData({ ...formData, noOfHours: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="1"
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
-                    Amount :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="40"
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
-                    EarningCode :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.earningCode}
-                    readOnly
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer"
-                    placeholder="Click Search to select"
-                  />
-                  <button
-                        onClick={() => setShowEmpCodeModal(true)}
-                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        <Search className="w-4 h-4" />
-                      </button>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Back to List
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && editingItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-              <h2 className="text-gray-900">Edit</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitEdit} className="p-6">
-              <h3 className="text-blue-600 mb-4">Allowance Bracketing Setup</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
-                    No of Hours :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.noOfHours}
-                    onChange={(e) => setFormData({ ...formData, noOfHours: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
-                    Amount :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
-                    EarningCode :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.earningCode}
-                    readOnly
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEarningCodeSearch(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                  >
-                    Search
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Update
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Back to List
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Earning Code Search Modal */}
+      {/* Earning Code Search Modal - LOWER z-index (z-50) - appears BEHIND */}
       {showEarningCodeModal && (
-        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-              <h2 className="text-gray-900">Search</h2>
+              <h2 className="text-gray-900">Search Earning Code</h2>
               <button
-                onClick={() => setShowEarningCodeModal(false)}
+                onClick={() => {
+                  setShowEarningCodeModal(false);
+                  setEarningCodeSearchTerm('');
+                }}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -537,46 +600,247 @@ export function AllowanceBracketingSetupPage() {
 
               {/* Table */}
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-100 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedEarningCodes.map((item) => (
-                      <tr 
-                        key={item.code} 
-                        className="hover:bg-blue-50 cursor-pointer"
-                        onClick={() => handleSelectEarningCode(item.code)}
-                      >
-                        <td className="px-6 py-3 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-3 text-sm text-gray-600">{item.description}</td>
+                {loadingEarnings ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-gray-600 text-sm">Loading earning codes...</div>
+                  </div>
+                ) : (
+                  <table className="w-full">
+                    <thead className="bg-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
+                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paginatedEarningCodes.map((item) => (
+                        <tr 
+                          key={item.id} 
+                          className="hover:bg-blue-50 cursor-pointer"
+                          onClick={() => handleSelectEarningCode(item.code)}
+                        >
+                          <td className="px-6 py-3 text-sm text-gray-900">{item.code}</td>
+                          <td className="px-6 py-3 text-sm text-gray-600">{item.description}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               {/* Pagination */}
               <div className="flex items-center justify-between mt-4">
-                <div className="text-gray-600">
-                  Showing 1 to {filteredBrackets.length} of {filteredBrackets.length} entries
+                <div className="text-sm text-gray-600">
+                  Showing {filteredEarningCodes.length > 0 ? earningCodeStartIndex + 1 : 0} to {Math.min(earningCodeStartIndex + earningCodesPerPage, filteredEarningCodes.length)} of {filteredEarningCodes.length} entries
                 </div>
                 <div className="flex gap-2">
-                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                  <button 
+                    onClick={() => setEarningCodePage(prev => Math.max(prev - 1, 1))}
+                    disabled={earningCodePage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     Previous
                   </button>
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                    1
-                  </button>
-                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                  {Array.from({ length: totalEarningPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setEarningCodePage(page)}
+                      className={`px-3 py-1 rounded ${
+                        earningCodePage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button 
+                    onClick={() => setEarningCodePage(prev => Math.min(prev + 1, totalEarningPages))}
+                    disabled={earningCodePage >= totalEarningPages || filteredEarningCodes.length === 0}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     Next
                   </button>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create New Modal - HIGHER z-index (z-[60]) - appears IN FRONT */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+              <h2 className="text-gray-900">Create New</h2>
+              <button
+                onClick={handleCloseModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitCreate} className="p-6">
+              <h3 className="text-blue-600 mb-4">Allowance Bracketing Setup</h3>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                    No of Hours :
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.noOfHours}
+                    onChange={(e) => setFormData({ ...formData, noOfHours: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="1"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                    Amount :
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="40"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                    Earning Code :
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.earningCode}
+                    readOnly
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer"
+                    placeholder="Click Search to select"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleOpenEarningCodeSearch}
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
+                >
+                  {submitting ? 'Saving...' : 'Submit'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
+                >
+                  Back to List
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal - HIGHER z-index (z-[60]) - appears IN FRONT */}
+      {showEditModal && editingItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+              <h2 className="text-gray-900">Edit</h2>
+              <button
+                onClick={handleCloseModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitEdit} className="p-6">
+              <h3 className="text-blue-600 mb-4">Allowance Bracketing Setup</h3>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                    No of Hours :
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.noOfHours}
+                    onChange={(e) => setFormData({ ...formData, noOfHours: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                    Amount :
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                    Earning Code :
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.earningCode}
+                    readOnly
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleOpenEarningCodeSearch}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
+                >
+                  {submitting ? 'Updating...' : 'Update'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
+                >
+                  Back to List
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

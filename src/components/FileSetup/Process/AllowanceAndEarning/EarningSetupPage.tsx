@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, X, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
+import apiClient from '../../../../services/apiClient';
+import Swal from 'sweetalert2';
 
 interface Earning {
-  id: number;
+  id: string;
   code: string;
   description: string;
+  earnType?: string;
+  sysId?: string;
 }
 
 export function EarningSetupPage() {
@@ -15,36 +19,44 @@ export function EarningSetupPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [formData, setFormData] = useState({ code: '', description: '' });
   const [editingItem, setEditingItem] = useState<Earning | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [codeError, setCodeError] = useState('');
 
-  const [earnings, setEarnings] = useState<Earning[]>([
-    { id: 1, code: 'E01', description: 'Regular Pay' },
-    { id: 2, code: 'E02', description: 'Overtime' },
-    { id: 3, code: 'E03', description: 'Charge SL/VL' },
-    { id: 4, code: 'E04', description: 'Absences' },
-    { id: 5, code: 'E05', description: 'UT/Tardiness' },
-    { id: 6, code: 'E06', description: '13th Month Pay NonTax' },
-    { id: 7, code: 'E07', description: 'COLA' },
-    { id: 8, code: 'E08', description: 'Transportation Expense Reimbursement Allowance' },
-    { id: 9, code: 'E09', description: 'Onsite Rollform Allowance' },
-    { id: 10, code: 'E10', description: 'Overwithheld' },
-    { id: 11, code: 'E11', description: 'Meal Allowance' },
-    { id: 12, code: 'E12', description: 'Uniform & Clothing Allowance' },
-    { id: 13, code: 'E13', description: 'Medical Allowance' },
-    { id: 14, code: 'E14', description: 'Emp. Achievement Awards' },
-    { id: 15, code: 'E15', description: 'Commission Taxable' },
-    { id: 16, code: 'E16', description: 'Commission Non-Taxable' },
-    { id: 17, code: 'E17', description: 'Salary Adjustment-Leave' },
-    { id: 18, code: 'E18', description: 'Paid Holiday' },
-    { id: 19, code: 'E19', description: 'Deferred Charges - Project Cost' },
-    { id: 20, code: 'E20', description: 'Retroactive Payment' },
-    { id: 21, code: 'E21', description: 'Other Leave' },
-    { id: 22, code: 'E22', description: 'Other Sal Adj-NT' },
-    { id: 23, code: 'E23', description: 'Leave conversion' },
-    { id: 24, code: 'E24', description: 'Christmas Gift' },
-    { id: 25, code: 'E25', description: 'Utility Allowance' }
-  ]);
+  const [earnings, setEarnings] = useState<Earning[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const itemsPerPage = 25;
+  const itemsPerPage = 100;
+
+  // Fetch earning data from API
+  useEffect(() => {
+    fetchEarningData();
+  }, []);
+
+  const fetchEarningData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/EarningsSetUp');
+      if (response.status === 200 && response.data) {
+        // Map API response to expected format
+        const mappedData = response.data.map((earning: any) => ({
+          id: earning.earnID?.toString() || earning.id || '',
+          code: earning.earnCode || earning.code || '',
+          description: earning.earnDesc || earning.description || '',
+          earnType: earning.earnType || '',
+          sysId: earning.sysId || '',
+        }));
+        setEarnings(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load earnings';
+      setError(errorMsg);
+      console.error('Error fetching earnings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const filteredData = earnings.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -55,48 +67,203 @@ export function EarningSetupPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const handleCreateNew = () => {
     setFormData({ code: '', description: '' });
+    setCodeError('');
     setShowCreateModal(true);
   };
 
   const handleEdit = (item: Earning) => {
     setEditingItem(item);
     setFormData({ code: item.code, description: item.description });
+    setCodeError('');
     setShowEditModal(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this earning?')) {
-      setEarnings(prev => prev.filter(item => item.id !== id));
+  const handleDelete = async (item: Earning) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete earning ${item.code}?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+      try {
+        await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${item.id}`);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Earning deleted successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the earning list
+        await fetchEarningData();
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete earning';
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: errorMsg,
+        });
+        console.error('Error deleting earning:', error);
+      }
     }
   };
 
-  const handleSubmitCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newEarning: Earning = {
-      id: Math.max(...earnings.map(c => c.id), 0) + 1,
-      code: formData.code,
-      description: formData.description
-    };
-    setEarnings(prev => [...prev, newEarning]);
-    setShowCreateModal(false);
-    setFormData({ code: '', description: '' });
+  const handleCodeChange = (value: string) => {
+    setFormData({ ...formData, code: value });
+    if (value.length > 10) {
+      setCodeError('Code maximum 10 characters');
+    } else {
+      setCodeError('');
+    }
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
+  const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setEarnings(prev =>
-        prev.map(item =>
-          item.id === editingItem.id
-            ? { ...item, code: formData.code, description: formData.description }
-            : item
-        )
-      );
+
+    // Validate code - must not be empty and must be max 10 characters
+    if (!formData.code.trim() || formData.code.length > 10) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code must be between 1 and 10 characters.',
+      });
+      return;
+    }
+
+    // Check for duplicate code
+    const isDuplicate = earnings.some(
+      (earning) => earning.code.toLowerCase() === formData.code.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        earnID: 0,
+        earnCode: formData.code,
+        earnDesc: formData.description,
+        earnType: 'USR', // Default to USR for user-created earnings
+        sysId: null,
+      };
+
+      await apiClient.post('/Fs/Process/AllowanceAndEarnings/EarningsSetUp', payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Earning created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      // Refresh the earning list
+      await fetchEarningData();
+      
+      // Close modal and reset form
+      setShowCreateModal(false);
+      setFormData({ code: '', description: '' });
+      setCodeError('');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error creating earning:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingItem) return;
+
+    // Validate code - must not be empty and must be max 10 characters
+    if (!formData.code.trim() || formData.code.length > 10) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code must be between 1 and 10 characters.',
+      });
+      return;
+    }
+
+    // Check for duplicate code (excluding current item)
+    const isDuplicate = earnings.some(
+      (earning) =>
+        earning.id !== editingItem.id &&
+        earning.code.toLowerCase() === formData.code.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        earnID: parseInt(editingItem.id),
+        earnCode: formData.code,
+        earnDesc: formData.description,
+        earnType: editingItem.earnType || 'USR',
+        sysId: editingItem.sysId || null,
+      };
+
+      await apiClient.put(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${editingItem.id}`, payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Earning updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      // Refresh the earning list
+      await fetchEarningData();
+      
+      // Close modal and reset form
       setShowEditModal(false);
       setEditingItem(null);
       setFormData({ code: '', description: '' });
+      setCodeError('');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error updating earning:', error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -105,6 +272,7 @@ export function EarningSetupPage() {
     setShowEditModal(false);
     setEditingItem(null);
     setFormData({ code: '', description: '' });
+    setCodeError('');
   };
 
   // Handle ESC key press with hierarchy
@@ -198,50 +366,60 @@ export function EarningSetupPage() {
 
             {/* Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                    <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
-                        <td className="px-6 py-4">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading earnings...</div>
+                </div>
+              ) : error ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
+                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
+                          <td className="px-6 py-4">
                             <div className="flex items-center justify-center gap-2">
-                                <button
-                                    onClick={() => handleEdit(item)}
-                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                    title="Edit"
-                                >
-                                    <Edit className="w-4 h-4" />
-                                </button>
-                                <span className="text-gray-300">|</span>
-                                <button
-                                    onClick={() => handleDelete(item.id)}
-                                    className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                    title="Delete"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                              <button
+                                onClick={() => handleEdit(item)}
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={() => handleDelete(item)}
+                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-16 text-center">
+                          <div className="text-gray-500">No data available in table</div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="px-6 py-16 text-center">
-                        <div className="text-gray-500">No data available in table</div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Pagination */}
@@ -253,15 +431,15 @@ export function EarningSetupPage() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <button
                     key={page}
-                    className={`px-3 py-1 rounded ${
-                      currentPage === page ? 'bg-blue-500 text-white' : 'text-blue-600 hover:bg-gray-100'
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'
                     }`}
                     onClick={() => setCurrentPage(page)}
                   >
@@ -271,7 +449,7 @@ export function EarningSetupPage() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
                   disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
@@ -286,7 +464,7 @@ export function EarningSetupPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
-              <h2 className="text-gray-900">Create New</h2>
+              <h2 className="text-gray-900">Create New Earning</h2>
               <button
                 onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -302,13 +480,23 @@ export function EarningSetupPage() {
                   <label className="text-gray-700 text-sm whitespace-nowrap w-28">
                     Code :
                   </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => handleCodeChange(e.target.value)}
+                      maxLength={10}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                        codeError 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                      required
+                    />
+                    {codeError && (
+                      <p className="text-red-500 text-xs mt-1">{codeError}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -328,14 +516,16 @@ export function EarningSetupPage() {
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
-                  Submit
+                  {submitting ? 'Saving...' : 'Submit'}
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   Back to List
                 </button>
@@ -366,13 +556,23 @@ export function EarningSetupPage() {
                   <label className="text-gray-700 text-sm whitespace-nowrap w-28">
                     Code :
                   </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => handleCodeChange(e.target.value)}
+                      maxLength={10}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                        codeError 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                      required
+                    />
+                    {codeError && (
+                      <p className="text-red-500 text-xs mt-1">{codeError}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -392,14 +592,16 @@ export function EarningSetupPage() {
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
-                  Update
+                  {submitting ? 'Updating...' : 'Update'}
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   Back to List
                 </button>
@@ -411,33 +613,6 @@ export function EarningSetupPage() {
 
       {/* Footer */}
       <Footer />
-
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 }

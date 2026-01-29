@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, X, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
+import apiClient from '../../../../services/apiClient';
+import Swal from 'sweetalert2';
 
 interface Classification {
-  id: number;
+  id: string;
   code: string;
   description: string;
 }
@@ -15,12 +17,42 @@ export function ClassificationSetupPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [formData, setFormData] = useState({ code: '', description: '' });
   const [editingItem, setEditingItem] = useState<Classification | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [codeError, setCodeError] = useState('');
 
-  const [classifications, setClassifications] = useState<Classification[]>([
-    { id: 1, code: '2', description: 'aa' }
-  ]);
+  const [classifications, setClassifications] = useState<Classification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const itemsPerPage = 10;
+  const itemsPerPage = 100;
+
+  // Fetch classification data from API
+  useEffect(() => {
+    fetchClassificationData();
+  }, []);
+
+  const fetchClassificationData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp');
+      if (response.status === 200 && response.data) {
+        // Map API response to expected format
+        const mappedData = response.data.map((classification: any) => ({
+          id: classification.classId || '',
+          code: classification.classCode || '',
+          description: classification.classDesc || '',
+        }));
+        setClassifications(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load classifications';
+      setError(errorMsg);
+      console.error('Error fetching classifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const filteredData = classifications.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -31,48 +63,199 @@ export function ClassificationSetupPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const handleCreateNew = () => {
     setFormData({ code: '', description: '' });
+    setCodeError('');
     setShowCreateModal(true);
   };
 
   const handleEdit = (item: Classification) => {
     setEditingItem(item);
     setFormData({ code: item.code, description: item.description });
+    setCodeError('');
     setShowEditModal(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this classification?')) {
-      setClassifications(prev => prev.filter(item => item.id !== id));
+  const handleDelete = async (item: Classification) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete classification ${item.code}?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+      try {
+        await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/ClassificationSetUp/${item.id}`);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Classification deleted successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the classification list
+        await fetchClassificationData();
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete classification';
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: errorMsg,
+        });
+        console.error('Error deleting classification:', error);
+      }
     }
   };
 
-  const handleSubmitCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newClassification: Classification = {
-      id: Math.max(...classifications.map(c => c.id), 0) + 1,
-      code: formData.code,
-      description: formData.description
-    };
-    setClassifications(prev => [...prev, newClassification]);
-    setShowCreateModal(false);
-    setFormData({ code: '', description: '' });
+  const handleCodeChange = (value: string) => {
+    setFormData({ ...formData, code: value });
+    if (value.length > 10) {
+      setCodeError('Code maximum 10 characters');
+    } else {
+      setCodeError('');
+    }
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
+  const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setClassifications(prev =>
-        prev.map(item =>
-          item.id === editingItem.id
-            ? { ...item, code: formData.code, description: formData.description }
-            : item
-        )
-      );
+
+    // Validate code - must not be empty and must be max 10 characters
+    if (!formData.code.trim() || formData.code.length > 10) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code must be between 1 and 10 characters.',
+      });
+      return;
+    }
+
+    // Check for duplicate code
+    const isDuplicate = classifications.some(
+      (classification) => classification.code.toLowerCase() === formData.code.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        classId: 0,
+        classCode: formData.code,
+        classDesc: formData.description,
+      };
+
+      await apiClient.post('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp', payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Classification created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      // Refresh the classification list
+      await fetchClassificationData();
+      
+      // Close modal and reset form
+      setShowCreateModal(false);
+      setFormData({ code: '', description: '' });
+      setCodeError('');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error creating classification:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingItem) return;
+
+    // Validate code - must not be empty and must be max 10 characters
+    if (!formData.code.trim() || formData.code.length > 10) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code must be between 1 and 10 characters.',
+      });
+      return;
+    }
+
+    // Check for duplicate code (excluding current item)
+    const isDuplicate = classifications.some(
+      (classification) =>
+        classification.id !== editingItem.id &&
+        classification.code.toLowerCase() === formData.code.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        classId: parseInt(editingItem.id),
+        classCode: formData.code,
+        classDesc: formData.description,
+      };
+
+      await apiClient.put(`/Fs/Process/AllowanceAndEarnings/ClassificationSetUp/${editingItem.id}`, payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Classification updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      // Refresh the classification list
+      await fetchClassificationData();
+      
+      // Close modal and reset form
       setShowEditModal(false);
       setEditingItem(null);
       setFormData({ code: '', description: '' });
+      setCodeError('');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error updating classification:', error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -81,6 +264,7 @@ export function ClassificationSetupPage() {
     setShowEditModal(false);
     setEditingItem(null);
     setFormData({ code: '', description: '' });
+    setCodeError('');
   };
 
   // Handle ESC key press with hierarchy
@@ -174,50 +358,60 @@ export function ClassificationSetupPage() {
 
             {/* Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                    <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
-                        <td className="px-6 py-4">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading classifications...</div>
+                </div>
+              ) : error ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
+                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
+                          <td className="px-6 py-4">
                             <div className="flex items-center justify-center gap-2">
-                                <button
-                                    onClick={() => handleEdit(item)}
-                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                    title="Edit"
-                                >
-                                    <Edit className="w-4 h-4" />
-                                </button>
-                                <span className="text-gray-300">|</span>
-                                <button
-                                    onClick={() => handleDelete(item.id)}
-                                    className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                    title="Delete"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                              <button
+                                onClick={() => handleEdit(item)}
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={() => handleDelete(item)}
+                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-16 text-center">
+                          <div className="text-gray-500">No data available in table</div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="px-6 py-16 text-center">
-                        <div className="text-gray-500">No data available in table</div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Pagination */}
@@ -229,22 +423,27 @@ export function ClassificationSetupPage() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
-                <button
-                  className={`px-3 py-1 rounded ${
-                    currentPage === 1 ? 'bg-blue-500 text-white' : 'text-blue-600 hover:bg-gray-100'
-                  }`}
-                  onClick={() => setCurrentPage(1)}
-                >
-                  1
-                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
                   disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
@@ -259,7 +458,7 @@ export function ClassificationSetupPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
-              <h2 className="text-gray-900">Create New</h2>
+              <h2 className="text-gray-900">Create New Classification</h2>
               <button
                 onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -275,13 +474,23 @@ export function ClassificationSetupPage() {
                   <label className="text-gray-700 text-sm whitespace-nowrap w-28">
                     Code :
                   </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => handleCodeChange(e.target.value)}
+                      maxLength={10}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                        codeError 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                      required
+                    />
+                    {codeError && (
+                      <p className="text-red-500 text-xs mt-1">{codeError}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -301,14 +510,16 @@ export function ClassificationSetupPage() {
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
-                  Submit
+                  {submitting ? 'Saving...' : 'Submit'}
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   Back to List
                 </button>
@@ -339,13 +550,23 @@ export function ClassificationSetupPage() {
                   <label className="text-gray-700 text-sm whitespace-nowrap w-28">
                     Code :
                   </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => handleCodeChange(e.target.value)}
+                      maxLength={10}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                        codeError 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                      required
+                    />
+                    {codeError && (
+                      <p className="text-red-500 text-xs mt-1">{codeError}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -365,14 +586,16 @@ export function ClassificationSetupPage() {
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
-                  Update
+                  {submitting ? 'Updating...' : 'Update'}
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   Back to List
                 </button>
@@ -384,33 +607,6 @@ export function ClassificationSetupPage() {
 
       {/* Footer */}
       <Footer />
-
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 }

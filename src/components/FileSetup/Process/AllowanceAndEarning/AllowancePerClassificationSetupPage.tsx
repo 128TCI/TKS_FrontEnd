@@ -1,34 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, X, Check, ArrowLeft, Info, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, X, Check, Info, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
+import apiClient from '../../../../services/apiClient';
+
 
 interface AllowancePerClassification {
     id: number;
-    referenceCode: string;
+    refNo: string;
     allowanceCode: string;
-    workshiftCode: string;
-    classificationCode: string;
-    minHoursRegular: string;
-    amountMinRegular: string;
-    maxHoursRegular: string;
-    amountMaxRegular: string;
-    minHoursRest: string;
-    amountMinRest: string;
-    maxHoursRest: string;
-    amountMaxRest: string;
-    minHoursHoliday: string;
-    amountMinHoliday: string;
-    maxHoursHoliday: string;
-    amountMaxHoliday: string;
-    minHoursHolidayRest: string;
-    amountMinHolidayRest: string;
-    maxHoursHolidayRest: string;
-    amountMaxHolidayRest: string;
+    workShiftCode: string;
+    classificationCode: string | null;
+    minHrsRegDay: number;
+    minAmtRegDay: number;
+    maxHrsRegDay: number;
+    maxAmtRegDay: number;
+    minHrsRestDay: number;
+    minAmtRestDay: number;
+    maxHrsRestDay: number;
+    maxAmtRestDay: number;
+    minHrsHoliday: number;
+    minAmtHoliday: number;
+    maxHrsHoliday: number;
+    maxAmtHoliday: number;
+    minHrsHolidayRestDay: number;
+    minAmountHolidayRestDay: number;
+    maxHrsHolidayRestDay: number;
+    maxAmountHolidayRestDay: number;
 }
 
 interface EarningCode {
+    id: string;
     code: string;
     description: string;
+    earnType?: string;
+    sysId?: string;
 }
 
 interface WorkshiftCode {
@@ -37,9 +42,12 @@ interface WorkshiftCode {
 }
 
 interface ClassificationCode {
+    id: string;
     code: string;
     description: string;
 }
+
+const API_BASE_URL = '/Fs/Process/AllowanceAndEarnings/AllowancePerClassificationSetUp';
 
 export function AllowancePerClassificationSetupPage() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -55,98 +63,125 @@ export function AllowancePerClassificationSetupPage() {
     const [allowanceCodeSearchTerm, setAllowanceCodeSearchTerm] = useState('');
     const [workshiftCodeSearchTerm, setWorkshiftCodeSearchTerm] = useState('');
     const [classificationCodeSearchTerm, setClassificationCodeSearchTerm] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
-        referenceCode: '',
+        refNo: '',
         allowanceCode: '',
-        workshiftCode: '',
+        workShiftCode: '',
         classificationCode: '',
-        minHoursRegular: '0',
-        amountMinRegular: '0',
-        maxHoursRegular: '0',
-        amountMaxRegular: '0',
-        minHoursRest: '0',
-        amountMinRest: '0',
-        maxHoursRest: '0',
-        amountMaxRest: '0',
-        minHoursHoliday: '0',
-        amountMinHoliday: '0',
-        maxHoursHoliday: '0',
-        amountMaxHoliday: '0',
-        minHoursHolidayRest: '0',
-        amountMinHolidayRest: '0',
-        maxHoursHolidayRest: '0',
-        amountMaxHolidayRest: '0'
+        minHrsRegDay: 0,
+        minAmtRegDay: 0,
+        maxHrsRegDay: 0,
+        maxAmtRegDay: 0,
+        minHrsRestDay: 0,
+        minAmtRestDay: 0,
+        maxHrsRestDay: 0,
+        maxAmtRestDay: 0,
+        minHrsHoliday: 0,
+        minAmtHoliday: 0,
+        maxHrsHoliday: 0,
+        maxAmtHoliday: 0,
+        minHrsHolidayRestDay: 0,
+        minAmountHolidayRestDay: 0,
+        maxHrsHolidayRestDay: 0,
+        maxAmountHolidayRestDay: 0
     });
 
-    const [classificationData, setClassificationData] = useState<AllowancePerClassification[]>([
-        {
-            id: 1,
-            referenceCode: 'z',
-            allowanceCode: 'E01',
-            workshiftCode: '3PM12AM',
-            classificationCode: '',
-            minHoursRegular: '1.00',
-            amountMinRegular: '1.00',
-            maxHoursRegular: '0.00',
-            amountMaxRegular: '0.00',
-            minHoursRest: '0.00',
-            amountMinRest: '0.00',
-            maxHoursRest: '0.00',
-            amountMaxRest: '0.00',
-            minHoursHoliday: '0.00',
-            amountMinHoliday: '0.00',
-            maxHoursHoliday: '0.00',
-            amountMaxHoliday: '0.00',
-            minHoursHolidayRest: '0.00',
-            amountMinHolidayRest: '0.00',
-            maxHoursHolidayRest: '0.00',
-            amountMaxHolidayRest: '0.00'
+    const [classificationData, setClassificationData] = useState<AllowancePerClassification[]>([]);
+    const [earningCodes, setEarningCodes] = useState<EarningCode[]>([]);
+    const [workshiftCodes, setWorkshiftCodes] = useState<WorkshiftCode[]>([]);
+    const [classificationCodes, setClassificationCodes] = useState<ClassificationCode[]>([]);
+
+    // Fetch all data on component mount
+    useEffect(() => {
+        fetchAllowancePerClassification();
+        fetchEarningCodes();
+        fetchWorkshiftCodes();
+        fetchClassificationCodes();
+    }, []);
+
+    // Fetch Allowance Per Classification data
+    const fetchAllowancePerClassification = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await apiClient.get(API_BASE_URL);
+            if (response.status === 200 && response.data) {
+                setClassificationData(response.data);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to fetch data');
+            console.error('Error fetching allowance per classification:', err);
+        } finally {
+            setLoading(false);
         }
-    ]);
+    };
+
+    // Fetch Earning Codes
+    const fetchEarningCodes = async () => {
+        try {
+            const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/EarningsSetUp');
+            if (response.status === 200 && response.data) {
+                const mappedData = response.data.map((earning: any) => ({
+                    id: earning.earnID?.toString() || earning.id || '',
+                    code: earning.earnCode || earning.code || '',
+                    description: earning.earnDesc || earning.description || '',
+                    earnType: earning.earnType || '',
+                    sysId: earning.sysId || '',
+                }));
+                setEarningCodes(mappedData);
+            }
+        } catch (err) {
+            console.error('Error fetching earning codes:', err);
+        }
+    };
+
+    // Fetch Workshift Codes
+    const fetchWorkshiftCodes = async () => {
+        try {
+            const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/WorkshiftSetUp');
+            if (response.status === 200 && response.data) {
+                const mappedData = response.data.map((workshift: any) => ({
+                    code: workshift.workShiftCode || workshift.code || '',
+                    description: workshift.workShiftDesc || workshift.description || '',
+                }));
+                setWorkshiftCodes(mappedData);
+            }
+        } catch (err) {
+            console.error('Error fetching workshift codes:', err);
+        }
+    };
+
+    // Fetch Classification Codes
+    const fetchClassificationCodes = async () => {
+        try {
+            const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp');
+            if (response.status === 200 && response.data) {
+                const mappedData = response.data.map((classification: any) => ({
+                    id: classification.classId || '',
+                    code: classification.classCode || '',
+                    description: classification.classDesc || '',
+                }));
+                setClassificationCodes(mappedData);
+            }
+        } catch (err) {
+            console.error('Error fetching classification codes:', err);
+        }
+    };
 
     const filteredData = classificationData.filter(item =>
-        item.referenceCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.refNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.allowanceCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.workshiftCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.classificationCode.toLowerCase().includes(searchTerm.toLowerCase())
+        item.workShiftCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.classificationCode && item.classificationCode.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     const itemsPerPage = 10;
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
-
-    // Mock data for search modals
-    const earningCodes: EarningCode[] = [
-        { code: 'E01', description: 'Regular Pay' },
-        { code: 'E02', description: 'Overtime' },
-        { code: 'E03', description: 'Charge SL/VL' },
-        { code: 'E04', description: 'Absences' },
-        { code: 'E05', description: 'UT/Tardiness' },
-        { code: 'E06', description: '13th Month Pay NonTax' },
-        { code: 'E07', description: 'COLA' },
-        { code: 'E08', description: 'Transportation Expense Reimbursement Allowance' },
-        { code: 'E09', description: 'Onsite Rollform Allowance' },
-        { code: 'E10', description: 'Overwithheld' }
-    ];
-
-    const workshiftCodes: WorkshiftCode[] = [
-        { code: '3PM12AM', description: '3PM TO 12AM' },
-        { code: '6AM3PM', description: '6AM3PM' },
-        { code: '6PM3AM', description: '6PM3AM' },
-        { code: '724AM6PM', description: '7:24AM TO 6PM' },
-        { code: '7AM4PM', description: '7AM to 4PM' },
-        { code: '7AM530PM', description: '7AM TO 530PM' },
-        { code: '7AM535PM', description: '7AM TO 535PM' },
-        { code: '7AM5PM', description: '7AM to 5PM' },
-        { code: '7AM6PM', description: '7AM to 6PM' },
-        { code: '8AM5PM', description: '8AM to 5PM' }
-    ];
-
-    const classificationCodes: ClassificationCode[] = [
-        { code: 'a', description: 'aa' }
-    ];
 
     const filteredEarningCodes = earningCodes.filter(item =>
         item.code.toLowerCase().includes(allowanceCodeSearchTerm.toLowerCase()) ||
@@ -165,26 +200,26 @@ export function AllowancePerClassificationSetupPage() {
 
     const handleCreateNew = () => {
         setFormData({
-            referenceCode: '',
+            refNo: '',
             allowanceCode: '',
-            workshiftCode: '',
+            workShiftCode: '',
             classificationCode: '',
-            minHoursRegular: '0',
-            amountMinRegular: '0',
-            maxHoursRegular: '0',
-            amountMaxRegular: '0',
-            minHoursRest: '0',
-            amountMinRest: '0',
-            maxHoursRest: '0',
-            amountMaxRest: '0',
-            minHoursHoliday: '0',
-            amountMinHoliday: '0',
-            maxHoursHoliday: '0',
-            amountMaxHoliday: '0',
-            minHoursHolidayRest: '0',
-            amountMinHolidayRest: '0',
-            maxHoursHolidayRest: '0',
-            amountMaxHolidayRest: '0'
+            minHrsRegDay: 0,
+            minAmtRegDay: 0,
+            maxHrsRegDay: 0,
+            maxAmtRegDay: 0,
+            minHrsRestDay: 0,
+            minAmtRestDay: 0,
+            maxHrsRestDay: 0,
+            maxAmtRestDay: 0,
+            minHrsHoliday: 0,
+            minAmtHoliday: 0,
+            maxHrsHoliday: 0,
+            maxAmtHoliday: 0,
+            minHrsHolidayRestDay: 0,
+            minAmountHolidayRestDay: 0,
+            maxHrsHolidayRestDay: 0,
+            maxAmountHolidayRestDay: 0
         });
         setShowCreateModal(true);
     };
@@ -192,26 +227,26 @@ export function AllowancePerClassificationSetupPage() {
     const handleEdit = (item: AllowancePerClassification) => {
         setEditingItem(item);
         setFormData({
-            referenceCode: item.referenceCode,
+            refNo: item.refNo,
             allowanceCode: item.allowanceCode,
-            workshiftCode: item.workshiftCode,
-            classificationCode: item.classificationCode,
-            minHoursRegular: item.minHoursRegular,
-            amountMinRegular: item.amountMinRegular,
-            maxHoursRegular: item.maxHoursRegular,
-            amountMaxRegular: item.amountMaxRegular,
-            minHoursRest: item.minHoursRest,
-            amountMinRest: item.amountMinRest,
-            maxHoursRest: item.maxHoursRest,
-            amountMaxRest: item.amountMaxRest,
-            minHoursHoliday: item.minHoursHoliday,
-            amountMinHoliday: item.amountMinHoliday,
-            maxHoursHoliday: item.maxHoursHoliday,
-            amountMaxHoliday: item.amountMaxHoliday,
-            minHoursHolidayRest: item.minHoursHolidayRest,
-            amountMinHolidayRest: item.amountMinHolidayRest,
-            maxHoursHolidayRest: item.maxHoursHolidayRest,
-            amountMaxHolidayRest: item.amountMaxHolidayRest
+            workShiftCode: item.workShiftCode,
+            classificationCode: item.classificationCode || '',
+            minHrsRegDay: item.minHrsRegDay,
+            minAmtRegDay: item.minAmtRegDay,
+            maxHrsRegDay: item.maxHrsRegDay,
+            maxAmtRegDay: item.maxAmtRegDay,
+            minHrsRestDay: item.minHrsRestDay,
+            minAmtRestDay: item.minAmtRestDay,
+            maxHrsRestDay: item.maxHrsRestDay,
+            maxAmtRestDay: item.maxAmtRestDay,
+            minHrsHoliday: item.minHrsHoliday,
+            minAmtHoliday: item.minAmtHoliday,
+            maxHrsHoliday: item.maxHrsHoliday,
+            maxAmtHoliday: item.maxAmtHoliday,
+            minHrsHolidayRestDay: item.minHrsHolidayRestDay,
+            minAmountHolidayRestDay: item.minAmountHolidayRestDay,
+            maxHrsHolidayRestDay: item.maxHrsHolidayRestDay,
+            maxAmountHolidayRestDay: item.maxAmountHolidayRestDay
         });
         setShowEditModal(true);
     };
@@ -221,34 +256,68 @@ export function AllowancePerClassificationSetupPage() {
         setShowDetailsModal(true);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         if (confirm('Are you sure you want to delete this entry?')) {
-            setClassificationData(prev => prev.filter(item => item.id !== id));
+            try {
+                setLoading(true);
+                const response = await apiClient.delete(`${API_BASE_URL}/${id}`);
+                if (response.status === 200 || response.status === 204) {
+                    await fetchAllowancePerClassification();
+                    alert('Entry deleted successfully');
+                }
+            } catch (err: any) {
+                setError(err.message || 'Failed to delete entry');
+                alert('Failed to delete entry');
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
-    const handleSubmitCreate = (e: any) => {
+    const handleSubmitCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        const newEntry: AllowancePerClassification = {
-            id: Math.max(...classificationData.map(b => b.id), 0) + 1,
-            ...formData
-        };
-        setClassificationData(prev => [...prev, newEntry]);
-        setShowCreateModal(false);
+        try {
+            setLoading(true);
+            const payload = {
+                ...formData,
+                classificationCode: formData.classificationCode || null
+            };
+            const response = await apiClient.post(API_BASE_URL, payload);
+            if (response.status === 200 || response.status === 201) {
+                await fetchAllowancePerClassification();
+                setShowCreateModal(false);
+                alert('Entry created successfully');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to create entry');
+            alert('Failed to create entry');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSubmitEdit = (e: any) => {
+    const handleSubmitEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingItem) {
-            setClassificationData(prev =>
-                prev.map(item =>
-                    item.id === editingItem.id
-                        ? { ...item, ...formData }
-                        : item
-                )
-            );
-            setShowEditModal(false);
-            setEditingItem(null);
+            try {
+                setLoading(true);
+                const payload = {
+                    ...formData,
+                    classificationCode: formData.classificationCode || null
+                };
+                const response = await apiClient.put(`${API_BASE_URL}/${editingItem.id}`, payload);
+                if (response.status === 200) {
+                    await fetchAllowancePerClassification();
+                    setShowEditModal(false);
+                    setEditingItem(null);
+                    alert('Entry updated successfully');
+                }
+            } catch (err: any) {
+                setError(err.message || 'Failed to update entry');
+                alert('Failed to update entry');
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -267,7 +336,6 @@ export function AllowancePerClassificationSetupPage() {
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
-                // Close modals in hierarchical order - search modals first, then main modals
                 if (showAllowanceCodeModal) {
                     setShowAllowanceCodeModal(false);
                 } else if (showWorkshiftCodeModal) {
@@ -304,11 +372,18 @@ export function AllowancePerClassificationSetupPage() {
                 <div className="max-w-7xl mx-auto">
                     {/* Page Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
-                        <h1 className="text-white">Allowance Per Classification Setup</h1>
+                        <h1 className="text-white text-2xl font-bold">Allowance Per Classification Setup</h1>
                     </div>
 
                     {/* Content Container */}
                     <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
+                        {/* Error Message */}
+                        {error && (
+                            <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                                <p className="text-red-700">{error}</p>
+                            </div>
+                        )}
+
                         {/* Information Frame */}
                         <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
                             <div className="flex items-start gap-3">
@@ -347,7 +422,8 @@ export function AllowancePerClassificationSetupPage() {
                         <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
                             <button
                                 onClick={handleCreateNew}
-                                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                                disabled={loading}
+                                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
                             >
                                 <Plus className="w-4 h-4" />
                                 Create New
@@ -377,13 +453,19 @@ export function AllowancePerClassificationSetupPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {paginatedData.length > 0 ? (
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-16 text-center">
+                                                <div className="text-gray-500">Loading...</div>
+                                            </td>
+                                        </tr>
+                                    ) : paginatedData.length > 0 ? (
                                         paginatedData.map((item) => (
                                             <tr key={item.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 text-sm text-gray-900">{item.referenceCode}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">{item.refNo}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-600">{item.allowanceCode}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.workshiftCode}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.classificationCode}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-600">{item.workShiftCode}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-600">{item.classificationCode || '-'}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2">
                                                         <button
@@ -405,6 +487,7 @@ export function AllowancePerClassificationSetupPage() {
                                                             onClick={() => handleDelete(item.id)}
                                                             className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                                             title="Delete"
+                                                            disabled={loading}
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
@@ -454,584 +537,43 @@ export function AllowancePerClassificationSetupPage() {
 
             {/* Create New Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-                            <h2 className="text-gray-800">Create New</h2>
-                            <button
-                                onClick={handleCloseModal}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleSubmitCreate} className="p-6">
-                            <h3 className="text-blue-600 mb-4">Allowance Per Classification</h3>
-
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Reference Code :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.referenceCode}
-                                        onChange={(e) => setFormData({ ...formData, referenceCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Allowance Code :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.allowanceCode}
-                                        onChange={(e) => setFormData({ ...formData, allowanceCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAllowanceCodeModal(true)}
-                                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, allowanceCode: '' })}
-                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Workshift Code :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.workshiftCode}
-                                        onChange={(e) => setFormData({ ...formData, workshiftCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowWorkshiftCodeModal(true)}
-                                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, workshiftCode: '' })}
-                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Classification :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.classificationCode}
-                                        onChange={(e) => setFormData({ ...formData, classificationCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowClassificationCodeModal(true)}
-                                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, classificationCode: '' })}
-                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                {/* Regular Day */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Regular Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursRegular}
-                                        onChange={(e) => setFormData({ ...formData, minHoursRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinRegular}
-                                        onChange={(e) => setFormData({ ...formData, amountMinRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Regular Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursRegular}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxRegular}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                {/* Rest Day */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Rest Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursRest}
-                                        onChange={(e) => setFormData({ ...formData, minHoursRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMinRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Rest Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursRest}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                {/* Holiday */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Holiday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursHoliday}
-                                        onChange={(e) => setFormData({ ...formData, minHoursHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinHoliday}
-                                        onChange={(e) => setFormData({ ...formData, amountMinHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Holiday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursHoliday}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxHoliday}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                {/* Holiday and Restday */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Holiday and Restday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, minHoursHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMinHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Holiday and Restday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 mt-6">
-                                <button
-                                    type="submit"
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                                >
-                                    Submit
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleCloseModal}
-                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                                >
-                                    Back to List
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                <FormModal
+                
+                    title="Create New"
+                    formData={formData}
+                    setFormData={setFormData}
+                    onSubmit={handleSubmitCreate}
+                    onClose={handleCloseModal}
+                    loading={loading}
+                    setShowAllowanceCodeModal={setShowAllowanceCodeModal}
+                    setShowWorkshiftCodeModal={setShowWorkshiftCodeModal}
+                    setShowClassificationCodeModal={setShowClassificationCodeModal}
+                    submitButtonText="Submit"
+                />
             )}
 
-            {/* Edit Modal - Same as Create but with Edit title */}
+            {/* Edit Modal */}
             {showEditModal && editingItem && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-                            <h2 className="text-gray-800">Edit</h2>
-                            <button
-                                onClick={handleCloseModal}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleSubmitEdit} className="p-6">
-                            <h3 className="text-blue-600 mb-4">Allowance Per Classification</h3>
-
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Reference Code :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.referenceCode}
-                                        onChange={(e) => setFormData({ ...formData, referenceCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Allowance Code :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.allowanceCode}
-                                        onChange={(e) => setFormData({ ...formData, allowanceCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAllowanceCodeModal(true)}
-                                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, allowanceCode: '' })}
-                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Workshift Code :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.workshiftCode}
-                                        onChange={(e) => setFormData({ ...formData, workshiftCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowWorkshiftCodeModal(true)}
-                                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, workshiftCode: '' })}
-                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Classification :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.classificationCode}
-                                        onChange={(e) => setFormData({ ...formData, classificationCode: e.target.value })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowClassificationCodeModal(true)}
-                                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, classificationCode: '' })}
-                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                {/* Regular Day */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Regular Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursRegular}
-                                        onChange={(e) => setFormData({ ...formData, minHoursRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinRegular}
-                                        onChange={(e) => setFormData({ ...formData, amountMinRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Regular Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursRegular}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxRegular}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxRegular: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                {/* Rest Day */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Rest Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursRest}
-                                        onChange={(e) => setFormData({ ...formData, minHoursRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMinRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Rest Day :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursRest}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                {/* Holiday */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Holiday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursHoliday}
-                                        onChange={(e) => setFormData({ ...formData, minHoursHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinHoliday}
-                                        onChange={(e) => setFormData({ ...formData, amountMinHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Holiday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursHoliday}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxHoliday}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxHoliday: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                {/* Holiday and Restday */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Min. Hours for Holiday and Restday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.minHoursHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, minHoursHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMinHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMinHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                        Max. Hours for Holiday and Restday :
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.maxHoursHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, maxHoursHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.amountMaxHolidayRest}
-                                        onChange={(e) => setFormData({ ...formData, amountMaxHolidayRest: e.target.value })}
-                                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 mt-6">
-                                <button
-                                    type="submit"
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                                >
-                                    Update
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleCloseModal}
-                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                                >
-                                    Back to List
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                <FormModal
+                    title="Edit"
+                    formData={formData}
+                    setFormData={setFormData}
+                    onSubmit={handleSubmitEdit}
+                    onClose={handleCloseModal}
+                    loading={loading}
+                    setShowAllowanceCodeModal={setShowAllowanceCodeModal}
+                    setShowWorkshiftCodeModal={setShowWorkshiftCodeModal}
+                    setShowClassificationCodeModal={setShowClassificationCodeModal}
+                    submitButtonText="Update"
+                />
             )}
 
             {/* Details Modal */}
             {showDetailsModal && detailsItem && (
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
-                            <h2 className="text-gray-900">Details</h2>
+                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[50vh] overflow-y-auto">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0 z-10">
+                            <h2 className="text-gray-900 font-semibold">Details</h2>
                             <button
                                 onClick={handleCloseModal}
                                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -1040,21 +582,21 @@ export function AllowancePerClassificationSetupPage() {
                             </button>
                         </div>
                         <div className="p-6">
-                            <h3 className="text-blue-600 mb-4">Allowance Per Classification Details</h3>
+                            <h3 className="text-blue-600 mb-4 font-semibold">Allowance Per Classification Details</h3>
 
                             <div className="space-y-3 text-sm">
-                                <div><span className="text-gray-700">Reference Code : </span><span className="text-gray-900">{detailsItem.referenceCode}</span></div>
-                                <div><span className="text-gray-700">Allowance Code : </span><span className="text-gray-900">{detailsItem.allowanceCode}</span></div>
-                                <div><span className="text-gray-700">Workshift Code : </span><span className="text-gray-900">{detailsItem.workshiftCode}</span></div>
-                                <div><span className="text-gray-700">Classification : </span><span className="text-gray-900">{detailsItem.classificationCode || '-'}</span></div>
-                                <div><span className="text-gray-700">Min. Hours for Regular Day : </span><span className="text-gray-900">{detailsItem.minHoursRegular}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMinRegular}</span></div>
-                                <div><span className="text-gray-700">Max. Hours for Regular Day : </span><span className="text-gray-900">{detailsItem.maxHoursRegular}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMaxRegular}</span></div>
-                                <div><span className="text-gray-700">Min. Hours for Rest Day : </span><span className="text-gray-900">{detailsItem.minHoursRest}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMinRest}</span></div>
-                                <div><span className="text-gray-700">Max. Hours for Rest Day : </span><span className="text-gray-900">{detailsItem.maxHoursRest}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMaxRest}</span></div>
-                                <div><span className="text-gray-700">Min. Hours for Holiday : </span><span className="text-gray-900">{detailsItem.minHoursHoliday}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMinHoliday}</span></div>
-                                <div><span className="text-gray-700">Max. Hours for Holiday : </span><span className="text-gray-900">{detailsItem.maxHoursHoliday}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMaxHoliday}</span></div>
-                                <div><span className="text-gray-700">Min. Hours for Holiday and Restday : </span><span className="text-gray-900">{detailsItem.minHoursHolidayRest}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMinHolidayRest}</span></div>
-                                <div><span className="text-gray-700">Max. Hours for Holiday and Restday : </span><span className="text-gray-900">{detailsItem.maxHoursHolidayRest}</span> <span className="text-gray-700">Amount: </span><span className="text-gray-900">{detailsItem.amountMaxHolidayRest}</span></div>
+                                <div><span className="text-gray-700 font-medium">Reference Code : </span><span className="text-gray-900">{detailsItem.refNo}</span></div>
+                                <div><span className="text-gray-700 font-medium">Allowance Code : </span><span className="text-gray-900">{detailsItem.allowanceCode}</span></div>
+                                <div><span className="text-gray-700 font-medium">Workshift Code : </span><span className="text-gray-900">{detailsItem.workShiftCode}</span></div>
+                                <div><span className="text-gray-700 font-medium">Classification : </span><span className="text-gray-900">{detailsItem.classificationCode || '-'}</span></div>
+                                <div><span className="text-gray-700 font-medium">Min. Hours for Regular Day : </span><span className="text-gray-900">{detailsItem.minHrsRegDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.minAmtRegDay}</span></div>
+                                <div><span className="text-gray-700 font-medium">Max. Hours for Regular Day : </span><span className="text-gray-900">{detailsItem.maxHrsRegDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmtRegDay}</span></div>
+                                <div><span className="text-gray-700 font-medium">Min. Hours for Rest Day : </span><span className="text-gray-900">{detailsItem.minHrsRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.minAmtRestDay}</span></div>
+                                <div><span className="text-gray-700 font-medium">Max. Hours for Rest Day : </span><span className="text-gray-900">{detailsItem.maxHrsRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmtRestDay}</span></div>
+                                <div><span className="text-gray-700 font-medium">Min. Hours for Holiday : </span><span className="text-gray-900">{detailsItem.minHrsHoliday}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.minAmtHoliday}</span></div>
+                                <div><span className="text-gray-700 font-medium">Max. Hours for Holiday : </span><span className="text-gray-900">{detailsItem.maxHrsHoliday}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmtHoliday}</span></div>
+                                <div><span className="text-gray-700 font-medium">Min. Hours for Holiday and Restday : </span><span className="text-gray-900">{detailsItem.minHrsHolidayRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.minAmountHolidayRestDay}</span></div>
+                                <div><span className="text-gray-700 font-medium">Max. Hours for Holiday and Restday : </span><span className="text-gray-900">{detailsItem.maxHrsHolidayRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmountHolidayRestDay}</span></div>
                             </div>
                         </div>
                     </div>
@@ -1063,207 +605,470 @@ export function AllowancePerClassificationSetupPage() {
 
             {/* Allowance Code Search Modal */}
             {showAllowanceCodeModal && (
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
-                            <h2 className="text-gray-900">Search</h2>
-                            <button
-                                onClick={() => setShowAllowanceCodeModal(false)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-6">
-                            <h3 className="text-blue-600 mb-4">Earnings Code</h3>
-
-                            {/* Search Input */}
-                            <div className="flex items-center justify-end gap-2 mb-4">
-                                <label className="text-sm text-gray-700">Search:</label>
-                                <input
-                                    type="text"
-                                    value={allowanceCodeSearchTerm}
-                                    onChange={(e) => setAllowanceCodeSearchTerm(e.target.value)}
-                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                                />
-                            </div>
-
-                            {/* Table */}
-                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-gray-100 border-b border-gray-200">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {filteredEarningCodes.map((item) => (
-                                            <tr
-                                                key={item.code}
-                                                className="hover:bg-blue-50 cursor-pointer"
-                                                onClick={() => {
-                                                    setFormData({ ...formData, allowanceCode: item.code });
-                                                    setShowAllowanceCodeModal(false);
-                                                }}
-                                            >
-                                                <td className="px-6 py-3 text-sm text-gray-900">{item.code}</td>
-                                                <td className="px-6 py-3 text-sm text-gray-600">{item.description}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <SearchModal
+                    title="Earnings Code"
+                    searchTerm={allowanceCodeSearchTerm}
+                    setSearchTerm={setAllowanceCodeSearchTerm}
+                    data={filteredEarningCodes}
+                    onSelect={(code) => {
+                        setFormData({ ...formData, allowanceCode: code });
+                        setShowAllowanceCodeModal(false);
+                        setAllowanceCodeSearchTerm('');
+                    }}
+                    onClose={() => setShowAllowanceCodeModal(false)}
+                />
             )}
 
             {/* Workshift Code Search Modal */}
             {showWorkshiftCodeModal && (
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
-                            <h2 className="text-gray-900">Search</h2>
-                            <button
-                                onClick={() => setShowWorkshiftCodeModal(false)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-6">
-                            <h3 className="text-blue-600 mb-4">Workshift Code</h3>
-
-                            {/* Search Input */}
-                            <div className="flex items-center justify-end gap-2 mb-4">
-                                <label className="text-sm text-gray-700">Search:</label>
-                                <input
-                                    type="text"
-                                    value={workshiftCodeSearchTerm}
-                                    onChange={(e) => setWorkshiftCodeSearchTerm(e.target.value)}
-                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                                />
-                            </div>
-
-                            {/* Table */}
-                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-gray-100 border-b border-gray-200">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {filteredWorkshiftCodes.map((item) => (
-                                            <tr
-                                                key={item.code}
-                                                className="hover:bg-blue-50 cursor-pointer"
-                                                onClick={() => {
-                                                    setFormData({ ...formData, workshiftCode: item.code });
-                                                    setShowWorkshiftCodeModal(false);
-                                                }}
-                                            >
-                                                <td className="px-6 py-3 text-sm text-gray-900">{item.code}</td>
-                                                <td className="px-6 py-3 text-sm text-gray-600">{item.description}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <SearchModal
+                    title="Workshift Code"
+                    searchTerm={workshiftCodeSearchTerm}
+                    setSearchTerm={setWorkshiftCodeSearchTerm}
+                    data={filteredWorkshiftCodes}
+                    onSelect={(code) => {
+                        setFormData({ ...formData, workShiftCode: code });
+                        setShowWorkshiftCodeModal(false);
+                        setWorkshiftCodeSearchTerm('');
+                    }}
+                    onClose={() => setShowWorkshiftCodeModal(false)}
+                />
             )}
 
             {/* Classification Code Search Modal */}
             {showClassificationCodeModal && (
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
-                            <h2 className="text-gray-900">Search</h2>
-                            <button
-                                onClick={() => setShowClassificationCodeModal(false)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-6">
-                            <h3 className="text-blue-600 mb-4">Classification Code</h3>
+                <SearchModal
+                    title="Classification Code"
+                    searchTerm={classificationCodeSearchTerm}
+                    setSearchTerm={setClassificationCodeSearchTerm}
+                    data={filteredClassificationCodes}
+                    onSelect={(code) => {
+                        setFormData({ ...formData, classificationCode: code });
+                        setShowClassificationCodeModal(false);
+                        setClassificationCodeSearchTerm('');
+                    }}
+                    onClose={() => setShowClassificationCodeModal(false)}
+                />
+            )}
 
-                            {/* Search Input */}
-                            <div className="flex items-center justify-end gap-2 mb-4">
-                                <label className="text-sm text-gray-700">Search:</label>
+            <Footer />
+        </div>
+    );
+}
+
+// Form Modal Component
+interface FormModalProps {
+    title: string;
+    formData: any;
+    setFormData: (data: any) => void;
+    onSubmit: (e: React.FormEvent) => void;
+    onClose: () => void;
+    loading: boolean;
+    setShowAllowanceCodeModal: (show: boolean) => void;
+    setShowWorkshiftCodeModal: (show: boolean) => void;
+    setShowClassificationCodeModal: (show: boolean) => void;
+    submitButtonText: string;
+}
+
+function FormModal({
+    title,
+    formData,
+    setFormData,
+    onSubmit,
+    onClose,
+    loading,
+    setShowAllowanceCodeModal,
+    setShowWorkshiftCodeModal,
+    setShowClassificationCodeModal,
+    submitButtonText
+}: FormModalProps) {
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[75vh] overflow-hidden flex flex-col">
+                {/* Sticky Header - No scroll */}
+                <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex-shrink-0">
+                    <h2 className="text-gray-800 font-semibold">{title}</h2>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                
+                {/* Scrollable Content */}
+                <div className="overflow-y-auto flex-1">
+                    <form onSubmit={onSubmit} className="p-6">
+                        <h3 className="text-blue-600 mb-4 font-semibold">Allowance Per Classification</h3>
+
+                        <div className="space-y-3">
+                            {/* All form fields with reduced spacing */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Reference Code :
+                                </label>
                                 <input
                                     type="text"
-                                    value={classificationCodeSearchTerm}
-                                    onChange={(e) => setClassificationCodeSearchTerm(e.target.value)}
-                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                                    value={formData.refNo}
+                                    onChange={(e) => setFormData({ ...formData, refNo: e.target.value })}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    required
                                 />
                             </div>
 
-                            {/* Table */}
-                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-gray-100 border-b border-gray-200">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {filteredClassificationCodes.map((item) => (
-                                            <tr
-                                                key={item.code}
-                                                className="hover:bg-blue-50 cursor-pointer"
-                                                onClick={() => {
-                                                    setFormData({ ...formData, classificationCode: item.code });
-                                                    setShowClassificationCodeModal(false);
-                                                }}
-                                            >
-                                                <td className="px-6 py-3 text-sm text-gray-900">{item.code}</td>
-                                                <td className="px-6 py-3 text-sm text-gray-600">{item.description}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Allowance Code :
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.allowanceCode}
+                                    onChange={(e) => setFormData({ ...formData, allowanceCode: e.target.value })}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAllowanceCodeModal(true)}
+                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                    <Search className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, allowanceCode: '' })}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Workshift Code :
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.workShiftCode}
+                                    onChange={(e) => setFormData({ ...formData, workShiftCode: e.target.value })}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWorkshiftCodeModal(true)}
+                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                    <Search className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, workShiftCode: '' })}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Classification :
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.classificationCode}
+                                    onChange={(e) => setFormData({ ...formData, classificationCode: e.target.value })}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowClassificationCodeModal(true)}
+                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                    <Search className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, classificationCode: '' })}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Regular Day Fields */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Min. Hours for Regular Day :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minHrsRegDay}
+                                    onChange={(e) => setFormData({ ...formData, minHrsRegDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minAmtRegDay}
+                                    onChange={(e) => setFormData({ ...formData, minAmtRegDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Max. Hours for Regular Day :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxHrsRegDay}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsRegDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxAmtRegDay}
+                                    onChange={(e) => setFormData({ ...formData, maxAmtRegDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+
+                            {/* Rest Day Fields */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Min. Hours for Rest Day :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minHrsRestDay}
+                                    onChange={(e) => setFormData({ ...formData, minHrsRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minAmtRestDay}
+                                    onChange={(e) => setFormData({ ...formData, minAmtRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Max. Hours for Rest Day :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxHrsRestDay}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxAmtRestDay}
+                                    onChange={(e) => setFormData({ ...formData, maxAmtRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+
+                            {/* Holiday Fields */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Min. Hours for Holiday :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minHrsHoliday}
+                                    onChange={(e) => setFormData({ ...formData, minHrsHoliday: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minAmtHoliday}
+                                    onChange={(e) => setFormData({ ...formData, minAmtHoliday: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Max. Hours for Holiday :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxHrsHoliday}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsHoliday: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxAmtHoliday}
+                                    onChange={(e) => setFormData({ ...formData, maxAmtHoliday: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+
+                            {/* Holiday and Restday Fields */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Min. Hours for Holiday and Restday :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minHrsHolidayRestDay}
+                                    onChange={(e) => setFormData({ ...formData, minHrsHolidayRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.minAmountHolidayRestDay}
+                                    onChange={(e) => setFormData({ ...formData, minAmountHolidayRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
+                                    Max. Hours for Holiday and Restday :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxHrsHolidayRestDay}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsHolidayRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxAmountHolidayRestDay}
+                                    onChange={(e) => setFormData({ ...formData, maxAmountHolidayRestDay: parseFloat(e.target.value) || 0 })}
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
                             </div>
                         </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm disabled:opacity-50"
+                            >
+                                {submitButtonText}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                            >
+                                Back to List
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+interface SearchModalProps {
+    title: string;
+    searchTerm: string;
+    setSearchTerm: (term: string) => void;
+    data: any[];
+    onSelect: (code: string) => void;
+    onClose: () => void;
+    style?: React.CSSProperties;
+}
+
+function SearchModal({ title, searchTerm, setSearchTerm, data, onSelect, onClose, style }: SearchModalProps) {
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div 
+                style={style}
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto"
+            >
+                {/* Modal Header - Sticky at the top */}
+                <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+                    <h2 className="text-gray-800 text-sm font-semibold">Search</h2>
+                    <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="p-3">
+                    <h3 className="text-blue-600 mb-2 text-sm font-semibold">{title}</h3>
+
+                    {/* Search Input Area */}
+                    <div className="flex items-center gap-2 mb-3">
+                        <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder="Type to filter..."
+                        />
+                    </div>
+
+                    {/* TABLE CONTAINER: Fixed height and scrollable */}
+                    <div 
+                        className="border border-gray-200 rounded overflow-hidden" 
+                        style={{ maxHeight: '400px', overflowY: 'auto' }}
+                    >
+                        <table className="w-full border-collapse text-sm">
+                            <thead className="sticky top-0 bg-white z-10">
+                                <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                    <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Code</th>
+                                    <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {data.length > 0 ? (
+                                    data.map((item) => (
+                                        <tr
+                                            key={item.id || item.code}
+                                            className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                            onClick={() => onSelect(item.code)}
+                                        >
+                                            <td className="px-3 py-1.5 text-gray-900 font-medium">{item.code}</td>
+                                            <td className="px-3 py-1.5 text-gray-600">{item.description}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">
+                                            No entries found
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            )}
-
-            {/* Footer */}
-            <Footer />
-
-            {/* CSS Animations */}
-            <style>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
+            </div>
         </div>
     );
 }

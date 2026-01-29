@@ -175,7 +175,7 @@ export function DivisionSetupPage() {
         const confirmed = await Swal.fire({
             icon: 'warning',
             title: 'Confirm Delete',
-            text: `Are you sure you want to delete division ${division.code}?`,
+            text: `Are you sure you want to delete division ${division.id}?`,
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
@@ -226,7 +226,23 @@ export function DivisionSetupPage() {
             });
             return;
         }
-
+// Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = divisionList.some((division, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedDivisionIndex === index) {
+                return false;
+              }
+              return division.code.toLowerCase() === code.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
         setSubmitting(true);
         try {
             const payload = {

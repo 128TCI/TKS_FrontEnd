@@ -226,7 +226,23 @@ export function AreaSetupPage() {
             });
             return;
         }
-
+         // Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = areaList.some((area, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedAreaIndex === index) {
+                return false;
+              }
+              return area.code.toLowerCase() === areaCode.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
         setSubmitting(true);
         try {
             const payload = {
