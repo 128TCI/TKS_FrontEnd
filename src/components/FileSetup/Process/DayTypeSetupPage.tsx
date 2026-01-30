@@ -1,74 +1,134 @@
 import { useState, useEffect } from 'react';
 import { Save, X, Check } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
+import apiClient from '../../../services/apiClient';
+import Swal from 'sweetalert2';
 
 interface DayType {
   label: string;
-  code: string;
   fieldName: string;
 }
 
+interface DayTypeData {
+  id: number;
+  regularDay: string;
+  restDay: string;
+  legalHoliday: string;
+  specialHoliday: string;
+  legalHolidayFallRestDay: string;
+  specialHolidayFallRestDay: string;
+  doubleLegalHoliday: string;
+  doubleLegalHolidayFallRestday: string;
+  specialHoliday2: string;
+  specialHoliday2FallRestDay: string;
+  nonWorkingHoliday: string;
+  nonWorkingHolidayFallRestDay: string;
+}
+
 export function DayTypeSetupPage() {
-  const [formData, setFormData] = useState({
-    regularDay: 'RegDay',
-    restDay: 'RestDay',
-    legalHoliday: 'Legal',
-    specialHoliday: 'SPH',
-    legalHolidayRestday: 'LHFRD',
-    specialHolidayRestday: 'SHFRD',
-    doubleLegalHoliday: '2LEGHOL',
-    doubleLegalHolidayRestday: '2LEGHOLRD',
-    specialHoliday2: 'SPH2',
-    specialHoliday2Restday: 'SPH2RD',
-    nonWorkingHoliday: 'NWH',
-    nonWorkingHolidayRestday: 'NWHRD'
+  const [formData, setFormData] = useState<DayTypeData>({
+    id: 0,
+    regularDay: '',
+    restDay: '',
+    legalHoliday: '',
+    specialHoliday: '',
+    legalHolidayFallRestDay: '',
+    specialHolidayFallRestDay: '',
+    doubleLegalHoliday: '',
+    doubleLegalHolidayFallRestday: '',
+    specialHoliday2: '',
+    specialHoliday2FallRestDay: '',
+    nonWorkingHoliday: '',
+    nonWorkingHolidayFallRestDay: ''
   });
 
+  const [originalData, setOriginalData] = useState<DayTypeData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const dayTypes: DayType[] = [
-    { label: 'Regular Day:', code: formData.regularDay, fieldName: 'regularDay' },
-    { label: 'Rest Day:', code: formData.restDay, fieldName: 'restDay' },
-    { label: 'Legal Holiday:', code: formData.legalHoliday, fieldName: 'legalHoliday' },
-    { label: 'Special Holiday:', code: formData.specialHoliday, fieldName: 'specialHoliday' },
-    { label: 'Legal Holiday that Falls on Restday:', code: formData.legalHolidayRestday, fieldName: 'legalHolidayRestday' },
-    { label: 'Special Holiday that Falls on Restday:', code: formData.specialHolidayRestday, fieldName: 'specialHolidayRestday' },
-    { label: 'Double Legal Holiday:', code: formData.doubleLegalHoliday, fieldName: 'doubleLegalHoliday' },
-    { label: 'Double Legal Holiday Falling on Restday:', code: formData.doubleLegalHolidayRestday, fieldName: 'doubleLegalHolidayRestday' },
-    { label: 'Special Holiday 2:', code: formData.specialHoliday2, fieldName: 'specialHoliday2' },
-    { label: 'Special Holiday 2 Falling on the Rest Day:', code: formData.specialHoliday2Restday, fieldName: 'specialHoliday2Restday' },
-    { label: 'Non-Working Holiday:', code: formData.nonWorkingHoliday, fieldName: 'nonWorkingHoliday' },
-    { label: 'Non-Working Holiday Falling on the Rest Day:', code: formData.nonWorkingHolidayRestday, fieldName: 'nonWorkingHolidayRestday' }
+    { label: 'Regular Day:', fieldName: 'regularDay' },
+    { label: 'Rest Day:', fieldName: 'restDay' },
+    { label: 'Legal Holiday:', fieldName: 'legalHoliday' },
+    { label: 'Special Holiday:', fieldName: 'specialHoliday' },
+    { label: 'Legal Holiday that Falls on Restday:', fieldName: 'legalHolidayFallRestDay' },
+    { label: 'Special Holiday that Falls on Restday:', fieldName: 'specialHolidayFallRestDay' },
+    { label: 'Double Legal Holiday:', fieldName: 'doubleLegalHoliday' },
+    { label: 'Double Legal Holiday Falling on Restday:', fieldName: 'doubleLegalHolidayFallRestday' },
+    { label: 'Special Holiday 2:', fieldName: 'specialHoliday2' },
+    { label: 'Special Holiday 2 Falling on the Rest Day:', fieldName: 'specialHoliday2FallRestDay' },
+    { label: 'Non-Working Holiday:', fieldName: 'nonWorkingHoliday' },
+    { label: 'Non-Working Holiday Falling on the Rest Day:', fieldName: 'nonWorkingHolidayFallRestDay' }
   ];
+
+  useEffect(() => {
+    fetchDayTypeData();
+  }, []);
+
+  const fetchDayTypeData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await apiClient.get('/Fs/Process/DayTypeSetUp');
+      if (response.status === 200 && response.data) {
+        // Assuming the API returns an array and we want the first item
+        const data = Array.isArray(response.data) ? response.data[0] : response.data;
+        setFormData(data);
+        setOriginalData(data);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load day type configuration';
+      setError(errorMsg);
+      console.error('Error fetching day type data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
   };
 
-  const handleSave = () => {
-    setIsEditing(false);
-    setShowSuccessMessage(true);
-    setTimeout(() => setShowSuccessMessage(false), 3000);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+        
+      const response = await apiClient.put(`/Fs/Process/DayTypeSetUp/${formData.id}`, formData);
+      
+      if (response.status === 200) {
+        const updatedData = response.data;
+        setFormData(updatedData);
+        setOriginalData(updatedData);
+        setIsEditing(false);
+        
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Day Type Setup saved successfully!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to save changes';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error saving day type data:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
+    if (originalData) {
+      setFormData(originalData);
+    }
     setIsEditing(false);
-    // Reset to original values
-    setFormData({
-      regularDay: 'RegDay',
-      restDay: 'RestDay',
-      legalHoliday: 'Legal',
-      specialHoliday: 'SPH',
-      legalHolidayRestday: 'LHFRD',
-      specialHolidayRestday: 'SHFRD',
-      doubleLegalHoliday: '2LEGHOL',
-      doubleLegalHolidayRestday: '2LEGHOLRD',
-      specialHoliday2: 'SPH2',
-      specialHoliday2Restday: 'SPH2RD',
-      nonWorkingHoliday: 'NWH',
-      nonWorkingHolidayRestday: 'NWHRD'
-    });
   };
 
   const handleInputChange = (fieldName: string, value: string) => {
@@ -78,8 +138,16 @@ export function DayTypeSetupPage() {
     }));
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-gray-600">Loading day type configuration...</div>
+      </div>
+    );
+  }
+
   return (
-      <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
@@ -124,13 +192,13 @@ export function DayTypeSetupPage() {
               </div>
             </div>
 
-            {/* Success Message */}
-            {showSuccessMessage && (
-              <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
-                Day Type Setup saved successfully!
+                {error}
               </div>
             )}
 
@@ -147,14 +215,16 @@ export function DayTypeSetupPage() {
                 <>
                   <button
                     onClick={handleSave}
-                    className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm"
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm"
                   >
                     <Save className="w-4 h-4" />
-                    Save Changes
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                   <button
                     onClick={handleCancel}
-                    className="px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2 shadow-sm"
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm"
                   >
                     <X className="w-4 h-4" />
                     Cancel
@@ -175,13 +245,13 @@ export function DayTypeSetupPage() {
                       {isEditing ? (
                         <input
                           type="text"
-                          value={dayType.code}
+                          value={formData[dayType.fieldName as keyof DayTypeData] as string}
                           onChange={(e) => handleInputChange(dayType.fieldName, e.target.value)}
                           className="flex-1 max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       ) : (
                         <div className="flex-1 max-w-xs px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900">
-                          {dayType.code}
+                          {formData[dayType.fieldName as keyof DayTypeData] as string}
                         </div>
                       )}
                     </div>

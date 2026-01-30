@@ -30,7 +30,7 @@ export function DivisionSetupPage() {
 
     // API Data states
     const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-    const [deviceData, setDeviceData] = useState<Array<{ deviceID: string; deviceName: string }>>([]);
+      const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [loadingDevices, setLoadingDevices] = useState(false);
     const [employeeError, setEmployeeError] = useState('');
@@ -109,12 +109,13 @@ export function DivisionSetupPage() {
         setLoadingDevices(true);
         setDeviceError('');
         try {
-            const response = await apiClient.get('/Device/GetAll');
+           const response = await apiClient.get('/BorrowedDeviceName');
             if (response.status === 200 && response.data) {
                 // Map API response to expected format
                 const mappedData = response.data.map((device: any) => ({
-                    deviceID: device.deviceCode || device.code || '',
-                    deviceName: device.deviceName || device.name || ''
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
                 }));
                 setDeviceData(mappedData);
             }
