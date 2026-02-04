@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import { tksGroupData } from '../data/tksGroupData';
+import apiClient from '../services/apiClient';
+
 
 interface TKSGroupTableProps {
   selectedCodes: number[];
@@ -8,15 +9,52 @@ interface TKSGroupTableProps {
   onSelectAll: () => void;
 }
 
-type SortField = 'code' | 'description';
+type SortField = 'groupCode' | 'groupDescription';
 type SortDirection = 'asc' | 'desc';
+
+
 
 export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroupTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('code');
+  const [sortField, setSortField] = useState<SortField>('groupCode');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const itemsPerPage = 10;
+  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+
+  useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        error;
+        try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+            if (response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((tksGroupList: any) => ({
+                    id: tksGroupList.id || tksGroupList.ID || '',
+                    groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+                    groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+
+                }));
+                setTKSGroupList(mappedData);
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+            setError(errorMsg);
+            console.error('Error fetching TKSGroup:', error);
+        } finally {
+            loading;
+        }
+    };
+
+
+
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -29,16 +67,16 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
   };
 
   const filteredAndSortedData = useMemo(() => {
-    let filtered = tksGroupData.filter(item => 
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase())
+    let filtered = tksGroupList.filter(item => 
+      item.groupCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.groupDescription.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     filtered.sort((a, b) => {
       const aValue = a[sortField].toLowerCase();
       const bValue = b[sortField].toLowerCase();
       
-      if (sortField === 'code') {
+      if (sortField === 'groupCode') {
         // Numeric sorting for code
         const aNum = parseInt(aValue) || 0;
         const bNum = parseInt(bValue) || 0;
@@ -134,27 +172,27 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
                 <th className="px-4 py-2 text-left" style={{ width: '40px' }}>
                   <input
                     type="checkbox"
-                    checked={selectedCodes.length === tksGroupData.length}
+                    checked={selectedCodes.length === tksGroupList.length}
                     onChange={onSelectAll}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
                 </th>
                 <th className="px-4 py-2 text-left text-xs text-gray-600" style={{ width: '80px' }}>
                   <button
-                    onClick={() => handleSort('code')}
+                    onClick={() => handleSort('groupCode')}
                     className="flex items-center hover:text-gray-900"
                   >
                     Code
-                    <SortIcon field="code" />
+                    <SortIcon field="groupCode" />
                   </button>
                 </th>
                 <th className="px-4 py-2 text-left text-xs text-gray-600">
                   <button
-                    onClick={() => handleSort('description')}
+                    onClick={() => handleSort('groupCode')}
                     className="flex items-center hover:text-gray-900"
                   >
                     Description
-                    <SortIcon field="description" />
+                    <SortIcon field="groupDescription" />
                   </button>
                 </th>
               </tr>
@@ -170,8 +208,8 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                   </td>
-                  <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{item.groupCode}</td>
+                  <td className="px-4 py-2 text-sm text-gray-600">{item.groupDescription}</td>
                 </tr>
               ))}
             </tbody>

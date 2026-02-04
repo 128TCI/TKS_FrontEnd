@@ -1,18 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, Upload, Calendar, Search, Download, FileText, Check } from 'lucide-react';
 import { DatePickerWithButton } from './DateSetup/DatePickerWithButton';
 import { Footer } from './Footer/Footer';
-import { TKSGroupTable } from './TKSGroupTable';
+import { TKSGroupTable} from './TKSGroupTable';
 import { tksGroupData } from '../data/tksGroupData';
+import { ImportWorkshiftRestdayDto } from '../data/ImportWorkshiftRestdayDto';
+import { ImportWorkshiftRestdayFormDto } from '../data/ImportWorkshiftRestdayDto';
+import { ImportTKSGroup } from '../data/ImportTKSGroup';
+import apiClient from '../services/apiClient';
+
+
+
 
 export function WorkshiftVariablePage() {
   const [selectedCodes, setSelectedCodes] = useState<number[]>([2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  const [fileName, setFileName] = useState('Copy of I - Workshift.xlsx');
+  const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(true);
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
   const [deleteExisting, setDeleteExisting] = useState(false);
   const [importType, setImportType] = useState('workshift-variable');
+  //const {TKSGroupList} = tksGroupList();
+  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
 
   const handleCodeToggle = (id: number) => {
     setSelectedCodes(prev => 
@@ -21,10 +33,10 @@ export function WorkshiftVariablePage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedCodes.length === tksGroupData.length) {
+    if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupData.map(w => w.id));
+      setSelectedCodes(tksGroupList.map(w => w.id));
     }
   };
 
@@ -35,6 +47,45 @@ export function WorkshiftVariablePage() {
       setFileLoaded(true);
     }
   };
+  const [isProcessing, setIsProcessing] = useState(false);
+
+     const fileLinkCreate = (blob: Blob, filename: string): void => {
+     const url = window.URL.createObjectURL(blob);
+     const link = document.createElement('a');
+     link.href = url;
+     link.download = filename;
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+     window.URL.revokeObjectURL(url);
+    };
+
+  const downloadTemplate = async () => {
+     setIsProcessing(true);
+     try {
+          const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportWorkShift_Template_Variable.xlsx`, {
+               responseType: 'blob'
+          });
+          const mimeType = response.headers['content-type'];
+          const blob = new Blob([response.data], { type: mimeType });
+          fileLinkCreate(blob, `ImportWorkShift_Template_Variable.xlsx`);
+     } finally {
+          isProcessing;
+     }
+  }
+  const downloadRDTemplate = async () => {
+     setIsProcessing(true);
+     try {
+          const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportWorkshiftWithRestDay_Template.xlsx`, {
+               responseType: 'blob'
+          });
+          const mimeType = response.headers['content-type'];
+          const blob = new Blob([response.data], { type: mimeType });
+          fileLinkCreate(blob, `ImportWorkshiftWithRestDay_Template.xlsx`);
+     } finally {
+          setIsProcessing(false);
+     }
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -176,12 +227,16 @@ export function WorkshiftVariablePage() {
                       <span className="text-sm text-gray-700">Download Templates:</span>
                     </div>
                     <div className="ml-6 space-y-1">
-                      <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700">
-                        <Download className="w-3 h-3" />
+                      <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+                        onClick={downloadTemplate}
+                      >
+                        <Download className="w-3 h-3" onClick={downloadTemplate}/>
                         Download Template (Workshift Variable)
                       </a>
-                      <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700">
-                        <Download className="w-3 h-3" />
+                      <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+                        onClick={downloadRDTemplate}
+                      >
+                        <Download className="w-3 h-3" onClick={downloadRDTemplate}/>
                         Download Template (Workshift w/ Rest Day)
                       </a>
                     </div>
