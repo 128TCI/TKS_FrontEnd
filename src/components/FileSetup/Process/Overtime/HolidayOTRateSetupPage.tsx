@@ -1,95 +1,347 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Save, XCircle, ArrowUpDown, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, Save, XCircle, ArrowUpDown, Check, Search, X } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
+import Swal from 'sweetalert2';
+import apiClient from '../../../../services/apiClient';
 
 interface HolidayOTRate {
+    id: number;
     code: string;
-    description: string;
+    desc: string;
+    withintheShift: string;
+    aftetheShift: string;
+    withintheShiftwithND: string;
+    aftertheShiftwithND: string;
+    withintheShiftandRestday: string;
+    aftertheShiftandRestday: string;
+    withintheShiftandRestdaywithND: string;
+    aftertheShiftandRestdaywithND: string;
+    unworkedHolidayPay: string;
+    unworkedHolidayPayRestday: string;
     holidayType: string;
+    unprodWorkHolidayRegDay: string;
+    unprodWorkHolidayRestDay: string;
+    otPremiumWithintheShiftwithND: string;
+    otPremiumAftertheShiftwithND: string;
+    otPremiumWithintheShiftandRestdaywithND: string;
+    otPremiumAftertheShiftandRestdaywithND: string;
+    eqOTCodeWinShf: string;
+    eqOTCodeWinShfRest: string;
+    eqOTCodeAftrShfForNoOfHrs: string;
+    eqOTCodeAftrShfRDForNoOfHrs: string;
+    eqOTCodeAftrShfNDForNoOfHrs: string;
+    eqOTCodeAftrShfRDNDForNoOfHrs: string;
 }
+
+interface OTCode {
+    otfid: number;
+    otfCode: string;
+    earnCode: string;
+    rate1: number;
+    rate2: number;
+    defAmt: number;
+    incPayslip: string;
+    incColaOT: string;
+    incColaBasic: string;
+    description: string;
+    isExemptionRpt: boolean;
+}
+
+const HOLIDAY_OPTIONS = [
+    { code: 'Legal1', label: 'Legal Holiday' },
+    { code: 'Special1', label: 'Special Holiday' },
+    { code: 'Calamity1', label: 'Calamity' },
+    { code: 'NoGrace1', label: 'No Grace Period' },
+    { code: 'Early1', label: 'Early Dismissal' },
+    { code: '2LEGHOL', label: 'Double Legal Holiday' },
+    { code: 'SPH2', label: 'Special Holiday 2' },
+    { code: 'NonWrk1', label: 'Non-Working Holiday' }
+];
 
 export function HolidayOTRateSetupPage() {
     const [isEditing, setIsEditing] = useState(false);
-    const [selectedRow, setSelectedRow] = useState<number | null>(0);
+    const [selectedRow, setSelectedRow] = useState<number | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [showOTSearchModal, setShowOTSearchModal] = useState(false);
+    const [searchField, setSearchField] = useState('');
+    const [otSearchQuery, setOtSearchQuery] = useState('');
+    const [otSearchPage, setOtSearchPage] = useState(1);
 
-    const [existingRecords] = useState<HolidayOTRate[]>([
-        { code: 'LEGAL', description: 'Legal Holiday', holidayType: 'Legal' },
-        { code: 'LEGAL_D', description: 'Legal Holiday Daily', holidayType: 'Legal' },
-        { code: 'SPECIAL', description: 'Special Holiday', holidayType: 'Special National' },
-        { code: 'SPECIAL_D', description: 'Special Holiday Daily', holidayType: 'Special National' }
-    ]);
+    const [existingRecords, setExistingRecords] = useState<HolidayOTRate[]>([]);
+    const [loadingData, setLoadingData] = useState(false);
+    const [dataError, setDataError] = useState('');
+
+    // OT Codes from API
+    const [otCodesData, setOTCodesData] = useState<OTCode[]>([]);
+    const [loadingOTCodes, setLoadingOTCodes] = useState(false);
 
     const [formData, setFormData] = useState({
-        code: 'LEGAL',
-        description: 'Legal Holiday',
-        holidayType: 'Legal Holiday',
-        withinShift: 'OTLHF8',
-        withinShiftND: 'NDLHF8',
-        otPremiumWithinShiftND: 'OTLHF8',
-        afterShift: 'OTLHX8',
-        afterShiftND: 'NDLHX8',
-        otPremiumAfterShiftND: 'OTLHX8',
-        withinShiftRestday: 'OTLHRDF8',
-        withinShiftRestdayND: 'NDLHRDF8',
-        otPremiumWithinShiftRestdayND: 'OTLHRDF8',
-        afterShiftRestday: 'OTLHRDX8',
-        afterShiftRestdayND: 'NDLHRDX8',
-        otPremiumAfterShiftRestdayND: 'OTLHRDX8',
-        unworkedHolidayPay: 'HOLIDAY',
-        unworkedHolidayPayRestday: 'HOLIDAY',
-        equivalentOTCodeNoHrs: '',
-        afterTheShift: '',
-        afterTheShiftRestDay: '',
-        afterTheShiftWithND: '',
-        afterTheShiftRestDayWithND: '',
-        equivalentOTCodeWithinShift: '',
-        equivalentOTCodeWithinShiftRestDay: ''
+        code: '',
+        desc: '',
+        holidayType: '',
+        withintheShift: '',
+        withintheShiftwithND: '',
+        otPremiumWithintheShiftwithND: '',
+        aftetheShift: '',
+        aftertheShiftwithND: '',
+        otPremiumAftertheShiftwithND: '',
+        withintheShiftandRestday: '',
+        withintheShiftandRestdaywithND: '',
+        otPremiumWithintheShiftandRestdaywithND: '',
+        aftertheShiftandRestday: '',
+        aftertheShiftandRestdaywithND: '',
+        otPremiumAftertheShiftandRestdaywithND: '',
+        unworkedHolidayPay: '',
+        unworkedHolidayPayRestday: '',
+        unprodWorkHolidayRegDay: '',
+        unprodWorkHolidayRestDay: '',
+        eqOTCodeWinShf: '',
+        eqOTCodeWinShfRest: '',
+        eqOTCodeAftrShfForNoOfHrs: '',
+        eqOTCodeAftrShfRDForNoOfHrs: '',
+        eqOTCodeAftrShfNDForNoOfHrs: '',
+        eqOTCodeAftrShfRDNDForNoOfHrs: ''
     });
 
+    // Fetch holiday OT rates from API
+    useEffect(() => {
+        fetchHolidayOTRates();
+    }, []);
+
+    const fetchHolidayOTRates = async () => {
+        setLoadingData(true);
+        setDataError('');
+        try {
+            const response = await apiClient.get('/Fs/Process/Overtime/HolidayOTRateSetUp');
+            if (response.status === 200 && response.data) {
+                setExistingRecords(response.data);
+                if (response.data.length > 0) {
+                    setSelectedRow(0);
+                    loadFormData(response.data[0]);
+                }
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load holiday OT rates';
+            setDataError(errorMsg);
+            console.error('Error fetching holiday OT rates:', error);
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    const fetchOTCodes = async () => {
+        setLoadingOTCodes(true);
+        try {
+            const response = await apiClient.get('/Fs/Process/Overtime/OverTimeFileSetUp');
+            if (response.status === 200 && response.data) {
+                setOTCodesData(response.data);
+            }
+        } catch (error: any) {
+            console.error('Error fetching OT codes:', error);
+        } finally {
+            setLoadingOTCodes(false);
+        }
+    };
+
+    const filteredOTCodes = otCodesData.filter(item =>
+        item.otfCode.toLowerCase().includes(otSearchQuery.toLowerCase()) ||
+        item.description.toLowerCase().includes(otSearchQuery.toLowerCase())
+    );
+
+    const otItemsPerPage = 10;
+    const otTotalPages = Math.ceil(filteredOTCodes.length / otItemsPerPage);
+    const otStartIndex = (otSearchPage - 1) * otItemsPerPage;
+    const otEndIndex = otStartIndex + otItemsPerPage;
+    const currentOTCodes = filteredOTCodes.slice(otStartIndex, otEndIndex);
+
+    const loadFormData = (record: HolidayOTRate) => {
+        setFormData({
+            code: record.code,
+            desc: record.desc,
+            holidayType: record.holidayType,
+            withintheShift: record.withintheShift,
+            withintheShiftwithND: record.withintheShiftwithND,
+            otPremiumWithintheShiftwithND: record.otPremiumWithintheShiftwithND,
+            aftetheShift: record.aftetheShift,
+            aftertheShiftwithND: record.aftertheShiftwithND,
+            otPremiumAftertheShiftwithND: record.otPremiumAftertheShiftwithND,
+            withintheShiftandRestday: record.withintheShiftandRestday,
+            withintheShiftandRestdaywithND: record.withintheShiftandRestdaywithND,
+            otPremiumWithintheShiftandRestdaywithND: record.otPremiumWithintheShiftandRestdaywithND,
+            aftertheShiftandRestday: record.aftertheShiftandRestday,
+            aftertheShiftandRestdaywithND: record.aftertheShiftandRestdaywithND,
+            otPremiumAftertheShiftandRestdaywithND: record.otPremiumAftertheShiftandRestdaywithND,
+            unworkedHolidayPay: record.unworkedHolidayPay,
+            unworkedHolidayPayRestday: record.unworkedHolidayPayRestday,
+            unprodWorkHolidayRegDay: record.unprodWorkHolidayRegDay,
+            unprodWorkHolidayRestDay: record.unprodWorkHolidayRestDay,
+            eqOTCodeWinShf: record.eqOTCodeWinShf,
+            eqOTCodeWinShfRest: record.eqOTCodeWinShfRest,
+            eqOTCodeAftrShfForNoOfHrs: record.eqOTCodeAftrShfForNoOfHrs,
+            eqOTCodeAftrShfRDForNoOfHrs: record.eqOTCodeAftrShfRDForNoOfHrs,
+            eqOTCodeAftrShfNDForNoOfHrs: record.eqOTCodeAftrShfNDForNoOfHrs,
+            eqOTCodeAftrShfRDNDForNoOfHrs: record.eqOTCodeAftrShfRDNDForNoOfHrs
+        });
+    };
+
+    const handleOpenSearch = (field: string) => {
+        setSearchField(field);
+        setOtSearchQuery('');
+        setOtSearchPage(1);
+        fetchOTCodes();
+        setShowOTSearchModal(true);
+    };
+
+    const handleSelectOTCode = (code: string) => {
+        setFormData(prev => ({ ...prev, [searchField]: code }));
+        setShowOTSearchModal(false);
+    };
+
+    const handleClearField = (field: string) => {
+        setFormData(prev => ({ ...prev, [field]: '' }));
+    };
+
     const handleEdit = () => {
+        if (selectedRow === null) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Record Selected',
+                text: 'Please select a record to edit.',
+            });
+            return;
+        }
         setIsEditing(true);
     };
 
-    const handleSave = () => {
-        setIsEditing(false);
-        // Add save logic here
+    const handleSave = async () => {
+        if (!formData.code.trim()) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
+            return;
+        }
+        if (!formData.desc.trim()) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' });
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const payload = {
+                id: selectedRow !== null ? existingRecords[selectedRow].id : 0,
+                code: formData.code,
+                desc: formData.desc,
+                withintheShift: formData.withintheShift,
+                aftetheShift: formData.aftetheShift,
+                withintheShiftwithND: formData.withintheShiftwithND,
+                aftertheShiftwithND: formData.aftertheShiftwithND,
+                withintheShiftandRestday: formData.withintheShiftandRestday,
+                aftertheShiftandRestday: formData.aftertheShiftandRestday,
+                withintheShiftandRestdaywithND: formData.withintheShiftandRestdaywithND,
+                aftertheShiftandRestdaywithND: formData.aftertheShiftandRestdaywithND,
+                unworkedHolidayPay: formData.unworkedHolidayPay,
+                unworkedHolidayPayRestday: formData.unworkedHolidayPayRestday,
+                holidayType: formData.holidayType,
+                unprodWorkHolidayRegDay: formData.unprodWorkHolidayRegDay,
+                unprodWorkHolidayRestDay: formData.unprodWorkHolidayRestDay,
+                otPremiumWithintheShiftwithND: formData.otPremiumWithintheShiftwithND,
+                otPremiumAftertheShiftwithND: formData.otPremiumAftertheShiftwithND,
+                otPremiumWithintheShiftandRestdaywithND: formData.otPremiumWithintheShiftandRestdaywithND,
+                otPremiumAftertheShiftandRestdaywithND: formData.otPremiumAftertheShiftandRestdaywithND,
+                eqOTCodeWinShf: formData.eqOTCodeWinShf,
+                eqOTCodeWinShfRest: formData.eqOTCodeWinShfRest,
+                eqOTCodeAftrShfForNoOfHrs: formData.eqOTCodeAftrShfForNoOfHrs,
+                eqOTCodeAftrShfRDForNoOfHrs: formData.eqOTCodeAftrShfRDForNoOfHrs,
+                eqOTCodeAftrShfNDForNoOfHrs: formData.eqOTCodeAftrShfNDForNoOfHrs,
+                eqOTCodeAftrShfRDNDForNoOfHrs: formData.eqOTCodeAftrShfRDNDForNoOfHrs
+            };
+
+            if (selectedRow !== null && existingRecords[selectedRow]) {
+                await apiClient.put(`/Fs/Process/Overtime/HolidayOTRateSetUp/${existingRecords[selectedRow].id}`, payload);
+                await Swal.fire({ icon: 'success', title: 'Success', text: 'Holiday OT rate updated successfully.', timer: 2000, showConfirmButton: false });
+            } else {
+                await apiClient.post('/Fs/Process/Overtime/HolidayOTRateSetUp', payload);
+                await Swal.fire({ icon: 'success', title: 'Success', text: 'Holiday OT rate created successfully.', timer: 2000, showConfirmButton: false });
+            }
+
+            await fetchHolidayOTRates();
+            setIsEditing(false);
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+            console.error('Error saving holiday OT rate:', error);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleCancel = () => {
         setIsEditing(false);
-        // Add cancel/reset logic here
+        if (selectedRow !== null && existingRecords[selectedRow]) {
+            loadFormData(existingRecords[selectedRow]);
+        }
     };
 
     const handleCreateNew = () => {
         setIsEditing(true);
         setSelectedRow(null);
-        // Reset form or open new entry
         setFormData({
             code: '',
-            description: '',
+            desc: '',
             holidayType: '',
-            withinShift: '',
-            withinShiftND: '',
-            otPremiumWithinShiftND: '',
-            afterShift: '',
-            afterShiftND: '',
-            otPremiumAfterShiftND: '',
-            withinShiftRestday: '',
-            withinShiftRestdayND: '',
-            otPremiumWithinShiftRestdayND: '',
-            afterShiftRestday: '',
-            afterShiftRestdayND: '',
-            otPremiumAfterShiftRestdayND: '',
+            withintheShift: '',
+            withintheShiftwithND: '',
+            otPremiumWithintheShiftwithND: '',
+            aftetheShift: '',
+            aftertheShiftwithND: '',
+            otPremiumAftertheShiftwithND: '',
+            withintheShiftandRestday: '',
+            withintheShiftandRestdaywithND: '',
+            otPremiumWithintheShiftandRestdaywithND: '',
+            aftertheShiftandRestday: '',
+            aftertheShiftandRestdaywithND: '',
+            otPremiumAftertheShiftandRestdaywithND: '',
             unworkedHolidayPay: '',
             unworkedHolidayPayRestday: '',
-            equivalentOTCodeNoHrs: '',
-            afterTheShift: '',
-            afterTheShiftRestDay: '',
-            afterTheShiftWithND: '',
-            afterTheShiftRestDayWithND: '',
-            equivalentOTCodeWithinShift: '',
-            equivalentOTCodeWithinShiftRestDay: ''
+            unprodWorkHolidayRegDay: '',
+            unprodWorkHolidayRestDay: '',
+            eqOTCodeWinShf: '',
+            eqOTCodeWinShfRest: '',
+            eqOTCodeAftrShfForNoOfHrs: '',
+            eqOTCodeAftrShfRDForNoOfHrs: '',
+            eqOTCodeAftrShfNDForNoOfHrs: '',
+            eqOTCodeAftrShfRDNDForNoOfHrs: ''
         });
+    };
+
+    const handleDelete = async () => {
+        if (selectedRow === null || !existingRecords[selectedRow]) {
+            await Swal.fire({ icon: 'warning', title: 'No Record Selected', text: 'Please select a record to delete.' });
+            return;
+        }
+
+        const record = existingRecords[selectedRow];
+        const confirmed = await Swal.fire({
+            icon: 'warning',
+            title: 'Confirm Delete',
+            text: `Are you sure you want to delete holiday OT rate "${record.code} - ${record.desc}"?`,
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+        });
+
+        if (confirmed.isConfirmed) {
+            try {
+                await apiClient.delete(`/Fs/Process/Overtime/HolidayOTRateSetUp/${record.id}`);
+                await Swal.fire({ icon: 'success', title: 'Success', text: 'Holiday OT rate deleted successfully.', timer: 2000, showConfirmButton: false });
+                await fetchHolidayOTRates();
+                setSelectedRow(null);
+            } catch (error: any) {
+                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete holiday OT rate';
+                await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+                console.error('Error deleting holiday OT rate:', error);
+            }
+        }
     };
 
     const handleInputChange = (field: string, value: string) => {
@@ -97,50 +349,67 @@ export function HolidayOTRateSetupPage() {
     };
 
     const handleRowClick = (index: number) => {
-        setSelectedRow(index);
-        const record = existingRecords[index];
-        setFormData({
-            code: record.code,
-            description: record.description,
-            holidayType: record.holidayType,
-            withinShift: 'OTLHF8',
-            withinShiftND: 'NDLHF8',
-            otPremiumWithinShiftND: 'OTLHF8',
-            afterShift: 'OTLHX8',
-            afterShiftND: 'NDLHX8',
-            otPremiumAfterShiftND: 'OTLHX8',
-            withinShiftRestday: 'OTLHRDF8',
-            withinShiftRestdayND: 'NDLHRDF8',
-            otPremiumWithinShiftRestdayND: 'OTLHRDF8',
-            afterShiftRestday: 'OTLHRDX8',
-            afterShiftRestdayND: 'NDLHRDX8',
-            otPremiumAfterShiftRestdayND: 'OTLHRDX8',
-            unworkedHolidayPay: 'HOLIDAY',
-            unworkedHolidayPayRestday: 'HOLIDAY',
-            equivalentOTCodeNoHrs: '',
-            afterTheShift: '',
-            afterTheShiftRestDay: '',
-            afterTheShiftWithND: '',
-            afterTheShiftRestDayWithND: '',
-            equivalentOTCodeWithinShift: '',
-            equivalentOTCodeWithinShiftRestDay: ''
-        });
+        if (!isEditing) {
+            setSelectedRow(index);
+            const record = existingRecords[index];
+            loadFormData(record);
+        }
     };
+
+    // Render field with search button
+    const renderFieldWithSearch = (label: string, field: keyof typeof formData, required: boolean = false) => (
+        <div>
+            <label className="block text-gray-700 mb-2">
+                {label} {required && <span className="text-red-500">*</span>}
+            </label>
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    value={formData[field]}
+                    readOnly
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-default"
+                />
+                <button
+                    type="button"
+                    onClick={() => handleOpenSearch(field)}
+                    disabled={!isEditing}
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    Search
+                </button>
+                <button
+                    type="button"
+                    onClick={() => handleClearField(field)}
+                    disabled={!isEditing}
+                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    );
+
+    useEffect(() => {
+        const handleEscKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && showOTSearchModal) {
+                setShowOTSearchModal(false);
+            }
+        };
+        if (showOTSearchModal) {
+            document.addEventListener('keydown', handleEscKey);
+        }
+        return () => document.removeEventListener('keydown', handleEscKey);
+    }, [showOTSearchModal]);
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
-
-            {/* Main Content */}
             <div className="flex-1 p-6">
                 <div className="max-w-7xl mx-auto">
-                    {/* Page Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
                         <h1 className="text-white">Holiday OT Rate Setup</h1>
                     </div>
 
-                    {/* Content Container */}
                     <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-                        {/* Information Frame */}
                         <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
                             <div className="flex items-start gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -153,422 +422,147 @@ export function HolidayOTRateSetupPage() {
                                         Define overtime rate codes and premium calculations for holidays. Configure rates for regular shifts, night differential, rest days, and their combinations to ensure accurate holiday pay computations.
                                     </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                        <div className="flex items-start gap-2">
-                                            <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                            <span className="text-gray-600">Within shift and after shift OT rates</span>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                            <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                            <span className="text-gray-600">Night differential premium calculations</span>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                            <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                            <span className="text-gray-600">Rest day combination rates</span>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                            <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                            <span className="text-gray-600">Unworked holiday pay configuration</span>
-                                        </div>
+                                        {['Within shift and after shift OT rates', 'Night differential premium calculations', 'Rest day combination rates', 'Unworked holiday pay configuration'].map(t => (
+                                            <div key={t} className="flex items-start gap-2">
+                                                <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                                <span className="text-gray-600">{t}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex items-center gap-3 mb-6">
                             {!isEditing && (
-                                <button
-                                    onClick={handleCreateNew}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Create New
+                                <button onClick={handleCreateNew} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                                    <Plus className="w-4 h-4" /> Create New
                                 </button>
                             )}
                             {!isEditing ? (
-                                <button
-                                    onClick={handleEdit}
-                                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm"
-                                >
-                                    <Pencil className="w-4 h-4" />
-                                    Edit
+                                <button onClick={handleEdit} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm">
+                                    <Pencil className="w-4 h-4" /> Edit
                                 </button>
                             ) : (
                                 <>
-                                    <button
-                                        onClick={handleSave}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm"
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        Save
+                                    <button onClick={handleSave} disabled={submitting} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm">
+                                        <Save className="w-4 h-4" /> {submitting ? 'Saving...' : 'Save'}
                                     </button>
-                                    <button
-                                        onClick={handleCancel}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
-                                    >
-                                        <XCircle className="w-4 h-4" />
-                                        Cancel
+                                    <button onClick={handleCancel} disabled={submitting} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm">
+                                        <XCircle className="w-4 h-4" /> Cancel
                                     </button>
                                 </>
                             )}
                             {!isEditing && (
-                                <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm">
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
+                                <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm">
+                                    <Trash2 className="w-4 h-4" /> Delete
                                 </button>
                             )}
                         </div>
 
-                        {/* Records Table */}
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 border-b border-gray-200">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left">
-                                                <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition-colors">
-                                                    Code
-                                                    <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                                                </button>
-                                            </th>
-                                            <th className="px-6 py-3 text-left">
-                                                <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition-colors">
-                                                    Description
-                                                    <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                                                </button>
-                                            </th>
-                                            <th className="px-6 py-3 text-left">
-                                                <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition-colors">
-                                                    Holiday Type
-                                                    <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                                                </button>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {existingRecords.map((record, index) => (
-                                            <tr
-                                                key={index}
-                                                onClick={() => handleRowClick(index)}
-                                                className={`cursor-pointer transition-colors ${selectedRow === index
-                                                        ? 'bg-blue-50 hover:bg-blue-100'
-                                                        : 'hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                <td className="px-6 py-3 text-gray-900">{record.code}</td>
-                                                <td className="px-6 py-3 text-gray-900">{record.description}</td>
-                                                <td className="px-6 py-3 text-gray-900">{record.holidayType}</td>
+                            {loadingData ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="text-gray-600 text-sm">Loading holiday OT rates...</div>
+                                </div>
+                            ) : dataError ? (
+                                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                                    <p className="text-red-700 text-sm">{dataError}</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left"><button className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition-colors">Code <ArrowUpDown className="w-4 h-4 text-gray-400" /></button></th>
+                                                <th className="px-6 py-3 text-left"><button className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition-colors">Description <ArrowUpDown className="w-4 h-4 text-gray-400" /></button></th>
+                                                <th className="px-6 py-3 text-left"><button className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition-colors">Holiday Type <ArrowUpDown className="w-4 h-4 text-gray-400" /></button></th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {existingRecords.length > 0 ? (
+                                                existingRecords.map((record, index) => (
+                                                    <tr key={record.id} onClick={() => handleRowClick(index)} className={`cursor-pointer transition-colors ${selectedRow === index ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'}`}>
+                                                        <td className="px-6 py-3 text-gray-900">{record.code}</td>
+                                                        <td className="px-6 py-3 text-gray-900">{record.desc}</td>
+                                                        <td className="px-6 py-3 text-gray-900">{record.holidayType}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500">No records found</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Main Form */}
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                 {/* Left Column */}
                                 <div className="space-y-5">
-                                    {/* Code */}
                                     <div>
-                                        <label className="block text-gray-700 mb-2">
-                                            Code <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.code}
-                                            onChange={(e) => handleInputChange('code', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
+                                        <label className="block text-gray-700 mb-2">Code <span className="text-red-500">*</span></label>
+                                        <input type="text" value={formData.code} maxLength={10} onChange={(e) => handleInputChange('code', e.target.value)} disabled={!isEditing} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600" />
                                     </div>
-
-                                    {/* Within the Shift */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Within the Shift <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.withinShift}
-                                            onChange={(e) => handleInputChange('withinShift', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* After the Shift */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">After the Shift <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.afterShift}
-                                            onChange={(e) => handleInputChange('afterShift', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* Within the Shift and Restday */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Within the Shift and Restday <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.withinShiftRestday}
-                                            onChange={(e) => handleInputChange('withinShiftRestday', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* After the Shift and Restday */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">After the Shift and Restday <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.afterShiftRestday}
-                                            onChange={(e) => handleInputChange('afterShiftRestday', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* Unworked Holiday Pay */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Unworked Holiday Pay <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.unworkedHolidayPay}
-                                            onChange={(e) => handleInputChange('unworkedHolidayPay', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* Unworked Holiday Pay (Restday) */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Unworked Holiday Pay (Restday) <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.unworkedHolidayPayRestday}
-                                            onChange={(e) => handleInputChange('unworkedHolidayPayRestday', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
+                                    {renderFieldWithSearch('Within the Shift', 'withintheShift', true)}
+                                    {renderFieldWithSearch('After the Shift', 'aftetheShift', true)}
+                                    {renderFieldWithSearch('Within the Shift and Restday', 'withintheShiftandRestday', true)}
+                                    {renderFieldWithSearch('After the Shift and Restday', 'aftertheShiftandRestday', true)}
+                                    {renderFieldWithSearch('Unworked Holiday Pay', 'unworkedHolidayPay', true)}
+                                    {renderFieldWithSearch('Unworked Holiday Pay (Restday)', 'unworkedHolidayPayRestday', true)}
                                 </div>
 
                                 {/* Middle Column */}
                                 <div className="space-y-5">
-                                    {/* Description */}
                                     <div>
-                                        <label className="block text-gray-700 mb-2">
-                                            Description <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.description}
-                                            onChange={(e) => handleInputChange('description', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
+                                        <label className="block text-gray-700 mb-2">Description <span className="text-red-500">*</span></label>
+                                        <input type="text" value={formData.desc} onChange={(e) => handleInputChange('desc', e.target.value)} disabled={!isEditing} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600" />
                                     </div>
-
-                                    {/* Within the Shift With ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Within the Shift With ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.withinShiftND}
-                                            onChange={(e) => handleInputChange('withinShiftND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* After the Shift With ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">After the Shift With ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.afterShiftND}
-                                            onChange={(e) => handleInputChange('afterShiftND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* Within the Shift and Restday with ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Within the Shift and Restday with ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.withinShiftRestdayND}
-                                            onChange={(e) => handleInputChange('withinShiftRestdayND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* After the Shift and Restday with ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">After the Shift and Restday with ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.afterShiftRestdayND}
-                                            onChange={(e) => handleInputChange('afterShiftRestdayND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
+                                    {renderFieldWithSearch('Within the Shift With ND', 'withintheShiftwithND', true)}
+                                    {renderFieldWithSearch('After the Shift With ND', 'aftertheShiftwithND', true)}
+                                    {renderFieldWithSearch('Within the Shift and Restday with ND', 'withintheShiftandRestdaywithND', true)}
+                                    {renderFieldWithSearch('After the Shift and Restday with ND', 'aftertheShiftandRestdaywithND', true)}
                                 </div>
 
                                 {/* Right Column */}
                                 <div className="space-y-5">
-                                    {/* Holiday Type */}
                                     <div>
-                                        <label className="block text-gray-700 mb-2">
-                                            Holiday Type <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.holidayType}
-                                            onChange={(e) => handleInputChange('holidayType', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
+                                        <label className="block text-gray-700 mb-2">Holiday Type <span className="text-red-500">*</span></label>
+                                 <select 
+                                    value={formData.holidayType} 
+                                    onChange={(e) => handleInputChange('holidayType', e.target.value)} 
+                                    disabled={!isEditing} 
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
+                                >
+                                    <option value="">Select Holiday Type</option>
+                                    {HOLIDAY_OPTIONS.map(option => (
+                                        <option key={option.code} value={option.code}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
                                     </div>
-
-                                    {/* OT Premium Within the Shift with ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">OT Premium Within the Shift with ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.otPremiumWithinShiftND}
-                                            onChange={(e) => handleInputChange('otPremiumWithinShiftND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* OT Premium After the Shift with ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">OT Premium After the Shift with ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.otPremiumAfterShiftND}
-                                            onChange={(e) => handleInputChange('otPremiumAfterShiftND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* OT Premium Within the Shift and Restday with ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">OT Premium Within the Shift and Restday with ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.otPremiumWithinShiftRestdayND}
-                                            onChange={(e) => handleInputChange('otPremiumWithinShiftRestdayND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* OT Premium After the Shift and Restday with ND */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">OT Premium After the Shift and Restday with ND <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={formData.otPremiumAfterShiftRestdayND}
-                                            onChange={(e) => handleInputChange('otPremiumAfterShiftRestdayND', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* Equivalent OT Code of Within in the Shift */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Equivalent OT Code of Within in the Shift</label>
-                                        <input
-                                            type="text"
-                                            value={formData.equivalentOTCodeWithinShift}
-                                            onChange={(e) => handleInputChange('equivalentOTCodeWithinShift', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
-
-                                    {/* Equivalent OT Code of Within in the Shift and Rest Day */}
-                                    <div>
-                                        <label className="block text-gray-700 mb-2">Equivalent OT Code of Within in the Shift and Rest Day</label>
-                                        <input
-                                            type="text"
-                                            value={formData.equivalentOTCodeWithinShiftRestDay}
-                                            onChange={(e) => handleInputChange('equivalentOTCodeWithinShiftRestDay', e.target.value)}
-                                            disabled={!isEditing}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                        />
-                                    </div>
+                                    {renderFieldWithSearch('OT Premium Within the Shift with ND', 'otPremiumWithintheShiftwithND', true)}
+                                    {renderFieldWithSearch('OT Premium After the Shift with ND', 'otPremiumAftertheShiftwithND', true)}
+                                    {renderFieldWithSearch('OT Premium Within the Shift and Restday with ND', 'otPremiumWithintheShiftandRestdaywithND', true)}
+                                    {renderFieldWithSearch('OT Premium After the Shift and Restday with ND', 'otPremiumAftertheShiftandRestdaywithND', true)}
+                                    {renderFieldWithSearch('Equivalent OT Code of Within in the Shift', 'eqOTCodeWinShf')}
+                                    {renderFieldWithSearch('Equivalent OT Code of Within in the Shift and Rest Day', 'eqOTCodeWinShfRest')}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Additional OT Configuration Section */}
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-                            <h3 className="text-gray-900 mb-6">Additional Equivalent OT Codes</h3>
-
+                            <h3 className="text-gray-900 mb-6">Equivalent OT Code for No of Hrs</h3>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* After The Shift */}
-                                <div>
-                                    <label className="block text-gray-700 mb-2">After The Shift :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.afterTheShift}
-                                        onChange={(e) => handleInputChange('afterTheShift', e.target.value)}
-                                        disabled={!isEditing}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                    />
-                                </div>
-
-                                {/* After The Shift and Rest Day */}
-                                <div>
-                                    <label className="block text-gray-700 mb-2">After The Shift and Rest Day :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.afterTheShiftRestDay}
-                                        onChange={(e) => handleInputChange('afterTheShiftRestDay', e.target.value)}
-                                        disabled={!isEditing}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                    />
-                                </div>
-
-                                {/* After The Shift With ND */}
-                                <div>
-                                    <label className="block text-gray-700 mb-2">After The Shift With ND :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.afterTheShiftWithND}
-                                        onChange={(e) => handleInputChange('afterTheShiftWithND', e.target.value)}
-                                        disabled={!isEditing}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                    />
-                                </div>
-
-                                {/* After The Shift and Rest Day With ND */}
-                                <div>
-                                    <label className="block text-gray-700 mb-2">After The Shift and Rest Day With ND :</label>
-                                    <input
-                                        type="text"
-                                        value={formData.afterTheShiftRestDayWithND}
-                                        onChange={(e) => handleInputChange('afterTheShiftRestDayWithND', e.target.value)}
-                                        disabled={!isEditing}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
-                                    />
-                                </div>
+                                {renderFieldWithSearch('After The Shift', 'eqOTCodeAftrShfForNoOfHrs')}
+                                {renderFieldWithSearch('After The Shift and Rest Day', 'eqOTCodeAftrShfRDForNoOfHrs')}
+                                {renderFieldWithSearch('After The Shift With ND', 'eqOTCodeAftrShfNDForNoOfHrs')}
+                                {renderFieldWithSearch('After The Shift and Rest Day With ND', 'eqOTCodeAftrShfRDNDForNoOfHrs')}
                             </div>
                         </div>
 
-                        {/* Info Note */}
                         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <p className="text-sm text-blue-800">
                                 <span className="font-semibold">Note:</span> Fields marked with <span className="text-red-500">*</span> are required.
@@ -579,35 +573,78 @@ export function HolidayOTRateSetupPage() {
                 </div>
             </div>
 
-            {/* Footer */}
-            <Footer />
+            {/* OT Code Search Modal */}
+            {showOTSearchModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg flex-shrink-0">
+                            <h2 className="text-gray-900">Overtime Code</h2>
+                            <button onClick={() => setShowOTSearchModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
 
-            {/* CSS Animations */}
-            <style>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
+                        <div className="px-6 py-3 border-b border-gray-100 flex-shrink-0">
+                            <div className="flex items-center gap-2 justify-end">
+                                <label className="text-gray-700 text-sm">Search:</label>
+                                <input type="text" value={otSearchQuery} onChange={(e) => setOtSearchQuery(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-80" />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-6 py-4">
+                            {loadingOTCodes ? (
+                                <div className="py-8 text-center text-gray-500 text-sm">Loading OT codes...</div>
+                            ) : (
+                                <table className="w-full">
+                                    <thead className="bg-gray-100 border-b-2 border-gray-300 sticky top-0">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Code ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Description ▲</th>
+                                            <th className="px-4 py-2 text-right text-gray-700 text-sm">Rate ▲</th>
+                                            <th className="px-4 py-2 text-right text-gray-700 text-sm">Default Amount ▲</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {currentOTCodes.length > 0 ? currentOTCodes.map((item) => (
+                                            <tr key={item.otfid} onClick={() => handleSelectOTCode(item.otfCode)} className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer">
+                                                <td className="px-4 py-2 text-sm text-blue-600 font-medium">{item.otfCode}</td>
+                                                <td className="px-4 py-2 text-sm">{item.description}</td>
+                                                <td className="px-4 py-2 text-sm text-right">{item.rate1.toFixed(2)}</td>
+                                                <td className="px-4 py-2 text-sm text-right">{item.defAmt.toFixed(2)}</td>
+                                            </tr>
+                                        )) : (
+                                            <tr><td colSpan={4} className="py-8 text-center text-gray-500 text-sm">No OT codes found.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
+                        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 rounded-b-lg flex-shrink-0">
+                            <div className="flex items-center justify-between">
+                                <div className="text-gray-600 text-sm">
+                                    Showing {otStartIndex + 1} to {Math.min(otEndIndex, filteredOTCodes.length)} of {filteredOTCodes.length} entries
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setOtSearchPage(prev => Math.max(1, prev - 1))} disabled={otSearchPage === 1} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm">
+                                        Previous
+                                    </button>
+                                    {Array.from({ length: Math.min(5, otTotalPages) }, (_, i) => i + 1).map(page => (
+                                        <button key={page} onClick={() => setOtSearchPage(page)} className={`px-3 py-1 rounded text-sm ${otSearchPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                                            {page}
+                                        </button>
+                                    ))}
+                                    <button onClick={() => setOtSearchPage(prev => Math.min(otTotalPages, prev + 1))} disabled={otSearchPage === otTotalPages} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm">
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <Footer />
         </div>
     );
 }

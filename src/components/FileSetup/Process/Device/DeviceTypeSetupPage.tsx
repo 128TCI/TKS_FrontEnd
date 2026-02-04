@@ -1,54 +1,290 @@
 import { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
-import { Check } from 'lucide-react';
+import { Search, Check } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
+import Swal from 'sweetalert2';
+import apiClient from '../../../../services/apiClient';
 
 interface DeviceType {
-  id: number;
+  id: number; // Temporary ID for React keys (based on index)
   deviceName: string;
   isChecked: boolean;
+  deviceType2Id?: number | null; // Actual DeviceType2 ID from database when checked
 }
+
+interface DeviceType2 {
+  id: number;
+  deviceName: string;
+}
+
+const API_DEVICE_TYPES = '/Fs/Process/Device/DeviceTypeSetUp';
+const API_ACTIVE_DEVICES = '/Fs/Process/Device/DeviceTypeSetUp/DeviceType2';
 
 export function DeviceTypeSetupPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  const [devices, setDevices] = useState<DeviceType[]>([
-    { id: 1, deviceName: 'B3TFT (TEXT FILE)', isChecked: false },
-    { id: 2, deviceName: 'B3-TFT-U', isChecked: false },
-    { id: 3, deviceName: 'B3-TFT-U_DATFILE', isChecked: true },
-    { id: 4, deviceName: 'DPA', isChecked: false },
-    { id: 5, deviceName: 'ELID Device (Text File)', isChecked: false },
-    { id: 6, deviceName: 'Excel Format', isChecked: true },
-    { id: 7, deviceName: 'FILMINERA DEVICE', isChecked: false },
-    { id: 8, deviceName: 'FLEXIBLE_IMPORT_UTILITY', isChecked: true },
-    { id: 9, deviceName: 'FPMS', isChecked: false },
-    { id: 10, deviceName: 'GUSI DEVICE', isChecked: false },
-    { id: 11, deviceName: 'IClock (Dat File)', isChecked: false },
-    { id: 12, deviceName: 'Iface', isChecked: false },
-    { id: 13, deviceName: 'IFACE WITH NO FLAG', isChecked: false },
-    { id: 14, deviceName: 'IN01-A', isChecked: false },
-    { id: 15, deviceName: 'IN01A WITH BREAK', isChecked: false },
-    { id: 16, deviceName: 'ISS DTR', isChecked: false },
-    { id: 17, deviceName: 'MAFIINC', isChecked: false },
-    { id: 18, deviceName: 'MDD DEVICE', isChecked: false },
-    { id: 19, deviceName: 'ONESIMUS_DEVICE', isChecked: false },
-    { id: 20, deviceName: 'P4P DEVICE', isChecked: false },
-    { id: 21, deviceName: 'PORTABLE BIOMETRICS_LDI', isChecked: false },
-    { id: 22, deviceName: 'POSC_DEVICE', isChecked: false },
-    { id: 23, deviceName: 'PROSYNC_DEVICE', isChecked: false },
-    { id: 24, deviceName: 'RCS_DEVICE', isChecked: true },
-    { id: 25, deviceName: 'SUPREMA', isChecked: false },
-    { id: 26, deviceName: 'TITANIUM_PORTABLE_TRS', isChecked: true },
-    { id: 27, deviceName: 'USB Digital Persona (U.ARE.U 4000B Reader)', isChecked: false },
-    { id: 28, deviceName: 'VIRDI (TEXT FILE)', isChecked: false },
-    { id: 29, deviceName: 'ZK TECO EXCEL', isChecked: false },
-    { id: 30, deviceName: 'ZK TIME', isChecked: false }
-  ]);
+  const [devices, setDevices] = useState<DeviceType[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [loadingActiveDevices, setLoadingActiveDevices] = useState(false);
+  const [deviceError, setDeviceError] = useState('');
+  const [processingToggle, setProcessingToggle] = useState<number | null>(null);
 
   const itemsPerPage = 25;
-  
+
+  // Fetch all device types
+  useEffect(() => {
+    fetchDeviceTypes();
+  }, []);
+
+  const fetchDeviceTypes = async () => {
+    setLoadingDevices(true);
+    setDeviceError('');
+    try {
+      const response = await apiClient.get(API_DEVICE_TYPES);
+      if (response.status === 200 && response.data) {
+        // API returns array of { deviceName } without id
+        // We'll create a unique ID based on index for React keys
+        const deviceList = response.data.map((device: any, index: number) => ({
+          id: index + 1, // Use index as temporary ID for UI purposes
+          deviceName: device.deviceName,
+          isChecked: false,
+          deviceType2Id: null
+        }));
+        console.log('Fetched device types:', deviceList);
+        setDevices(deviceList);
+        // After loading devices, fetch active devices
+        await fetchActiveDevices(deviceList);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load device types';
+      setDeviceError(errorMsg);
+      console.error('Error fetching device types:', error);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  const fetchActiveDevices = async (deviceList?: DeviceType[]) => {
+    setLoadingActiveDevices(true);
+    try {
+      const response = await apiClient.get(API_ACTIVE_DEVICES);
+      if (response.status === 200 && response.data) {
+        // Create a map of deviceName to DeviceType2 ID
+        const activeDevicesMap = new Map<string, number>();
+        response.data.forEach((d: DeviceType2) => {
+          activeDevicesMap.set(d.deviceName, d.id);
+        });
+        
+        console.log('Active devices map:', Object.fromEntries(activeDevicesMap));
+        
+        // Use provided deviceList or current state
+        const currentDevices = deviceList || devices;
+        
+        // Update isChecked and store DeviceType2 ID based on active devices
+        const updatedDevices = currentDevices.map(device => ({
+          ...device,
+          isChecked: activeDevicesMap.has(device.deviceName),
+          deviceType2Id: activeDevicesMap.get(device.deviceName) || null
+        }));
+        
+        console.log('Updated devices with active status');
+        setDevices(updatedDevices);
+      }
+    } catch (error: any) {
+      console.error('Error fetching active devices:', error);
+      // Don't show error message for active devices, just log it
+    } finally {
+      setLoadingActiveDevices(false);
+    }
+  };
+
+  const handleToggleDevice = async (deviceId: number, deviceName: string) => {
+    console.log('handleToggleDevice called with:', { deviceId, deviceName });
+    
+    if (processingToggle !== null) {
+      console.log('Already processing, skipping...');
+      return;
+    }
+
+    // Find the device by deviceName (not id, since id is just for UI)
+    const deviceIndex = devices.findIndex(d => d.deviceName === deviceName);
+    if (deviceIndex === -1) {
+      console.error('Device not found with deviceName:', deviceName);
+      return;
+    }
+
+    const device = devices[deviceIndex];
+    
+    console.log('Found device at index', deviceIndex, ':', { 
+      id: device.id, 
+      deviceName: device.deviceName, 
+      isChecked: device.isChecked, 
+      deviceType2Id: device.deviceType2Id 
+    });
+
+    setProcessingToggle(deviceId);
+
+    try {
+      if (device.isChecked && device.deviceType2Id) {
+        // Uncheck - DELETE from DeviceType2 using stored ID
+        console.log('Deleting active device:', {
+          deviceType2Id: device.deviceType2Id,
+          deviceName: device.deviceName
+        });
+        const deleteUrl = `${API_ACTIVE_DEVICES}/${device.deviceType2Id}`;
+        console.log('DELETE URL:', deleteUrl);
+        await apiClient.delete(deleteUrl);
+        
+        // Update local state immediately using deviceName to find
+        setDevices(prev => {
+          const idx = prev.findIndex(d => d.deviceName === deviceName);
+          if (idx === -1) return prev;
+          
+          const newDevices = [...prev];
+          newDevices[idx] = { 
+            ...newDevices[idx], 
+            isChecked: false, 
+            deviceType2Id: null 
+          };
+          console.log('Updated device to unchecked:', newDevices[idx]);
+          return newDevices;
+        });
+      } else {
+        // Check - POST to DeviceType2
+        const payload = {
+          id: 0,
+          deviceName: device.deviceName
+        };
+
+        console.log('POST payload:', payload);
+        const response = await apiClient.post(API_ACTIVE_DEVICES, payload);
+        console.log('POST response:', response.data);
+        
+        // Get the new ID from response if available
+        const newDeviceType2Id = response.data?.id || null;
+        console.log('New DeviceType2 ID:', newDeviceType2Id);
+        
+        // Update local state immediately using deviceName to find
+        setDevices(prev => {
+          const idx = prev.findIndex(d => d.deviceName === deviceName);
+          if (idx === -1) return prev;
+          
+          const newDevices = [...prev];
+          newDevices[idx] = { 
+            ...newDevices[idx], 
+            isChecked: true, 
+            deviceType2Id: newDeviceType2Id 
+          };
+          console.log('Updated device to checked:', newDevices[idx]);
+          return newDevices;
+        });
+        
+        // Always refresh to ensure IDs are synced correctly
+        await fetchActiveDevices();
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to update device';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error toggling device:', error);
+      // Refresh to sync state on error
+      await fetchActiveDevices();
+    } finally {
+      setProcessingToggle(null);
+    }
+  };
+
+  const handleToggleAll = async () => {
+    if (processingToggle !== null) return;
+
+    const allChecked = paginatedData.every(device => device.isChecked);
+    const devicesToToggle = paginatedData;
+
+    setProcessingToggle(-1); // Use -1 to indicate bulk operation
+
+    try {
+      if (allChecked) {
+        // Uncheck all - DELETE all from DeviceType2 one by one
+        for (const device of devicesToToggle) {
+          if (device.deviceType2Id) {
+            console.log('Deleting active device with ID:', device.deviceType2Id);
+            try {
+              await apiClient.delete(`${API_ACTIVE_DEVICES}/${device.deviceType2Id}`);
+              
+              // Update local state after each successful delete using deviceName to find
+              setDevices(prev => {
+                const deviceIndex = prev.findIndex(d => d.deviceName === device.deviceName);
+                if (deviceIndex === -1) return prev;
+                
+                const newDevices = [...prev];
+                newDevices[deviceIndex] = { 
+                  ...newDevices[deviceIndex], 
+                  isChecked: false, 
+                  deviceType2Id: null 
+                };
+                return newDevices;
+              });
+            } catch (error) {
+              console.error(`Failed to delete device ${device.deviceName}:`, error);
+              // Continue with next device even if one fails
+            }
+          }
+        }
+      } else {
+        // Check all - POST all to DeviceType2 one by one
+        for (const device of devicesToToggle) {
+          if (!device.isChecked) {
+            try {
+              const payload = {
+                id: 0,
+                deviceName: device.deviceName
+              };
+              const response = await apiClient.post(API_ACTIVE_DEVICES, payload);
+              
+              // Get the new ID from response if available
+              const newDeviceType2Id = response.data?.id || null;
+              
+              // Update local state after each successful post using deviceName to find
+              setDevices(prev => {
+                const deviceIndex = prev.findIndex(d => d.deviceName === device.deviceName);
+                if (deviceIndex === -1) return prev;
+                
+                const newDevices = [...prev];
+                newDevices[deviceIndex] = { 
+                  ...newDevices[deviceIndex], 
+                  isChecked: true, 
+                  deviceType2Id: newDeviceType2Id 
+                };
+                return newDevices;
+              });
+            } catch (error) {
+              console.error(`Failed to add device ${device.deviceName}:`, error);
+              // Continue with next device even if one fails
+            }
+          }
+        }
+        
+        // Refresh to sync IDs after bulk add
+        await fetchActiveDevices();
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to update devices';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error toggling all devices:', error);
+      // Refresh to sync state
+      await fetchActiveDevices();
+    } finally {
+      setProcessingToggle(null);
+    }
+  };
+
   const filteredData = devices.filter(item =>
     item.deviceName.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -65,34 +301,19 @@ export function DeviceTypeSetupPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = sortedData.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleToggleDevice = (id: number) => {
-    setDevices(prev =>
-      prev.map(device =>
-        device.id === id ? { ...device, isChecked: !device.isChecked } : device
-      )
-    );
-  };
-
-  const handleToggleAll = () => {
-    const allChecked = paginatedData.every(device => device.isChecked);
-    const idsToToggle = paginatedData.map(d => d.id);
-    
-    setDevices(prev =>
-      prev.map(device =>
-        idsToToggle.includes(device.id) ? { ...device, isChecked: !allChecked } : device
-      )
-    );
-  };
-
   const handleSortToggle = () => {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
   const allPageItemsChecked = paginatedData.length > 0 && paginatedData.every(device => device.isChecked);
 
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-
       {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
@@ -151,68 +372,84 @@ export function DeviceTypeSetupPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left w-12">
-                      <input
-                        type="checkbox"
-                        checked={allPageItemsChecked}
-                        onChange={handleToggleAll}
-                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                      />
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs text-gray-600 uppercase cursor-pointer hover:text-gray-900 select-none"
-                      onClick={handleSortToggle}
-                    >
-                      <div className="flex items-center gap-2">
-                        DeviceName
-                        <span className="text-gray-400">
-                          {sortDirection === 'asc' ? '▲' : '▼'}
-                        </span>
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((device) => (
-                      <tr 
-                        key={device.id} 
-                        className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                          device.isChecked ? 'bg-blue-50' : ''
-                        }`}
-                        onClick={() => handleToggleDevice(device.id)}
-                      >
-                        <td className="px-6 py-4">
+            <div className="overflow-x-auto">
+              {loadingDevices || loadingActiveDevices ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading device types...</div>
+                </div>
+              ) : deviceError ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{deviceError}</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left w-12">
                           <input
                             type="checkbox"
-                            checked={device.isChecked}
-                            onChange={() => handleToggleDevice(device.id)}
-                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
+                            checked={allPageItemsChecked}
+                            onChange={handleToggleAll}
+                            disabled={processingToggle !== null}
+                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
                           />
-                        </td>
-                        <td 
-                          className={`px-6 py-4 text-sm ${
-                            device.isChecked ? 'text-blue-700' : 'text-gray-900'
-                          }`}
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs text-gray-600 uppercase cursor-pointer hover:text-gray-900 select-none"
+                          onClick={handleSortToggle}
                         >
-                          {device.deviceName}
-                        </td>
+                          <div className="flex items-center gap-2">
+                            DeviceName
+                            <span className="text-gray-400">
+                              {sortDirection === 'asc' ? '▲' : '▼'}
+                            </span>
+                          </div>
+                        </th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={2} className="px-6 py-16 text-center">
-                        <div className="text-gray-500">No data available in table</div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paginatedData.length > 0 ? (
+                        paginatedData.map((device) => (
+                          <tr 
+                            key={device.id} 
+                            className={`hover:bg-gray-50 transition-colors ${
+                              device.isChecked ? 'bg-blue-50' : ''
+                            } ${processingToggle === device.id ? 'opacity-50' : ''}`}
+                          >
+                            <td className="px-6 py-4">
+                              <input
+                                type="checkbox"
+                                checked={device.isChecked}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleDevice(device.id, device.deviceName);
+                                }}
+                                disabled={processingToggle !== null}
+                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                              />
+                            </td>
+                            <td 
+                              className={`px-6 py-4 text-sm cursor-pointer ${
+                                device.isChecked ? 'text-blue-700' : 'text-gray-900'
+                              }`}
+                              onClick={() => handleToggleDevice(device.id, device.deviceName)}
+                            >
+                              {device.deviceName}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={2} className="px-6 py-16 text-center">
+                            <div className="text-gray-500">No data available in table</div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Pagination */}

@@ -1,4 +1,4 @@
-import "./chunk-DC5AMYBS.js";
+import "./chunk-2TUXWMP5.js";
 
 // node_modules/sweetalert2/dist/sweetalert2.esm.all.js
 function _assertClassBrand(e, t, n) {

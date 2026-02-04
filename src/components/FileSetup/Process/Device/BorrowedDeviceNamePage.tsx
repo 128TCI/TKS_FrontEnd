@@ -11,7 +11,7 @@ interface BorrowedDevice {
   description: string;
 }
 
-const API_BASE_URL = '/BorrowedDeviceName';
+const API_BASE_URL = '/Fs/Process/Device/BorrowedDeviceName';
 
 export function BorrowedDeviceNamePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);

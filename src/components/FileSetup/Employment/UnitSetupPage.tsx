@@ -118,7 +118,7 @@ export function UnitSetupPage() {
     setLoadingDevices(true);
     setDeviceError('');
     try {
-      const response = await apiClient.get('/BorrowedDeviceName');
+      const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
             if (response.status === 200 && response.data) {
                 // Map API response to expected format
                 const mappedData = response.data.map((device: any) => ({
