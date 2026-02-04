@@ -3,27 +3,48 @@ import { ChevronDown, Upload, Calendar, Search, Download, FileText, Check } from
 import { DatePickerWithButton } from './DateSetup/DatePickerWithButton';
 import { Footer } from './Footer/Footer';
 import { TKSGroupTable} from './TKSGroupTable';
-import { tksGroupData } from '../data/tksGroupData';
-import { ImportWorkshiftRestdayDto } from '../data/ImportWorkshiftRestdayDto';
-import { ImportWorkshiftRestdayFormDto } from '../data/ImportWorkshiftRestdayDto';
-import { ImportTKSGroup } from '../data/ImportTKSGroup';
 import apiClient from '../services/apiClient';
-
-
+import * as XLSX from 'xlsx';
 
 
 export function WorkshiftVariablePage() {
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(true);
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
   const [deleteExisting, setDeleteExisting] = useState(false);
   const [importType, setImportType] = useState('workshift-variable');
-  //const {TKSGroupList} = tksGroupList();
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        error;
+        try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+            if (response.data) {
+                const mappedData = response.data.map((tksGroupList: any) => ({
+                    id: tksGroupList.id || tksGroupList.ID || '',
+                    groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+                    groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+
+                }));
+                setTKSGroupList(mappedData);
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+            setError(errorMsg);
+            console.error('Error fetching TKSGroup:', error);
+        } finally {
+            loading;
+        }
+    };
 
 
   const handleCodeToggle = (id: number) => {
@@ -151,14 +172,14 @@ export function WorkshiftVariablePage() {
                     <label className="block text-gray-700 text-sm mb-2">Excel File</label>
                     <div className="bg-teal-50 border-2 border-teal-200 rounded-lg p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                        {fileName && (<div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                        </div>
+                        </div>)}
                         <div>
                           <div className="text-sm text-gray-900">{fileName}</div>
-                          <div className="text-xs text-teal-600">File loaded successfully</div>
+                          {fileName && (<div className="text-xs text-teal-600">File loaded successfully</div>)}
                         </div>
                       </div>
                       <input

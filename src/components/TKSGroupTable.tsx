@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
@@ -35,7 +35,6 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
         try {
             const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
             if (response.data) {
-                // Map API response to expected format
                 const mappedData = response.data.map((tksGroupList: any) => ({
                     id: tksGroupList.id || tksGroupList.ID || '',
                     groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
@@ -53,9 +52,6 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
         }
     };
 
-
-
-
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -65,32 +61,11 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
     }
     setCurrentPage(1);
   };
-
-  const filteredAndSortedData = useMemo(() => {
-    let filtered = tksGroupList.filter(item => 
-      item.groupCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.groupDescription.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    filtered.sort((a, b) => {
-      const aValue = a[sortField].toLowerCase();
-      const bValue = b[sortField].toLowerCase();
-      
-      if (sortField === 'groupCode') {
-        // Numeric sorting for code
-        const aNum = parseInt(aValue) || 0;
-        const bNum = parseInt(bValue) || 0;
-        return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
-      } else {
-        // Alphabetic sorting for description
-        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-      }
-    });
-
-    return filtered;
-  }, [searchTerm, sortField, sortDirection]);
+  
+  const filteredAndSortedData = tksGroupList.filter(tksGroupList =>
+      tksGroupList.groupCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tksGroupList.groupDescription.toLowerCase().includes(searchTerm.toLowerCase()) 
+  );
 
   const totalPages = Math.ceil(filteredAndSortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -138,6 +113,10 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
       <ChevronDown className="w-3 h-3 text-blue-600 ml-1" />
     );
   };
+
+   useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
   return (
     <div className="lg:col-span-2 bg-gray-50 rounded-lg border border-gray-200 p-5">
