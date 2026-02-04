@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import React from 'react';
 import { Calendar, Search, X, FileText, Printer, Check, Clock, Users, Building2, Briefcase, Award, Network, Grid } from 'lucide-react';
-import { CalendarPopover } from './CalendarPopover';
+import { CalendarPopover } from './Modals/CalendarPopover';
 import { Footer } from './Footer/Footer';
 
 type TabType = 'tk-group' | 'branch' | 'department' | 'designation' | 'division' | 'section';
@@ -365,7 +365,7 @@ export function DailyTimeRecordMonitoringPage() {
       <div className="flex-1 relative z-10 p-6">
         <div className="max-w-7xl mx-auto relative">
           {/* Page Header */}
-          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Daily Time Record Monitoring</h1>
           </div>
 

@@ -26,44 +26,55 @@ import { TwoShiftsEmployeeTimekeepConfigPage } from '../TwoShiftsEmployeeTimekee
 import { OvertimeApplication2ShiftsPage } from '../OvertimeApplication2ShiftsPage';
 import { WorkshiftVariable2ShiftsPage } from '../WorkshiftVariable2ShiftsPage';
 import { ImportLogsFromDevice2ShiftsPage } from '../ImportLogsFromDevice2ShiftsPage';
-import { UpdateStatusPage } from '../UpdateStatusPage';
-import { UpdateEmployeeOvertimeApplicationPage } from '../UpdateEmployeeOvertimeApplicationPage';
-import { UpdateEmployeeWorkshiftPage } from '../UpdateEmployeeWorkshiftPage';
-import { UpdateEmployeeLeaveApplicationPage } from '../UpdateEmployeeLeaveApplicationPage';
-import { UpdateEmployeePayHousePage } from '../UpdateEmployeePayHousePage';
-import { UpdateEmployeeClassificationPage } from '../UpdateEmployeeClassificationPage';
-import { UpdateBatchRestDayPage } from '../UpdateBatchRestDayPage';
-import { DeleteEmployeeTransactionsPage } from '../DeleteEmployeeTransactionsPage';
-import { UpdateRawdataOnlinePage } from '../UpdateRawdataOnlinePage';
-import { UpdateDaytypeRawdataPage } from '../UpdateDaytypeRawdataPage';
-import { UpdateWorkshiftRawdataPage } from '../UpdateWorkshiftRawdataPage';
-import { DeleteIncompleteLogsPage } from '../DeleteIncompleteLogsPage';
-import { DeleteRawdataPage } from '../DeleteRawdataPage';
-import { UnpostTransactionPage } from '../UnpostTransactionPage';
-import { AdditionalHoursPerWeekPage } from '../AdditionalHoursPerWeekPage';
-import { ApplyOTAllowancesPage } from '../ApplyOTAllowancesPage';
-import { ApplyBreakOverbreakPage } from '../ApplyBreakOverbreakPage';
-import { UpdateAllowancePerBracketPage } from '../UpdateAllowancePerBracketPage';
-import { UpdateGLCodeUtilityPage } from '../UpdateGLCodeUtilityPage';
-import { UpdateFlexiBreakPage } from '../UpdateFlexiBreakPage';
-import { UpdateSssNotificationPage } from '../UpdateSssNotificationPage';
-import { UpdateHoursPerWeekPage } from '../UpdateHoursPerWeekPage';
-import { UpdateTardinessPenaltyPage } from '../UpdateTardinessPenaltyPage';
-import { DeleteOtRestdayAbsentPage } from '../DeleteOtRestdayAbsentPage';
-import { ProcessOvertimeCutoffPage } from '../ProcessOvertimeCutoffPage';
-import { UpdateAssumedDaysPage } from '../UpdateAssumedDaysPage';
-import { DeductAbsencesExcessPage } from '../DeductAbsencesExcessPage';
-import { ProcessOvertime24HoursPage } from '../ProcessOvertime24HoursPage';
-import { PostProcessedTimekeepingPage } from '../PostProcessedTimekeepingPage';
-import { UpdateTimeFlagBreaksPage } from '../UpdateTimeFlagBreaksPage';
-import { UnpaidLunchDeductionPage } from '../UnpaidLunchDeductionPage';
-import { DeductTardinessToOvertimePage } from '../DeductTardinessToOvertimePage';
-import { RawDataPage } from '../RawDataPage';
-import { ProcessPage } from '../ProcessPage';
-import { Process2ShiftsPayrollPage } from '../Process2ShiftsPayrollPage';
-import { ProcessedDataPage } from '../ProcessedDataPage';
-import { DailyTimeRecordMonitoringPage } from '../DailyTimeRecordMonitoringPage';
 
+//Maintenance Sub-menu
+import { ProcessedDataPage } from '../Maintenance/ProcessedDataPage';
+
+//Utilities
+//Utility on Employee Configuration
+import { UpdateStatusPage } from '../Utilities/UpdateStatusPage';
+import { UpdateEmployeeOvertimeApplicationPage } from '../Utilities/UpdateEmployeeOvertimeApplicationPage';
+import { UpdateEmployeeWorkshiftPage } from '../Utilities/UpdateEmployeeWorkshiftPage';
+import { UpdateEmployeeLeaveApplicationPage } from '../Utilities/UpdateEmployeeLeaveApplicationPage';
+import { UpdateEmployeePayHousePage } from '../Utilities/UpdateEmployeePayHousePage';
+import { UpdateEmployeeClassificationPage } from '../Utilities/UpdateEmployeeClassificationPage';
+import { UpdateBatchRestDayPage } from '../Utilities/UpdateBatchRestDayPage';
+import { DeleteEmployeeTransactionsPage } from '../Utilities/DeleteEmployeeTransactionsPage';
+import { UpdateRawdataOnlinePage } from '../UpdateRawdataOnlinePage';
+//Utility on Raw Data
+import { UpdateDaytypeRawdataPage } from '../Utilities/UpdateDaytypeRawdataPage';
+import { UpdateWorkshiftRawdataPage } from '../Utilities/UpdateWorkshiftRawdataPage';
+import { DeleteIncompleteLogsPage } from '../Utilities/DeleteIncompleteLogsPage';
+import { DeleteRawdataPage } from '../Utilities/DeleteRawdataPage';
+//Utility on Processed Data
+import { UnpostTransactionPage } from '../Utilities/UnpostTransactionPage';
+import { AdditionalHoursPerWeekPage } from '../Utilities/AdditionalHoursPerWeekPage';
+import { ApplyOTAllowancesPage } from '../Utilities/ApplyOTAllowancesPage';
+import { ApplyBreakOverbreakPage } from '../Utilities/ApplyBreakOverbreakPage';
+import { UpdateAllowancePerBracketPage } from '../Utilities/UpdateAllowancePerBracketPage';
+import { UpdateGLCodeUtilityPage } from '../Utilities/UpdateGLCodeUtilityPage';
+import { UpdateFlexiBreakPage } from '../Utilities/UpdateFlexiBreakPage';
+import { UpdateSssNotificationPage } from '../Utilities/UpdateSssNotificationPage';
+import { UpdateHoursPerWeekPage } from '../Utilities/UpdateHoursPerWeekPage';
+import { UpdateTardinessPenaltyPage } from '../Utilities/UpdateTardinessPenaltyPage';
+import { DeleteOtRestdayAbsentPage } from '../Utilities/DeleteOtRestdayAbsentPage';
+import { ProcessOvertimeCutoffPage } from '../Utilities/ProcessOvertimeCutoffPage';
+import { UpdateAssumedDaysPage } from '../Utilities/UpdateAssumedDaysPage';
+import { DeductAbsencesExcessPage } from '../Utilities/DeductAbsencesExcessPage';
+import { ProcessOvertime24HoursPage } from '../Utilities/ProcessOvertime24HoursPage';
+import { PostProcessedTimekeepingPage } from '../Utilities/PostProcessedTimekeepingPage';
+import { UpdateTimeFlagBreaksPage } from '../Utilities/UpdateTimeFlagBreaksPage';
+import { UnpaidLunchDeductionPage } from '../Utilities/UnpaidLunchDeductionPage';
+import { DeductTardinessToOvertimePage } from '../Utilities/DeductTardinessToOvertimePage';
+
+import { RawDataPage } from '../RawDataPage';
+
+
+//Process Sub-Menu
+import { ProcessPage } from '../Process/ProcessPage';
+import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
+
+import { DailyTimeRecordMonitoringPage } from '../DailyTimeRecordMonitoringPage';
 import { TKSGroupSetupDefinitionPage } from '../TKSGroupSetupDefinitionPage';
 import { CompanyInformation } from '../../components/FileSetup/System/CompanyInformation';
 import { CalendarSetup } from '../FileSetup/Process/CalendarSetup';
@@ -110,9 +121,12 @@ import { CreateNewDatabasePage } from '../CreateNewDatabasePage';
 import { EmailConfigurationPage } from '../EmailConfigurationPage';
 import { AuditTrailPage } from '../AuditTrailPage';
 import { SecurityManagerPage } from '../SecurityManagerPage';
-import { PayrollDTRAllowancePage } from '../PayrollDTRAllowancePage';
-import { ExportNAVPage } from '../ExportNAVPage';
-import { ExportPayrollDataPage } from '../ExportPayrollDataPage';
+
+//Export Sub-menu
+import { PayrollDTRAllowancePage } from '../Export/PayrollDTRAllowancePage';
+import { ExportNAVPage } from '../Export/ExportNAVPage';
+import { ExportPayrollDataPage } from '../Export/ExportPayrollDataPage';
+
 import { GroupScheduleSetupPage } from '../FileSetup/Process/GroupScheduleSetupPage';
 import { HelpSetupPage } from '../FileSetup/Process/HelpSetupPage';
 import { LeaveTypeSetupPage } from '../FileSetup/Process/LeaveTypeSetupPage';
