@@ -157,7 +157,7 @@ export function DepartmentSetupPage() {
   // API Data states
   const [divisionData, setDivisionData] = useState<Array<{ code: string; description: string }>>([]);
   const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-  const [deviceData, setDeviceData] = useState<Array<{ deviceID: string; deviceName: string }>>([]);
+    const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
   const [loadingDivisions, setLoadingDivisions] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -263,12 +263,15 @@ export function DepartmentSetupPage() {
     setLoadingDevices(true);
     setDeviceError('');
     try {
-      const response = await apiClient.get('/Device/GetAll');
-      if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((device: any) => ({
-          deviceID: device.deviceCode || device.code || '',
-          deviceName: device.deviceName || device.name || ''
-        }));
+       const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((device: any) => ({
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
+                }));
+                setDeviceData(mappedData);
         setDeviceData(mappedData);
       }
     } catch (error: any) {

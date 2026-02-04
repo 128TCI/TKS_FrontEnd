@@ -30,7 +30,7 @@ export function EmployeeDesignationSetupPage() {
     const [showDeviceNameModal, setShowDeviceNameModal] = useState(false);
 
     // Device List states
-    const [deviceData, setDeviceData] = useState<Array<{ deviceID: string; deviceName: string }>>([]);
+      const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
     const [loadingDevices, setLoadingDevices] = useState(false);
     const [deviceError, setDeviceError] = useState('');
     // Job Level List states
@@ -108,12 +108,13 @@ export function EmployeeDesignationSetupPage() {
         setLoadingDevices(true);
         setDeviceError('');
         try {
-            const response = await apiClient.get('/Device/GetAll');
+           const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
             if (response.status === 200 && response.data) {
                 // Map API response to expected format
                 const mappedData = response.data.map((device: any) => ({
-                    deviceID: device.deviceCode || device.code || '',
-                    deviceName: device.deviceName || device.name || ''
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
                 }));
                 setDeviceData(mappedData);
             }
