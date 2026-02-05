@@ -20,10 +20,10 @@ import {
   Trash,
   Trash2
 } from 'lucide-react';
-import { LeaveApplicationModal } from './LeaveApplicationModal';
-import { OvertimeApplicationModal } from './OvertimeApplicationModal';
-import { ContractualModal } from './ContractualModal';
-import { SuspensionModal } from './SuspensionModal';
+import { LeaveApplicationModal } from './Modals/LeaveApplicationModal';
+import { OvertimeApplicationModal } from './Modals//OvertimeApplicationModal';
+import { ContractualModal } from './Modals/ContractualModal';
+import { SuspensionModal } from './Modals/SuspensionModal';
 import { Footer } from './Footer/Footer';
 
 type TabType = 'basic-config' | 'exemptions' | 'device-code' | 'rest-day' | 'workshift' | 'classification' | 'leave-applications' | 'overtime-applications' | 'contractual' | 'suspension';

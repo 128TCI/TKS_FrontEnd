@@ -14,7 +14,7 @@ import {
   Edit,
   Trash2
 } from 'lucide-react';
-import { OvertimeApplicationModal } from './OvertimeApplicationModal';
+import { OvertimeApplicationModal } from './Modals/OvertimeApplicationModal';
 import { DatePicker } from './DateSetup/DatePicker';
 import { Footer } from './Footer/Footer';
 
