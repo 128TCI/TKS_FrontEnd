@@ -1,7 +1,7 @@
 import { X, Check, ArrowLeft, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { LeaveCodeSearchModal } from './LeaveCodeSearchModal';
-import { DatePicker } from './DateSetup/DatePicker';
+import { DatePicker } from '../DateSetup/DatePicker';
 
 interface LeaveApplicationModalProps {
     isOpen: boolean;

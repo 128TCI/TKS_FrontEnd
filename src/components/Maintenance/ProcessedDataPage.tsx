@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Plus, Clock, AlertCircle, TrendingDown, CalendarX, Zap, DollarSign, Settings, Layers, Search, X, Calendar, Edit, Trash2 } from 'lucide-react';
-import { AdvancedModal, AdjustmentModal, OtherEarningsModal, UndertimeModal, OvertimeModal, TardinessModal, LeaveAbsencesModal, NoOfHoursModal, WorkshiftSearchModal, OTCodeSearchModal, LeaveTypeSearchModal } from './ProcessedDataModals';
+import { AdvancedModal, AdjustmentModal, OtherEarningsModal, UndertimeModal, OvertimeModal, TardinessModal, LeaveAbsencesModal, NoOfHoursModal, WorkshiftSearchModal, OTCodeSearchModal, LeaveTypeSearchModal } from '../Modals/ProcessedDataModals';
 import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
 

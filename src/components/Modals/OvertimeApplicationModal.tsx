@@ -1,5 +1,5 @@
 import { X, Check, ArrowLeft } from 'lucide-react';
-import { DatePicker } from './DateSetup/DatePicker';
+import { DatePicker } from '../DateSetup/DatePicker';
 import { useEffect } from 'react';
 
 interface OvertimeApplicationModalProps {

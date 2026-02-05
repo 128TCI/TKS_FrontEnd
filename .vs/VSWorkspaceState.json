@@ -4,9 +4,9 @@
     "\\src",
     "\\src\\components",
     "\\src\\components\\Dashboard",
-    "\\src\\components\\FileSetup\\Employment",
+    "\\src\\components\\Export",
+    "\\src\\components\\Maintenance",
     "\\src\\components\\Modals"
   ],
-  "SelectedNode": "\\src\\components\\Dashboard\\DashboardContent.tsx",
   "PreviewInSolutionExplorer": false
 }

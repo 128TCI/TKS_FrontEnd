@@ -1,7 +1,7 @@
 import { X, Check, ArrowLeft } from 'lucide-react';
-import { DatePicker } from './DateSetup/DatePicker';
+import { DatePicker } from '../DateSetup/DatePicker';
 
-interface SuspensionModalProps {
+interface ContractualModalProps {
   isOpen: boolean;
   isEditMode: boolean;
   dateFrom: string;
@@ -12,7 +12,7 @@ interface SuspensionModalProps {
   onSubmit: () => void;
 }
 
-export function SuspensionModal({
+export function ContractualModal({
   isOpen,
   isEditMode,
   dateFrom,
@@ -21,7 +21,7 @@ export function SuspensionModal({
   onDateFromChange,
   onDateToChange,
   onSubmit
-}: SuspensionModalProps) {
+}: ContractualModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -32,12 +32,12 @@ export function SuspensionModal({
         onClick={onClose}
       ></div>
 
-      {/* Modal Dialog */}
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    {/* Modal Dialog */}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                <h2 className="text-gray-800">{isEditMode ? 'Edit Suspension' : 'Create New'}</h2>
+            <h2 className="text-gray-800">{isEditMode ? 'Edit Record' : 'Create New'}</h2>
             <button 
               onClick={onClose}
               className="text-gray-600 hover:text-gray-800"
@@ -48,7 +48,7 @@ export function SuspensionModal({
 
           {/* Modal Content */}
           <div className="p-5">
-            <h3 className="text-blue-600 mb-4">Suspension</h3>
+            <h3 className="text-blue-600 mb-4">Employee Contractual</h3>
 
             {/* Form Fields */}
             <div className="space-y-3">
