@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, X, Check, ArrowLeft, Calendar, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
-
+import Swal from 'sweetalert2';
+import apiClient from '../../../../services/apiClient';
 
 interface AMSDatabase {
     id: number;
@@ -9,12 +10,29 @@ interface AMSDatabase {
     server: string;
     databaseName: string;
     username: string;
+    password?: string;
     withDeviceCode: boolean;
     lastDateUpdated: string;
+    tableName: string;
+    empCode: string;
+    timeStamp: string;
+    flag: string;
+    flagCode: string;
+    isAutomaticEmpCode: boolean;
+    employeeCodeTable: string;
+    employeeCodeCol: string;
+    empoyeeCodeIDCol: string;
+    dateDaysAhead: number;
+    lastDateUpdateReplica: string;
+    lastDateUpdateTo: string;
+    lastDateUpdateFlag: boolean;
+    lastDateUpdateFrom: string;
+    deviceNameCol: string;
 }
 
 interface FlagCode {
-    code: string;
+    id: number;
+    flagCode: string;
     timeIn: string;
     timeOut: string;
     break1Out: string;
@@ -152,6 +170,8 @@ export function AMSDatabaseConfigurationSetupPage() {
     const [flagSearchTerm, setFlagSearchTerm] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
     const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
+    const [calendarField, setCalendarField] = useState<'lastDateUpdated' | 'lastDateUpdatedFrom' | 'lastDateUpdatedTo'>('lastDateUpdated');
+    const [submitting, setSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         description: '',
@@ -177,26 +197,54 @@ export function AMSDatabaseConfigurationSetupPage() {
         deviceNameColumn: ''
     });
 
-    const [databases, setDatabases] = useState<AMSDatabase[]>([
-        {
-            id: 1,
-            description: 'test2',
-            server: 'TXRPC-8XSQL2017',
-            databaseName: 'attendancedb',
-            username: 'sa',
-            withDeviceCode: false,
-            lastDateUpdated: '5/2/2023'
-        }
-    ]);
+    // API Data States
+    const [databases, setDatabases] = useState<AMSDatabase[]>([]);
+    const [loadingDatabases, setLoadingDatabases] = useState(false);
+    const [databasesError, setDatabasesError] = useState('');
 
-    const flagCodes: FlagCode[] = [
-        { code: 'CANON', timeIn: 'Face (IN)', timeOut: 'Face (OUT)', break1Out: '', break1In: '', break2Out: '', break2In: '', break3Out: '', break3In: '' },
-        { code: 'DTR_Logs', timeIn: 'T/IN', timeOut: 'T/OUT', break1Out: 'B1O', break1In: 'B1I', break2Out: 'B2O', break2In: 'B2I', break3Out: 'B3O', break3In: 'B3I' },
-        { code: 'ZK', timeIn: 'I', timeOut: 'O', break1Out: '', break1In: '', break2Out: 'Out', break2In: 'Out Back', break3Out: '', break3In: '' },
-        { code: 'ZK2', timeIn: 'IN', timeOut: 'OUT', break1Out: '', break1In: '', break2Out: '', break2In: '', break3Out: '', break3In: '' }
-    ];
+    const [flagCodes, setFlagCodes] = useState<FlagCode[]>([]);
+    const [loadingFlags, setLoadingFlags] = useState(false);
 
     const itemsPerPage = 10;
+
+    // Fetch AMS Databases from API
+    useEffect(() => {
+        fetchAMSDatabases();
+        fetchFlagCodes();
+    }, []);
+
+    const fetchAMSDatabases = async () => {
+        setLoadingDatabases(true);
+        setDatabasesError('');
+        try {
+            const response = await apiClient.get('/Fs/Process/Device/AMSDbConfigSetUp');
+            if (response.status === 200 && response.data) {
+                setDatabases(response.data);
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load AMS databases';
+            setDatabasesError(errorMsg);
+            console.error('Error fetching AMS databases:', error);
+        } finally {
+            setLoadingDatabases(false);
+        }
+    };
+
+    const fetchFlagCodes = async () => {
+        setLoadingFlags(true);
+        try {
+            const response = await apiClient.get('/Fs/Process/Device/DTRFlagSetUp');
+            if (response.status === 200 && response.data) {
+                setFlagCodes(response.data);
+            }
+        } catch (error: any) {
+            console.error('Error fetching flag codes:', error);
+            // Use default flag codes if API fails
+            setFlagCodes([]);
+        } finally {
+            setLoadingFlags(false);
+        }
+    };
 
     const filteredData = databases.filter(item =>
         item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -210,8 +258,13 @@ export function AMSDatabaseConfigurationSetupPage() {
     const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
     const filteredFlags = flagCodes.filter(flag =>
-        flag.code.toLowerCase().includes(flagSearchTerm.toLowerCase())
+        flag.flagCode.toLowerCase().includes(flagSearchTerm.toLowerCase())
     );
+
+    // Reset to page 1 when search term changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const handleCreateNew = () => {
         setFormData({
@@ -250,65 +303,243 @@ export function AMSDatabaseConfigurationSetupPage() {
             password: '',
             withDeviceCode: item.withDeviceCode,
             lastDateUpdated: item.lastDateUpdated,
-            tableName: '',
-            empCodeColumn: '',
-            timeStampColumn: '',
-            flagColumn: '',
-            flagCode: '',
-            automaticEmpCode: false,
-            empCodeTableName: '',
-            empCodeColumnName: '',
-            empCodeIDColumn: '',
-            daysToDeduct: '',
-            specificRange: false,
-            lastDateUpdatedFrom: '',
-            lastDateUpdatedTo: '',
-            deviceNameColumn: ''
+            tableName: item.tableName,
+            empCodeColumn: item.empCode,
+            timeStampColumn: item.timeStamp,
+            flagColumn: item.flag,
+            flagCode: item.flagCode,
+            automaticEmpCode: item.isAutomaticEmpCode,
+            empCodeTableName: item.employeeCodeTable,
+            empCodeColumnName: item.employeeCodeCol,
+            empCodeIDColumn: item.empoyeeCodeIDCol,
+            daysToDeduct: item.dateDaysAhead.toString(),
+            specificRange: item.lastDateUpdateFlag,
+            lastDateUpdatedFrom: item.lastDateUpdateFrom,
+            lastDateUpdatedTo: item.lastDateUpdateTo,
+            deviceNameColumn: item.deviceNameCol
         });
         setShowEditModal(true);
     };
 
-    const handleDelete = (id: number) => {
-        if (confirm('Are you sure you want to delete this database configuration?')) {
-            setDatabases(prev => prev.filter(item => item.id !== id));
+    const handleDelete = async (item: AMSDatabase) => {
+        const confirmed = await Swal.fire({
+            icon: 'warning',
+            title: 'Confirm Delete',
+            text: `Are you sure you want to delete database configuration "${item.description}"?`,
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+        });
+
+        if (confirmed.isConfirmed) {
+            try {
+                await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Database configuration deleted successfully.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                await fetchAMSDatabases();
+            } catch (error: any) {
+                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete database configuration';
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: errorMsg,
+                });
+                console.error('Error deleting database configuration:', error);
+            }
         }
     };
 
-    const handleSubmitCreate = (e: React.FormEvent) => {
+    const handleSubmitCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        const newDatabase: AMSDatabase = {
-            id: Math.max(...databases.map(d => d.id), 0) + 1,
-            description: formData.description,
-            server: formData.server,
-            databaseName: formData.databaseName,
-            username: formData.username,
-            withDeviceCode: formData.withDeviceCode,
-            lastDateUpdated: formData.lastDateUpdated || new Date().toLocaleDateString()
-        };
-        setDatabases(prev => [...prev, newDatabase]);
-        setShowCreateModal(false);
+
+        // Validate required fields
+        if (!formData.description.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Description is required.',
+            });
+            return;
+        }
+
+        if (!formData.server.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Server is required.',
+            });
+            return;
+        }
+
+        if (!formData.databaseName.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Database Name is required.',
+            });
+            return;
+        }
+
+        if (!formData.username.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Username is required.',
+            });
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const payload = {
+                id: 0,
+                description: formData.description,
+                server: formData.server,
+                databaseName: formData.databaseName,
+                username: formData.username,
+                password: formData.password,
+                lastDateUpdated: formData.lastDateUpdated || new Date().toISOString(),
+                withDeviceCode: formData.withDeviceCode,
+                tableName: formData.tableName,
+                empCode: formData.empCodeColumn,
+                timeStamp: formData.timeStampColumn,
+                flag: formData.flagColumn,
+                flagCode: formData.flagCode,
+                isAutomaticEmpCode: formData.automaticEmpCode,
+                employeeCodeTable: formData.empCodeTableName,
+                employeeCodeCol: formData.empCodeColumnName,
+                empoyeeCodeIDCol: formData.empCodeIDColumn,
+                dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
+                lastDateUpdateReplica: '',
+                lastDateUpdateTo: formData.lastDateUpdatedTo || new Date().toISOString(),
+                lastDateUpdateFlag: formData.specificRange,
+                lastDateUpdateFrom: formData.lastDateUpdatedFrom || new Date().toISOString(),
+                deviceNameCol: formData.deviceNameColumn
+            };
+
+            await apiClient.post('/Fs/Process/Device/AMSDbConfigSetUp', payload);
+            await Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: 'Database configuration created successfully.',
+                timer: 2000,
+                showConfirmButton: false,
+            });
+
+            await fetchAMSDatabases();
+            setShowCreateModal(false);
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+            await Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: errorMsg,
+            });
+            console.error('Error creating database configuration:', error);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
-    const handleSubmitEdit = (e: React.FormEvent) => {
+    const handleSubmitEdit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (editingItem) {
-            setDatabases(prev =>
-                prev.map(item =>
-                    item.id === editingItem.id
-                        ? {
-                            ...item,
-                            description: formData.description,
-                            server: formData.server,
-                            databaseName: formData.databaseName,
-                            username: formData.username,
-                            withDeviceCode: formData.withDeviceCode,
-                            lastDateUpdated: formData.lastDateUpdated || item.lastDateUpdated
-                        }
-                        : item
-                )
-            );
+
+        if (!editingItem) return;
+
+        // Validate required fields
+        if (!formData.description.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Description is required.',
+            });
+            return;
+        }
+
+        if (!formData.server.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Server is required.',
+            });
+            return;
+        }
+
+        if (!formData.databaseName.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Database Name is required.',
+            });
+            return;
+        }
+
+        if (!formData.username.trim()) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Username is required.',
+            });
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const payload = {
+                id: editingItem.id,
+                description: formData.description,
+                server: formData.server,
+                databaseName: formData.databaseName,
+                username: formData.username,
+                password: formData.password || editingItem.password,
+                lastDateUpdated: formData.lastDateUpdated || editingItem.lastDateUpdated,
+                withDeviceCode: formData.withDeviceCode,
+                tableName: formData.tableName,
+                empCode: formData.empCodeColumn,
+                timeStamp: formData.timeStampColumn,
+                flag: formData.flagColumn,
+                flagCode: formData.flagCode,
+                isAutomaticEmpCode: formData.automaticEmpCode,
+                employeeCodeTable: formData.empCodeTableName,
+                employeeCodeCol: formData.empCodeColumnName,
+                empoyeeCodeIDCol: formData.empCodeIDColumn,
+                dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
+                lastDateUpdateReplica: editingItem.lastDateUpdateReplica,
+                lastDateUpdateTo: formData.lastDateUpdatedTo || editingItem.lastDateUpdateTo,
+                lastDateUpdateFlag: formData.specificRange,
+                lastDateUpdateFrom: formData.lastDateUpdatedFrom || editingItem.lastDateUpdateFrom,
+                deviceNameCol: formData.deviceNameColumn
+            };
+
+            await apiClient.put(`/Fs/Process/Device/AMSDbConfigSetUp/${editingItem.id}`, payload);
+            await Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: 'Database configuration updated successfully.',
+                timer: 2000,
+                showConfirmButton: false,
+            });
+
+            await fetchAMSDatabases();
             setShowEditModal(false);
             setEditingItem(null);
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+            await Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: errorMsg,
+            });
+            console.error('Error updating database configuration:', error);
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -323,6 +554,27 @@ export function AMSDatabaseConfigurationSetupPage() {
         setFormData(prev => ({ ...prev, flagCode: code }));
         setShowFlagSearchModal(false);
         setFlagSearchTerm('');
+    };
+
+    const handleCalendarClick = (field: 'lastDateUpdated' | 'lastDateUpdatedFrom' | 'lastDateUpdatedTo', e: React.MouseEvent) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setCalendarPosition({
+            top: rect.bottom + 5,
+            left: rect.left
+        });
+        setCalendarField(field);
+        setShowCalendar(true);
+    };
+
+    const handleCalendarChange = (date: string) => {
+        if (calendarField === 'lastDateUpdated') {
+            setFormData({ ...formData, lastDateUpdated: date });
+        } else if (calendarField === 'lastDateUpdatedFrom') {
+            setFormData({ ...formData, lastDateUpdatedFrom: date });
+        } else if (calendarField === 'lastDateUpdatedTo') {
+            setFormData({ ...formData, lastDateUpdatedTo: date });
+        }
+        setShowCalendar(false);
     };
 
     // Handle ESC key press with hierarchy
@@ -434,30 +686,25 @@ export function AMSDatabaseConfigurationSetupPage() {
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                <div className="flex items-center gap-2">
+                    <label className="text-gray-700 text-sm whitespace-nowrap w-40">
                         Last Date Updated :
                     </label>
-                    <input
-                        type="text"
-                        value={formData.lastDateUpdated}
-                        onChange={(e) => setFormData({ ...formData, lastDateUpdated: e.target.value })}
-                        className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
-                    />
-                    <button
-                        type="button"
-                        className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center transition-colors"
-                        onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setCalendarPosition({
-                                top: rect.bottom + 5,
-                                left: rect.left
-                            });
-                            setShowCalendar(true);
-                        }}
-                    >
-                        <Calendar className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2 flex-1">
+                        <input
+                            type="text"
+                            value={formData.lastDateUpdated}
+                            onChange={(e) => setFormData({ ...formData, lastDateUpdated: e.target.value })}
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                        <button
+                            type="button"
+                            className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center transition-colors flex-shrink-0"
+                            onClick={(e) => handleCalendarClick('lastDateUpdated', e)}
+                        >
+                            <Calendar className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -621,27 +868,45 @@ export function AMSDatabaseConfigurationSetupPage() {
 
             {/* Last Date Updated From & To Row */}
             <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm whitespace-nowrap w-40">
+                <div className="flex items-center gap-2">
+                    <label className="text-gray-700 text-sm whitespace-nowrap w-44">
                         Last Date Updated From :
                     </label>
-                    <input
-                        type="text"
-                        value={formData.lastDateUpdatedFrom}
-                        onChange={(e) => setFormData({ ...formData, lastDateUpdatedFrom: e.target.value })}
-                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
+                    <div className="flex items-center gap-2 flex-1">
+                        <input
+                            type="text"
+                            value={formData.lastDateUpdatedFrom}
+                            onChange={(e) => setFormData({ ...formData, lastDateUpdatedFrom: e.target.value })}
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                        <button
+                            type="button"
+                            className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center transition-colors flex-shrink-0"
+                            onClick={(e) => handleCalendarClick('lastDateUpdatedFrom', e)}
+                        >
+                            <Calendar className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm whitespace-nowrap w-32">
+                <div className="flex items-center gap-2">
+                    <label className="text-gray-700 text-sm whitespace-nowrap w-40">
                         Last Date Updated To :
                     </label>
-                    <input
-                        type="text"
-                        value={formData.lastDateUpdatedTo}
-                        onChange={(e) => setFormData({ ...formData, lastDateUpdatedTo: e.target.value })}
-                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
+                    <div className="flex items-center gap-2 flex-1">
+                        <input
+                            type="text"
+                            value={formData.lastDateUpdatedTo}
+                            onChange={(e) => setFormData({ ...formData, lastDateUpdatedTo: e.target.value })}
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                        <button
+                            type="button"
+                            className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center transition-colors flex-shrink-0"
+                            onClick={(e) => handleCalendarClick('lastDateUpdatedTo', e)}
+                            >
+                            <Calendar className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -729,58 +994,70 @@ export function AMSDatabaseConfigurationSetupPage() {
 
                         {/* Table */}
                         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                            <table className="w-full">
-                                <thead className="bg-gray-100 border-b border-gray-200">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Server</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Database Name</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Username</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">With Device Code</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Last Date Updated</th>
-                                        <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {paginatedData.length > 0 ? (
-                                        paginatedData.map((item) => (
-                                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 text-sm text-gray-900">{item.description}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.server}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.databaseName}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.username}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.withDeviceCode ? 'Yes' : 'No'}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.lastDateUpdated}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={() => handleEdit(item)}
-                                                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                                            title="Edit"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                        <span className="text-gray-300">|</span>
-                                                        <button
-                                                            onClick={() => handleDelete(item.id)}
-                                                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
+                            {loadingDatabases ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="text-gray-600 text-sm">Loading database configurations...</div>
+                                </div>
+                            ) : databasesError ? (
+                                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                                    <p className="text-red-700 text-sm">{databasesError}</p>
+                                </div>
+                            ) : (
+                                <table className="w-full">
+                                    <thead className="bg-gray-100 border-b border-gray-200">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Server</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Database Name</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Username</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">With Device Code</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Last Date Updated</th>
+                                            <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {paginatedData.length > 0 ? (
+                                            paginatedData.map((item) => (
+                                                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4 text-sm text-gray-900">{item.description}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{item.server}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{item.databaseName}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{item.username}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{item.withDeviceCode ? 'Yes' : 'No'}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">
+                                                        {new Date(item.lastDateUpdated).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button
+                                                                onClick={() => handleEdit(item)}
+                                                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                                                title="Edit"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <span className="text-gray-300">|</span>
+                                                            <button
+                                                                onClick={() => handleDelete(item)}
+                                                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-16 text-center">
+                                                    <div className="text-gray-500">No data available in table</div>
                                                 </td>
                                             </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={7} className="px-6 py-16 text-center">
-                                                <div className="text-gray-500">No data available in table</div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
 
                         {/* Pagination */}
@@ -835,14 +1112,16 @@ export function AMSDatabaseConfigurationSetupPage() {
                             <div className="flex gap-3 mt-5 pt-4 border-t border-gray-200">
                                 <button
                                     type="submit"
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                                    disabled={submitting}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                                 >
-                                    Submit
+                                    {submitting ? 'Submitting...' : 'Submit'}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
-                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                                    disabled={submitting}
+                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                                 >
                                     Back to List
                                 </button>
@@ -871,14 +1150,16 @@ export function AMSDatabaseConfigurationSetupPage() {
                             <div className="flex gap-3 mt-5 pt-4 border-t border-gray-200">
                                 <button
                                     type="submit"
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                                    disabled={submitting}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                                 >
-                                    Update
+                                    {submitting ? 'Updating...' : 'Update'}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
-                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                                    disabled={submitting}
+                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                                 >
                                     Back to List
                                 </button>
@@ -915,40 +1196,54 @@ export function AMSDatabaseConfigurationSetupPage() {
                             </div>
 
                             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Flag Code</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Time In</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Time Out</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break1 Out</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break1 In</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break2 Out</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break2 In</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break3 Out</th>
-                                            <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break3 In</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {filteredFlags.map((flag, index) => (
-                                            <tr
-                                                key={index}
-                                                className="hover:bg-blue-50 cursor-pointer transition-colors"
-                                                onClick={() => handleSelectFlagCode(flag.code)}
-                                            >
-                                                <td className="px-4 py-3 text-sm text-blue-600 hover:underline">{flag.code}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.timeIn}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.timeOut}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break1Out}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break1In}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break2Out}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break2In}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break3Out}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break3In}</td>
+                                {loadingFlags ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <div className="text-gray-600 text-sm">Loading flag codes...</div>
+                                    </div>
+                                ) : (
+                                    <table className="w-full">
+                                        <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Flag Code</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Time In</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Time Out</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break1 Out</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break1 In</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break2 Out</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break2 In</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break3 Out</th>
+                                                <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break3 In</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {filteredFlags.length > 0 ? (
+                                                filteredFlags.map((flag, index) => (
+                                                    <tr
+                                                        key={index}
+                                                        className="hover:bg-blue-50 cursor-pointer transition-colors"
+                                                        onClick={() => handleSelectFlagCode(flag.flagCode)}
+                                                    >
+                                                        <td className="px-4 py-3 text-sm text-blue-600 hover:underline">{flag.flagCode}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.timeIn}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.timeOut}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.break1Out}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.break1In}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.break2Out}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.break2In}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.break3Out}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{flag.break3In}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                                                        No flag codes available
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -958,11 +1253,12 @@ export function AMSDatabaseConfigurationSetupPage() {
             {/* Calendar Popup */}
             {showCalendar && (
                 <CalendarPopup
-                    value={formData.lastDateUpdated}
-                    onChange={(date) => {
-                        setFormData({ ...formData, lastDateUpdated: date });
-                        setShowCalendar(false);
-                    }}
+                    value={
+                        calendarField === 'lastDateUpdated' ? formData.lastDateUpdated :
+                            calendarField === 'lastDateUpdatedFrom' ? formData.lastDateUpdatedFrom :
+                                formData.lastDateUpdatedTo
+                    }
+                    onChange={handleCalendarChange}
                     onClose={() => setShowCalendar(false)}
                     position={calendarPosition}
                 />

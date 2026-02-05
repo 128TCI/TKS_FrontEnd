@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 interface Device {
-    deviceID: string;
-    deviceName: string;
+    id: number;
+    code: string;
+    description: string;
 }
 
 interface DeviceSearchModalProps {
@@ -53,8 +54,8 @@ export function DeviceSearchModal({
     }, [isOpen]);
 
     const filteredDevices = devices.filter(dev =>
-        dev.deviceID.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dev.deviceName.toLowerCase().includes(searchTerm.toLowerCase())
+        dev.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dev.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Pagination logic
@@ -148,15 +149,15 @@ export function DeviceSearchModal({
                                         {paginatedDevices.length > 0 ? (
                                             paginatedDevices.map((dev) => (
                                                 <tr
-                                                    key={dev.deviceID}
+                                                    key={dev.code}
                                                     className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
                                                     onClick={() => {
-                                                        onSelect(dev.deviceID, dev.deviceName);
+                                                        onSelect(dev.code, dev.description);
                                                         onClose();
                                                     }}
                                                 >
-                                                    <td className="px-3 py-1.5">{dev.deviceID}</td>
-                                                    <td className="px-3 py-1.5">{dev.deviceName}</td>
+                                                    <td className="px-3 py-1.5">{dev.code}</td>
+                                                    <td className="px-3 py-1.5">{dev.description}</td>
                                                 </tr>
                                             ))
                                         ) : (

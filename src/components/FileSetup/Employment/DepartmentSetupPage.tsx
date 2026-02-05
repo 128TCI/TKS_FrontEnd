@@ -132,6 +132,7 @@ export function DepartmentSetupPage() {
   
   // Form fields
   const [departmentCode, setDepartmentCode] = useState('');
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [divisionCode, setDivisionCode] = useState('');
   const [departmentHeadCode, setDepartmentHeadCode] = useState('');
@@ -156,7 +157,7 @@ export function DepartmentSetupPage() {
   // API Data states
   const [divisionData, setDivisionData] = useState<Array<{ code: string; description: string }>>([]);
   const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-  const [deviceData, setDeviceData] = useState<Array<{ deviceID: string; deviceName: string }>>([]);
+    const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
   const [loadingDivisions, setLoadingDivisions] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -176,8 +177,10 @@ export function DepartmentSetupPage() {
       const response = await apiClient.get('/Fs/Employment/DepartmentSetUp');
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((dept: any) => ({
-          id: dept.depID || '',
+          departmentId: dept.depID || '',
           code: dept.depCode || '',
+          departmentCode: dept.depCode || '',
+          departmentHeadCode: dept.depHeadCode || '',
           description: dept.depDesc || '',
           divisionCode: dept.divCode || '',
           head: dept.depHead || '',
@@ -260,12 +263,15 @@ export function DepartmentSetupPage() {
     setLoadingDevices(true);
     setDeviceError('');
     try {
-      const response = await apiClient.get('/Device/GetAll');
-      if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((device: any) => ({
-          deviceID: device.deviceCode || device.code || '',
-          deviceName: device.deviceName || device.name || ''
-        }));
+       const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((device: any) => ({
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
+                }));
+                setDeviceData(mappedData);
         setDeviceData(mappedData);
       }
     } catch (error: any) {
@@ -312,11 +318,12 @@ export function DepartmentSetupPage() {
 
   const handleEdit = (department: any, index: number) => {
     setIsEditMode(true);
+    setDepartmentId(department.departmentId);
     setSelectedDepartmentIndex(index);
     setDepartmentCode(department.code);
+    setDepartmentHeadCode(department.departmentHeadCode);
     setDescription(department.description);
     setDivisionCode(department.divisionCode);
-    setDepartmentHeadCode('');
     setDepartmentHead(department.head);
     setDeviceName(department.deviceName);
     setHead1(department.head1);
@@ -330,7 +337,7 @@ export function DepartmentSetupPage() {
     const confirmed = await Swal.fire({
       icon: 'warning',
       title: 'Confirm Delete',
-      text: `Are you sure you want to delete department ${department.code}?`,
+      text: `Are you sure you want to delete department ${department.departmentId}?`,
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
@@ -370,7 +377,23 @@ export function DepartmentSetupPage() {
       });
       return;
     }
-
+// Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = departmentList.some((department, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedDepartmentIndex === index) {
+                return false;
+              }
+              return department.code.toLowerCase() === departmentCode.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
@@ -395,6 +418,7 @@ export function DepartmentSetupPage() {
     setSubmitting(true);
     try {
       const payload = {
+        depID: isEditMode && departmentId ? parseInt(departmentId) : 0,
         depCode: departmentCode,
         depDesc: description,
         divCode: divisionCode || null,
@@ -408,8 +432,7 @@ export function DepartmentSetupPage() {
       };
 
       if (isEditMode && selectedDepartmentIndex !== null) {
-        const deptId = departmentList[selectedDepartmentIndex]?.id;
-        await apiClient.put(`/Fs/Employment/DepartmentSetUp/${deptId}`, payload);
+        await apiClient.put(`/Fs/Employment/DepartmentSetUp/${payload.depID}`, payload);
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -685,15 +708,22 @@ export function DepartmentSetupPage() {
                     <h3 className="text-blue-600 mb-3">Department Setup</h3>
 
                     <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <label className="w-40 text-gray-700 text-sm">Department Code :</label>
-                        <input
-                          type="text"
-                          value={departmentCode}
-                          onChange={(e) => setDepartmentCode(e.target.value)}
-                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
+                     <div className="flex items-center gap-3">
+    <label className="w-40 text-gray-700 text-sm">Department Code :</label>
+    <input
+        type="text"
+        value={departmentCode}
+        onChange={(e) => {
+            const value = e.target.value;
+            // Limit to 10 characters at HTML level
+            if (value.length <= 10) {
+                setDepartmentCode(value);
+            }
+        }}
+        maxLength={10}
+        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+    />
+</div>
 
                       <div className="flex items-center gap-3">
                         <label className="w-40 text-gray-700 text-sm">Description :</label>

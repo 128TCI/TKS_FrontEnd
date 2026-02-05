@@ -5,6 +5,7 @@ import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
+import { decryptData } from '../../../services/encryptionService';
 
 export function BranchSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -18,6 +19,7 @@ export function BranchSetupPage() {
   const [branchManagerCode, setBranchManagerCode] = useState('');
   const [branchManager, setBranchManager] = useState('');
   const [deviceName, setDeviceName] = useState('');
+  const [branchId, setBranchId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   
   // Modal state
@@ -31,12 +33,45 @@ export function BranchSetupPage() {
 
   // API Data states
   const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-  const [deviceData, setDeviceData] = useState<Array<{ deviceID: string; deviceName: string }>>([]);
+    const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [employeeError, setEmployeeError] = useState('');
   const [deviceError, setDeviceError] = useState('');
 
+  // Permissions
+const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+const hasPermission = (accessType: string) => permissions[accessType] === true;
+
+ useEffect(() => {
+  getBranchPermissions();
+}, []);
+
+const getBranchPermissions = () => {
+  const rawPayload = localStorage.getItem("loginPayload");
+  if (!rawPayload) return;
+
+  try {
+    const parsedPayload = JSON.parse(rawPayload);
+    const encryptedArray: any[] = parsedPayload.permissions || [];
+
+    const branchEntries = encryptedArray.filter(
+      (p) => decryptData(p.formName) === "BranchSetup"
+    );
+
+    // Build a map: { Add: true, Edit: true, ... }
+    const permMap: Record<string, boolean> = {};
+    branchEntries.forEach((p) => {
+      const accessType = decryptData(p.accessTypeName);
+      if (accessType) permMap[accessType] = true;
+    });
+
+    setPermissions(permMap);
+
+  } catch (e) {
+    console.error("Error parsing or decrypting payload", e);
+  }
+};
   // Fetch branch data from API
   useEffect(() => {
     fetchBranchData();
@@ -50,7 +85,7 @@ export function BranchSetupPage() {
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((branch: any) => ({
-          id: branch.braID || branch.id || '',
+          branchId: branch.braID || branch.id || '',
           code: branch.braCode || branch.code || '',
           description: branch.braDesc || branch.description || '',
           branchManager: branch.braMngr || branch.branchManager || '',
@@ -105,13 +140,15 @@ export function BranchSetupPage() {
     setLoadingDevices(true);
     setDeviceError('');
     try {
-      const response = await apiClient.get('/Device/GetAll');
-      if (response.status === 200 && response.data) {
-        // Map API response to expected format
-        const mappedData = response.data.map((device: any) => ({
-          deviceID: device.deviceCode || device.code || '',
-          deviceName: device.deviceName || device.name || ''
-        }));
+       const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((device: any) => ({
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
+                }));
+                setDeviceData(mappedData);
         setDeviceData(mappedData);
       }
     } catch (error: any) {
@@ -155,6 +192,7 @@ export function BranchSetupPage() {
   const handleEdit = (branch: any, index: number) => {
     setIsEditMode(true);
     setSelectedBranchIndex(index);
+    setBranchId(branch.branchId);
     setCode(branch.code);
     setDescription(branch.description);
     setBranchManagerCode(branch.branchManagerCode);
@@ -209,10 +247,27 @@ export function BranchSetupPage() {
       });
       return;
     }
-
+            // Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = branchList.some((branch, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedBranchIndex === index) {
+                return false;
+              }
+              return branch.code.toLowerCase() === code.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
     setSubmitting(true);
     try {
       const payload = {
+        braID: isEditMode && branchId ? parseInt(branchId) : 0,
         braCode: code,
         braDesc: description,
         braMngr: branchManager || null,
@@ -222,8 +277,8 @@ export function BranchSetupPage() {
 
       if (isEditMode && selectedBranchIndex !== null) {
         // Update existing record via PUT
-        const branchId = branchList[selectedBranchIndex]?.id;
-        await apiClient.put(`/Fs/Employment/BranchSetUp/${branchId}`, payload);
+        const id = branchId;
+        await apiClient.put(`/Fs/Employment/BranchSetUp/${id}`, payload);
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -335,6 +390,7 @@ export function BranchSetupPage() {
 
             {/* Controls Row */}
             <div className="flex items-center gap-4 mb-6">
+               {hasPermission("Add") && (
               <button 
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                 onClick={handleCreateNew}
@@ -342,6 +398,7 @@ export function BranchSetupPage() {
                 <Plus className="w-4 h-4" />
                 Create New
               </button>
+               )}
               <div className="ml-auto flex items-center gap-2">
                 <label className="text-gray-700">Search:</label>
                 <input
@@ -353,52 +410,68 @@ export function BranchSetupPage() {
               </div>
             </div>
 
-            {/* Data Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 border-b-2 border-gray-300">
-                    <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Description</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Branch Manager</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Device Name</th>
-                    <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBranches.map((branch, index) => (
-                    <tr
-                      key={index}
-                      className="border-b border-gray-200 hover:bg-gray-50"
+           {/* Data Table */}
+<div className="overflow-x-auto">
+  {hasPermission("View") ? (
+    <table className="w-full border-collapse">
+      <thead>
+        <tr className="bg-gray-100 border-b-2 border-gray-300">
+          <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
+          <th className="px-4 py-2 text-left text-gray-700">Description</th>
+          <th className="px-4 py-2 text-left text-gray-700">Branch Manager</th>
+          <th className="px-4 py-2 text-left text-gray-700">Device Name</th>
+          {(hasPermission("Edit") || hasPermission("Delete")) && (
+            <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {filteredBranches.map((branch, index) => (
+          <tr
+            key={index}
+            className="border-b border-gray-200 hover:bg-gray-50"
+          >
+            <td className="px-4 py-2">{branch.code}</td>
+            <td className="px-4 py-2">{branch.description}</td>
+            <td className="px-4 py-2">{branch.branchManager}</td>
+            <td className="px-4 py-2">{branch.deviceName}</td>
+            {(hasPermission("Edit") || hasPermission("Delete")) && (
+              <td className="px-4 py-2 whitespace-nowrap">
+                <div className="flex gap-2">
+                  {hasPermission("Edit") && (
+                    <button
+                      onClick={() => handleEdit(branch, index)}
+                      className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                      title="Edit"
                     >
-                      <td className="px-4 py-2">{branch.code}</td>
-                      <td className="px-4 py-2">{branch.description}</td>
-                      <td className="px-4 py-2">{branch.branchManager}</td>
-                      <td className="px-4 py-2">{branch.deviceName}</td>
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit(branch, index)}
-                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <span className="text-gray-300">|</span>
-                          <button
-                            onClick={() => handleDelete(branch.code)}
-                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  )}
+                  {hasPermission("Edit") && hasPermission("Delete") && (
+                    <span className="text-gray-300">|</span>
+                  )}
+                  {hasPermission("Delete") && (
+                    <button
+                      onClick={() => handleDelete(branch)}
+                      className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </td>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  ) : (
+    <div className="text-center py-10 text-gray-500">
+      You do not have permission to view this list.
+    </div>
+  )}
+</div>
 
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
@@ -445,6 +518,7 @@ export function BranchSetupPage() {
                           <label className="w-40 text-gray-700 text-sm">Code :</label>
                           <input
                             type="text"
+                            maxLength={10}
                             value={code}
                             onChange={(e) => setCode(e.target.value)}
                             className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"

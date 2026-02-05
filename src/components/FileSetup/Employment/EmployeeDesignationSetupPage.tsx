@@ -1,96 +1,156 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Check, ArrowLeft, Search, Edit, Trash2 } from 'lucide-react';
+import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
+import apiClient from '../../../services/apiClient';
 import { Footer } from '../../Footer/Footer';
+import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
+import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
+import Swal from 'sweetalert2';
 
 export function EmployeeDesignationSetupPage() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showJobLevelSearchModal, setShowJobLevelSearchModal] = useState(false);
-  const [showDeviceNameSearchModal, setShowDeviceNameSearchModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [jobLevelSearchTerm, setJobLevelSearchTerm] = useState('');
-  const [deviceNameSearchTerm, setDeviceNameSearchTerm] = useState('');
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedDesignationIndex, setSelectedDesignationIndex] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [jobLevelSearchTerm, setJobLevelSearchTerm] = useState('');
+    const [showDeviceNameSearchModal, setShowDeviceNameSearchModal] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [selectedDesignationIndex, setSelectedDesignationIndex] = useState<number | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 100;
   
   // Form fields
-  const [code, setCode] = useState('');
-  const [description, setDescription] = useState('');
-  const [jobLevelCode, setJobLevelCode] = useState('');
-  const [deviceName, setDeviceName] = useState('');
-  
-  // Sample data for Job Level Code
-  const [jobLevelList] = useState([
-    { code: 'ASSOCSTAFF', description: 'Associate Staff' },
-    { code: 'DIRECTOR', description: 'Director' },
-    { code: 'EXECUTIVE', description: 'Executive' },
-    { code: 'INTERSTAFF', description: 'Intermediate Staff' },
-    { code: 'MANAGER', description: 'Manager' },
-    { code: 'ProjB', description: 'Installer' },
-    { code: 'SRDIR', description: 'Senior Director' },
-    { code: 'SREXEC', description: 'Senior Executive' },
-    { code: 'SRMNGR', description: 'Senior Manager' },
-    { code: 'SRSTAFF', description: 'Senior Staff' },
-  ]);
+    const [code, setCode] = useState('');
+    const [codeError, setCodeError] = useState('');
+    const [description, setDescription] = useState('');
+    const [jobLevelCode, setJobLevelCode] = useState('');
+    const [deviceName, setDeviceName] = useState('');
+    const [designationId, setDesignationId] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
 
-  // Sample data for the designation list
-  const [designationList, setDesignationList] = useState([
-    { code: 'AA/RA', description: 'Accounting Analyst/Relief Assistant', jobLevelCode: '', deviceName: '' },
-    { code: 'ACC/ADMSTF', description: 'Accounting/Admin Staff', jobLevelCode: '', deviceName: '' },
-    { code: 'ACCLERK', description: 'Accounting Clerk', jobLevelCode: '', deviceName: '' },
-    { code: 'ACCLERK-R', description: 'ACCOUNTING CLERK-RELIEVER', jobLevelCode: '', deviceName: '' },
-    { code: 'ACCLRK-RLV', description: 'Accounting Clerk- Reliever', jobLevelCode: '', deviceName: '' },
-    { code: 'ACCT', description: 'ACCOUNTANT', jobLevelCode: '', deviceName: '' },
-    { code: 'ACHFTW', description: 'Actual Measurer, In-house Tinsmith & Welder', jobLevelCode: '', deviceName: '' },
-    { code: 'ACLRK/COOR', description: 'Accounting Clerk/Coordinator', jobLevelCode: '', deviceName: '' },
-    { code: 'ADM', description: 'Admin Assistant', jobLevelCode: '', deviceName: '' },
-    { code: 'ADMCOOR', description: 'Building Administrative Coordinator', jobLevelCode: '', deviceName: '' },
-    { code: 'ADMINCLRK', description: 'Office Administrative Clerk', jobLevelCode: '', deviceName: '' },
-    { code: 'AELECTRIC', description: 'Auto/Building Electrician', jobLevelCode: '', deviceName: '' },
-    { code: 'AM', description: 'Actual Measurer', jobLevelCode: '', deviceName: '' },
-    { code: 'AM/SR', description: 'Actual Measurer/Service Repairman', jobLevelCode: '', deviceName: '' },
-    { code: 'AMGR', description: 'Audit Manager', jobLevelCode: '', deviceName: '' },
-    { code: 'AMKO', description: 'Assistant Marketing Operations Manager', jobLevelCode: '', deviceName: '' },
-    { code: 'ASST-WHM', description: 'Assistant Warehouseman', jobLevelCode: '', deviceName: '' },
-    { code: 'AUTOCAD', description: 'Autocad Operator', jobLevelCode: '', deviceName: '' },
-    { code: 'AVP', description: 'AVP Marketing Operations', jobLevelCode: '', deviceName: '' },
-    { code: 'BA', description: 'Branch Accountant', jobLevelCode: '', deviceName: '' },
-    { code: 'BA-TR', description: 'Branch Accountant-Trainee', jobLevelCode: '', deviceName: '' },
-    { code: 'BAPROG', description: 'BUSINESS APPLICATION PROG.', jobLevelCode: '', deviceName: '' },
-    { code: 'BENDER', description: 'BENDER', jobLevelCode: '', deviceName: '' },
-    { code: 'BENDMAOP', description: 'Bending Machine Operator', jobLevelCode: '', deviceName: '' },
-    { code: 'BILLER', description: 'Biller', jobLevelCode: '', deviceName: '' },
-  ]);
+    // Modal state
+    const [showJobLevelModal, setShowJobLevelModal] = useState(false);
+    const [showDeviceNameModal, setShowDeviceNameModal] = useState(false);
 
-  // Handle ESC key to close modals
-  useEffect(() => {
-    const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (showJobLevelSearchModal) {
-          setShowJobLevelSearchModal(false);
-        } else if (showDeviceNameSearchModal) {
-          setShowDeviceNameSearchModal(false);
-        } else if (showCreateModal) {
-          setShowCreateModal(false);
+    // Device List states
+      const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
+    const [loadingDevices, setLoadingDevices] = useState(false);
+    const [deviceError, setDeviceError] = useState('');
+    // Job Level List states
+    const [levelList, setLevelList] = useState<Array<{ id: string; code: string; description: string; }>>([]);
+    const [loadingJobLevels, setLoadingJobLevels] = useState(false);
+    const [jobLevelError, setJobLevelError] = useState('');
+
+    // Designation List states
+    const [designationList, setDesignationList] = useState<Array<{ id: string; code: string; description: string; jobLevelCode: string; deviceName: string }>>([]);
+    const [loadingDesignation, setLoadingDesignation] = useState(false);
+    const [designationError, setDesignationError] = useState('');
+
+   // Fetch job level data from API
+    useEffect(() => {
+        fetchJobLevelData();
+    }, []);
+
+    const fetchJobLevelData = async () => {
+        setLoadingJobLevels(true);
+        setJobLevelError('');
+        try {
+            const response = await apiClient.get('/Fs/Employment/JobLevelSetUp');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((division: any) => ({
+                    id: division.jobLevelID || '',
+                    code: division.jobLevelCode || '',
+                    description: division.jobLevelDesc || '',
+                }));
+                setLevelList(mappedData);
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load divisions';
+            setJobLevelError(errorMsg);
+            console.error('Error fetching divisions:', error);
+        } finally {
+            setLoadingJobLevels(false);
         }
-      }
+    };
+    // Fetch division data from API
+    useEffect(() => {
+        fetchDesignationData();
+    }, []);
+
+    const fetchDesignationData = async () => {
+        setLoadingDesignation(true);
+        setDesignationError('');
+        try {
+            const response = await apiClient.get('/Fs/Employment/DesignationSetUp');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((division: any) => ({
+                    id: division.desID  || '',
+                    code: division.desCode || '',
+                    description: division.desDesc || '',
+                    jobLevelCode: division.jobLevelCode || '',
+                    deviceName: division.deviceName || '',
+                }));
+                setDesignationList(mappedData);
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load divisions';
+            setDesignationError(errorMsg);
+            console.error('Error fetching Designation:', error);
+        } finally {
+            setLoadingDesignation(false);
+        }
+    };
+// Fetch device data from API
+    useEffect(() => {
+        fetchDeviceData();
+    }, []);
+
+    const fetchDeviceData = async () => {
+        setLoadingDevices(true);
+        setDeviceError('');
+        try {
+           const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((device: any) => ({
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
+                }));
+                setDeviceData(mappedData);
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load devices';
+            setDeviceError(errorMsg);
+            console.error('Error fetching devices:', error);
+        } finally {
+            setLoadingDevices(false);
+        }
     };
 
-    if (showCreateModal || showJobLevelSearchModal || showDeviceNameSearchModal) {
-      document.addEventListener('keydown', handleEscKey);
-    }
+    // Handle ESC key to close create modal only
+    useEffect(() => {
+        const handleEscKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && showCreateModal) {
+                setShowCreateModal(false);
+            }
+        };
 
-    return () => {
-      document.removeEventListener('keydown', handleEscKey);
-    };
-  }, [showCreateModal, showJobLevelSearchModal, showDeviceNameSearchModal]);
+        if (showCreateModal) {
+            document.addEventListener('keydown', handleEscKey);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleEscKey);
+        };
+    }, [showCreateModal]);
 
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedDesignationIndex(null);
+    setDesignationId(null);
     // Clear form
     setCode('');
+    setCodeError('');
     setDescription('');
     setJobLevelCode('');
     setDeviceName('');
@@ -100,62 +160,155 @@ export function EmployeeDesignationSetupPage() {
   const handleEdit = (designation: any, index: number) => {
     setIsEditMode(true);
     setSelectedDesignationIndex(index);
+    setDesignationId(designation.id || null);
     setCode(designation.code);
+    setCodeError('')
     setDescription(designation.description);
     setJobLevelCode(designation.jobLevelCode);
     setDeviceName(designation.deviceName);
     setShowCreateModal(true);
   };
 
-  const handleDelete = (designationCode: string) => {
-    if (window.confirm('Are you sure you want to delete this designation?')) {
-      setDesignationList(designationList.filter(designation => designation.code !== designationCode));
-    }
-  };
+  const handleDelete = async (designation: any) => {
+    console.log(designation)
+        const confirmed = await Swal.fire({
+            icon: 'warning',
+            title: 'Confirm Delete',
+            text: `Are you sure you want to delete designation ${designation.code}?`,
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+        });
 
-  const handleSubmit = () => {
-    // Validate code
-    if (!code.trim()) {
-      alert('Please enter a Code.');
-      return;
-    }
+        if (confirmed.isConfirmed) {
+            try {
+                await apiClient.delete(`/Fs/Employment/Designation/${designation.id}`);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Designation deleted successfully.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                // Refresh the designation list
+                await fetchDesignationData();
+            } catch (error: any) {
+                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete designation';
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: errorMsg,
+                });
+                console.error('Error deleting designation:', error);
+            }
+        }
+    };
 
-    if (isEditMode && selectedDesignationIndex !== null) {
-      // Update existing record
-      const updatedList = [...designationList];
-      updatedList[selectedDesignationIndex] = {
-        code: code,
-        description: description,
-        jobLevelCode: jobLevelCode,
-        deviceName: deviceName
-      };
-      setDesignationList(updatedList);
-    } else {
-      // Create new record
-      const newDesignation = {
-        code: code,
-        description: description,
-        jobLevelCode: jobLevelCode,
-        deviceName: deviceName
-      };
-      setDesignationList([...designationList, newDesignation]);
-    }
+    const handleCodeChange = (value: string) => {
+        setCode(value);
+        if (value.length > 10) {
+            setCodeError('Code maximum 10 characters');
+        } else {
+            setCodeError('');
+        }
+    };
 
-    // Close modal and reset form
-    setShowCreateModal(false);
-    setCode('');
-    setDescription('');
-    setJobLevelCode('');
-    setDeviceName('');
-    setIsEditMode(false);
-    setSelectedDesignationIndex(null);
-  };
+  const handleSubmit = async () => {
+        // Validate code - must not be empty and must be max 10 characters
+        if (!code.trim() || code.length > 10) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Code must be between 1 and 10 characters.',
+            });
+            return;
+        }
+// Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = designationList.some((designation, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedDesignationIndex === index) {
+                return false;
+              }
+              return designation.code.toLowerCase() === code.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
+        setSubmitting(true);
+        try {
+            const payload = {
+                desID: isEditMode && designationId ? parseInt(designationId) : 0,
+                 desCode: code,
+                  desDesc: description,
+                  jobLevelCode: jobLevelCode,
+                  deviceName: deviceName
+            };
 
-  const handleSelectJobLevel = (jobLevel: any) => {
-    setJobLevelCode(jobLevel.code);
-    setShowJobLevelSearchModal(false);
-  };
+            if (isEditMode && designationId) {
+                // Update existing record via PUT
+                await apiClient.put(`/Fs/Employment/DesignationSetUp/${designationId}`, payload);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Designation updated successfully.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                // Refresh the designation list
+                await fetchDesignationData();
+            } else {
+                // Create new record via POST
+                await apiClient.post('/Fs/Employment/DesignationSetUp', payload);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Designation created successfully.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                // Refresh the designation list
+                await fetchDesignationData();
+            }
 
+            // Close modal and reset form
+            setShowCreateModal(false);
+            setCode('');
+            setCodeError('');
+            setDescription('');
+            setJobLevelCode('');
+            setDeviceName('');
+            setDesignationId(null);
+            setIsEditMode(false);
+            setSelectedDesignationIndex(null);
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+            await Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: errorMsg,
+            });
+            console.error('Error submitting form:', error);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+   const handleJobLevelSelect = (empCode: string, name: string) => {
+        setJobLevelCode(empCode);
+        setShowJobLevelModal(false);
+    };
+
+    const handleDeviceNameSelect = (deviceID: string, deviceName: string) => {
+        setDeviceName(deviceName);
+        setShowDeviceNameModal(false);
+    };
   const filteredDesignations = designationList.filter(designation =>
     designation.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     designation.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -163,55 +316,21 @@ export function EmployeeDesignationSetupPage() {
     designation.deviceName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredJobLevels = jobLevelList.filter(jobLevel =>
+  const filteredJobLevels = levelList.filter(jobLevel =>
     jobLevel.code.toLowerCase().includes(jobLevelSearchTerm.toLowerCase()) ||
     jobLevel.description.toLowerCase().includes(jobLevelSearchTerm.toLowerCase())
   );
 
-  // Pagination
-  const totalPages = Math.ceil(filteredDesignations.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentDesignations = filteredDesignations.slice(startIndex, endIndex);
+     // Pagination logic
+    const totalPages = Math.ceil(filteredDesignations.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedDesignations = filteredDesignations.slice(startIndex, endIndex);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const renderPageNumbers = () => {
-    const pages = [];
-    const maxPagesToShow = 5;
-    
-    if (totalPages <= maxPagesToShow) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 5; i++) {
-          pages.push(i);
-        }
-        pages.push('...');
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1);
-        pages.push('...');
-        for (let i = totalPages - 4; i <= totalPages; i++) {
-          pages.push(i);
-        }
-      } else {
-        pages.push(1);
-        pages.push('...');
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-          pages.push(i);
-        }
-        pages.push('...');
-        pages.push(totalPages);
-      }
-    }
-    
-    return pages;
-  };
+    // Reset to page 1 when search term changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -281,6 +400,15 @@ export function EmployeeDesignationSetupPage() {
 
             {/* Data Table */}
             <div className="overflow-x-auto">
+              {loadingDesignation ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="text-gray-600 text-sm">Loading designations...</div>
+                                </div>
+                            ) : designationError ? (
+                                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                                    <p className="text-red-700 text-sm">{designationError}</p>
+                                </div>
+                            ) : (
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-100 border-b-2 border-gray-300">
@@ -292,7 +420,7 @@ export function EmployeeDesignationSetupPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentDesignations.map((designation, index) => (
+                  {paginatedDesignations.map((designation, index) => (
                     <tr
                       key={index}
                       className="border-b border-gray-200 hover:bg-gray-50"
@@ -312,7 +440,7 @@ export function EmployeeDesignationSetupPage() {
                           </button>
                           <span className="text-gray-300">|</span>
                           <button
-                            onClick={() => handleDelete(designation.code)}
+                            onClick={() => handleDelete(designation)}
                             className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                             title="Delete"
                           >
@@ -324,47 +452,44 @@ export function EmployeeDesignationSetupPage() {
                   ))}
                 </tbody>
               </table>
+                            )}
             </div>
 
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
-              <div className="text-gray-600">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredDesignations.length)} of {filteredDesignations.length} entries
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                {renderPageNumbers().map((page, index) => (
-                  page === '...' ? (
-                    <span key={index} className="px-3 py-1">...</span>
-                  ) : (
-                    <button
-                      key={index}
-                      onClick={() => handlePageChange(page as number)}
-                      className={`px-3 py-1 rounded ${
-                        currentPage === page
-                          ? 'bg-blue-600 text-white'
-                          : 'border border-gray-300 hover:bg-gray-100'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )
-                ))}
-                <button 
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+                            <div className="text-gray-600">
+                                Showing {filteredDesignations.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredDesignations.length)} of {filteredDesignations.length} entries
+                            </div>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Previous
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                    <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`px-3 py-1 rounded transition-colors ${
+                                            currentPage === page
+                                                ? 'bg-blue-600 text-white'
+                                                : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
 
             {/* Create/Edit Modal */}
               {showCreateModal && (
@@ -419,7 +544,7 @@ export function EmployeeDesignationSetupPage() {
                             readOnly
                           />
                           <button
-                            onClick={() => setShowJobLevelSearchModal(true)}
+                            onClick={() => setShowJobLevelModal(true)}
                             className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                           >
                             <Search className="w-4 h-4" />
@@ -442,7 +567,7 @@ export function EmployeeDesignationSetupPage() {
                             readOnly
                           />
                           <button
-                            onClick={() => setShowDeviceNameSearchModal(true)}
+                            onClick={() => setShowDeviceNameModal(true)}
                             className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                           >
                             <Search className="w-4 h-4" />
@@ -478,12 +603,12 @@ export function EmployeeDesignationSetupPage() {
             )}
 
             {/* Job Level Search Modal */}
-            {showJobLevelSearchModal && (
+            {showJobLevelModal && (
               <>
                 {/* Modal Backdrop */}
                 <div 
                   className="fixed inset-0 bg-black/30 z-30"
-                  onClick={() => setShowJobLevelSearchModal(false)}
+                  onClick={() => setShowJobLevelModal(false)}
                 ></div>
 
                 {/* Modal Dialog */}
@@ -493,7 +618,7 @@ export function EmployeeDesignationSetupPage() {
                     <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
                       <h2 className="text-gray-800">Search</h2>
                       <button 
-                        onClick={() => setShowJobLevelSearchModal(false)}
+                        onClick={() => setShowJobLevelModal(false)}
                         className="text-gray-600 hover:text-gray-800"
                       >
                         <X className="w-5 h-5" />
@@ -528,7 +653,7 @@ export function EmployeeDesignationSetupPage() {
                             {filteredJobLevels.map((jobLevel, index) => (
                               <tr
                                 key={index}
-                                onClick={() => handleSelectJobLevel(jobLevel)}
+                                onClick={() => handleJobLevelSelect(jobLevel.code, jobLevel.description)}
                                 className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
                               >
                                 <td className="px-4 py-2 text-sm">{jobLevel.code}</td>
@@ -562,50 +687,15 @@ export function EmployeeDesignationSetupPage() {
               </>
             )}
 
-            {/* Device Name Search Modal (placeholder - similar to Job Level) */}
-            {showDeviceNameSearchModal && (
-              <>
-                {/* Modal Backdrop */}
-                <div 
-                  className="fixed inset-0 bg-black/30 z-30"
-                  onClick={() => setShowDeviceNameSearchModal(false)}
-                ></div>
-
-                {/* Modal Dialog */}
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[110vh] overflow-y-auto">
-                    {/* Modal Header */}
-                    <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                      <h2 className="text-gray-800">Search</h2>
-                      <button 
-                        onClick={() => setShowDeviceNameSearchModal(false)}
-                        className="text-gray-600 hover:text-gray-800"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    {/* Modal Content */}
-                    <div className="p-4">
-                      <h3 className="text-blue-600 mb-3">Device Name</h3>
-
-                      {/* Search Field */}
-                      <div className="flex items-center gap-2 mb-4">
-                        <label className="text-gray-700 text-sm">Search:</label>
-                        <input
-                          type="text"
-                          value={deviceNameSearchTerm}
-                          onChange={(e) => setDeviceNameSearchTerm(e.target.value)}
-                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          {/* Device Search Modal - Reusable Component */}
+                        <DeviceSearchModal
+                            isOpen={showDeviceNameModal}
+                            onClose={() => setShowDeviceNameModal(false)}
+                            onSelect={handleDeviceNameSelect}
+                            devices={deviceData}
+                            loading={loadingDevices}
+                            error={deviceError}
                         />
-                      </div>
-
-                      <p className="text-gray-500 text-sm text-center py-8">No device names available</p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
           </div>
         </div>
       </div>

@@ -30,7 +30,7 @@ export function AreaSetupPage() {
 
     // API Data states
     const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-    const [deviceData, setDeviceData] = useState<Array<{ deviceID: string; deviceName: string }>>([]);
+    const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [loadingDevices, setLoadingDevices] = useState(false);
     const [employeeError, setEmployeeError] = useState('');
@@ -109,12 +109,13 @@ export function AreaSetupPage() {
         setLoadingDevices(true);
         setDeviceError('');
         try {
-            const response = await apiClient.get('/Device/GetAll');
+            const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
             if (response.status === 200 && response.data) {
                 // Map API response to expected format
                 const mappedData = response.data.map((device: any) => ({
-                    deviceID: device.deviceCode || device.code || '',
-                    deviceName: device.deviceName || device.name || ''
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
                 }));
                 setDeviceData(mappedData);
             }
@@ -226,7 +227,23 @@ export function AreaSetupPage() {
             });
             return;
         }
-
+         // Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = areaList.some((area, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedAreaIndex === index) {
+                return false;
+              }
+              return area.code.toLowerCase() === areaCode.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
         setSubmitting(true);
         try {
             const payload = {
@@ -538,6 +555,7 @@ export function AreaSetupPage() {
                                                     <input
                                                         type="text"
                                                         value={headCode}
+                                                        maxLength={10}
                                                         onChange={(e) => setHeadCode(e.target.value)}
                                                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                         readOnly

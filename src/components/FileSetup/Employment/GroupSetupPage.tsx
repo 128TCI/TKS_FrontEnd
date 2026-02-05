@@ -1,71 +1,122 @@
 import { useState, useEffect } from 'react';
-import { X, Search, Plus, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
+import apiClient from '../../../services/apiClient';
 import { Footer } from '../../Footer/Footer';
+import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
+import Swal from 'sweetalert2';
 
 export function GroupSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedGroupIndex, setSelectedGroupIndex] = useState<number | null>(null);
-  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
+
   // Form fields
   const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState('');
   const [description, setDescription] = useState('');
   const [headCode, setHeadCode] = useState('');
   const [head, setHead] = useState('');
-  
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   // Modal state
   const [showHeadModal, setShowHeadModal] = useState(false);
-  const [headSearchTerm, setHeadSearchTerm] = useState('');
-  
-  // Sample data for the list
-  const [groupList, setGroupList] = useState([
-    { code: '-', description: '-', head: '' },
-    { code: 'a', description: 'a', head: '' },
-    { code: 'gr1', description: 'group1', head: '' },
-    { code: 'xx', description: 'xxx', head: '' },
-  ]);
 
-  // Sample employee data for Head modal
-  const employeeData = [
-    { empCode: '000877', name: 'Last122, First A', groupCode: '45' },
-    { empCode: '000878', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000900', name: 'Last, First A', groupCode: '109' },
-    { empCode: '000901', name: 'Last, First A', groupCode: '109' },
-    { empCode: '000902', name: 'Last, First III A', groupCode: '45' },
-    { empCode: '000903', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000904', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000905', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000906', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000907', name: 'Last, First A', groupCode: '45' },
-  ];
+  // API Data states
+  const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [employeeError, setEmployeeError] = useState('');
 
-  // Handle ESC key to close modals
+  // Group List states
+  const [groupList, setGroupList] = useState<Array<{ id: string; code: string; description: string; head: string; headCode: string }>>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [groupError, setGroupError] = useState('');
+
+  // Fetch group data from API
+  useEffect(() => {
+    fetchGroupData();
+  }, []);
+
+  const fetchGroupData = async () => {
+    setLoadingGroups(true);
+    setGroupError('');
+    try {
+      const response = await apiClient.get('/Fs/Employment/GroupSetUp');
+      if (response.status === 200 && response.data) {
+        // Map API response to expected format
+        const mappedData = response.data.map((group: any) => ({
+          id: group.id || '',
+          code: group.grpCode || '',
+          description: group.grpDesc || '',
+          head: group.grpHead || '',
+          headCode: group.grpHeadCode || '',
+        }));
+        setGroupList(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load groups';
+      setGroupError(errorMsg);
+      console.error('Error fetching groups:', error);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  // Fetch employee data from API
+  useEffect(() => {
+    fetchEmployeeData();
+  }, []);
+
+  const fetchEmployeeData = async () => {
+    setLoadingEmployees(true);
+    setEmployeeError('');
+    try {
+      const response = await apiClient.get('/EmployeeMasterFile');
+      if (response.status === 200 && response.data) {
+        // Map API response to expected format
+        const mappedData = response.data.map((emp: any) => ({
+          empCode: emp.empCode || emp.code || '',
+          name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+          groupCode: emp.grpCode || ''
+        }));
+        setEmployeeData(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+      setEmployeeError(errorMsg);
+      console.error('Error fetching employees:', error);
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
+
+  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (showHeadModal) {
-          setShowHeadModal(false);
-        } else if (showCreateModal) {
-          setShowCreateModal(false);
-        }
+      if (event.key === 'Escape' && showCreateModal) {
+        setShowCreateModal(false);
       }
     };
 
-    if (showCreateModal || showHeadModal) {
+    if (showCreateModal) {
       document.addEventListener('keydown', handleEscKey);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showHeadModal, showCreateModal]);
+  }, [showCreateModal]);
 
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedGroupIndex(null);
+    setGroupId(null);
     // Clear form
     setCode('');
+    setCodeError('');
     setDescription('');
     setHeadCode('');
     setHead('');
@@ -75,53 +126,144 @@ export function GroupSetupPage() {
   const handleEdit = (group: any, index: number) => {
     setIsEditMode(true);
     setSelectedGroupIndex(index);
+    setGroupId(group.id || null);
     setCode(group.code);
+    setCodeError('');
     setDescription(group.description);
-    setHeadCode('');
+    setHeadCode(group.headCode);
     setHead(group.head);
     setShowCreateModal(true);
   };
 
-  const handleDelete = (groupCode: string) => {
-    if (window.confirm('Are you sure you want to delete this group?')) {
-      setGroupList(groupList.filter(group => group.code !== groupCode));
+  const handleDelete = async (group: any) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete group ${group.code}?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+      try {
+        await apiClient.delete(`/Fs/Employment/GroupSetUp/${group.id}`);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Group deleted successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the group list
+        await fetchGroupData();
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete group';
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: errorMsg,
+        });
+        console.error('Error deleting group:', error);
+      }
     }
   };
 
-  const handleSubmit = () => {
-    // Validate code
-    if (!code.trim()) {
-      alert('Please enter a Code.');
+  const handleCodeChange = (value: string) => {
+    setCode(value);
+    if (value.length > 10) {
+      setCodeError('Code maximum 10 characters');
+    } else {
+      setCodeError('');
+    }
+  };
+
+  const handleSubmit = async () => {
+    // Validate code - must not be empty and must be max 10 characters
+    if (!code.trim() || code.length > 10) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code must be between 1 and 10 characters.',
+      });
       return;
     }
+// Check for duplicate code (only when creating new or changing code during edit)
+                const isDuplicate = groupList.some((group, index) => {
+                  // When editing, exclude the current record from duplicate check
+                  if (isEditMode && selectedGroupIndex === index) {
+                    return false;
+                  }
+                  return group.code.toLowerCase() === code.trim().toLowerCase();
+                });
+            
+                if (isDuplicate) {
+                  await Swal.fire({
+                    icon: 'error',
+                    title: 'Duplicate Code',
+                    text: 'This code is already in use. Please use a different code.',
+                  });
+                  return;
+                }
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: isEditMode && groupId ? parseInt(groupId) : 0,
+        grpCode: code,
+        grpDesc: description,
+        grpHead: head,
+        grpHeadCode: headCode,
+      };
+      console.log('Submitting payload:', payload);
+      if (isEditMode && groupId) {
+        // Update existing record via PUT
+        await apiClient.put(`/Fs/Employment/GroupSetUp/${groupId}`, payload);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Group updated successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the group list
+        await fetchGroupData();
+      } else {
+        // Create new record via POST
+        await apiClient.post('/Fs/Employment/GroupSetUp', payload);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Group created successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the group list
+        await fetchGroupData();
+      }
 
-    if (isEditMode && selectedGroupIndex !== null) {
-      // Update existing record
-      const updatedList = [...groupList];
-      updatedList[selectedGroupIndex] = {
-        code: code,
-        description: description,
-        head: head
-      };
-      setGroupList(updatedList);
-    } else {
-      // Create new record
-      const newGroup = {
-        code: code,
-        description: description,
-        head: head
-      };
-      setGroupList([...groupList, newGroup]);
+      // Close modal and reset form
+      setShowCreateModal(false);
+      setCode('');
+      setCodeError('');
+      setDescription('');
+      setHeadCode('');
+      setHead('');
+      setGroupId(null);
+      setIsEditMode(false);
+      setSelectedGroupIndex(null);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error submitting form:', error);
+    } finally {
+      setSubmitting(false);
     }
-
-    // Close modal and reset form
-    setShowCreateModal(false);
-    setCode('');
-    setDescription('');
-    setHeadCode('');
-    setHead('');
-    setIsEditMode(false);
-    setSelectedGroupIndex(null);
   };
 
   const handleHeadSelect = (empCode: string, name: string) => {
@@ -136,11 +278,16 @@ export function GroupSetupPage() {
     group.head.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredEmployees = employeeData.filter(emp =>
-    emp.empCode.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
-    emp.name.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
-    emp.groupCode.toLowerCase().includes(headSearchTerm.toLowerCase())
-  );
+  // Pagination logic
+  const totalPages = Math.ceil(filteredGroups.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedGroups = filteredGroups.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -210,62 +357,90 @@ export function GroupSetupPage() {
 
             {/* Data Table */}
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 border-b-2 border-gray-300">
-                    <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Description</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Head</th>
-                    <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredGroups.map((group, index) => (
-                    <tr
-                      key={index}
-                      className="border-b border-gray-200 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-2">{group.code}</td>
-                      <td className="px-4 py-2">{group.description}</td>
-                      <td className="px-4 py-2">{group.head}</td>
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit(group, index)}
-                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <span className="text-gray-300">|</span>
-                          <button
-                            onClick={() => handleDelete(group.code)}
-                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                       </td>
+              {loadingGroups ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading groups...</div>
+                </div>
+              ) : groupError ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{groupError}</p>
+                </div>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b-2 border-gray-300">
+                      <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
+                      <th className="px-4 py-2 text-left text-gray-700">Description</th>
+                      <th className="px-4 py-2 text-left text-gray-700">Head</th>
+                      <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {paginatedGroups.map((group, index) => (
+                      <tr
+                        key={index}
+                        className="border-b border-gray-200 hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-2">{group.code}</td>
+                        <td className="px-4 py-2">{group.description}</td>
+                        <td className="px-4 py-2">{group.head}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEdit(group, index)}
+                              className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <span className="text-gray-300">|</span>
+                            <button
+                              onClick={() => handleDelete(group)}
+                              className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
               <div className="text-gray-600">
-                Showing 1 to {filteredGroups.length} of {filteredGroups.length} entries
+                Showing {filteredGroups.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredGroups.length)} of {filteredGroups.length} entries
               </div>
               <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
                   Previous
                 </button>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
                   Next
                 </button>
               </div>
@@ -284,7 +459,7 @@ export function GroupSetupPage() {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
                     {/* Modal Header */}
-                    <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                    <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                       <h2 className="text-gray-800">{isEditMode ? 'Edit Group' : 'Create New'}</h2>
                       <button 
                         onClick={() => setShowCreateModal(false)}
@@ -305,10 +480,18 @@ export function GroupSetupPage() {
                           <input
                             type="text"
                             value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            onChange={(e) => handleCodeChange(e.target.value)}
+                            maxLength={10}
+                            className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
+                              codeError 
+                                ? 'border-red-500 focus:ring-red-500' 
+                                : 'border-gray-300 focus:ring-blue-500'
+                            }`}
                           />
                         </div>
+                        {codeError && (
+                          <p className="ml-32 text-red-500 text-xs mt-1">{codeError}</p>
+                        )}
 
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">Description :</label>
@@ -361,13 +544,15 @@ export function GroupSetupPage() {
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
-                          {isEditMode ? 'Update' : 'Submit'}
+                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Submit')}
                         </button>
                         <button
                           onClick={() => setShowCreateModal(false)}
-                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
                           Back to List
                         </button>
@@ -378,96 +563,15 @@ export function GroupSetupPage() {
               </>
             )}
 
-            {/* Head Search Modal (Employee Code) */}
-            {showHeadModal && (
-              <>
-                {/* Modal Backdrop */}
-                <div 
-                  className="fixed inset-0 bg-black/30 z-10"
-                  onClick={() => setShowHeadModal(false)}
-                ></div>
-
-                {/* Modal Dialog */}
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[110vh] overflow-y-auto">
-                    {/* Modal Header */}
-                    <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                      <h2 className="text-gray-800">Search</h2>
-                      <button 
-                        onClick={() => setShowHeadModal(false)}
-                        className="text-gray-600 hover:text-gray-800"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    {/* Modal Content */}
-                    <div className="p-3">
-                      <h3 className="text-blue-600 mb-2 text-sm">Employee Code</h3>
-
-                      {/* Search Input */}
-                      <div className="flex items-center gap-2 mb-4 justify-end">
-                        <label className="text-gray-700 text-sm">Search:</label>
-                        <input
-                          type="text"
-                          value={headSearchTerm}
-                          onChange={(e) => setHeadSearchTerm(e.target.value)}
-                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-
-                      {/* Employee Table */}
-                      <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <table className="w-full border-collapse text-sm">
-                          <thead className="sticky top-0 bg-white">
-                            <tr className="bg-gray-100 border-b-2 border-gray-300">
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode ▲</th>
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Group Code</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredEmployees.map((emp, index) => (
-                              <tr 
-                                key={emp.empCode}
-                                className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                onClick={() => handleHeadSelect(emp.empCode, emp.name)}
-                              >
-                                <td className="px-3 py-1.5">{emp.empCode}</td>
-                                <td className="px-3 py-1.5">{emp.name}</td>
-                                <td className="px-3 py-1.5">{emp.groupCode}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Pagination */}
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="text-gray-600 text-xs">
-                          Showing 1 to 10 of 1,658 entries
-                        </div>
-                        <div className="flex gap-1">
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                            Previous
-                          </button>
-                          <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">1</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">2</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">3</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">4</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">5</button>
-                          <span className="px-1 text-gray-500 text-xs">...</span>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">166</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                            Next
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Employee Search Modal - Reusable Component */}
+            <EmployeeSearchModal
+              isOpen={showHeadModal}
+              onClose={() => setShowHeadModal(false)}
+              onSelect={handleHeadSelect}
+              employees={employeeData}
+              loading={loadingEmployees}
+              error={employeeError}
+            />
           </div>
         </div>
       </div>

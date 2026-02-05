@@ -1,138 +1,336 @@
 import { useState, useEffect } from 'react';
-import { X, Search, Plus, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
+import apiClient from '../../../services/apiClient';
 import { Footer } from '../../Footer/Footer';
+import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
+import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
+import Swal from 'sweetalert2';
 
 export function UnitSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedUnitIndex, setSelectedUnitIndex] = useState<number | null>(null);
-  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
+
   // Form fields
   const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState('');
   const [description, setDescription] = useState('');
   const [headCode, setHeadCode] = useState('');
   const [head, setHead] = useState('');
+  const [position, setPosition] = useState('');
   const [deviceName, setDeviceName] = useState('');
-  
+  const [unitId, setUnitId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   // Modal state
   const [showHeadModal, setShowHeadModal] = useState(false);
-  const [headSearchTerm, setHeadSearchTerm] = useState('');
   const [showDeviceNameModal, setShowDeviceNameModal] = useState(false);
-  const [deviceNameSearchTerm, setDeviceNameSearchTerm] = useState('');
-  
-  // Sample data for the list
-  const [unitList, setUnitList] = useState([
-    { code: '-', description: '-', head: '', deviceName: '' },
-    { code: 'UNIT 1', description: 'UNIT1', head: '', deviceName: '' },
-  ]);
 
-  // Sample employee data for Head modal
-  const employeeData = [
-    { empCode: '000877', name: 'Last122, First A', groupCode: '45' },
-    { empCode: '000878', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000900', name: 'Last, First A', groupCode: '109' },
-    { empCode: '000901', name: 'Last, First A', groupCode: '109' },
-    { empCode: '000902', name: 'Last, First III A', groupCode: '45' },
-    { empCode: '000903', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000904', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000905', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000906', name: 'Last, First A', groupCode: '45' },
-    { empCode: '000907', name: 'Last, First A', groupCode: '45' },
-  ];
+  // API Data states
+  const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
+    const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [employeeError, setEmployeeError] = useState('');
+  const [deviceError, setDeviceError] = useState('');
 
-  // Sample device data for Device Name modal (empty as per requirements)
-  const deviceData: { code: string; description: string }[] = [];
+  // Unit List states
+  const [unitList, setUnitList] = useState<Array<{ 
+    id: string; 
+    code: string; 
+    description: string; 
+    head: string; 
+    headCode: string;
+    position: string;
+    deviceName: string;
+  }>>([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+  const [unitError, setUnitError] = useState('');
 
-  // Handle ESC key to close modals
+  // Fetch unit data from API
+  useEffect(() => {
+    fetchUnitData();
+  }, []);
+
+  const fetchUnitData = async () => {
+    setLoadingUnits(true);
+    setUnitError('');
+    try {
+      const response = await apiClient.get('/Fs/Employment/UnitSetUp');
+      if (response.status === 200 && response.data) {
+        // Map API response to expected format
+        const mappedData = response.data.map((unit: any) => ({
+          id: unit.unitID || '',
+          code: unit.unitCode || '',
+          description: unit.unitDesc || '',
+          head: unit.head || '',
+          position: unit.position || '',
+          deviceName: unit.deviceName || '',
+        }));
+        setUnitList(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load units';
+      setUnitError(errorMsg);
+      console.error('Error fetching units:', error);
+    } finally {
+      setLoadingUnits(false);
+    }
+  };
+
+  // Fetch employee data from API
+  useEffect(() => {
+    fetchEmployeeData();
+  }, []);
+
+  const fetchEmployeeData = async () => {
+    setLoadingEmployees(true);
+    setEmployeeError('');
+    try {
+      const response = await apiClient.get('/EmployeeMasterFile');
+      if (response.status === 200 && response.data) {
+        // Map API response to expected format
+        const mappedData = response.data.map((emp: any) => ({
+          empCode: emp.empCode || emp.code || '',
+          name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+          groupCode: emp.grpCode || ''
+        }));
+        setEmployeeData(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+      setEmployeeError(errorMsg);
+      console.error('Error fetching employees:', error);
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
+
+  // Fetch device data from API
+  useEffect(() => {
+    fetchDeviceData();
+  }, []);
+
+  const fetchDeviceData = async () => {
+    setLoadingDevices(true);
+    setDeviceError('');
+    try {
+      const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
+            if (response.status === 200 && response.data) {
+                // Map API response to expected format
+                const mappedData = response.data.map((device: any) => ({
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
+                }));
+                setDeviceData(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load devices';
+      setDeviceError(errorMsg);
+      console.error('Error fetching devices:', error);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (showHeadModal) {
-          setShowHeadModal(false);
-        } else if (showDeviceNameModal) {
-          setShowDeviceNameModal(false);
-        } else if (showCreateModal) {
-          setShowCreateModal(false);
-        }
+      if (event.key === 'Escape' && showCreateModal) {
+        setShowCreateModal(false);
       }
     };
 
-    if (showCreateModal || showHeadModal || showDeviceNameModal) {
+    if (showCreateModal) {
       document.addEventListener('keydown', handleEscKey);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showHeadModal, showDeviceNameModal, showCreateModal]);
+  }, [showCreateModal]);
 
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedUnitIndex(null);
+    setUnitId(null);
     // Clear form
     setCode('');
+    setCodeError('');
     setDescription('');
     setHeadCode('');
     setHead('');
+    setPosition('');
     setDeviceName('');
     setShowCreateModal(true);
   };
 
   const handleEdit = (unit: any, index: number) => {
-    setIsEditMode(true);
-    setSelectedUnitIndex(index);
-    setCode(unit.code);
-    setDescription(unit.description);
-    setHeadCode('');
-    setHead(unit.head);
-    setDeviceName(unit.deviceName);
-    setShowCreateModal(true);
-  };
+  console.log('Editing unit:', unit);
+  setIsEditMode(true);
+  setSelectedUnitIndex(index);
+  setUnitId(unit.id || null);
+  setCode(unit.code);
+  setCodeError('');
+  setDescription(unit.description);
+  
+  // Try to get headCode from unit data first, or lookup from employee data
+  let headCodeValue = unit.headCode || '';
+  if (!headCodeValue && unit.head) {
+    const employee = employeeData.find(emp => emp.name === unit.head);
+    if (employee) {
+      console.log('Found employee for head:', employee);
+      headCodeValue = employee.empCode;
+      console.log('Set headCode to:', employee.empCode);
+    }
+  }
+  
+  setHeadCode(headCodeValue);
+  console.log('Final headCode value:', headCodeValue);
+  setHead(unit.head || '');
+  setPosition(unit.position || '');
+  setDeviceName(unit.deviceName || '');
+  setShowCreateModal(true);
+};
+  const handleDelete = async (unit: any) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete unit ${unit.code}?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
 
-  const handleDelete = (unitCode: string) => {
-    if (window.confirm('Are you sure you want to delete this unit?')) {
-      setUnitList(unitList.filter(unit => unit.code !== unitCode));
+    if (confirmed.isConfirmed) {
+      try {
+        await apiClient.delete(`/Fs/Employment/UnitSetUp/${unit.id}`);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Unit deleted successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the unit list
+        await fetchUnitData();
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete unit';
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: errorMsg,
+        });
+        console.error('Error deleting unit:', error);
+      }
     }
   };
 
-  const handleSubmit = () => {
-    // Validate code
-    if (!code.trim()) {
-      alert('Please enter a Code.');
+  const handleCodeChange = (value: string) => {
+    setCode(value);
+    if (value.length > 10) {
+      setCodeError('Code maximum 10 characters');
+    } else {
+      setCodeError('');
+    }
+  };
+
+  const handleSubmit = async () => {
+    // Validate code - must not be empty and must be max 10 characters
+    if (!code.trim() || code.length > 10) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code must be between 1 and 10 characters.',
+      });
       return;
     }
 
-    if (isEditMode && selectedUnitIndex !== null) {
-      // Update existing record
-      const updatedList = [...unitList];
-      updatedList[selectedUnitIndex] = {
-        code: code,
-        description: description,
-        head: head,
-        deviceName: deviceName
-      };
-      setUnitList(updatedList);
-    } else {
-      // Create new record
-      const newUnit = {
-        code: code,
-        description: description,
-        head: head,
-        deviceName: deviceName
-      };
-      setUnitList([...unitList, newUnit]);
+    // Check for duplicate code (only when creating new or changing code during edit)
+    const isDuplicate = unitList.some((unit, index) => {
+      // When editing, exclude the current record from duplicate check
+      if (isEditMode && selectedUnitIndex === index) {
+        return false;
+      }
+      return unit.code.toLowerCase() === code.trim().toLowerCase();
+    });
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This code is already in use. Please use a different code.',
+      });
+      return;
     }
 
-    // Close modal and reset form
-    setShowCreateModal(false);
-    setCode('');
-    setDescription('');
-    setHeadCode('');
-    setHead('');
-    setDeviceName('');
-    setIsEditMode(false);
-    setSelectedUnitIndex(null);
+    setSubmitting(true);
+    try {
+      const payload = {
+        unitID: isEditMode && unitId ? parseInt(unitId) : 0,
+        unitCode: code,
+        unitDesc: description,
+        head: head,
+        headCode: headCode,
+        position: position,
+        deviceName: deviceName
+      };
+
+      if (isEditMode && unitId) {
+        // Update existing record via PUT
+        await apiClient.put(`/Fs/Employment/UnitSetUp/${unitId}`, payload);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Unit updated successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the unit list
+        await fetchUnitData();
+      } else {
+        // Create new record via POST
+        await apiClient.post('/Fs/Employment/UnitSetUp', payload);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Unit created successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the unit list
+        await fetchUnitData();
+      }
+
+      // Close modal and reset form
+      setShowCreateModal(false);
+      setCode('');
+      setCodeError('');
+      setDescription('');
+      setHeadCode('');
+      setHead('');
+      setPosition('');
+      setDeviceName('');
+      setUnitId(null);
+      setIsEditMode(false);
+      setSelectedUnitIndex(null);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error submitting form:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleHeadSelect = (empCode: string, name: string) => {
@@ -141,8 +339,8 @@ export function UnitSetupPage() {
     setShowHeadModal(false);
   };
 
-  const handleDeviceNameSelect = (deviceCode: string, deviceDesc: string) => {
-    setDeviceName(deviceDesc);
+  const handleDeviceNameSelect = (deviceID: string, deviceName: string) => {
+    setDeviceName(deviceName);
     setShowDeviceNameModal(false);
   };
 
@@ -150,19 +348,20 @@ export function UnitSetupPage() {
     unit.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     unit.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     unit.head.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    unit.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
     unit.deviceName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredEmployees = employeeData.filter(emp =>
-    emp.empCode.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
-    emp.name.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
-    emp.groupCode.toLowerCase().includes(headSearchTerm.toLowerCase())
-  );
+  // Pagination logic
+  const totalPages = Math.ceil(filteredUnits.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedUnits = filteredUnits.slice(startIndex, endIndex);
 
-  const filteredDevices = deviceData.filter(device =>
-    device.code.toLowerCase().includes(deviceNameSearchTerm.toLowerCase()) ||
-    device.description.toLowerCase().includes(deviceNameSearchTerm.toLowerCase())
-  );
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -232,64 +431,94 @@ export function UnitSetupPage() {
 
             {/* Data Table */}
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 border-b-2 border-gray-300">
-                    <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Description</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Head</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Device Name</th>
-                    <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUnits.map((unit, index) => (
-                    <tr
-                      key={index}
-                      className="border-b border-gray-200 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-2">{unit.code}</td>
-                      <td className="px-4 py-2">{unit.description}</td>
-                      <td className="px-4 py-2">{unit.head}</td>
-                      <td className="px-4 py-2">{unit.deviceName}</td>
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <div className="flex gap-2">
+              {loadingUnits ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading units...</div>
+                </div>
+              ) : unitError ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{unitError}</p>
+                </div>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b-2 border-gray-300">
+                      <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
+                      <th className="px-4 py-2 text-left text-gray-700">Description</th>
+                      <th className="px-4 py-2 text-left text-gray-700">Head</th>
+                      <th className="px-4 py-2 text-left text-gray-700">Position</th>
+                      <th className="px-4 py-2 text-left text-gray-700">Device Name</th>
+                      <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedUnits.map((unit, index) => (
+                      <tr
+                        key={index}
+                        className="border-b border-gray-200 hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-2">{unit.code}</td>
+                        <td className="px-4 py-2">{unit.description}</td>
+                        <td className="px-4 py-2">{unit.head}</td>
+                        <td className="px-4 py-2">{unit.position}</td>
+                        <td className="px-4 py-2">{unit.deviceName}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex gap-2">
                             <button
-                                onClick={() => handleEdit(unit, index)}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                title="Edit"
+                              onClick={() => handleEdit(unit, index)}
+                              className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                              title="Edit"
                             >
-                            <Edit className="w-4 h-4" />
+                              <Edit className="w-4 h-4" />
                             </button>
                             <span className="text-gray-300">|</span>
                             <button
-                                onClick={() => handleDelete(unit.code)}
-                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                title="Delete"
+                              onClick={() => handleDelete(unit)}
+                              className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                              title="Delete"
                             >
-                            <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
               <div className="text-gray-600">
-                Showing 1 to {filteredUnits.length} of {filteredUnits.length} entries
+                Showing {filteredUnits.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredUnits.length)} of {filteredUnits.length} entries
               </div>
               <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
                   Previous
                 </button>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
                   Next
                 </button>
               </div>
@@ -297,19 +526,19 @@ export function UnitSetupPage() {
 
             {/* Create/Edit Modal */}
             {showCreateModal && (
-            <>
-            {/* Modal Backdrop */}
-            <div 
-                className="fixed inset-0 bg-black/30 z-10"
-                onClick={() => setShowCreateModal(false)}
-            ></div>
+              <>
+                {/* Modal Backdrop */}
+                <div 
+                  className="fixed inset-0 bg-black/30 z-10"
+                  onClick={() => setShowCreateModal(false)}
+                ></div>
 
-            {/* Modal Dialog */}
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                {/* Modal Header */}
-                <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                      <h2 className="text-gray-800">{isEditMode ? 'Edit' : 'Create New'}</h2>
+                {/* Modal Dialog */}
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+                      <h2 className="text-gray-800">{isEditMode ? 'Edit Unit' : 'Create New'}</h2>
                       <button 
                         onClick={() => setShowCreateModal(false)}
                         className="text-gray-600 hover:text-gray-800"
@@ -329,10 +558,18 @@ export function UnitSetupPage() {
                           <input
                             type="text"
                             value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            onChange={(e) => handleCodeChange(e.target.value)}
+                            maxLength={10}
+                            className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
+                              codeError 
+                                ? 'border-red-500 focus:ring-red-500' 
+                                : 'border-gray-300 focus:ring-blue-500'
+                            }`}
                           />
                         </div>
+                        {codeError && (
+                          <p className="ml-32 text-red-500 text-xs mt-1">{codeError}</p>
+                        )}
 
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">Description :</label>
@@ -381,6 +618,16 @@ export function UnitSetupPage() {
                         </div>
 
                         <div className="flex items-center gap-3">
+                          <label className="w-32 text-gray-700 text-sm">Position :</label>
+                          <input
+                            type="text"
+                            value={position}
+                            onChange={(e) => setPosition(e.target.value)}
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">Device Name :</label>
                           <input
                             type="text"
@@ -408,13 +655,15 @@ export function UnitSetupPage() {
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
-                          {isEditMode ? 'Update' : 'Submit'}
+                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Submit')}
                         </button>
                         <button
                           onClick={() => setShowCreateModal(false)}
-                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
                           Back to List
                         </button>
@@ -425,189 +674,30 @@ export function UnitSetupPage() {
               </>
             )}
 
-            {/* Head Search Modal (Employee Code) */}
-            {showHeadModal && (
-              <>
-                {/* Modal Backdrop */}
-                <div 
-                  className="fixed inset-0 bg-black/30 z-30"
-                  onClick={() => setShowHeadModal(false)}
-                ></div>
+            {/* Employee Search Modal - Reusable Component */}
+            <EmployeeSearchModal
+              isOpen={showHeadModal}
+              onClose={() => setShowHeadModal(false)}
+              onSelect={handleHeadSelect}
+              employees={employeeData}
+              loading={loadingEmployees}
+              error={employeeError}
+            />
 
-                {/* Modal Dialog */}
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[110vh] overflow-y-auto">
-                    {/* Modal Header */}
-                    <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                      <h2 className="text-gray-800 text-sm">Search</h2>
-                      <button 
-                        onClick={() => setShowHeadModal(false)}
-                        className="text-gray-600 hover:text-gray-800"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Modal Content */}
-                    <div className="p-3">
-                      <h3 className="text-blue-600 mb-2 text-sm">Employee Code</h3>
-
-                      {/* Search Input */}
-                      <div className="flex items-center gap-2 mb-3">
-                        <label className="text-gray-700 text-sm">Search:</label>
-                        <input
-                          type="text"
-                          value={headSearchTerm}
-                          onChange={(e) => setHeadSearchTerm(e.target.value)}
-                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-
-                      {/* Employee Table */}
-                      <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <table className="w-full border-collapse text-sm">
-                          <thead className="sticky top-0 bg-white">
-                            <tr className="bg-gray-100 border-b-2 border-gray-300">
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode ▲</th>
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Group Code</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredEmployees.map((emp, index) => (
-                              <tr 
-                                key={emp.empCode}
-                                className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                onClick={() => handleHeadSelect(emp.empCode, emp.name)}
-                              >
-                                <td className="px-3 py-1.5">{emp.empCode}</td>
-                                <td className="px-3 py-1.5">{emp.name}</td>
-                                <td className="px-3 py-1.5">{emp.groupCode}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Pagination */}
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="text-gray-600 text-xs">
-                          Showing 1 to 10 of 1,658 entries
-                        </div>
-                        <div className="flex gap-1">
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                            Previous
-                          </button>
-                          <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">1</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">2</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">3</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">4</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">5</button>
-                          <span className="px-1 text-gray-500 text-xs">...</span>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">166</button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                            Next
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Device Name Search Modal */}
-            {showDeviceNameModal && (
-              <>
-                {/* Modal Backdrop */}
-                <div 
-                  className="fixed inset-0 bg-black/30 z-30"
-                  onClick={() => setShowDeviceNameModal(false)}
-                ></div>
-
-                {/* Modal Dialog */}
-                <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[110vh] overflow-y-auto">
-                    {/* Modal Header */}
-                    <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                      <h2 className="text-gray-800 text-sm">Search</h2>
-                      <button 
-                        onClick={() => setShowDeviceNameModal(false)}
-                        className="text-gray-600 hover:text-gray-800"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Modal Content */}
-                    <div className="p-3">
-                      <h3 className="text-blue-600 mb-2 text-sm">Borrowed Device Name</h3>
-
-                      {/* Search Input */}
-                      <div className="flex items-center gap-2 mb-3">
-                        <label className="text-gray-700 text-sm">Search:</label>
-                        <input
-                          type="text"
-                          value={deviceNameSearchTerm}
-                          onChange={(e) => setDeviceNameSearchTerm(e.target.value)}
-                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-
-                      {/* Device Table */}
-                      <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <table className="w-full border-collapse text-sm">
-                          <thead className="sticky top-0 bg-white">
-                            <tr className="bg-gray-100 border-b-2 border-gray-300">
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Code ▲</th>
-                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Description</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredDevices.length > 0 ? (
-                              filteredDevices.map((device, index) => (
-                                <tr 
-                                  key={device.code}
-                                  className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                  onClick={() => handleDeviceNameSelect(device.code, device.description)}
-                                >
-                                  <td className="px-3 py-1.5">{device.code}</td>
-                                  <td className="px-3 py-1.5">{device.description}</td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={2} className="px-3 py-8 text-center text-gray-500 text-sm">
-                                  No data available in table
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Pagination */}
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="text-gray-600 text-xs">
-                          Showing 0 to 0 of 0 entries
-                        </div>
-                        <div className="flex gap-1">
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                            Previous
-                          </button>
-                          <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                            Next
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Device Search Modal - Reusable Component */}
+            <DeviceSearchModal
+              isOpen={showDeviceNameModal}
+              onClose={() => setShowDeviceNameModal(false)}
+              onSelect={handleDeviceNameSelect}
+              devices={deviceData}
+              loading={loadingDevices}
+              error={deviceError}
+            />
           </div>
         </div>
       </div>
+
+      {/* Footer */}
       <Footer />
     </div>
   );

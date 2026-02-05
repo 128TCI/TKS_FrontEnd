@@ -30,7 +30,7 @@ export function DivisionSetupPage() {
 
     // API Data states
     const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-    const [deviceData, setDeviceData] = useState<Array<{ deviceID: string; deviceName: string }>>([]);
+      const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [loadingDevices, setLoadingDevices] = useState(false);
     const [employeeError, setEmployeeError] = useState('');
@@ -109,12 +109,13 @@ export function DivisionSetupPage() {
         setLoadingDevices(true);
         setDeviceError('');
         try {
-            const response = await apiClient.get('/Device/GetAll');
+           const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
             if (response.status === 200 && response.data) {
                 // Map API response to expected format
                 const mappedData = response.data.map((device: any) => ({
-                    deviceID: device.deviceCode || device.code || '',
-                    deviceName: device.deviceName || device.name || ''
+                    id: device.id || '',
+                    code: device.code || '',
+                    description: device.description || ''
                 }));
                 setDeviceData(mappedData);
             }
@@ -175,7 +176,7 @@ export function DivisionSetupPage() {
         const confirmed = await Swal.fire({
             icon: 'warning',
             title: 'Confirm Delete',
-            text: `Are you sure you want to delete division ${division.code}?`,
+            text: `Are you sure you want to delete division ${division.id}?`,
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
@@ -226,7 +227,23 @@ export function DivisionSetupPage() {
             });
             return;
         }
-
+// Check for duplicate code (only when creating new or changing code during edit)
+            const isDuplicate = divisionList.some((division, index) => {
+              // When editing, exclude the current record from duplicate check
+              if (isEditMode && selectedDivisionIndex === index) {
+                return false;
+              }
+              return division.code.toLowerCase() === code.trim().toLowerCase();
+            });
+        
+            if (isDuplicate) {
+              await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Code',
+                text: 'This code is already in use. Please use a different code.',
+              });
+              return;
+            }
         setSubmitting(true);
         try {
             const payload = {
