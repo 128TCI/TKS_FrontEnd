@@ -793,22 +793,22 @@ function StatCard({ icon: Icon, label, value, change, changeType, color }: StatC
         negative: 'text-red-600'
     };
 
-    return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
-            <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 bg-gradient-to-br ${colorClasses[color]} rounded-xl shadow-lg`}>
-                    <Icon className="w-6 h-6 text-white" />
-                </div>
-            </div>
-            <div className="mb-1">
-                <div className="text-gray-900" style={{ fontSize: '1.875rem', lineHeight: '2.25rem' }}>{value}</div>
-            </div>
-            <div className="text-gray-600 mb-2">{label}</div>
-            <div className={`${changeColors[changeType]}`} style={{ fontSize: '0.875rem', lineHeight: '1.25rem' }}>
-                {change}
-            </div>
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-3 bg-gradient-to-br ${colorClasses[color]} rounded-xl shadow-lg`}>
+          <Icon className="w-6 h-6 text-white" />
         </div>
-    );
+      </div>
+      <div className="mb-1">
+        <div className="text-gray-900" style={{ fontSize: '1.875rem', lineHeight: '2.25rem' }}>{value}</div>
+      </div>
+      <div className="text-gray-600 mb-2">{label}</div>
+      <div className={`${changeColors[changeType]}`} style={{ fontSize: '0.875rem', lineHeight: '1.25rem' }}>
+        {change}
+      </div>
+    </div>
+  );
 }
 
 interface QuickActionCardProps {
