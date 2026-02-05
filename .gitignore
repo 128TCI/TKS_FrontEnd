@@ -1,0 +1,16 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/TKS_FrontEnd/CopilotIndices/17.14.1368.60722/CodeChunks.db
+/.vs/TKS_FrontEnd/CopilotIndices/17.14.1368.60722/CodeChunks.db-wal
+/.vs/TKS_FrontEnd/CopilotIndices/17.14.1368.60722/CodeChunks.db-shm
+/.vs/TKS_FrontEnd/CopilotIndices/17.14.1368.60722/SemanticSymbols.db
+/.vs/TKS_FrontEnd/CopilotIndices/17.14.1368.60722/SemanticSymbols.db-shm
+/.vs/TKS_FrontEnd/CopilotIndices/17.14.1368.60722/SemanticSymbols.db-wal
+/.vs/TKS_FrontEnd/FileContentIndex/8146f73c-7cff-42ee-8691-4921fe49cdec.vsidx
+/.vs/TKS_FrontEnd/FileContentIndex/b22f0458-3cfd-44b6-8771-2ce263999adb.vsidx
+/.vs/TKS_FrontEnd/FileContentIndex/64bb4e45-f6dd-498b-b0f7-1f8c3c749542.vsidx
+/.vs/slnx.sqlite
+/.vs/TKS_FrontEnd/FileContentIndex/fd9fddf8-04fe-4f58-8e3a-807d69126cfe.vsidx
+/.vs/TKS_FrontEnd/FileContentIndex/f46dc8cb-b5aa-4726-84d6-8d289f4e70bc.vsidx
