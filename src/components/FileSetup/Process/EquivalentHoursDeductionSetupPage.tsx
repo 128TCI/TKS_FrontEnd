@@ -1,77 +1,88 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, ArrowLeft, UserX, LogIn, LogOut, PlayCircle, PauseCircle, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
+import Swal from 'sweetalert2';
+import apiClient from '../../../services/apiClient';
 
 interface DeductionItem {
   id: number;
   code: string;
-  description: string;
-  monday: string;
-  tuesday: string;
-  wednesday: string;
-  thursday: string;
-  friday: string;
-  saturday: string;
-  sunday: string;
+  desc: string;
+  monday: number;
+  tuesday: number;
+  wednesday: number;
+  thursday: number;
+  friday: number;
+  saturday: number;
+  sunday: number;
 }
 
 type DeductionType = 'absent' | 'no-login' | 'no-logout' | 'no-break2-out' | 'no-break2-in';
+
+const API_ENDPOINTS = {
+  'absent': '/Fs/Process/Device/EquivHoursDeductionSetUp/ForAbsent',
+  'no-login': '/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogin',
+  'no-logout': '/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogout',
+  'no-break2-out': '/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2Out',
+  'no-break2-in': '/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2In'
+};
 
 export function EquivalentHoursDeductionSetupPage() {
   const [activeTab, setActiveTab] = useState<DeductionType>('absent');
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [editingItem, setEditingItem] = useState<DeductionItem | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
+    id: 0,
     code: '',
-    description: '',
-    monday: '0',
-    tuesday: '0',
-    wednesday: '0',
-    thursday: '0',
-    friday: '0',
-    saturday: '0',
-    sunday: '0'
+    desc: '',
+    monday: '',
+    tuesday: '',
+    wednesday: '',
+    thursday: '',
+    friday: '',
+    saturday: '',
+    sunday: ''
   });
 
   // Separate data for each tab
-  const [absentData, setAbsentData] = useState<DeductionItem[]>([
-    {
-      id: 1,
-      code: 'ABSENT',
-      description: 'ABSENT',
-      monday: '8.00',
-      tuesday: '8.00',
-      wednesday: '8.00',
-      thursday: '8.00',
-      friday: '8.00',
-      saturday: '8.00',
-      sunday: '8.00'
-    }
-  ]);
-
+  const [absentData, setAbsentData] = useState<DeductionItem[]>([]);
   const [noLoginData, setNoLoginData] = useState<DeductionItem[]>([]);
-  const [noLogoutData, setNoLogoutData] = useState<DeductionItem[]>([
-    {
-      id: 1,
-      code: 'NOLOGIN',
-      description: 'NOLOGIN',
-      monday: '8.00',
-      tuesday: '8.00',
-      wednesday: '8.00',
-      thursday: '8.00',
-      friday: '8.00',
-      saturday: '8.00',
-      sunday: '8.00'
-    }
-  ]);
+  const [noLogoutData, setNoLogoutData] = useState<DeductionItem[]>([]);
   const [noBreak2OutData, setNoBreak2OutData] = useState<DeductionItem[]>([]);
   const [noBreak2InData, setNoBreak2InData] = useState<DeductionItem[]>([]);
 
+  // Loading states for each tab
+  const [loadingData, setLoadingData] = useState(false);
+  const [dataError, setDataError] = useState('');
+
   const itemsPerPage = 10;
+
+  // Fetch data when component mounts or tab changes
+  useEffect(() => {
+    fetchDeductionData();
+  }, [activeTab]);
+
+  const fetchDeductionData = async () => {
+    setLoadingData(true);
+    setDataError('');
+    try {
+      const endpoint = API_ENDPOINTS[activeTab];
+      const response = await apiClient.get(endpoint);
+      if (response.status === 200 && response.data) {
+        setCurrentData(response.data);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load deduction data';
+      setDataError(errorMsg);
+      console.error('Error fetching deduction data:', error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   // Get current data based on active tab
   const getCurrentData = (): DeductionItem[] => {
@@ -99,97 +110,236 @@ export function EquivalentHoursDeductionSetupPage() {
   
   const filteredData = currentData.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchTerm.toLowerCase())
+    item.desc.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const handleCreateNew = () => {
     setFormData({
+      id: 0,
       code: '',
-      description: '',
-      monday: '0',
-      tuesday: '0',
-      wednesday: '0',
-      thursday: '0',
-      friday: '0',
-      saturday: '0',
-      sunday: '0'
+      desc: '',
+      monday: '',
+      tuesday: '',
+      wednesday: '',
+      thursday: '',
+      friday: '',
+      saturday: '',
+      sunday: ''
     });
+    setEditingItem(null);
     setShowCreateModal(true);
   };
 
   const handleEdit = (item: DeductionItem) => {
     setEditingItem(item);
     setFormData({
+      id: item.id,
       code: item.code,
-      description: item.description,
-      monday: item.monday,
-      tuesday: item.tuesday,
-      wednesday: item.wednesday,
-      thursday: item.thursday,
-      friday: item.friday,
-      saturday: item.saturday,
-      sunday: item.sunday
+      desc: item.desc,
+      monday: item.monday.toString(),
+      tuesday: item.tuesday.toString(),
+      wednesday: item.wednesday.toString(),
+      thursday: item.thursday.toString(),
+      friday: item.friday.toString(),
+      saturday: item.saturday.toString(),
+      sunday: item.sunday.toString()
     });
-    setShowEditModal(true);
+    setShowCreateModal(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this deduction item?')) {
-      setCurrentData(currentData.filter(item => item.id !== id));
+  const handleDelete = async (item: DeductionItem) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete "${item.code} - ${item.desc}"?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+      try {
+        const endpoint = API_ENDPOINTS[activeTab];
+        await apiClient.delete(`${endpoint}/${item.id}`);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Deduction item deleted successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        await fetchDeductionData();
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete deduction item';
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: errorMsg,
+        });
+        console.error('Error deleting deduction item:', error);
+      }
     }
   };
 
-  const handleSubmitCreate = (e: React.FormEvent) => {
+  const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newItem: DeductionItem = {
-      id: Math.max(...currentData.map(d => d.id), 0) + 1,
-      code: formData.code,
-      description: formData.description,
-      monday: formData.monday,
-      tuesday: formData.tuesday,
-      wednesday: formData.wednesday,
-      thursday: formData.thursday,
-      friday: formData.friday,
-      saturday: formData.saturday,
-      sunday: formData.sunday
-    };
-    setCurrentData([...currentData, newItem]);
-    setShowCreateModal(false);
+
+    // Validate required fields
+    if (!formData.code.trim()) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code is required.',
+      });
+      return;
+    }
+
+    // Check for duplicate code
+    const isDuplicate = currentData.some(item => 
+      item.code.toLowerCase() === formData.code.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This deduction code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: 0,
+        code: formData.code,
+        desc: formData.desc,
+        monday: parseFloat(formData.monday) || 0,
+        tuesday: parseFloat(formData.tuesday) || 0,
+        wednesday: parseFloat(formData.wednesday) || 0,
+        thursday: parseFloat(formData.thursday) || 0,
+        friday: parseFloat(formData.friday) || 0,
+        saturday: parseFloat(formData.saturday) || 0,
+        sunday: parseFloat(formData.sunday) || 0
+      };
+
+      const endpoint = API_ENDPOINTS[activeTab];
+      await apiClient.post(endpoint, payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Deduction item created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      await fetchDeductionData();
+      setShowCreateModal(false);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error creating deduction item:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
+  const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setCurrentData(
-        currentData.map(item =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                code: formData.code,
-                description: formData.description,
-                monday: formData.monday,
-                tuesday: formData.tuesday,
-                wednesday: formData.wednesday,
-                thursday: formData.thursday,
-                friday: formData.friday,
-                saturday: formData.saturday,
-                sunday: formData.sunday
-              }
-            : item
-        )
-      );
-      setShowEditModal(false);
+
+    if (!editingItem) return;
+
+    // Validate required fields
+    if (!formData.code.trim()) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code is required.',
+      });
+      return;
+    }
+
+    // Check for duplicate code (excluding current item)
+    const isDuplicate = currentData.some(item => 
+      item.id !== editingItem.id && 
+      item.code.toLowerCase() === formData.code.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This deduction code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: editingItem.id,
+        code: formData.code,
+        desc: formData.desc,
+        monday: parseFloat(formData.monday) || 0,
+        tuesday: parseFloat(formData.tuesday) || 0,
+        wednesday: parseFloat(formData.wednesday) || 0,
+        thursday: parseFloat(formData.thursday) || 0,
+        friday: parseFloat(formData.friday) || 0,
+        saturday: parseFloat(formData.saturday) || 0,
+        sunday: parseFloat(formData.sunday) || 0
+      };
+
+      const endpoint = API_ENDPOINTS[activeTab];
+      await apiClient.put(`${endpoint}/${payload.id}`, payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Deduction item updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      await fetchDeductionData();
+      setShowCreateModal(false);
       setEditingItem(null);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error updating deduction item:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    if (editingItem) {
+      handleSubmitEdit(e);
+    } else {
+      handleSubmitCreate(e);
     }
   };
 
   const handleCloseModal = () => {
     setShowCreateModal(false);
-    setShowEditModal(false);
     setEditingItem(null);
   };
 
@@ -199,28 +349,26 @@ export function EquivalentHoursDeductionSetupPage() {
       if (event.key === 'Escape') {
         if (showCreateModal) {
           setShowCreateModal(false);
-        } else if (showEditModal) {
-          setShowEditModal(false);
           setEditingItem(null);
         }
       }
     };
 
-    if (showCreateModal || showEditModal) {
+    if (showCreateModal) {
       document.addEventListener('keydown', handleEscKey);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showCreateModal, showEditModal]);
+  }, [showCreateModal]);
 
-    const tabs = [
-        { id: 'absent' as DeductionType, label: 'For Absent', icon: UserX },
-        { id: 'no-login' as DeductionType, label: 'For No Login', icon: LogIn },
-        { id: 'no-logout' as DeductionType, label: 'For No Logout', icon: LogOut },
-        { id: 'no-break2-out' as DeductionType, label: 'For No Break2 Out', icon: PlayCircle },
-        { id: 'no-break2-in' as DeductionType, label: 'For No Break2 In', icon: PauseCircle }
+  const tabs = [
+    { id: 'absent' as DeductionType, label: 'For Absent', icon: UserX },
+    { id: 'no-login' as DeductionType, label: 'For No Login', icon: LogIn },
+    { id: 'no-logout' as DeductionType, label: 'For No Logout', icon: LogOut },
+    { id: 'no-break2-out' as DeductionType, label: 'For No Break2 Out', icon: PlayCircle },
+    { id: 'no-break2-in' as DeductionType, label: 'For No Break2 In', icon: PauseCircle }
   ];
 
   return (
@@ -245,24 +393,24 @@ export function EquivalentHoursDeductionSetupPage() {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Process employee timekeeping data by various criteria including TK Group, branch, department, and more. Generate comprehensive reports for tardiness, undertime, overtime, leave, and other attendance metrics.
+                    Configure equivalent hours deduction for various attendance scenarios including absences, missing login/logout, and break violations. Set specific deduction hours for each day of the week to ensure accurate timekeeping calculations.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Process by multiple organizational groups</span>
+                      <span className="text-gray-600">Day-specific deduction configurations</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Generate comprehensive attendance reports</span>
+                      <span className="text-gray-600">Multiple deduction scenarios</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Track tardiness, undertime, and overtime</span>
+                      <span className="text-gray-600">Flexible hours calculation</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Monitor leave and absences efficiently</span>
+                      <span className="text-gray-600">Accurate attendance tracking</span>
                     </div>
                   </div>
                 </div>
@@ -284,12 +432,12 @@ export function EquivalentHoursDeductionSetupPage() {
                       ? 'font-medium bg-blue-600 text-white -mb-px'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   } transition-colors`}
-                  >
-                   <tab.icon className="w-4 h-4" />
-                   {tab.label}
-                   {activeTab === tab.id && (
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                  {activeTab === tab.id && (
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
-                   )}
+                  )}
                 </button>
               ))}
             </div>
@@ -317,64 +465,74 @@ export function EquivalentHoursDeductionSetupPage() {
 
             {/* Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Monday</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Tuesday</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Wednesday</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Thursday</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Friday</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Saturday</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Sunday</th>
-                    <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.monday}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.tuesday}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.wednesday}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.thursday}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.friday}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.saturday}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.sunday}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
+              {loadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading deduction data...</div>
+                </div>
+              ) : dataError ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{dataError}</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Monday</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Tuesday</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Wednesday</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Thursday</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Friday</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Saturday</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Sunday</th>
+                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.desc}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.monday.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.tuesday.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.wednesday.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.thursday.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.friday.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.saturday.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.sunday.toFixed(2)}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
                                 onClick={() => handleEdit(item)}
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 title="Edit"
-                            >
+                              >
                                 <Edit className="w-4 h-4" />
-                            </button>
-                            <span className="text-gray-300">|</span>
-                            <button
-                                onClick={() => handleDelete(item.id)}
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={() => handleDelete(item)}
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
-                            >
+                              >
                                 <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={10} className="px-6 py-16 text-center">
+                          <div className="text-gray-500">No data available in table</div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={10} className="px-6 py-16 text-center">
-                        <div className="text-gray-500">No data available in table</div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Pagination */}
@@ -386,22 +544,27 @@ export function EquivalentHoursDeductionSetupPage() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
-                <button
-                  className={`px-3 py-1 rounded ${
-                    currentPage === 1 ? 'bg-blue-500 text-white' : 'text-blue-600 hover:bg-gray-100'
-                  }`}
-                  onClick={() => setCurrentPage(1)}
-                >
-                  1
-                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
                   disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
@@ -411,175 +574,12 @@ export function EquivalentHoursDeductionSetupPage() {
         </div>
       </div>
 
-      {/* Create New Modal */}
+      {/* Create/Edit Modal */}
       {showCreateModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-              <h2 className="text-gray-900">Create New</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitCreate} className="p-6">
-              <h3 className="text-blue-600 mb-4">Equivalent Hours Deduction</h3>
-              
-              <div className="space-y-3">
-                {/* Code */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Code :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Description */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Description :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Monday */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Monday :
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.monday}
-                    onChange={(e) => setFormData({ ...formData, monday: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Tuesday */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Tuesday :
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.tuesday}
-                    onChange={(e) => setFormData({ ...formData, tuesday: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Wednesday */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Wednesday :
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.wednesday}
-                    onChange={(e) => setFormData({ ...formData, wednesday: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Thursday */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Thursday :
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.thursday}
-                    onChange={(e) => setFormData({ ...formData, thursday: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Friday */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Friday :
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.friday}
-                    onChange={(e) => setFormData({ ...formData, friday: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Saturday */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Saturday :
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.saturday}
-                    onChange={(e) => setFormData({ ...formData, saturday: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Sunday */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Sunday :
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.sunday}
-                    onChange={(e) => setFormData({ ...formData, sunday: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Back to List
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && editingItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-              <h2 className="text-gray-900">Create New</h2>
+              <h2 className="text-gray-900">{editingItem ? 'Edit' : 'Create New'}</h2>
               <button
                 onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -587,7 +587,7 @@ export function EquivalentHoursDeductionSetupPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmitEdit} className="p-6">
+            <form onSubmit={handleSubmit} className="p-6">
               <h3 className="text-blue-600 mb-4">Equivalent Hours Deduction</h3>
               
               <div className="space-y-3">
@@ -599,6 +599,7 @@ export function EquivalentHoursDeductionSetupPage() {
                   <input
                     type="text"
                     value={formData.code}
+                    maxLength={10}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     required
@@ -612,8 +613,8 @@ export function EquivalentHoursDeductionSetupPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    value={formData.desc}
+                    onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
@@ -720,14 +721,16 @@ export function EquivalentHoursDeductionSetupPage() {
               <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
-                  Update
+                  {submitting ? (editingItem ? 'Updating...' : 'Submitting...') : (editingItem ? 'Update' : 'Submit')}
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   Back to List
                 </button>
@@ -739,33 +742,6 @@ export function EquivalentHoursDeductionSetupPage() {
 
       {/* Footer */}
       <Footer />
-
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 }
