@@ -1,98 +1,255 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
-
+import Swal from 'sweetalert2';
+import apiClient from '../../../services/apiClient';
 
 interface GroupSchedule {
-  id: number;
-  code: string;
-  description: string;
+  groupScheduleID: number;
+  groupScheduleCode: string;
+  groupScheduleDesc: string;
 }
 
 export function GroupScheduleSetupPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [editingItem, setEditingItem] = useState<GroupSchedule | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
-    code: '',
-    description: ''
+    groupScheduleCode: '',
+    groupScheduleDesc: ''
   });
 
-  const [schedules, setSchedules] = useState<GroupSchedule[]>([
-    { id: 1, code: 'a', description: 'a' },
-    { id: 2, code: 'ab', description: 'ab' }
-  ]);
+  // API Data States
+  const [schedules, setSchedules] = useState<GroupSchedule[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
+  const [dataError, setDataError] = useState('');
+
+  // Fetch group schedules from API
+  useEffect(() => {
+    fetchGroupSchedules();
+  }, []);
+
+  const fetchGroupSchedules = async () => {
+    setLoadingData(true);
+    setDataError('');
+    try {
+      const response = await apiClient.get('/Fs/Process/GroupScheduleSetUp');
+      if (response.status === 200 && response.data) {
+        setSchedules(response.data);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load group schedules';
+      setDataError(errorMsg);
+      console.error('Error fetching group schedules:', error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   const itemsPerPage = 10;
   
   const filteredData = schedules.filter(item =>
-    item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchTerm.toLowerCase())
+    item.groupScheduleCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.groupScheduleDesc.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const handleCreateNew = () => {
     setFormData({
-      code: '',
-      description: ''
+      groupScheduleCode: '',
+      groupScheduleDesc: ''
     });
+    setEditingItem(null);
     setShowCreateModal(true);
   };
 
   const handleEdit = (item: GroupSchedule) => {
     setEditingItem(item);
     setFormData({
-      code: item.code,
-      description: item.description
+      groupScheduleCode: item.groupScheduleCode,
+      groupScheduleDesc: item.groupScheduleDesc
     });
-    setShowEditModal(true);
+    setShowCreateModal(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this group schedule?')) {
-      setSchedules(prev => prev.filter(item => item.id !== id));
+  const handleDelete = async (item: GroupSchedule) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete "${item.groupScheduleCode} - ${item.groupScheduleDesc}"?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+      try {
+        await apiClient.delete(`/Fs/Process/GroupScheduleSetUp/${item.groupScheduleID}`);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Group schedule deleted successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        await fetchGroupSchedules();
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete group schedule';
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: errorMsg,
+        });
+        console.error('Error deleting group schedule:', error);
+      }
     }
   };
 
-  const handleSubmitCreate = (e: React.FormEvent) => {
+  const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newSchedule: GroupSchedule = {
-      id: Math.max(...schedules.map(d => d.id), 0) + 1,
-      code: formData.code,
-      description: formData.description
-    };
-    setSchedules(prev => [...prev, newSchedule]);
-    setShowCreateModal(false);
+
+    // Validate required fields
+    if (!formData.groupScheduleCode.trim()) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code is required.',
+      });
+      return;
+    }
+
+    // Check for duplicate code
+    const isDuplicate = schedules.some(item => 
+      item.groupScheduleCode.toLowerCase() === formData.groupScheduleCode.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This group schedule code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        groupScheduleID: 0,
+        groupScheduleCode: formData.groupScheduleCode,
+        groupScheduleDesc: formData.groupScheduleDesc
+      };
+
+      await apiClient.post('/Fs/Process/GroupScheduleSetUp', payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Group schedule created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      await fetchGroupSchedules();
+      setShowCreateModal(false);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error creating group schedule:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
+  const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setSchedules(prev =>
-        prev.map(item =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                code: formData.code,
-                description: formData.description
-              }
-            : item
-        )
-      );
-      setShowEditModal(false);
+
+    if (!editingItem) return;
+
+    // Validate required fields
+    if (!formData.groupScheduleCode.trim()) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code is required.',
+      });
+      return;
+    }
+
+    // Check for duplicate code (excluding current item)
+    const isDuplicate = schedules.some(item => 
+      item.groupScheduleID !== editingItem.groupScheduleID && 
+      item.groupScheduleCode.toLowerCase() === formData.groupScheduleCode.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This group schedule code is already in use. Please use a different code.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        groupScheduleID: editingItem.groupScheduleID,
+        groupScheduleCode: formData.groupScheduleCode,
+        groupScheduleDesc: formData.groupScheduleDesc
+      };
+
+      await apiClient.put(`/Fs/Process/GroupScheduleSetUp/${editingItem.groupScheduleID}`, payload);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Group schedule updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      await fetchGroupSchedules();
+      setShowCreateModal(false);
       setEditingItem(null);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error updating group schedule:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    if (editingItem) {
+      handleSubmitEdit(e);
+    } else {
+      handleSubmitCreate(e);
     }
   };
 
   const handleCloseModal = () => {
     setShowCreateModal(false);
-    setShowEditModal(false);
     setEditingItem(null);
   };
 
@@ -102,24 +259,22 @@ export function GroupScheduleSetupPage() {
       if (event.key === 'Escape') {
         if (showCreateModal) {
           setShowCreateModal(false);
-        } else if (showEditModal) {
-          setShowEditModal(false);
           setEditingItem(null);
         }
       }
     };
 
-    if (showCreateModal || showEditModal) {
+    if (showCreateModal) {
       document.addEventListener('keydown', handleEscKey);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showCreateModal, showEditModal]);
+  }, [showCreateModal]);
 
-    return (
-     <div className="min-h-screen bg-white flex flex-col">
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
       {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
@@ -140,24 +295,24 @@ export function GroupScheduleSetupPage() {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Create and manage help documentation, user guides, and reference materials for the timekeeping system to assist users with various features and functionalities.
+                    Create and manage group schedule codes and descriptions for organizing employee schedules. Group schedules allow you to efficiently manage multiple employees with similar shift patterns.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Comprehensive help documentation</span>
+                      <span className="text-gray-600">Define group schedule codes</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Custom topic organization</span>
+                      <span className="text-gray-600">Custom schedule descriptions</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Detailed content management</span>
+                      <span className="text-gray-600">Efficient schedule management</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">User-friendly reference system</span>
+                      <span className="text-gray-600">Team-based organization</span>
                     </div>
                   </div>
                 </div>
@@ -187,50 +342,60 @@ export function GroupScheduleSetupPage() {
 
             {/* Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                    <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
+              {loadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600 text-sm">Loading group schedules...</div>
+                </div>
+              ) : dataError ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded">
+                  <p className="text-red-700 text-sm">{dataError}</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
+                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((item) => (
+                        <tr key={item.groupScheduleID} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.groupScheduleCode}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.groupScheduleDesc}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
                                 onClick={() => handleEdit(item)}
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 title="Edit"
-                            >
+                              >
                                 <Edit className="w-4 h-4" />
-                            </button>
-                            <span className="text-gray-300">|</span>
-                            <button
-                                onClick={() => handleDelete(item.id)}
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={() => handleDelete(item)}
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
-                            >
+                              >
                                 <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-16 text-center">
+                          <div className="text-gray-500">No data available in table</div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="px-6 py-16 text-center">
-                        <div className="text-gray-500">No data available in table</div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Pagination */}
@@ -242,22 +407,27 @@ export function GroupScheduleSetupPage() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
-                <button
-                  className={`px-3 py-1 rounded ${
-                    currentPage === 1 ? 'bg-blue-500 text-white' : 'text-blue-600 hover:bg-gray-100'
-                  }`}
-                  onClick={() => setCurrentPage(1)}
-                >
-                  1
-                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
                   disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
@@ -267,12 +437,12 @@ export function GroupScheduleSetupPage() {
         </div>
       </div>
 
-      {/* Create New Modal */}
+      {/* Create/Edit Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-              <h2 className="text-gray-900">Create New</h2>
+              <h2 className="text-gray-900">{editingItem ? 'Edit' : 'Create New'}</h2>
               <button
                 onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -280,7 +450,7 @@ export function GroupScheduleSetupPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmitCreate} className="p-6">
+            <form onSubmit={handleSubmit} className="p-6">
               <h3 className="text-blue-600 mb-4">Group Schedule Setup</h3>
               
               <div className="space-y-3">
@@ -291,8 +461,8 @@ export function GroupScheduleSetupPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    value={formData.groupScheduleCode}
+                    onChange={(e) => setFormData({ ...formData, groupScheduleCode: e.target.value })}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     required
                   />
@@ -305,8 +475,8 @@ export function GroupScheduleSetupPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    value={formData.groupScheduleDesc}
+                    onChange={(e) => setFormData({ ...formData, groupScheduleDesc: e.target.value })}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
@@ -315,79 +485,16 @@ export function GroupScheduleSetupPage() {
               <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
-                  Submit
+                  {submitting ? (editingItem ? 'Updating...' : 'Submitting...') : (editingItem ? 'Update' : 'Submit')}
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Back to List
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && editingItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-              <h2 className="text-gray-900">Edit Group Schedule</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitEdit} className="p-6">
-              <h3 className="text-blue-600 mb-4">Group Schedule Setup</h3>
-              
-              <div className="space-y-3">
-                {/* Code */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Code :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Description */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-900 text-sm whitespace-nowrap w-32">
-                    Description :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                >
-                  Update
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   Back to List
                 </button>
@@ -399,33 +506,6 @@ export function GroupScheduleSetupPage() {
 
       {/* Footer */}
       <Footer />
-
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 }
