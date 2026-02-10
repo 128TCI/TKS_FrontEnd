@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
-
 interface TKSGroupTableProps {
+  importTKS: string
   selectedCodes: number[];
   onToggle: (id: number) => void;
   onSelectAll: () => void;
@@ -12,9 +12,7 @@ interface TKSGroupTableProps {
 type SortField = 'groupCode' | 'groupDescription';
 type SortDirection = 'asc' | 'desc';
 
-
-
-export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroupTableProps) {
+export function TKSGroupTable({importTKS, selectedCodes, onToggle, onSelectAll }: TKSGroupTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('groupCode');
@@ -25,6 +23,7 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
   const [error, setError] = useState<string | null>(null);
 
 
+
   useEffect(() => {
         fetchData();
     }, []);
@@ -32,23 +31,100 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
     const fetchData = async () => {
         setLoading(true);
         error;
-        try {
-            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+        if(importTKS == "WorkShift"){
+          try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImport');
             if (response.data) {
-                const mappedData = response.data.map((tksGroupList: any) => ({
-                    id: tksGroupList.id || tksGroupList.ID || '',
-                    groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
-                    groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
-
-                }));
-                setTKSGroupList(mappedData);
+              const mappedData = response.data.map((tksGroupList: any) => ({
+              id: tksGroupList.id || tksGroupList.ID || '',
+              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+            }));
+              setTKSGroupList(mappedData);
             }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-            setError(errorMsg);
-            console.error('Error fetching TKSGroup:', error);
-        } finally {
-            loading;
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+              setError(errorMsg);
+              console.error('Error fetching TKSGroup:', error);
+            } finally {
+                loading;
+              }
+        }
+        else if(importTKS == "Leave"){
+          try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportLeave');
+            if (response.data) {
+              const mappedData = response.data.map((tksGroupList: any) => ({
+              id: tksGroupList.id || tksGroupList.ID || '',
+              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+            }));
+              setTKSGroupList(mappedData);
+            }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+              setError(errorMsg);
+              console.error('Error fetching TKSGroup:', error);
+            } finally {
+                loading;
+              } 
+        }
+        else if(importTKS == "Overtime"){
+          try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportOvertime');
+            if (response.data) {
+              const mappedData = response.data.map((tksGroupList: any) => ({
+              id: tksGroupList.id || tksGroupList.ID || '',
+              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+            }));
+              setTKSGroupList(mappedData);
+            }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+              setError(errorMsg);
+              console.error('Error fetching TKSGroup:', error);
+            } finally {
+                loading;
+              } 
+        }
+        else if(importTKS == "MasterFile"){
+          try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportMasterFile');
+            if (response.data) {
+              const mappedData = response.data.map((tksGroupList: any) => ({
+              id: tksGroupList.id || tksGroupList.ID || '',
+              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+            }));
+              setTKSGroupList(mappedData);
+            }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+              setError(errorMsg);
+              console.error('Error fetching TKSGroup:', error);
+            } finally {
+                loading;
+              } 
+        }
+        else if(importTKS == "Adjustment"){
+          try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportAdjustment');
+            if (response.data) {
+              const mappedData = response.data.map((tksGroupList: any) => ({
+              id: tksGroupList.id || tksGroupList.ID || '',
+              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+            }));
+              setTKSGroupList(mappedData);
+            }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+              setError(errorMsg);
+              console.error('Error fetching TKSGroup:', error);
+            } finally {
+                loading;
+              } 
         }
     };
 
@@ -61,7 +137,7 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
     }
     setCurrentPage(1);
   };
-  
+    
   const filteredAndSortedData = tksGroupList.filter(tksGroupList =>
       tksGroupList.groupCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tksGroupList.groupDescription.toLowerCase().includes(searchTerm.toLowerCase()) 
@@ -117,6 +193,8 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
    useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm]);
+
+    console.log(selectedCodes);
 
   return (
     <div className="lg:col-span-2 bg-gray-50 rounded-lg border border-gray-200 p-5">
