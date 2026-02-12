@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Database, RefreshCw } from 'lucide-react';
-import { Footer } from './Footer/Footer';
+import { Footer } from '../Footer/Footer';
 
 export function UpdateRawdataOnlinePage() {
   const [option, setOption] = useState('');

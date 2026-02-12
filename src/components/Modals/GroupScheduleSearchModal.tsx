@@ -1,82 +1,50 @@
 import { X, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import apiClient from '../../services/apiClient';
-import Swal from 'sweetalert2';
 
-interface LeaveType {
-  leaveID: number;
-  leaveCode: string;
-  leaveDesc: string;
-  chargeableTo: string;
-  withPay: string;
-  subTypeRequired: boolean;
-  basedOnTenure: boolean;
-  withDateDuration: boolean;
-  noBalance: boolean;
-  legalFileAsLeave: boolean;
-  sphFileAsLeave: boolean;
-  dbleLegalFileAsLeave: boolean;
-  sph2FileAsLeave: boolean;
-  prevYrLvCode: string;
-  nwhFileAsLeave: boolean;
-  requiredAdvanceFiling: boolean;
-  exemptFromAllowDeduction: boolean;
+interface GroupSchedule {
+  groupScheduleID: number;
+  groupScheduleCode: string;
+  groupScheduleDesc: string;
 }
 
-interface LeaveCodeSearchModalProps {
+interface GroupScheduleSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (code: string) => void;
+  groupSchedules: GroupSchedule[];
+  loading: boolean;
 }
 
-export function LeaveCodeSearchModal({
+export function GroupScheduleSearchModal({
   isOpen,
   onClose,
-  onSelect
-}: LeaveCodeSearchModalProps) {
+  onSelect,
+  groupSchedules,
+  loading
+}: GroupScheduleSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
-  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  // Fetch leave types
-  const fetchLeaveTypes = async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get('/Fs/Process/LeaveTypeSetUp');
-      if (response.status === 200 && response.data) {
-        setLeaveTypes(response.data);
-      }
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load leave types';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-      console.error('Error fetching leave types:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Reset search and page when modal opens
   useEffect(() => {
     if (isOpen) {
       setSearchTerm('');
       setCurrentPage(1);
-      fetchLeaveTypes();
     }
   }, [isOpen]);
 
-  // Filter leave types based on search term
-  const filteredLeaveTypes = leaveTypes.filter(leave =>
-    (leave.leaveCode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (leave.leaveDesc?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  // Filter group schedules based on search term
+  const filteredSchedules = groupSchedules.filter(schedule =>
+    (schedule.groupScheduleCode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (schedule.groupScheduleDesc?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredLeaveTypes.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredSchedules.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentLeaveTypes = filteredLeaveTypes.slice(startIndex, endIndex);
+  const currentSchedules = filteredSchedules.slice(startIndex, endIndex);
 
   // Generate page numbers
   const getPageNumbers = () => {
@@ -157,16 +125,16 @@ export function LeaveCodeSearchModal({
     <>
       {/* Modal Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50 z-[60]"
+        className="fixed inset-0 bg-black/50 z-40"
         onClick={onClose}
       ></div>
 
       {/* Modal Dialog */}
-      <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
-        <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-3xl max-h-[90vh] overflow-hidden">
           {/* Modal Header */}
           <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-            <h2 className="text-gray-800 text-sm">Select Leave Type</h2>
+            <h2 className="text-gray-800 text-sm">Select Group Schedule</h2>
             <button 
               onClick={onClose}
               className="text-gray-600 hover:text-gray-800"
@@ -177,7 +145,7 @@ export function LeaveCodeSearchModal({
 
           {/* Modal Content */}
           <div className="p-3 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 50px)' }}>
-            <h3 className="text-blue-600 mb-2 text-sm">Leave Type Setup</h3>
+            <h3 className="text-blue-600 mb-2 text-sm">Group Schedule Setup</h3>
 
             {/* Search Input */}
             <div className="flex items-center gap-2 mb-3">
@@ -194,54 +162,44 @@ export function LeaveCodeSearchModal({
             {/* Loading State */}
             {loading ? (
               <div className="text-center py-8 text-gray-500">
-                Loading leave types...
+                Loading group schedules...
               </div>
             ) : (
               <>
-                {/* Leave Type Table */}
+                {/* Group Schedule Table */}
                 <div className="border border-gray-200 rounded overflow-hidden">
                   <table className="w-full border-collapse text-sm">
                     <thead className="bg-white">
                       <tr className="bg-gray-100 border-b-2 border-gray-300">
                         <th className="px-3 py-1.5 text-left text-gray-700 text-sm">
-                          Leave Code
+                          Group Schedule Code
                           <span className="ml-1 text-blue-500">▲</span>
                         </th>
                         <th className="px-3 py-1.5 text-left text-gray-700 text-sm">
                           Description
                           <span className="ml-1 text-gray-400">▼</span>
                         </th>
-                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">
-                          Chargeable To
-                          <span className="ml-1 text-gray-400">▼</span>
-                        </th>
-                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">
-                          With Pay
-                          <span className="ml-1 text-gray-400">▼</span>
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {currentLeaveTypes.length === 0 ? (
+                      {currentSchedules.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-3 py-8 text-center text-gray-500">
-                            No leave types found
+                          <td colSpan={2} className="px-3 py-8 text-center text-gray-500">
+                            No group schedules found
                           </td>
                         </tr>
                       ) : (
-                        currentLeaveTypes.map((leave) => (
+                        currentSchedules.map((schedule) => (
                           <tr 
-                            key={leave.leaveID}
+                            key={schedule.groupScheduleID}
                             className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
                             onClick={() => {
-                              onSelect(leave.leaveCode);
+                              onSelect(schedule.groupScheduleCode);
                               onClose();
                             }}
                           >
-                            <td className="px-3 py-1.5">{leave.leaveCode}</td>
-                            <td className="px-3 py-1.5">{leave.leaveDesc}</td>
-                            <td className="px-3 py-1.5">{leave.chargeableTo}</td>
-                            <td className="px-3 py-1.5">{leave.withPay}</td>
+                            <td className="px-3 py-1.5">{schedule.groupScheduleCode}</td>
+                            <td className="px-3 py-1.5">{schedule.groupScheduleDesc}</td>
                           </tr>
                         ))
                       )}
@@ -252,7 +210,7 @@ export function LeaveCodeSearchModal({
                 {/* Pagination */}
                 <div className="flex items-center justify-between mt-3">
                   <div className="text-gray-600 text-xs">
-                    Showing {filteredLeaveTypes.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredLeaveTypes.length)} of {filteredLeaveTypes.length} entries
+                    Showing {filteredSchedules.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredSchedules.length)} of {filteredSchedules.length} entries
                   </div>
                   <div className="flex gap-1">
                     <button 

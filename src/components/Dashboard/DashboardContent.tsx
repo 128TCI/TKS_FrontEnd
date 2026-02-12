@@ -21,8 +21,8 @@ import { UpdateRawDataPage } from '../UpdateRawDataPage';
 import { RawDataOTGroupPage } from '../RawDataOTGroupPage';
 import { RawdataOtGapPage } from '../RawdataOtGapPage';
 import { RawdataOnStraightDutyPage } from '../RawdataOnStraightDutyPage';
-import { TwoShiftsRawDataPage } from '../TwoShiftsRawDataPage';
-import { TwoShiftsEmployeeTimekeepConfigPage } from '../TwoShiftsEmployeeTimekeepConfigPage';
+import { TwoShiftsRawDataPage } from '../Maintenance/TwoShiftsRawDataPage';
+import { TwoShiftsEmployeeTimekeepConfigPage } from '../Maintenance/TwoShiftsEmployeeTimekeepConfigPage';
 import { OvertimeApplication2ShiftsPage } from '../OvertimeApplication2ShiftsPage';
 import { WorkshiftVariable2ShiftsPage } from '../WorkshiftVariable2ShiftsPage';
 import { ImportLogsFromDevice2ShiftsPage } from '../ImportLogsFromDevice2ShiftsPage';
@@ -40,7 +40,7 @@ import { UpdateEmployeePayHousePage } from '../Utilities/UpdateEmployeePayHouseP
 import { UpdateEmployeeClassificationPage } from '../Utilities/UpdateEmployeeClassificationPage';
 import { UpdateBatchRestDayPage } from '../Utilities/UpdateBatchRestDayPage';
 import { DeleteEmployeeTransactionsPage } from '../Utilities/DeleteEmployeeTransactionsPage';
-import { UpdateRawdataOnlinePage } from '../UpdateRawdataOnlinePage';
+import { UpdateRawdataOnlinePage } from '../Maintenance/UpdateRawdataOnlinePage';
 //Utility on Raw Data
 import { UpdateDaytypeRawdataPage } from '../Utilities/UpdateDaytypeRawdataPage';
 import { UpdateWorkshiftRawdataPage } from '../Utilities/UpdateWorkshiftRawdataPage';
@@ -67,7 +67,6 @@ import { UpdateTimeFlagBreaksPage } from '../Utilities/UpdateTimeFlagBreaksPage'
 import { UnpaidLunchDeductionPage } from '../Utilities/UnpaidLunchDeductionPage';
 import { DeductTardinessToOvertimePage } from '../Utilities/DeductTardinessToOvertimePage';
 
-import { RawDataPage } from '../RawDataPage';
 
 
 //Process Sub-Menu
@@ -80,8 +79,7 @@ import { CompanyInformation } from '../../components/FileSetup/System/CompanyInf
 import { CalendarSetup } from '../FileSetup/Process/CalendarSetup';
 import { HolidayOTRateSetupPage } from '../FileSetup/Process/Overtime/HolidayOTRateSetupPage';
 import { OvertimeSetupPage } from '../FileSetup/Process/Overtime/OvertimeSetupPage';
-import { EmployeeMasterFilePage } from '../EmployeeMasterFilePage';
-import { EmployeeTimekeepConfigPage } from '../EmployeeTimekeepConfigPage';
+
 import { AllowanceBracketCodeSetupPage } from '../FileSetup/Process/AllowanceAndEarning/AllowanceBracketCodeSetupPage';
 import { AllowanceBracketingSetupPage } from '../FileSetup/Process/AllowanceAndEarning/AllowanceBracketingSetupPage';
 import { AllowancePerClassificationSetupPage } from '../FileSetup/Process/AllowanceAndEarning/AllowancePerClassificationSetupPage';
@@ -143,6 +141,9 @@ import { DeviceTypeSetupPage } from '../FileSetup/Process/Device/DeviceTypeSetup
 import { CoordinatesSetupPage } from '../FileSetup/Process/Device/CoordinatesSetupPage';
 import { AMSDatabaseConfigurationSetupPage } from '../FileSetup/Process/Device/AMSDatabaseConfigurationSetupPage';
 import { MySQLDatabaseConfigurationSetupPage } from '../FileSetup/Process/Device/MySQLDatabaseConfigurationSetupPage';
+import { EmployeeMasterFilePage } from '../Maintenance/EmployeeMasterFilePage';
+import { EmployeeTimekeepConfigPage } from '../Maintenance/EmployeeTimekeepConfigPage';
+import { RawDataPage } from '../Maintenance/RawDataPage';
 
 interface DashboardContentProps {
     activeSection: string;

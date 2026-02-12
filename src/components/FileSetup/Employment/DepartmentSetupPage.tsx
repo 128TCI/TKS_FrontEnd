@@ -236,7 +236,7 @@ export function DepartmentSetupPage() {
     setLoadingEmployees(true);
     setEmployeeError('');
     try {
-      const response = await apiClient.get('/EmployeeMasterFile');
+      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((emp: any) => ({
           empCode: emp.empCode || emp.code || '',
