@@ -12,13 +12,13 @@ import {
 // import { WorkshiftVariablePage } from '../WorkshiftVariablePage';
 import { WorkshiftVariablePage } from '../Import/WorkshiftVariablePage';
 import { ImportAdjustmentPage } from '../Import/ImportAdjustmentPage';
-import { ImportLogsFromDeviceV2Page } from '../ImportLogsFromDeviceV2Page';
+import { ImportLogsFromDeviceV2Page } from '../Import/ImportLogsFromDeviceV2Page';
 import { ImportDeviceCodePage } from '../Import/ImportDeviceCodePage';
 import { ImportEmployeeMasterfilePage } from '../Import/ImportEmployeeMasterfilePage';
 import { OvertimeApplicationPage } from '../Import/OvertimeApplicationPage';
 import { LeaveApplicationPage } from '../Import/LeaveApplicationPage';
 import { ImportLogsFromDevicePage } from '../ImportLogsFromDevicePage';
-import { UpdateRawDataPage } from '../UpdateRawDataPage';
+import { UpdateRawDataPage } from '../Import/UpdateRawDataPage';
 import { RawDataOTGroupPage } from '../RawDataOTGroupPage';
 import { RawdataOtGapPage } from '../RawdataOtGapPage';
 import { RawdataOnStraightDutyPage } from '../RawdataOnStraightDutyPage';

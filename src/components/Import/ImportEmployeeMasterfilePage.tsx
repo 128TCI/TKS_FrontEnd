@@ -7,47 +7,44 @@ import * as XLSX from "xlsx";
 import Swal from 'sweetalert2';
 
 interface ImportEmployeeMasterFileDto {
-  remarks: string;
-  empCode: string;
-
-  statusActive?: string | null;
-  empStatCode?: string | null;
-  courtesy?: string | null;
-  lName?: string | null;
-  fName?: string | null;
-  mName?: string | null;
-  nickName?: string | null;
-  hAddress?: string | null;
-  pAddress?: string | null;
-  city?: string | null;
-  province?: string | null;
-  postalCode?: string | null;
-  civilStatus?: string | null;
-  citizenship?: string | null;
-  religion?: string | null;
-  sex?: string | null;
-  email?: string | null;
-  weight?: string | null;
-  height?: string | null;
-  mobilePhone?: string | null;
-  homePhone?: string | null;
-  presentPhone?: string | null;
-  birthPlace?: string | null;
-
-  braCode?: string | null;
-  divCode?: string | null;
-  depCode?: string | null;
-  secCode?: string | null;
-  unitCode?: string | null;
-  lineCode?: string | null;
-  desCode?: string | null;
-  superior?: string | null;
-  grdCode?: string | null;
-
-  sssNo?: string | null;
-  philHealthNo?: string | null;
-  tin?: string | null;
-  gsisNo?: string | null;
+  remarks: string
+  empCode: string
+  statusActive: string
+  empStatCode: string
+  courtesy: string
+  lName: string
+  fName: string
+  mName: string
+  nickName: string
+  hAddress: string
+  pAddress: string
+  city: string
+  province: string
+  postalCode: string
+  civilStatus: string
+  citizenship: string
+  religion: string | null;
+  sex: string | null;
+  email: string | null;
+  weight: string | null;
+  height: string | null;
+  mobilePhone: string | null;
+  homePhone: string | null;
+  presentPhone: string | null;
+  birthPlace: string | null;
+  braCode: string | null;
+  divCode: string | null;
+  depCode: string | null;
+  secCode: string | null;
+  unitCode: string | null;
+  lineCode: string
+  desCode: string
+  superior: string
+  grdCode: string
+  sssNo: string
+  philHealthNo: string
+  tin: string
+  gsisNo: string
 
   dateHired: Date;
   dateRegularized: Date;
@@ -57,29 +54,29 @@ interface ImportEmployeeMasterFileDto {
   probeEnd: Date;
   birthDate: Date;
 
-  tksGroup?: string | null;
-  groupSchedCode?: string | null;
+  tksGroup: string | null;
+  groupSchedCode: string | null;
 
-  allowOTDefault?: string | null;
-  tardyExemp?: string | null;
-  utExempt?: string | null;
-  ndExempt?: string | null;
-  otExempt?: string | null;
-  absenceExempt?: string | null;
-  otherEarnExempt?: string | null;
-  holidayExempt?: string | null;
-  unproductiveExempt?: string | null;
+  allowOTDefault: string | null;
+  tardyExemp: string | null;
+  utExempt: string | null;
+  ndExempt: string | null;
+  otExempt: string | null;
+  absenceExempt: string | null;
+  otherEarnExempt: string | null;
+  holidayExempt: string | null;
+  unproductiveExempt: string | null;
 
-  deviceCode?: string | null;
+  deviceCode: string | null;
 
-  fixedRestDay1?: string | null;
-  fixedRestDay2?: string | null;
-  fixedRestDay3?: string | null;
+  fixedRestDay1: string | null;
+  fixedRestDay2: string | null;
+  fixedRestDay3: string | null;
 
-  dailySchedule?: string | null;
-  classificationCode?: string | null;
-  suffix?: string | null;
-  onlineAppCode?: string | null;
+  dailySchedule: string | null;
+  classificationCode: string | null;
+  suffix: string | null;
+  onlineAppCode: string | null;
 
   message: string;
   rowNumber: number;
@@ -96,15 +93,12 @@ type ResponseResultDto<T> = {
     messages: string
 }
 
-
-
 export function ImportEmployeeMasterfilePage() {
   const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [importTKS, setImportTKS] = useState("MasterFile");
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -127,7 +121,7 @@ export function ImportEmployeeMasterfilePage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportMasterFile');
+      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
           id: tksGroupList.id || tksGroupList.ID || '',
@@ -228,7 +222,9 @@ const onClickImport = async ( ) => {
     const formData = new FormData();
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
-
+    console.log(deleteExisting);
+    console.log(xlsxFile);
+    console.log(formData instanceof FormData);
     try {
       const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Utilities/Import/ImportEmployeeMasterfile`, formData)
         setImportDataResult(data.data.resultData);
@@ -369,7 +365,6 @@ const onClickImport = async ( ) => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               {/* Left Section - TKS Group (2 columns width) */}
               <TKSGroupTable
-                importTKS={importTKS}
                 selectedCodes={selectedCodes}
                 onToggle={handleCodeToggle}
                 onSelectAll={handleSelectAll}
@@ -472,6 +467,7 @@ const onClickImport = async ( ) => {
                       <th className="px-4 py-3 text-left text-xs text-gray-600">LastName</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">FirstName</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">MiddleName</th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-600">Suffix</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">NickName</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">HomeAdd</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">PresAdd</th>

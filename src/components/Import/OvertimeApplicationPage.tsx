@@ -45,6 +45,10 @@ type ResponseResultDto<T> = {
 }
 
 export function OvertimeApplicationPage() {
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState<string>("");
+  const [sheetData, setSheetData] = useState<any[]>([]);
   const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -52,7 +56,6 @@ export function OvertimeApplicationPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [importTKS, setImportTKS] = useState("Overtime");
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -77,7 +80,7 @@ export function OvertimeApplicationPage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportOvertime');
+      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
           id: tksGroupList.id || tksGroupList.ID || '',
@@ -109,48 +112,87 @@ export function OvertimeApplicationPage() {
     }
   };
 
+  const getDefaultSheetName = (sheetNames: string[]) => {
+    return sheetNames.includes("OvertimeApplication")
+      ? "OvertimeApplication"
+      : sheetNames[0];
+    };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (!file) return;
-
-    setXlsxFile(file);  
-    setFileName(file!.name);
-    //setFileLoaded(true);
-
+  
+    setXlsxFile(file);
+    setFileName(file.name);
+  
     const reader = new FileReader();
     reader.onload = (event) => {
       const data = event.target?.result;
       if (!data) return;
-      const workbook = XLSX.read(data, { type: "array" });
-        // Sheet names
-      const sheetNames: string[] = workbook.SheetNames;
-        console.log("Sheets:", sheetNames);
-        // Example: ["Sheet1", "Employees", "Summary"]
+  
+      const workbook = XLSX.read(data, { type: "array", cellDates: true});
+      const sheetNames = workbook.SheetNames;
+      const defaultSheet = getDefaultSheetName(sheetNames);
+      const worksheet = workbook.Sheets[defaultSheet];
+      const sheetData = XLSX.utils.sheet_to_json(worksheet, {
+        defval: "",
+      });
+  
+      setWorkbook(workbook);
+      setSheetNames(workbook.SheetNames);
+      setSelectedSheet(defaultSheet);
+      setSheetData(sheetData);
+  
+      console.log("Sheets:", workbook.SheetNames);
+      console.log(sheetData);
     };
-    reader.readAsArrayBuffer(file);      
+  
+      reader.readAsArrayBuffer(file);
   };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0] ?? null;
-  //if (!file) return;
-  setXlsxFile(file);
-  const reader = new FileReader();
-
-  reader.onload = (event) => {
-    const data = event.target?.result;
-    if (!data) return;
-
-    const workbook = XLSX.read(data, { type: "array" });
-
-    // Sheet names
-    const sheetNames: string[] = workbook.SheetNames;
-
-    console.log("Sheets:", sheetNames);
-    // Example: ["Sheet1", "Employees", "Summary"]
+  
+  const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sheetName = e.target.value;
+    setSelectedSheet(sheetName);
+  
+    if (!workbook) return;
+  
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet, {
+      defval: "", // prevent undefined cells
+    });
+  
+    setSheetData(data);
+      //console.log(data);
+      //setForm(data);
   };
-
-  reader.readAsArrayBuffer(xlsxFile!);
+  useEffect(() => {
+    console.log("sheetData updated:", sheetData);
+  }, [sheetData]);
+  
+  const createXlsxFileFromSheetData = (
+    sheetData: any[],
+    sheetName: string
+  ): File => {
+    const worksheet = XLSX.utils.json_to_sheet(sheetData);
+  
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  
+    const buffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+  
+    return new File([buffer], `${sheetName}.xlsx`, {
+      type:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
   };
+  useEffect(() => {
+    if (!sheetData.length || !selectedSheet) return;
+  
+    const file = createXlsxFileFromSheetData(sheetData, selectedSheet);
+    setXlsxFile(file);
+  }, [sheetData, selectedSheet]);
 
   const fileLinkCreate = (blob: Blob, filename: string): void => {
     const url = window.URL.createObjectURL(blob);
@@ -338,7 +380,6 @@ const onClickImport = async ( ) => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               {/* Left Section - TKS Group (2 columns width) */}
               <TKSGroupTable
-                importTKS={importTKS}
                 selectedCodes={selectedCodes}
                 onToggle={handleCodeToggle}
                 onSelectAll={handleSelectAll}
@@ -379,6 +420,20 @@ const onClickImport = async ( ) => {
                         Choose File
                       </label>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm mb-2">Worksheet:</label>
+                    <select
+                      value={selectedSheet}
+                      onChange={handleSheetChange}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      {sheetNames.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                    {/* Date Range */}

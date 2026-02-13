@@ -35,7 +35,6 @@ export function ImportDeviceCodePage() {
   //const [dateFrom, setDateFrom] = useState<string>("");
   //const [dateTo, setDateTo] = useState<string>("");
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [importTKS, setImportTKS] = useState("Overtime");
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -59,7 +58,7 @@ export function ImportDeviceCodePage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImport');
+      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
           id: tksGroupList.id || tksGroupList.ID || '',
@@ -298,7 +297,6 @@ const onClickImport = async ( ) => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               {/* Left Section - TKS Group (2 columns width) */}
               <TKSGroupTable
-                importTKS={importTKS}
                 selectedCodes={selectedCodes}
                 onToggle={handleCodeToggle}
                 onSelectAll={handleSelectAll}

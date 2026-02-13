@@ -37,7 +37,6 @@ export function WorkshiftVariablePage() {
   const [fileLoaded, setFileLoaded] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const [importTKS, setImportTKS] = useState<string>("WorkShift");
   const [deleteExisting, setDeleteExisting] = useState(false);
   const [importType, setImportType] = useState('workshift-variable');
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
@@ -58,7 +57,7 @@ export function WorkshiftVariablePage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImport');
+      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
           id: tksGroupList.id || tksGroupList.ID || '',
@@ -97,24 +96,6 @@ export function WorkshiftVariablePage() {
 
     setXlsxFile(file);  
     setFileName(file!.name);
-
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      const data = event.target?.result;
-      if (!data) return;
-
-      const workbook = XLSX.read(data, { type: "array" });
-
-      // Sheet names
-      const sheetNames: string[] = workbook.SheetNames;
-
-      console.log("Sheets:", sheetNames);
-      // Example: ["Sheet1", "Employees", "Summary"]
-    };
-
-    reader.readAsArrayBuffer(file);
-    
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -199,6 +180,8 @@ export function WorkshiftVariablePage() {
     //formData.append("isDeleteExistingRecord", form.isDeleteExistingRecord.toString());
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
+
+    console.log(dateFrom, dateTo)
 
     if(importType == "workshift-variable"){
       try {
@@ -386,7 +369,6 @@ export function WorkshiftVariablePage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               {/* Left Section - TKS Group (2 columns width) */}
               <TKSGroupTable
-                importTKS={importTKS}
                 selectedCodes={selectedCodes}
                 onToggle={handleCodeToggle}
                 onSelectAll={handleSelectAll}

@@ -3,19 +3,18 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
 interface TKSGroupTableProps {
-  importTKS: string
   selectedCodes: number[];
   onToggle: (id: number) => void;
   onSelectAll: () => void;
 }
 
-type SortField = 'groupCode' | 'groupDescription';
+type SortField = 'code' | 'description';
 type SortDirection = 'asc' | 'desc';
 
-export function TKSGroupTable({importTKS, selectedCodes, onToggle, onSelectAll }: TKSGroupTableProps) {
+export function TKSGroupTable({selectedCodes, onToggle, onSelectAll }: TKSGroupTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('groupCode');
+  const [sortField, setSortField] = useState<SortField>('code');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const itemsPerPage = 10;
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
@@ -31,9 +30,8 @@ export function TKSGroupTable({importTKS, selectedCodes, onToggle, onSelectAll }
     const fetchData = async () => {
         setLoading(true);
         error;
-        if(importTKS == "WorkShift"){
           try {
-            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImport');
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
             if (response.data) {
               const mappedData = response.data.map((tksGroupList: any) => ({
               id: tksGroupList.id || tksGroupList.ID || '',
@@ -49,83 +47,6 @@ export function TKSGroupTable({importTKS, selectedCodes, onToggle, onSelectAll }
             } finally {
                 loading;
               }
-        }
-        else if(importTKS == "Leave"){
-          try {
-            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportLeave');
-            if (response.data) {
-              const mappedData = response.data.map((tksGroupList: any) => ({
-              id: tksGroupList.id || tksGroupList.ID || '',
-              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
-              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
-            }));
-              setTKSGroupList(mappedData);
-            }
-          } catch (error: any) {
-              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-              setError(errorMsg);
-              console.error('Error fetching TKSGroup:', error);
-            } finally {
-                loading;
-              } 
-        }
-        else if(importTKS == "Overtime"){
-          try {
-            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportOvertime');
-            if (response.data) {
-              const mappedData = response.data.map((tksGroupList: any) => ({
-              id: tksGroupList.id || tksGroupList.ID || '',
-              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
-              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
-            }));
-              setTKSGroupList(mappedData);
-            }
-          } catch (error: any) {
-              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-              setError(errorMsg);
-              console.error('Error fetching TKSGroup:', error);
-            } finally {
-                loading;
-              } 
-        }
-        else if(importTKS == "MasterFile"){
-          try {
-            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportMasterFile');
-            if (response.data) {
-              const mappedData = response.data.map((tksGroupList: any) => ({
-              id: tksGroupList.id || tksGroupList.ID || '',
-              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
-              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
-            }));
-              setTKSGroupList(mappedData);
-            }
-          } catch (error: any) {
-              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-              setError(errorMsg);
-              console.error('Error fetching TKSGroup:', error);
-            } finally {
-                loading;
-              } 
-        }
-        else if(importTKS == "Adjustment"){
-          try {
-            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportAdjustment');
-            if (response.data) {
-              const mappedData = response.data.map((tksGroupList: any) => ({
-              id: tksGroupList.id || tksGroupList.ID || '',
-              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
-              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
-            }));
-              setTKSGroupList(mappedData);
-            }
-          } catch (error: any) {
-              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-              setError(errorMsg);
-              console.error('Error fetching TKSGroup:', error);
-            } finally {
-                loading;
-              } 
-        }
     };
 
   const handleSort = (field: SortField) => {
@@ -137,7 +58,7 @@ export function TKSGroupTable({importTKS, selectedCodes, onToggle, onSelectAll }
     }
     setCurrentPage(1);
   };
-    
+
   const filteredAndSortedData = tksGroupList.filter(tksGroupList =>
       tksGroupList.groupCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tksGroupList.groupDescription.toLowerCase().includes(searchTerm.toLowerCase()) 
@@ -194,7 +115,7 @@ export function TKSGroupTable({importTKS, selectedCodes, onToggle, onSelectAll }
         setCurrentPage(1);
     }, [searchTerm]);
 
-    console.log(selectedCodes);
+    //console.log(selectedCodes);
 
   return (
     <div className="lg:col-span-2 bg-gray-50 rounded-lg border border-gray-200 p-5">
@@ -236,20 +157,20 @@ export function TKSGroupTable({importTKS, selectedCodes, onToggle, onSelectAll }
                 </th>
                 <th className="px-4 py-2 text-left text-xs text-gray-600" style={{ width: '80px' }}>
                   <button
-                    onClick={() => handleSort('groupCode')}
+                    onClick={() => handleSort('code')}
                     className="flex items-center hover:text-gray-900"
                   >
                     Code
-                    <SortIcon field="groupCode" />
+                    <SortIcon field="code" />
                   </button>
                 </th>
                 <th className="px-4 py-2 text-left text-xs text-gray-600">
                   <button
-                    onClick={() => handleSort('groupCode')}
+                    onClick={() => handleSort('code')}
                     className="flex items-center hover:text-gray-900"
                   >
                     Description
-                    <SortIcon field="groupDescription" />
+                    <SortIcon field="description" />
                   </button>
                 </th>
               </tr>

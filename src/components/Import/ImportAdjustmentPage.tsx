@@ -8,21 +8,21 @@ import * as XLSX from "xlsx";
 import Swal from 'sweetalert2';
 
 interface ImportAdjustmentDto {
-  empCode: string;                 // required
-  empName?: string | null;
-  transactionDate: Date;
-  transactionType?: string | null;
-  leaveType?: string | null;
-  overtimeCode?: string | null;
-  noOfHours: number;
-  adjustType?: string | null;
-  remarks?: string | null;
-  status?: string | null;
-  isLateFiling?: boolean | null;
-  isLateFilingActualDate?: Date | string | null;
-  message: string;
-  rowNumber: number;
-  columnNumber: number;
+  empCode: string                 // required
+  empName: string
+  transactionDate: Date
+  transactionType: string
+  leaveType: string
+  overtimeCode: string
+  noOfHours: number
+  adjustType: string
+  remarks: string
+  status: string
+  isLateFiling: boolean
+  isLateFilingActualDate: Date | string | null;
+  message: string
+  rowNumber: number
+  columnNumber: number
 }
 interface ImportAdjustmentFormDto {
     dateFrom: "",
@@ -45,7 +45,6 @@ export function ImportAdjustmentPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [importTKS, setImportTKS] = useState("Adjustment");
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -70,7 +69,7 @@ export function ImportAdjustmentPage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportAdjustment');
+      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
           id: tksGroupList.id || tksGroupList.ID || '',
@@ -313,7 +312,6 @@ const onClickImport = async ( ) => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               {/* Left Section - TKS Group (2 columns width) */}
               <TKSGroupTable
-                importTKS={importTKS}
                 selectedCodes={selectedCodes}
                 onToggle={handleCodeToggle}
                 onSelectAll={handleSelectAll}

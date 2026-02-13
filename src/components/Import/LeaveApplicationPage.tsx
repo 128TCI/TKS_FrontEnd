@@ -50,8 +50,8 @@ export function LeaveApplicationPage() {
   const [fileLoaded, setFileLoaded] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [listNotEqual, setListNotEqual] = useState(false);
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [importTKS, setImportTKS] = useState("Leave");
   const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -76,7 +76,7 @@ export function LeaveApplicationPage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp/ForImportLeave');
+      const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
           id: tksGroupList.id || tksGroupList.ID || '',
@@ -245,6 +245,7 @@ const onClickImport = async ( ) => {
     formData.append("dateFrom", dateFrom);
     formData.append("dateTo", dateTo);
     formData.append("isDeleteExistingRecord", String(deleteExisting));
+    formData.append("listNotEqual", String(listNotEqual));
     formData.append("file", xlsxFile, fileName)
     console.log(xlsxFile);
     try {
@@ -395,7 +396,6 @@ const onClickImport = async ( ) => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               {/* Left Section - TKS Group (2 columns width) */}
               <TKSGroupTable
-                importTKS={importTKS}
                 selectedCodes={selectedCodes}
                 onToggle={handleCodeToggle}
                 onSelectAll={handleSelectAll}
@@ -438,12 +438,12 @@ const onClickImport = async ( ) => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-gray-700 text-sm mb-2">Device:</label>
+                    <label className="block text-gray-700 text-sm mb-2">Worksheet:</label>
                     <select
                       value={selectedSheet}
                       onChange={handleSheetChange}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
+                    > 
                       {sheetNames.map((name) => (
                         <option key={name} value={name}>
                           {name}
@@ -479,6 +479,23 @@ const onClickImport = async ( ) => {
                       <div>
                         <div className="text-sm text-gray-900">Delete Existing Leave Applications</div>
                         <div className="text-xs text-gray-600 mt-1">Remove all existing leave applications before importing new data</div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Delete Existing Warning */}
+                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="list-not-equal"
+                        checked={listNotEqual}
+                        onChange={(e) => setListNotEqual(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
+                      />
+                      <div>
+                        <div className="text-sm text-gray-900">List Not Equal</div>
+                        <div className="text-xs text-gray-600 mt-1">Check if Approved Leave Hours is not equal to Standard Hours</div>
                       </div>
                     </label>
                   </div>
