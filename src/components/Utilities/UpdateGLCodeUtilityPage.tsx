@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
+import axios from "axios";
 
 interface GroupItem {
   id: number;
@@ -465,10 +466,21 @@ export function UpdateGLCodeUtilityPage() {
 
     try {
       setIsUpdating(true);
+      const payload = {
+        dateFrom,
+        dateTo,
+        empCode: selectedEmployees, // works for selected employees   
+      };
+
+      console.log("Sending payload:", payload);
+     
+      // Update existing record via PUT
+      await apiClient.put(`/Utilities/UpdateGLCodeUtilityByDate,`, 
+        payload);
       await Swal.fire({
           icon: 'success',
           title: 'Success',
-          text: 'GL code policy settings successfully updated.',
+          text: `GL code policy settings successfully updated for employees: ${selectedEmployees.map(empCode => empCode.toString()).join(', ')}`,
           timer: 2000,
           showConfirmButton: false,
       });
@@ -479,9 +491,14 @@ export function UpdateGLCodeUtilityPage() {
       setDateTo('');
 
     } 
-    catch (error) {
-      console.error(error);
-      alert("Failed to update records");
+    catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+            await Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: errorMsg,
+            });
+      console.error('Error submitting form:', error);
     } 
     finally {
       setIsUpdating(false);

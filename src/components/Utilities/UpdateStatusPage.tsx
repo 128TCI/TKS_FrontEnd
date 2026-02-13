@@ -224,75 +224,125 @@ export function UpdateStatusPage() {
     );
   };
 
+  // Generic function to check if API response is successful
+  const isApiSuccess = (response: any): boolean => {
+    // Check HTTP status code (2xx range)
+    if (response?.status >= 200 && response?.status < 300) {
+      return true;
+    }
+
+    // Check common boolean response patterns
+    if (response?.data === true) return true;
+    if (response?.data?.success === true) return true;
+    if (response?.data?.isSuccess === true) return true;
+    if (response?.data?.status === 'success') return true;
+    if (response?.data?.result === true) return true;
+
+    return false;
+  };  
+
+  // Generic success modal handler
+  const showSuccessModal = async (message: string, timer: number = 3000) => {
+    await Swal.fire({
+      icon: 'success',
+      title: 'Success',
+      text: message,
+      timer: timer,
+      showConfirmButton: false,
+    });
+  };  
+
   const handleUpdate = async () => {
-     if (!selectedItems.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select TK Group item/s.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
-      return;
-    }
+  if (!selectedItems.length) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Please select TK Group item/s.',
+      timer: 2000,
+      showConfirmButton: true,
+    });
+    return;
+  }
 
-    if (!dateFrom || !dateTo) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Please select Date From and Date To.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
-        return;
-      }
+  if (!dateFrom || !dateTo) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Please select Date From and Date To.',
+      timer: 2000,
+      showConfirmButton: true,
+    });
+    return;
+  }
 
-    try {
-      setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated TKGroup Status.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+  try {
+    // Format dates to ISO 8601 format
+    const formatDateForAPI = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toISOString();
+    };
 
-      setSelectedItems([]);
-      setDateFrom('');
-      setDateTo('');
+    const payload = {
+      //param: selectedItems.join(","),
+      dateFrom: formatDateForAPI(dateFrom),
+      dateTo: formatDateForAPI(dateTo),
+      tkGroupList: selectedItems.map(String), // Convert to array of strings
+    };
+
+    setIsUpdating(true);
+    console.log("Sending payload:", payload);
+
+    //for checking of selected items
+    const tkGroupList = selectedItems.join(",");
+
+    if(updateOption === 'attendance') {
+      // Make API call
+      const _ByDateResponse = await apiClient.post("/Utilities/UpdateStatus_byDate", payload);
+      console.log("API response:", _ByDateResponse);
+      const _byTKGroupCodeResponse = await apiClient.post("/Utilities/UpdateStatus_byTKGroupCode", payload);
+      console.log("API response:", _byTKGroupCodeResponse);
+
+      // Convert response to boolean
+      const isSuccessByDate = isApiSuccess(_ByDateResponse);
+      console.log("Is success:", isSuccessByDate);   
+      const isSuccessByTKGroup = isApiSuccess(_byTKGroupCodeResponse);
+      console.log("Is success:", isSuccessByTKGroup);
       
-    } 
-    catch (error) {
-      console.error(error);
-      alert("Failed to update records");
-    } 
-    finally {
-      setIsUpdating(false);
+      if (isSuccessByDate && isSuccessByTKGroup) {
+          await showSuccessModal('Successfully updated TKGroup Items.');    
+
+          setSelectedItems([]);
+          setDateFrom('');
+          setDateTo('');
+        
+      }  
+    } else if(updateOption === 'contract') {
+      const _ByCDateResponse = await apiClient.post("/Utilities/UpdateStatus_byCDate", payload);
+      console.log("API response:", _ByCDateResponse);
+
+      const isSuccessByCDate = isApiSuccess(_ByCDateResponse);
+      console.log("Is success:", isSuccessByCDate);   
+      if (isSuccessByCDate) {
+          await showSuccessModal('Successfully updated TKGroup Items.');    
+
+          setSelectedItems([]);
+          setDateFrom('');
+          setDateTo('');
+        
+      }  
+
     }
-
-    /*
-    (id: number, checked: boolean) => {
-    setSelectedItems(prev =>
-      checked ? [...prev, id] : prev.filter(itemId => itemId !== id)
-    );
-
-    if (searchTerm.length === 0) {
-      alert("Please select at least one TKgroup item.");
-      return;
-
-    }
-
-    setLoading(true);
-
-    try {
-      await batchUpdateEmployees(selectedItems);
-      alert("Update successful!");
-    } catch (err) {
-      alert("Error updating TKGroup status");
-    } finally {
-      setLoading(false);
-    }
-    */
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+    await Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: errorMsg,
+    });
+    console.error('Error submitting form:', error);
+  } finally {
+    setIsUpdating(false);
+  }
   };
 
   const handleDateClick = (event: React.MouseEvent<HTMLInputElement>) => {

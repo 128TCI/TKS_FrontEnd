@@ -360,13 +360,13 @@ export function DailyTimeRecordMonitoringPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Main Content */}
-      <div className="flex-1 relative z-10 p-6">
-        <div className="max-w-7xl mx-auto relative">
+      <div className="flex-1 p-6">
+        <div className="max-w-7xl mx-auto">
           {/* Page Header */}
-          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
-            <h1 className="text-white">Daily Time Record Monitoring</h1>
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
+        <h1 className="text-white">Daily Time Record Monitoring</h1>
           </div>
 
           {/* Content Container */}
