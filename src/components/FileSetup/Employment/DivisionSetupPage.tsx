@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from '../../Footer/Footer';
 import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
@@ -40,6 +41,9 @@ export function DivisionSetupPage() {
     const [divisionList, setDivisionList] = useState<Array<{ id: string; code: string; description: string; head: string; headCode: string; deviceName: string }>>([]);
     const [loadingDivisions, setLoadingDivisions] = useState(false);
     const [divisionError, setDivisionError] = useState('');
+
+    // Form Name
+    const formName = 'Division Setup';
 
     // Fetch division data from API
     useEffect(() => {
@@ -187,6 +191,12 @@ export function DivisionSetupPage() {
         if (confirmed.isConfirmed) {
             try {
                 await apiClient.delete(`/Fs/Employment/DivisionSetUp/${division.divID}`);
+                await auditTrail.log({
+                    accessType: 'Delete',
+                    trans: `Deleted division ${division.divCode}`,
+                    messages: `Division deleted: ${division.divCode} - ${division.divDesc}`,
+                    formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -258,6 +268,12 @@ export function DivisionSetupPage() {
             if (isEditMode && divisionId) {
                 // Update existing record via PUT
                 await apiClient.put(`/Fs/Employment/DivisionSetUp/${divisionId}`, payload);
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Edited division ${payload.divCode}`,
+                    messages: `Division updated: ${payload.divCode} - ${payload.divDesc}`,
+                    formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -270,6 +286,12 @@ export function DivisionSetupPage() {
             } else {
                 // Create new record via POST
                 await apiClient.post('/Fs/Employment/DivisionSetUp', payload);
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Added division ${payload.divCode}`,
+                    messages: `Division created: ${payload.divCode} - ${payload.divDesc}`,
+                    formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from '../../Footer/Footer';
 import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
@@ -49,7 +50,10 @@ export function UnitSetupPage() {
   }>>([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [unitError, setUnitError] = useState('');
-
+    
+  // Form Name
+  const formName = 'Area Setup';
+    
   // Fetch unit data from API
   useEffect(() => {
     fetchUnitData();
@@ -170,32 +174,32 @@ export function UnitSetupPage() {
   };
 
   const handleEdit = (unit: any, index: number) => {
-  console.log('Editing unit:', unit);
-  setIsEditMode(true);
-  setSelectedUnitIndex(index);
-  setUnitId(unit.id || null);
-  setCode(unit.code);
-  setCodeError('');
-  setDescription(unit.description);
-  
-  // Try to get headCode from unit data first, or lookup from employee data
-  let headCodeValue = unit.headCode || '';
-  if (!headCodeValue && unit.head) {
-    const employee = employeeData.find(emp => emp.name === unit.head);
-    if (employee) {
-      console.log('Found employee for head:', employee);
-      headCodeValue = employee.empCode;
-      console.log('Set headCode to:', employee.empCode);
+    console.log('Editing unit:', unit);
+    setIsEditMode(true);
+    setSelectedUnitIndex(index);
+    setUnitId(unit.id || null);
+    setCode(unit.code);
+    setCodeError('');
+    setDescription(unit.description);
+    
+    // Try to get headCode from unit data first, or lookup from employee data
+    let headCodeValue = unit.headCode || '';
+    if (!headCodeValue && unit.head) {
+      const employee = employeeData.find(emp => emp.name === unit.head);
+      if (employee) {
+        console.log('Found employee for head:', employee);
+        headCodeValue = employee.empCode;
+        console.log('Set headCode to:', employee.empCode);
+      }
     }
-  }
-  
-  setHeadCode(headCodeValue);
-  console.log('Final headCode value:', headCodeValue);
-  setHead(unit.head || '');
-  setPosition(unit.position || '');
-  setDeviceName(unit.deviceName || '');
-  setShowCreateModal(true);
-};
+    
+    setHeadCode(headCodeValue);
+    console.log('Final headCode value:', headCodeValue);
+    setHead(unit.head || '');
+    setPosition(unit.position || '');
+    setDeviceName(unit.deviceName || '');
+    setShowCreateModal(true);
+  };
   const handleDelete = async (unit: any) => {
     const confirmed = await Swal.fire({
       icon: 'warning',
@@ -211,6 +215,12 @@ export function UnitSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/UnitSetUp/${unit.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted unit ${unit.code}`,
+            messages: `Unit deleted: ${unit.code} - ${unit.unitDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -285,6 +295,12 @@ export function UnitSetupPage() {
       if (isEditMode && unitId) {
         // Update existing record via PUT
         await apiClient.put(`/Fs/Employment/UnitSetUp/${unitId}`, payload);
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited unit ${payload.unitCode}`,
+            messages: `Unit updated: ${payload.unitCode} - ${payload.unitDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -297,6 +313,12 @@ export function UnitSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post('/Fs/Employment/UnitSetUp', payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added unit ${payload.unitCode}`,
+            messages: `Unit created: ${payload.unitCode} - ${payload.unitDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',

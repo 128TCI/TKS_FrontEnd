@@ -4,6 +4,7 @@ import { Footer } from '../../Footer/Footer';
 import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 import Swal from 'sweetalert2';
 
 // Division Search Modal Component
@@ -164,6 +165,9 @@ export function DepartmentSetupPage() {
   const [divisionError, setDivisionError] = useState('');
   const [employeeError, setEmployeeError] = useState('');
   const [deviceError, setDeviceError] = useState('');
+
+    // Form Name
+    const formName = 'Department Setup';
 
   // Fetch department data from API
   useEffect(() => {
@@ -347,7 +351,13 @@ export function DepartmentSetupPage() {
 
     if (confirmed.isConfirmed) {
       try {
-        await apiClient.delete(`/Fs/Employment/DepartmentSetUp/${department.id}`);
+        await apiClient.delete(`/Fs/Employment/DepartmentSetUp/${department.departmentId}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted department ${department.code}`,
+          messages: `Department deleted: ${department.code} - ${department.description}`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -377,23 +387,23 @@ export function DepartmentSetupPage() {
       });
       return;
     }
-// Check for duplicate code (only when creating new or changing code during edit)
-            const isDuplicate = departmentList.some((department, index) => {
-              // When editing, exclude the current record from duplicate check
-              if (isEditMode && selectedDepartmentIndex === index) {
-                return false;
-              }
-              return department.code.toLowerCase() === departmentCode.trim().toLowerCase();
-            });
-        
-            if (isDuplicate) {
-              await Swal.fire({
-                icon: 'error',
-                title: 'Duplicate Code',
-                text: 'This code is already in use. Please use a different code.',
-              });
-              return;
-            }
+  // Check for duplicate code (only when creating new or changing code during edit)
+    const isDuplicate = departmentList.some((department, index) => {
+      // When editing, exclude the current record from duplicate check
+      if (isEditMode && selectedDepartmentIndex === index) {
+        return false;
+      }
+      return department.code.toLowerCase() === departmentCode.trim().toLowerCase();
+    });
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Code',
+        text: 'This code is already in use. Please use a different code.',
+      });
+      return;
+    }
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
@@ -433,6 +443,12 @@ export function DepartmentSetupPage() {
 
       if (isEditMode && selectedDepartmentIndex !== null) {
         await apiClient.put(`/Fs/Employment/DepartmentSetUp/${payload.depID}`, payload);
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Edited department ${payload.depCode}`,
+          messages: `Department updated: ${payload.depCode} - ${payload.depDesc}`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -443,6 +459,12 @@ export function DepartmentSetupPage() {
         await fetchDepartmentData();
       } else {
         await apiClient.post('/Fs/Employment/DepartmentSetUp', payload);
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Added department ${payload.depCode}`,
+          messages: `Department created ${payload.depCode} - ${payload.depDesc}`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',

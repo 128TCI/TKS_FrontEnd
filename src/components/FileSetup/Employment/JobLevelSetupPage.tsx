@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from '../../Footer/Footer';
 import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
@@ -25,7 +26,10 @@ export function JobLevelSetupPage() {
     const [levelList, setLevelList] = useState<Array<{ id: string; code: string; description: string; }>>([]);
     const [loadingJobLevels, setLoadingJobLevels] = useState(false);
     const [jobLevelError, setJobLevelError] = useState('');
-
+    
+    // Form Name
+    const formName = 'Job Level Setup';
+    
   // Fetch division data from API
     useEffect(() => {
         fetchDivisionData();
@@ -91,11 +95,11 @@ export function JobLevelSetupPage() {
         setShowCreateModal(true);
     };
 
- const handleDelete = async (division: any) => {
+    const handleDelete = async (jobLevel: any) => {
         const confirmed = await Swal.fire({
             icon: 'warning',
             title: 'Confirm Delete',
-            text: `Are you sure you want to delete division ${division.code}?`,
+            text: `Are you sure you want to delete job level ${jobLevel.code}?`,
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
@@ -105,27 +109,38 @@ export function JobLevelSetupPage() {
 
         if (confirmed.isConfirmed) {
             try {
-                await apiClient.delete(`/Fs/Employment/DivisionSetUp/${division.divID}`);
+                await apiClient.delete(`/Fs/Employment/JobLevelSetUp/${jobLevel.jobLevelID}`);
+
+                // Audit trail for delete
+                await auditTrail.log({
+                    accessType: 'Delete',
+                    trans: `Deleted job level ${jobLevel.code}`,
+                    messages: `Job Level deleted: ${jobLevel.code} - ${jobLevel.jobLevelDesc}`,
+                    formName,
+                });
+
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
-                    text: 'Division deleted successfully.',
+                    text: 'Job level deleted successfully.',
                     timer: 2000,
                     showConfirmButton: false,
                 });
-                // Refresh the division list
+
+                // Refresh the job level list
                 await fetchDivisionData();
             } catch (error: any) {
-                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete division';
+                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete job level';
                 await Swal.fire({
                     icon: 'error',
                     title: 'Error',
                     text: errorMsg,
                 });
-                console.error('Error deleting division:', error);
+                console.error('Error deleting job level:', error);
             }
         }
     };
+
 
     const handleCodeChange = (value: string) => {
         setCode(value);
@@ -174,6 +189,12 @@ export function JobLevelSetupPage() {
             if (isEditMode && jobLevelId) {
                 // Update existing record via PUT
                 await apiClient.put(`/Fs/Employment/JobLevelSetUp/${jobLevelId}`, payload);
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Edited job level ${payload.jobLevelCode}`,
+                    messages: `Job Level updated: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
+                    formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -186,6 +207,12 @@ export function JobLevelSetupPage() {
             } else {
                 // Create new record via POST
                 await apiClient.post('/Fs/Employment/JobLevelSetUp', payload);
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Added job level ${payload.jobLevelCode}`,
+                    messages: `Job Level created: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
+                    formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',

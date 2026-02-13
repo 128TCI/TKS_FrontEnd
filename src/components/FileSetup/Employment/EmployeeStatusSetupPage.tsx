@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from '../../Footer/Footer';
 import Swal from 'sweetalert2';
 
@@ -22,7 +23,10 @@ export function EmployeeStatusSetupPage() {
   const [statusList, setStatusList] = useState<Array<{ id: number; code: string; description: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState('');
-
+    
+  // Form Name
+  const formName = 'Employee Status Setup';
+    
   // Fetch data from API
   useEffect(() => {
     fetchStatusData();
@@ -91,6 +95,12 @@ export function EmployeeStatusSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/EmployeeStatusSetUp/${status.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted status ${status.code}`,
+            messages: `Status deleted: ${status.code} - ${status.description}`,
+            formName,
+        });
         await Swal.fire({ icon: 'success', title: 'Deleted', text: 'Status deleted successfully.', timer: 1500, showConfirmButton: false });
         fetchStatusData();
       } catch (error: any) {
@@ -131,8 +141,34 @@ export function EmployeeStatusSetupPage() {
 
       if (isEditMode && statusId) {
         await apiClient.put(`/Fs/Employment/EmployeeStatusSetUp/${statusId}`, payload);
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited status ${payload.empStatCode}`,
+            messages: `Status updated: ${payload.empStatCode} - ${payload.empStatDesc}`,
+            formName,
+        });
+        await Swal.fire({
+            icon: 'success',
+            title: 'Success',
+            text: 'Employee Status updated successfully.',
+            timer: 2000,
+            showConfirmButton: false,
+        });
       } else {
         await apiClient.post('/Fs/Employment/EmployeeStatusSetUp', payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added status ${payload.empStatCode}`,
+            messages: `Status created: ${payload.empStatCode} - ${payload.empStatDesc}`,
+            formName,
+        });
+        await Swal.fire({
+            icon: 'success',
+            title: 'Success',
+            text: `Status ${isEditMode ? 'updated' : 'created'} successfully.`,
+            timer: 1500,
+            showConfirmButton: false,
+        });
       }
 
       await Swal.fire({ icon: 'success', title: 'Success', text: `Status ${isEditMode ? 'updated' : 'created'} successfully.`, timer: 1500, showConfirmButton: false });

@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { FileText, Check, Search, X, ChevronUp, ChevronDown, Calendar, Clock, RotateCcw, Download } from 'lucide-react';
 import { Footer } from './Footer/Footer';
-
+import { UserSearchModal } from '../components/Modals/UserSearchModal';
+import { FormNameSearchModal } from '../components/Modals/FormNameSearchModal';
+ 
+import apiClient from '../services/apiClient';
 interface AuditLog {
   id: number;
   date: string;
@@ -236,66 +239,108 @@ export function AuditTrailPage() {
   const [showTimePicker, setShowTimePicker] = useState<'timeFrom' | 'timeTo' | null>(null);
   const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
   const [timePickerPosition, setTimePickerPosition] = useState({ top: 0, left: 0 });
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(0);
+  const pageSize = 100;
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isFormNameModalOpen, setIsFormNameModalOpen] = useState(false);
+  const [isFiltered, setIsFiltered] = useState(false);
 
-  // Mock data
-  const auditLogs: AuditLog[] = [
-    {
-      id: 1,
-      date: '12/26/2025 10:30:15',
-      user: 'admin',
-      pcName: 'WORKSTATION-01',
-      formName: 'EmployeeForm',
-      accessType: 'Edit',
-      activity: 'Update Record',
-      message: 'Updated employee #12345 information'
-    },
-    {
-      id: 2,
-      date: '12/26/2025 10:25:42',
-      user: 'jdoe',
-      pcName: 'WORKSTATION-02',
-      formName: 'AttendanceForm',
-      accessType: 'View',
-      activity: 'View Record',
-      message: 'Viewed attendance logs for 12/26/2025'
-    },
-    {
-      id: 3,
-      date: '12/26/2025 10:20:33',
-      user: 'admin',
-      pcName: 'WORKSTATION-01',
-      formName: 'PayrollForm',
-      accessType: 'Create',
-      activity: 'Create Record',
-      message: 'Created new payroll batch #2025-12'
+  useEffect(() => {
+    if (isFiltered) {
+      fetchAuditTrailFiltered(page);
+    } else {
+      fetchAuditTrail(page);
     }
-  ];
+  }, [page, isFiltered]);
+  const fetchAuditTrail = async (pageNumber = 0) => {
+    setLoading(true);
+    setError('');
 
-  const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>(auditLogs);
-
-  const handleSearch = () => {
-    let filtered = auditLogs;
-
-    if (formNameFilter) {
-      filtered = filtered.filter(log => 
-        log.formName.toLowerCase().includes(formNameFilter.toLowerCase())
+    try {
+      const response = await apiClient.get(
+        `/AuditTrail/GetAuditTrail/All?page=${pageNumber}&pageSize=${pageSize}`
       );
-    }
 
-    if (activityFilter) {
-      filtered = filtered.filter(log => 
-        log.activity.toLowerCase().includes(activityFilter.toLowerCase())
-      );
-    }
+      if (response.status === 200 && response.data) {
+        const mappedData: AuditLog[] = response.data.data.map((item: any) => ({
+          id: item.id || 0,
+          date: item.date || '',
+          user: item.userId || '',
+          pcName: item.machine || '',
+          formName: item.formName || '',
+          accessType: item.accessType || '',
+          activity: item.trans || '',
+          message: item.messages || ''
+        }));
 
-    if (userFilter) {
-      filtered = filtered.filter(log => 
-        log.user.toLowerCase().includes(userFilter.toLowerCase())
-      );
+        setFilteredLogs(mappedData);
+        setTotalCount(response.data.totalCount);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch audit trail');
+    } finally {
+      setLoading(false);
     }
-
-    setFilteredLogs(filtered);
   };
+
+  const fetchAuditTrailFiltered = async (pageNumber = 0) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const payload = {
+        DateFrom: new Date(`${dateFrom} ${timeFrom}`),
+        DateTo: new Date(`${dateTo} ${timeTo}`),
+        FormName: formNameFilter || '',
+        UserId: userFilter || '',
+        Activity: activityFilter || '',
+        DisplayStart: pageNumber * pageSize,
+        DisplayLength: pageSize
+      };
+
+
+      const response = await apiClient.post(
+        '/AuditTrail/GetAuditTrail/Filtered',
+        payload
+      );
+
+      if (response.status === 200 && response.data) {
+        const mappedData: AuditLog[] = response.data.data.map((item: any) => ({
+          id: item.id || 0,
+          date: item.date || '',
+          user: item.userId || '',
+          pcName: item.machine || '',
+          formName: item.formName || '',
+          accessType: item.accessType || '',
+          activity: item.trans || '',
+          message: item.messages || ''
+        }));
+
+        setFilteredLogs(mappedData);
+        setTotalCount(response.data.totalCount);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to search audit trail');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+const handleSearch = async () => {
+  setIsFiltered(true);
+
+  if (page === 0) {
+    await fetchAuditTrailFiltered(0);
+  } else {
+    setPage(0);
+  }
+};
+
 
   const handleReset = () => {
     setDateFrom('12/26/2025');
@@ -305,7 +350,8 @@ export function AuditTrailPage() {
     setFormNameFilter('');
     setActivityFilter('');
     setUserFilter('');
-    setFilteredLogs(auditLogs);
+    setIsFiltered(false);
+    setPage(0);
   };
 
   const handleSort = (field: keyof AuditLog) => {
@@ -492,7 +538,7 @@ export function AuditTrailPage() {
                           className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                         <button
-                          onClick={handleSearch}
+                          onClick={() => setIsFormNameModalOpen(true)} 
                           className="p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                         >
                           <Search className="w-4 h-4" />
@@ -530,7 +576,7 @@ export function AuditTrailPage() {
                           className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                         <button
-                          onClick={handleSearch}
+                          onClick={() => setIsUserModalOpen(true)} 
                           className="p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                         >
                           <Search className="w-4 h-4" />
@@ -642,7 +688,20 @@ export function AuditTrailPage() {
                     {filteredLogs.length > 0 ? (
                       filteredLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{log.date}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {(() => {
+                              const parsed = new Date(log.date);
+                              if (isNaN(parsed.getTime())) return '-';
+                              return new Intl.DateTimeFormat('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              }).format(parsed);
+                            })()}
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-900">{log.user}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">{log.pcName}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">{log.formName}</td>
@@ -665,13 +724,20 @@ export function AuditTrailPage() {
               {/* Pagination */}
               <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                 <span className="text-xs text-gray-500">
-                  Showing {filteredLogs.length} {filteredLogs.length === 1 ? 'entry' : 'entries'}
+                  Showing {page * pageSize + 1} to {Math.min(page * pageSize + filteredLogs.length, totalCount)} of {totalCount} entries
                 </span>
                 <div className="flex items-center gap-1">
-                  <button className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs">
+                  <button
+                    onClick={() => setPage(prev => Math.max(prev - 1, 0))}
+                    className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs"
+                  >
                     Previous
                   </button>
-                  <button className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs">
+
+                  <button
+                    onClick={() => setPage(prev => prev + 1)}
+                    className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs"
+                  >
                     Next
                   </button>
                 </div>
@@ -715,6 +781,23 @@ export function AuditTrailPage() {
           position={timePickerPosition}
         />
       )}
+      {/* User Search Popup */}
+      <UserSearchModal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        onSelect={(id, username) => {
+          setUserFilter(username);  // populate the input
+          setIsUserModalOpen(false);    // close modal
+        }}
+      />
+      <FormNameSearchModal
+        isOpen={isFormNameModalOpen}
+        onClose={() => setIsFormNameModalOpen(false)}
+        onSelect={(name) => {
+          setFormNameFilter(name);        // populate the input with the selected form name
+          setIsFormNameModalOpen(false);  // close modal
+        }}
+      />
     </div>
   );
 }

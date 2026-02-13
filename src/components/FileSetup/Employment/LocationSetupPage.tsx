@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from '../../Footer/Footer';
 import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
@@ -40,7 +41,10 @@ export function LocationSetupPage() {
   const [locationList, setLocationList] = useState<Array<{ id: string; code: string; description: string; head: string; headCode: string; deviceName: string }>>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [locationError, setLocationError] = useState('');
-
+    
+  // Form Name
+  const formName = 'Location Setup';
+    
   // Fetch location data from API
   useEffect(() => {
     fetchLocationData();
@@ -192,6 +196,12 @@ export function LocationSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/LocationSetUp/${location.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted location ${location.code}`,
+            messages: `Location deleted: ${location.code} - ${location.locationDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -250,78 +260,90 @@ export function LocationSetupPage() {
                   return;
                 }
     setSubmitting(true);
-try {
-  const loginPayloadStr = localStorage.getItem('userData');
-  const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
-  const userName = loginPayload.userName || loginPayload.username || loginPayload.name || 'Guest';
+    try {
+      const loginPayloadStr = localStorage.getItem('userData');
+      const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+      const userName = loginPayload.userName || loginPayload.username || loginPayload.name || 'Guest';
 
- const payload = {
-  // Identity logic: locationId for PUT, 0 for POST
-  id: isEditMode && locationId ? parseInt(locationId) : 0,
-  locationCode: code,
-  locationDesc: description,
-  head: head,
-  headCode: headCode,
-  acctCode: '',
-  deviceName: deviceName,
+    const payload = {
+      // Identity logic: locationId for PUT, 0 for POST
+      id: isEditMode && locationId ? parseInt(locationId) : 0,
+      locationCode: code,
+      locationDesc: description,
+      head: head,
+      headCode: headCode,
+      acctCode: '',
+      deviceName: deviceName,
 
-  // 1. Creation Fields: Set only when creating, otherwise null to preserve original data
-  createdBy: isEditMode ? null : userName,
-  createdDate: isEditMode ? null : new Date().toISOString(),
+      // 1. Creation Fields: Set only when creating, otherwise null to preserve original data
+      createdBy: isEditMode ? null : userName,
+      createdDate: isEditMode ? null : new Date().toISOString(),
 
-  // 2. Edit Fields: Set ONLY when editing
-  editedBy: isEditMode ? userName : null,
-  editedDate: isEditMode ? new Date().toISOString() : null
-};
+      // 2. Edit Fields: Set ONLY when editing
+      editedBy: isEditMode ? userName : null,
+      editedDate: isEditMode ? new Date().toISOString() : null
+    };
 
-  if (isEditMode && locationId) {
-    // PUT logic
-    await apiClient.put(`/Fs/Employment/LocationSetUp/${locationId}`, payload);
-    await Swal.fire({
-      icon: 'success',
-      title: 'Success',
-      text: 'Location updated successfully.',
-      timer: 2000,
-      showConfirmButton: false,
-    });
-  } else {
-    // POST logic
-    await apiClient.post('/Fs/Employment/LocationSetUp', payload);
-    await Swal.fire({
-      icon: 'success',
-      title: 'Success',
-      text: 'Location created successfully.',
-      timer: 2000,
-      showConfirmButton: false,
-    });
-  }
+      if (isEditMode && locationId) {
+        // PUT logic
+        await apiClient.put(`/Fs/Employment/LocationSetUp/${locationId}`, payload);
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited location ${payload.locationCode}`,
+            messages: `Location updated: ${payload.locationCode} - ${payload.locationDesc}`,
+            formName,
+        });
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Location updated successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        // POST logic
+        await apiClient.post('/Fs/Employment/LocationSetUp', payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added location ${payload.locationCode}`,
+            messages: `Location created: ${payload.locationCode} - ${payload.locationDesc}`,
+            formName,
+        });
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Location created successfully.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
 
-  // Refresh data and close UI
-  await fetchLocationData();
-  setShowCreateModal(false);
-  
-  // Reset Form
-  resetFormState(); // Recommended: Move reset logic to a single function
+      // Refresh data and close UI
+      await fetchLocationData();
+      setShowCreateModal(false);
+      
+      // Reset Form
+      resetFormState(); // Recommended: Move reset logic to a single function
 
-} catch (error: any) {
-  const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-  await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  console.error('Error submitting form:', error);
-} finally {
-  setSubmitting(false);
-}
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+      console.error('Error submitting form:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
   const resetFormState = () => {
-  setCode('');
-  setCodeError('');
-  setDescription('');
-  setHeadCode('');
-  setHead('');
-  setDeviceName('');
-  setLocationId(null);
-  setIsEditMode(false);
-  setSelectedLocationIndex(null);
-};
+    setCode('');
+    setCodeError('');
+    setDescription('');
+    setHeadCode('');
+    setHead('');
+    setDeviceName('');
+    setLocationId(null);
+    setIsEditMode(false);
+    setSelectedLocationIndex(null);
+  };
   const handleHeadSelect = (empCode: string, name: string) => {
     setHeadCode(empCode);
     setHead(name);
