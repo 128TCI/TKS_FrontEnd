@@ -4,6 +4,7 @@ import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import { decryptData } from '../../../../services/encryptionService';
 
 interface DTRFlag {
   id: number;
@@ -45,6 +46,40 @@ export function DTRFlagSetupPage() {
 
   const itemsPerPage = 10;
 
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getDTRFlagSetupPermissions();
+    }, []);
+  
+    const getDTRFlagSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "DTRFlagSetup"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
+
   // Fetch DTR flags from API
   useEffect(() => {
     fetchDTRFlags();
@@ -68,25 +103,25 @@ export function DTRFlagSetupPage() {
   };
   
   const filteredData = flags.filter(item =>
-    item.flagCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.timeIn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.timeOut.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.break1Out.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.break1In.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.break2Out.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.break2In.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.break3Out.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.break3In.toLowerCase().includes(searchTerm.toLowerCase())
+    item.flagCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.timeIn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.timeOut?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.break1Out?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.break1In?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.break2Out?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.break2In?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.break3Out?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.break3In?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
-  // Reset to page 1 when search term changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+  //Reset to page 1 when search term changes
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [searchTerm]);
 
   const handleCreateNew = () => {
     setFormData({
@@ -369,23 +404,27 @@ export function DTRFlagSetupPage() {
 
             {/* Top Controls */}
             <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-              <button
-                onClick={handleCreateNew}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Create New
-              </button>
+              {(hasPermission('Add') && hasPermission('View')) && (
+                <button
+                  onClick={handleCreateNew}
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New
+                </button>
+              )}
 
-              <div className="flex items-center gap-2">
-                <label className="text-gray-700 text-sm">Search:</label>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                />
-              </div>
+              {hasPermission('View') && (
+                <div className="flex items-center gap-2">
+                  <label className="text-gray-700 text-sm">Search:</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Table */}
@@ -398,7 +437,7 @@ export function DTRFlagSetupPage() {
                 <div className="p-4 bg-red-50 border border-red-200 rounded">
                   <p className="text-red-700 text-sm">{flagsError}</p>
                 </div>
-              ) : (
+              ) : hasPermission('View') ? (
                 <table className="w-full">
                   <thead className="bg-gray-100 border-b border-gray-200">
                     <tr>
@@ -411,7 +450,10 @@ export function DTRFlagSetupPage() {
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase whitespace-nowrap">Break2 In</th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase whitespace-nowrap">Break3 Out</th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase whitespace-nowrap">Break3 In</th>
-                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase whitespace-nowrap">Actions</th>
+                      {(hasPermission('Edit') || hasPermission('Delete')) && (
+                        <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase whitespace-nowrap">Actions</th>
+                      )}
+                      
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -427,25 +469,32 @@ export function DTRFlagSetupPage() {
                           <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{item.break2In}</td>
                           <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{item.break3Out}</td>
                           <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{item.break3In}</td>
+                          {(hasPermission('Edit') || hasPermission('Delete')) && (
                           <td className="px-6 py-4">
                             <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <span className="text-gray-300">|</span>
-                              <button
-                                onClick={() => handleDelete(item)}
-                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {hasPermission('Edit') && (
+                                <button
+                                  onClick={() => handleEdit(item)}
+                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              )}
+                              {hasPermission("Edit") && hasPermission("Delete") && (
+                                <span className="text-gray-300">|</span>
+                              )}
+                              {hasPermission('Delete') && (
+                                <button
+                                  onClick={() => handleDelete(item)}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
-                          </td>
+                          </td>)}
                         </tr>
                       ))
                     ) : (
@@ -456,11 +505,15 @@ export function DTRFlagSetupPage() {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table> ) : (
+                  <div className="text-center py-10 text-gray-500">
+                      You do not have permission to view this list.
+                  </div>
               )}
             </div>
 
             {/* Pagination */}
+            {hasPermission('View') && (
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-gray-600">
                 Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
@@ -494,7 +547,7 @@ export function DTRFlagSetupPage() {
                   Next
                 </button>
               </div>
-            </div>
+            </div>)}
           </div>
         </div>
       </div>

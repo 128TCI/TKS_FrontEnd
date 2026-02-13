@@ -3,6 +3,7 @@ import { X, Plus, Trash, Copy, Search, Check, Edit, Trash2 } from 'lucide-react'
 import { Footer } from '../../Footer/Footer';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
+import { decryptData } from '../../../services/encryptionService';
 
 interface CalendarSetupProps {
   onBack?: () => void;
@@ -69,6 +70,40 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
     { value: 'Special1', label: 'Special1' },
     { value: 'Special2', label: 'Special2' },
   ];
+
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getCalendatSetupPermissions();
+    }, []);
+  
+    const getCalendatSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "CalendarSetUp"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
   // Fetch holidays and branches on component mount
   useEffect(() => {
@@ -368,6 +403,8 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
 
             {/* Controls Row */}
             <div className="flex items-center gap-4 mb-6">
+              {(hasPermission('Add') && hasPermission('View')) && (
+              <>
               <div className="flex items-center gap-2">
                 <label className="text-gray-700">Year:</label>
                 <select 
@@ -380,22 +417,25 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
                   ))}
                 </select>
               </div>
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                onClick={handleCreateNew}
-              >
-                <Plus className="w-4 h-4" />
-                Create New
-              </button>
-              <div className="ml-auto flex items-center gap-2">
-                <label className="text-gray-700">Search:</label>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                />
-              </div>
+                <button 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                  onClick={handleCreateNew}
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New
+                </button>
+              </>)}
+              {hasPermission('View') && (
+                <div className="ml-auto flex items-center gap-2">
+                  <label className="text-gray-700">Search:</label>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Table */}
@@ -408,7 +448,7 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
                 <div className="p-4 bg-red-50 border border-red-200 rounded">
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
-              ) : (
+              ) : hasPermission('View') ? (
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-100 border-b-2 border-gray-300">
@@ -418,7 +458,9 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
                       <th className="px-4 py-2 text-left text-gray-700">Description</th>
                       <th className="px-4 py-2 text-left text-gray-700">Holiday Type</th>
                       <th className="px-4 py-2 text-left text-gray-700">Branch</th>
-                      <th className="px-4 py-2 text-left text-gray-700">Actions</th>
+                      {(hasPermission('View') || hasPermission('Delete')) &&
+                        <th className="px-4 py-2 text-left text-gray-700">Actions</th>
+                      }
                     </tr>
                   </thead>
                   <tbody>
@@ -435,25 +477,32 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
                             </span>
                           </td>
                           <td className="px-4 py-2">{holiday.branch}</td>
+                          {(hasPermission('Edit') || hasPermission('Delete')) && (
                           <td className="px-4 py-2">
                             <div className="flex items-center gap-2">
-                              <button 
-                                onClick={() => handleEdit(holiday)}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <span className="text-gray-300">|</span>
-                              <button
-                                onClick={() => handleDelete(holiday)}
-                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {hasPermission('Edit') && (
+                                <button 
+                                  onClick={() => handleEdit(holiday)}
+                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              )}
+                              {hasPermission("Edit") && hasPermission("Delete") && (
+                                <span className="text-gray-300">|</span>
+                              )}
+                              {hasPermission('Delete') && (
+                                <button
+                                  onClick={() => handleDelete(holiday)}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
-                          </td>
+                          </td>)}
                         </tr>
                       ))
                     ) : (
@@ -464,11 +513,15 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table> ) : (
+                  <div className="text-center py-10 text-gray-500">
+                      You do not have permission to view this list.
+                  </div>
               )}
             </div>
 
             {/* Pagination */}
+            {hasPermission('View') && (
             <div className="flex items-center justify-between mt-4">
               <div className="text-sm text-gray-600">
                 Showing {filteredHolidays.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredHolidays.length)} of {filteredHolidays.length} entries
@@ -502,7 +555,7 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
                   Next
                 </button>
               </div>
-            </div>
+            </div>)}
 
             {/* Create/Edit Modal */}
             {showCreateModal && (

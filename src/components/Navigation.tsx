@@ -39,6 +39,7 @@ interface MenuItem {
 
 interface SubMenuItem {
   label: string;
+  formName?: string;
   action?: string;
   separator?: boolean;
   isCategory?: boolean;
@@ -146,7 +147,7 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
           label: 'System',
           isCategory: true,
           children: [
-            { label: 'Company Information', action: 'company-information' }
+            { label: 'Company Information', formName:'', action: 'company-information' }
           ]
         },
         {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, Save, Pencil, X } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
+import { decryptData } from '../../../services/encryptionService';
 
 
 export function SystemConfigurationSetupPage() {
@@ -51,6 +52,40 @@ export function SystemConfigurationSetupPage() {
     break2Minutes: '',
     break3Minutes: ''
   });
+
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getSystemConfigSetupPermissions();
+    }, []);
+  
+    const getSystemConfigSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "SystemConfig"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
   // Handle ESC key press
   useEffect(() => {
@@ -122,7 +157,7 @@ export function SystemConfigurationSetupPage() {
 
             {/* Edit Button */}
             <div className="mb-6">
-              {!showEditMode && (
+              {!showEditMode && hasPermission("View") && (
                 <button 
                   onClick={() => setShowEditMode(true)}
                   className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm"
@@ -152,6 +187,7 @@ export function SystemConfigurationSetupPage() {
             </div>
 
             {/* Configuration Form */}
+            {hasPermission('View') ? (
             <div className="space-y-6">
               {/* Old Process Options */}
               <div className="space-y-3">
@@ -494,7 +530,11 @@ export function SystemConfigurationSetupPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </div>) : (
+              <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,77 +1,122 @@
-import { useState, useEffect } from 'react';
-import { X, Search, Plus, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
-import { Footer } from '../../Footer/Footer';
-import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
-import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
-import apiClient from '../../../services/apiClient';
-import Swal from 'sweetalert2';
-import { decryptData } from '../../../services/encryptionService';
+import { useState, useEffect } from "react";
+import { X, Search, Plus, Check, ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { Footer } from "../../Footer/Footer";
+import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
+import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
+import apiClient from "../../../services/apiClient";
+import Swal from "sweetalert2";
+import { decryptData } from "../../../services/encryptionService";
 
 export function BranchSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedBranchIndex, setSelectedBranchIndex] = useState<number | null>(null);
-  
+  const [selectedBranchIndex, setSelectedBranchIndex] = useState<number | null>(
+    null,
+  );
+
   // Form fields
-  const [code, setCode] = useState('');
-  const [description, setDescription] = useState('');
-  const [branchManagerCode, setBranchManagerCode] = useState('');
-  const [branchManager, setBranchManager] = useState('');
-  const [deviceName, setDeviceName] = useState('');
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [branchManagerCode, setBranchManagerCode] = useState("");
+  const [branchManager, setBranchManager] = useState("");
+  const [deviceName, setDeviceName] = useState("");
   const [branchId, setBranchId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Modal state
   const [showBranchManagerModal, setShowBranchManagerModal] = useState(false);
   const [showDeviceNameModal, setShowDeviceNameModal] = useState(false);
 
   // Branch List states
-  const [branchList, setBranchList] = useState<Array<{ id?: string; code: string; description: string; branchManager: string; branchManagerCode: string; deviceName: string }>>([]);
+  const [branchList, setBranchList] = useState<
+    Array<{
+      id?: string;
+      code: string;
+      description: string;
+      branchManager: string;
+      branchManagerCode: string;
+      deviceName: string;
+    }>
+  >([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
-  const [branchError, setBranchError] = useState('');
+  const [branchError, setBranchError] = useState("");
 
   // API Data states
-  const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-    const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
+  const [employeeData, setEmployeeData] = useState<
+    Array<{ empCode: string; name: string; groupCode: string }>
+  >([]);
+  const [deviceData, setDeviceData] = useState<
+    Array<{ id: number; code: string; description: string }>
+  >([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingDevices, setLoadingDevices] = useState(false);
-  const [employeeError, setEmployeeError] = useState('');
-  const [deviceError, setDeviceError] = useState('');
+  const [employeeError, setEmployeeError] = useState("");
+  const [deviceError, setDeviceError] = useState("");
 
   // Permissions
-const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-const hasPermission = (accessType: string) => permissions[accessType] === true;
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) =>
+    permissions[accessType] === true;
 
- useEffect(() => {
-  getBranchPermissions();
-}, []);
+  useEffect(() => {
+    getEmployeeStatusPermissions();
+  }, []);
 
-const getBranchPermissions = () => {
-  const rawPayload = localStorage.getItem("loginPayload");
-  if (!rawPayload) return;
+  const getEmployeeStatusPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
 
-  try {
-    const parsedPayload = JSON.parse(rawPayload);
-    const encryptedArray: any[] = parsedPayload.permissions || [];
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
 
-    const branchEntries = encryptedArray.filter(
-      (p) => decryptData(p.formName) === "BranchSetup"
-    );
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "EmployeeStatusSetUp",
+      );
 
-    // Build a map: { Add: true, Edit: true, ... }
-    const permMap: Record<string, boolean> = {};
-    branchEntries.forEach((p) => {
-      const accessType = decryptData(p.accessTypeName);
-      if (accessType) permMap[accessType] = true;
-    });
+      // Build a map: { Add: true, Edit: true, ... }
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
 
-    setPermissions(permMap);
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
 
-  } catch (e) {
-    console.error("Error parsing or decrypting payload", e);
-  }
-};
+  useEffect(() => {
+    getBranchPermissions();
+  }, []);
+
+  const getBranchPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "BranchSetup",
+      );
+
+      // Build a map: { Add: true, Edit: true, ... }
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
+
   // Fetch branch data from API
   useEffect(() => {
     fetchBranchData();
@@ -79,25 +124,28 @@ const getBranchPermissions = () => {
 
   const fetchBranchData = async () => {
     setLoadingBranches(true);
-    setBranchError('');
+    setBranchError("");
     try {
-      const response = await apiClient.get('/Fs/Employment/BranchSetUp');
+      const response = await apiClient.get("/Fs/Employment/BranchSetUp");
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((branch: any) => ({
-          branchId: branch.braID || branch.id || '',
-          code: branch.braCode || branch.code || '',
-          description: branch.braDesc || branch.description || '',
-          branchManager: branch.braMngr || branch.branchManager || '',
-          branchManagerCode: branch.braMngrCode || '',
-          deviceName: branch.deviceName || branch.DeviceName || '',
+          branchId: branch.braID || branch.id || "",
+          code: branch.braCode || branch.code || "",
+          description: branch.braDesc || branch.description || "",
+          branchManager: branch.braMngr || branch.branchManager || "",
+          branchManagerCode: branch.braMngrCode || "",
+          deviceName: branch.deviceName || branch.DeviceName || "",
         }));
         setBranchList(mappedData);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load branches';
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load branches";
       setBranchError(errorMsg);
-      console.error('Error fetching branches:', error);
+      console.error("Error fetching branches:", error);
     } finally {
       setLoadingBranches(false);
     }
@@ -110,22 +158,25 @@ const getBranchPermissions = () => {
 
   const fetchEmployeeData = async () => {
     setLoadingEmployees(true);
-    setEmployeeError('');
+    setEmployeeError("");
     try {
-      const response = await apiClient.get('/EmployeeMasterFile');
+      const response = await apiClient.get("/EmployeeMasterFile");
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((emp: any) => ({
-          empCode: emp.empCode || emp.code || '',
-          name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-          groupCode: emp.grpCode || ''
+          empCode: emp.empCode || emp.code || "",
+          name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
+          groupCode: emp.grpCode || "",
         }));
         setEmployeeData(mappedData);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load employees";
       setEmployeeError(errorMsg);
-      console.error('Error fetching employees:', error);
+      console.error("Error fetching employees:", error);
     } finally {
       setLoadingEmployees(false);
     }
@@ -138,23 +189,28 @@ const getBranchPermissions = () => {
 
   const fetchDeviceData = async () => {
     setLoadingDevices(true);
-    setDeviceError('');
+    setDeviceError("");
     try {
-       const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
-            if (response.status === 200 && response.data) {
-                // Map API response to expected format
-                const mappedData = response.data.map((device: any) => ({
-                    id: device.id || '',
-                    code: device.code || '',
-                    description: device.description || ''
-                }));
-                setDeviceData(mappedData);
+      const response = await apiClient.get(
+        "/Fs/Process/Device/BorrowedDeviceName",
+      );
+      if (response.status === 200 && response.data) {
+        // Map API response to expected format
+        const mappedData = response.data.map((device: any) => ({
+          id: device.id || "",
+          code: device.code || "",
+          description: device.description || "",
+        }));
+        setDeviceData(mappedData);
         setDeviceData(mappedData);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load devices';
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load devices";
       setDeviceError(errorMsg);
-      console.error('Error fetching devices:', error);
+      console.error("Error fetching devices:", error);
     } finally {
       setLoadingDevices(false);
     }
@@ -163,17 +219,17 @@ const getBranchPermissions = () => {
   // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showCreateModal) {
+      if (event.key === "Escape" && showCreateModal) {
         setShowCreateModal(false);
       }
     };
 
     if (showCreateModal) {
-      document.addEventListener('keydown', handleEscKey);
+      document.addEventListener("keydown", handleEscKey);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener("keydown", handleEscKey);
     };
   }, [showCreateModal]);
 
@@ -181,11 +237,11 @@ const getBranchPermissions = () => {
     setIsEditMode(false);
     setSelectedBranchIndex(null);
     // Clear form
-    setCode('');
-    setDescription('');
-    setBranchManagerCode('');
-    setBranchManager('');
-    setDeviceName('');
+    setCode("");
+    setDescription("");
+    setBranchManagerCode("");
+    setBranchManager("");
+    setDeviceName("");
     setShowCreateModal(true);
   };
 
@@ -203,36 +259,39 @@ const getBranchPermissions = () => {
 
   const handleDelete = async (branch: any) => {
     const confirmed = await Swal.fire({
-      icon: 'warning',
-      title: 'Confirm Delete',
+      icon: "warning",
+      title: "Confirm Delete",
       text: `Are you sure you want to delete branch ${branch.code}?`,
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
     });
 
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/BranchSetUp/${branch.id}`);
         await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Branch deleted successfully.',
+          icon: "success",
+          title: "Success",
+          text: "Branch deleted successfully.",
           timer: 2000,
           showConfirmButton: false,
         });
         // Refresh the branch list
         await fetchBranchData();
       } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete branch';
+        const errorMsg =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to delete branch";
         await Swal.fire({
-          icon: 'error',
-          title: 'Error',
+          icon: "error",
+          title: "Error",
           text: errorMsg,
         });
-        console.error('Error deleting branch:', error);
+        console.error("Error deleting branch:", error);
       }
     }
   };
@@ -241,29 +300,29 @@ const getBranchPermissions = () => {
     // Validate code
     if (!code.trim()) {
       await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Please enter a Code.',
+        icon: "warning",
+        title: "Validation Error",
+        text: "Please enter a Code.",
       });
       return;
     }
-            // Check for duplicate code (only when creating new or changing code during edit)
-            const isDuplicate = branchList.some((branch, index) => {
-              // When editing, exclude the current record from duplicate check
-              if (isEditMode && selectedBranchIndex === index) {
-                return false;
-              }
-              return branch.code.toLowerCase() === code.trim().toLowerCase();
-            });
-        
-            if (isDuplicate) {
-              await Swal.fire({
-                icon: 'error',
-                title: 'Duplicate Code',
-                text: 'This code is already in use. Please use a different code.',
-              });
-              return;
-            }
+    // Check for duplicate code (only when creating new or changing code during edit)
+    const isDuplicate = branchList.some((branch, index) => {
+      // When editing, exclude the current record from duplicate check
+      if (isEditMode && selectedBranchIndex === index) {
+        return false;
+      }
+      return branch.code.toLowerCase() === code.trim().toLowerCase();
+    });
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Code",
+        text: "This code is already in use. Please use a different code.",
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -271,8 +330,8 @@ const getBranchPermissions = () => {
         braCode: code,
         braDesc: description,
         braMngr: branchManager || null,
-        braMngrCode: branchManagerCode || '',
-        deviceName: deviceName || null
+        braMngrCode: branchManagerCode || "",
+        deviceName: deviceName || null,
       };
 
       if (isEditMode && selectedBranchIndex !== null) {
@@ -280,9 +339,9 @@ const getBranchPermissions = () => {
         const id = branchId;
         await apiClient.put(`/Fs/Employment/BranchSetUp/${id}`, payload);
         await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Branch updated successfully.',
+          icon: "success",
+          title: "Success",
+          text: "Branch updated successfully.",
           timer: 2000,
           showConfirmButton: false,
         });
@@ -290,11 +349,11 @@ const getBranchPermissions = () => {
         await fetchBranchData();
       } else {
         // Create new record via POST
-        await apiClient.post('/Fs/Employment/BranchSetUp', payload);
+        await apiClient.post("/Fs/Employment/BranchSetUp", payload);
         await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Branch created successfully.',
+          icon: "success",
+          title: "Success",
+          text: "Branch created successfully.",
           timer: 2000,
           showConfirmButton: false,
         });
@@ -304,21 +363,22 @@ const getBranchPermissions = () => {
 
       // Close modal and reset form
       setShowCreateModal(false);
-      setCode('');
-      setDescription('');
-      setBranchManagerCode('');
-      setBranchManager('');
-      setDeviceName('');
+      setCode("");
+      setDescription("");
+      setBranchManagerCode("");
+      setBranchManager("");
+      setDeviceName("");
       setIsEditMode(false);
       setSelectedBranchIndex(null);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+      const errorMsg =
+        error.response?.data?.message || error.message || "An error occurred";
       await Swal.fire({
-        icon: 'error',
-        title: 'Error',
+        icon: "error",
+        title: "Error",
         text: errorMsg,
       });
-      console.error('Error submitting form:', error);
+      console.error("Error submitting form:", error);
     } finally {
       setSubmitting(false);
     }
@@ -335,11 +395,12 @@ const getBranchPermissions = () => {
     setShowDeviceNameModal(false);
   };
 
-  const filteredBranches = branchList.filter(branch =>
-    branch.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    branch.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    branch.branchManager.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    branch.deviceName.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredBranches = branchList.filter(
+    (branch) =>
+      branch.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      branch.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      branch.branchManager.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      branch.deviceName.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -358,30 +419,51 @@ const getBranchPermissions = () => {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-6 h-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Manage branch locations with branch manager assignments and device configurations for comprehensive organizational structure and time tracking across multiple business locations.
+                    Manage branch locations with branch manager assignments and
+                    device configurations for comprehensive organizational
+                    structure and time tracking across multiple business
+                    locations.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Branch code and description management</span>
+                      <span className="text-gray-600">
+                        Branch code and description management
+                      </span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Branch manager assignment</span>
+                      <span className="text-gray-600">
+                        Branch manager assignment
+                      </span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Device name configuration</span>
+                      <span className="text-gray-600">
+                        Device name configuration
+                      </span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Multi-location tracking</span>
+                      <span className="text-gray-600">
+                        Multi-location tracking
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -390,106 +472,122 @@ const getBranchPermissions = () => {
 
             {/* Controls Row */}
             <div className="flex items-center gap-4 mb-6">
-               {hasPermission("Add") && (
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                onClick={handleCreateNew}
-              >
-                <Plus className="w-4 h-4" />
-                Create New
-              </button>
-               )}
-              <div className="ml-auto flex items-center gap-2">
-                <label className="text-gray-700">Search:</label>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                />
-              </div>
+              {hasPermission("Add") && hasPermission("View") && (
+                <button
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                  onClick={handleCreateNew}
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New
+                </button>
+              )}
+              {hasPermission("View") && (
+                <div className="ml-auto flex items-center gap-2">
+                  <label className="text-gray-700">Search:</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                  />
+                </div>
+              )}
             </div>
 
-           {/* Data Table */}
-<div className="overflow-x-auto">
-  {hasPermission("View") ? (
-    <table className="w-full border-collapse">
-      <thead>
-        <tr className="bg-gray-100 border-b-2 border-gray-300">
-          <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
-          <th className="px-4 py-2 text-left text-gray-700">Description</th>
-          <th className="px-4 py-2 text-left text-gray-700">Branch Manager</th>
-          <th className="px-4 py-2 text-left text-gray-700">Device Name</th>
-          {(hasPermission("Edit") || hasPermission("Delete")) && (
-            <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
-          )}
-        </tr>
-      </thead>
-      <tbody>
-        {filteredBranches.map((branch, index) => (
-          <tr
-            key={index}
-            className="border-b border-gray-200 hover:bg-gray-50"
-          >
-            <td className="px-4 py-2">{branch.code}</td>
-            <td className="px-4 py-2">{branch.description}</td>
-            <td className="px-4 py-2">{branch.branchManager}</td>
-            <td className="px-4 py-2">{branch.deviceName}</td>
-            {(hasPermission("Edit") || hasPermission("Delete")) && (
-              <td className="px-4 py-2 whitespace-nowrap">
-                <div className="flex gap-2">
-                  {hasPermission("Edit") && (
-                    <button
-                      onClick={() => handleEdit(branch, index)}
-                      className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                      title="Edit"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                  )}
-                  {hasPermission("Edit") && hasPermission("Delete") && (
-                    <span className="text-gray-300">|</span>
-                  )}
-                  {hasPermission("Delete") && (
-                    <button
-                      onClick={() => handleDelete(branch)}
-                      className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+            {/* Data Table */}
+            <div className="overflow-x-auto">
+              {hasPermission("View") ? (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b-2 border-gray-300">
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Code ▲
+                      </th>
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Description
+                      </th>
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Branch Manager
+                      </th>
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Device Name
+                      </th>
+                      {(hasPermission("Edit") || hasPermission("Delete")) && (
+                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">
+                          Actions
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBranches.map((branch, index) => (
+                      <tr
+                        key={index}
+                        className="border-b border-gray-200 hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-2">{branch.code}</td>
+                        <td className="px-4 py-2">{branch.description}</td>
+                        <td className="px-4 py-2">{branch.branchManager}</td>
+                        <td className="px-4 py-2">{branch.deviceName}</td>
+                        {(hasPermission("Edit") || hasPermission("Delete")) && (
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <div className="flex gap-2">
+                              {hasPermission("Edit") && (
+                                <button
+                                  onClick={() => handleEdit(branch, index)}
+                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              )}
+                              {hasPermission("Edit") &&
+                                hasPermission("Delete") && (
+                                  <span className="text-gray-300">|</span>
+                                )}
+                              {hasPermission("Delete") && (
+                                <button
+                                  onClick={() => handleDelete(branch)}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
                 </div>
-              </td>
-            )}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <div className="text-center py-10 text-gray-500">
-      You do not have permission to view this list.
-    </div>
-  )}
-</div>
+              )}
+            </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-gray-600">
-                Showing 1 to {filteredBranches.length} of {filteredBranches.length} entries
+            {hasPermission("View") && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-gray-600">
+                  Showing 1 to {filteredBranches.length} of{" "}
+                  {filteredBranches.length} entries
+                </div>
+                <div className="flex gap-2">
+                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                    Previous
+                  </button>
+                  <button className="px-3 py-1 bg-blue-600 text-white rounded">
+                    1
+                  </button>
+                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
+                    Next
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
-                  Previous
-                </button>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
-                  Next
-                </button>
-              </div>
-            </div>
+            )}
 
             {/* Create/Edit Modal */}
             {showCreateModal && (
@@ -499,8 +597,10 @@ const getBranchPermissions = () => {
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
                     {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-                      <h2 className="text-gray-800">{isEditMode ? 'Edit Branch' : 'Create New'}</h2>
-                      <button 
+                      <h2 className="text-gray-800">
+                        {isEditMode ? "Edit Branch" : "Create New"}
+                      </h2>
+                      <button
                         onClick={() => setShowCreateModal(false)}
                         className="text-gray-600 hover:text-gray-800"
                       >
@@ -515,7 +615,9 @@ const getBranchPermissions = () => {
                       {/* Form Fields */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <label className="w-40 text-gray-700 text-sm">Code :</label>
+                          <label className="w-40 text-gray-700 text-sm">
+                            Code :
+                          </label>
                           <input
                             type="text"
                             maxLength={10}
@@ -526,7 +628,9 @@ const getBranchPermissions = () => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <label className="w-40 text-gray-700 text-sm">Description :</label>
+                          <label className="w-40 text-gray-700 text-sm">
+                            Description :
+                          </label>
                           <input
                             type="text"
                             value={description}
@@ -536,11 +640,15 @@ const getBranchPermissions = () => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <label className="w-40 text-gray-700 text-sm">Branch Manager Code :</label>
+                          <label className="w-40 text-gray-700 text-sm">
+                            Branch Manager Code :
+                          </label>
                           <input
                             type="text"
                             value={branchManagerCode}
-                            onChange={(e) => setBranchManagerCode(e.target.value)}
+                            onChange={(e) =>
+                              setBranchManagerCode(e.target.value)
+                            }
                             className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly
                           />
@@ -552,8 +660,8 @@ const getBranchPermissions = () => {
                           </button>
                           <button
                             onClick={() => {
-                              setBranchManagerCode('');
-                              setBranchManager('');
+                              setBranchManagerCode("");
+                              setBranchManager("");
                             }}
                             className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                           >
@@ -562,7 +670,9 @@ const getBranchPermissions = () => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <label className="w-40 text-gray-700 text-sm">Branch Manager :</label>
+                          <label className="w-40 text-gray-700 text-sm">
+                            Branch Manager :
+                          </label>
                           <input
                             type="text"
                             value={branchManager}
@@ -572,7 +682,9 @@ const getBranchPermissions = () => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <label className="w-40 text-gray-700 text-sm">Device Name :</label>
+                          <label className="w-40 text-gray-700 text-sm">
+                            Device Name :
+                          </label>
                           <input
                             type="text"
                             value={deviceName}
@@ -587,7 +699,7 @@ const getBranchPermissions = () => {
                             <Search className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => setDeviceName('')}
+                            onClick={() => setDeviceName("")}
                             className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                           >
                             <X className="w-4 h-4" />
@@ -602,7 +714,11 @@ const getBranchPermissions = () => {
                           disabled={submitting}
                           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {submitting ? 'Processing...' : (isEditMode ? 'Update' : 'Submit')}
+                          {submitting
+                            ? "Processing..."
+                            : isEditMode
+                              ? "Update"
+                              : "Submit"}
                         </button>
                         <button
                           onClick={() => setShowCreateModal(false)}

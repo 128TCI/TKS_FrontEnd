@@ -3,7 +3,7 @@ import { Database, Check, AlertCircle } from 'lucide-react';
 import { Footer } from './Footer/Footer';
 
 export function CreateNewDatabasePage() {
-  const [serverName, setServerName] = useState('128PC-85\\SQL2022');
+  const [serverName, setServerName] = useState('128PC-92\\SQL2022');
   const [databaseName, setDatabaseName] = useState('');
   const [useServerAuth, setUseServerAuth] = useState(true);
   const [username, setUsername] = useState('');
@@ -87,7 +87,7 @@ export function CreateNewDatabasePage() {
                       onChange={(e) => setServerName(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     >
-                      <option value="128PC-85\SQL2022">128PC-85\SQL2022</option>
+                      <option value="128PC-92\SQL2022">128PC-92\SQL2022</option>
                       <option value="localhost">localhost</option>
                       <option value=".\SQLEXPRESS">.\SQLEXPRESS</option>
                     </select>

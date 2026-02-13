@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Check, ArrowLeft, Edit, Trash2} from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
+import { decryptData } from '../../../services/encryptionService';
 
 
 interface PayrollLocation {
@@ -68,6 +69,40 @@ export function PayrollLocationSetupPage() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const currentData = filteredData.slice(startIndex, endIndex);
+
+    // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getPayrollLocationSetupPermissions();
+    }, []);
+  
+    const getPayrollLocationSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "PayrollLocationSetup"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
     const handleCreateNew = () => {
         setFormData({
@@ -161,26 +196,32 @@ export function PayrollLocationSetupPage() {
                         </div>
 
                         {/* Controls Row */}
+                        {hasPermission('View') && (
                         <div className="flex items-center gap-4 mb-6">
-                            <button
+                            {hasPermission('Add') && (
+                                <button
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                                 onClick={handleCreateNew}
-                            >
-                                <Plus className="w-4 h-4" />
-                                Create New
-                            </button>
-                            <div className="ml-auto flex items-center gap-2">
-                                <label className="text-gray-700">Search:</label>
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                                />
-                            </div>
-                        </div>
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Create New
+                                </button>
+                            )}
+                            {hasPermission('View') && (
+                                <div className="ml-auto flex items-center gap-2">
+                                    <label className="text-gray-700">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                                    />
+                                </div>
+                            )}
+                        </div>)}
 
                         {/* Table */}
+                        {hasPermission('View') ? (
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse">
                                 <thead>
@@ -191,7 +232,10 @@ export function PayrollLocationSetupPage() {
                                         <th className="px-4 py-2 text-left text-gray-700">No. of Days</th>
                                         <th className="px-4 py-2 text-left text-gray-700">No. of Hours</th>
                                         <th className="px-4 py-2 text-left text-gray-700">Total Period</th>
-                                        <th className="px-4 py-2 text-center text-gray-700">Actions</th>
+                                        {(hasPermission('Edit') || hasPermission('Delete')) && (
+                                            <th className="px-4 py-2 text-center text-gray-700">Actions</th>
+                                        )}
+                                        
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -203,31 +247,43 @@ export function PayrollLocationSetupPage() {
                                             <td className="px-4 py-2">{item.noOfDays}</td>
                                             <td className="px-4 py-2">{item.noOfHours}</td>
                                             <td className="px-4 py-2">{item.totalPeriod}</td>
+                                            {(hasPermission('Edit') || hasPermission('Delete')) && (
                                             <td className="px-4 py-2">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEdit(item)}
-                                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <span className="text-gray-300">|</span>
-                                                    <button
-                                                        className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {hasPermission('Edit') && (
+                                                        <button
+                                                            onClick={() => handleEdit(item)}
+                                                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                                            title="Edit"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {hasPermission("Edit") && hasPermission("Delete") && (
+                                                        <span className="text-gray-300">|</span>
+                                                    )}
+                                                    {hasPermission('Delete') && (
+                                                        <button
+                                                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                            </td>
+                                            </td>)}
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        </div>) : (
+                            <div className="text-center py-10 text-gray-500">
+                                You do not have permission to view this list.
+                            </div>
+                        )}
 
                         {/* Pagination */}
+                        {hasPermission('View') && (
                         <div className="flex items-center justify-between mt-4">
                             <div className="text-gray-600">
                                 Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
@@ -260,7 +316,7 @@ export function PayrollLocationSetupPage() {
                                     Next
                                 </button>
                             </div>
-                        </div>
+                        </div>)}
 
                         {/* Create/Edit Modal */}
                         {showCreateModal && (

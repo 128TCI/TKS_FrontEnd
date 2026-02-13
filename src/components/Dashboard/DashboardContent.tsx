@@ -155,6 +155,7 @@ export function DashboardContent({ activeSection }: DashboardContentProps) {
     }
 
     if (activeSection === 'import-workshift-variable') {
+        
         return <WorkshiftVariablePage />;
     }
 
@@ -183,6 +184,7 @@ export function DashboardContent({ activeSection }: DashboardContentProps) {
     }
 
     if (activeSection === 'leave-application') {
+
         return <LeaveApplicationPage />;
     }
 

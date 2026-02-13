@@ -3,6 +3,7 @@ import { Search, Check } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import { decryptData } from '../../../../services/encryptionService';
 
 interface DeviceType {
   id: number; // Temporary ID for React keys (based on index)
@@ -30,6 +31,40 @@ export function DeviceTypeSetupPage() {
   const [processingToggle, setProcessingToggle] = useState<number | null>(null);
 
   const itemsPerPage = 25;
+
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getDeviceTypePermissions();
+    }, []);
+  
+    const getDeviceTypePermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "DeviceTypeSetUp"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
   // Fetch all device types
   useEffect(() => {
@@ -360,7 +395,8 @@ export function DeviceTypeSetupPage() {
 
             {/* Top Controls */}
             <div className="flex items-center justify-end mb-6">
-              <div className="flex items-center gap-2">
+              {hasPermission('View') && (
+                <div className="flex items-center gap-2">
                 <label className="text-gray-700 text-sm">Search:</label>
                 <input
                   type="text"
@@ -369,6 +405,7 @@ export function DeviceTypeSetupPage() {
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
                 />
               </div>
+              )}
             </div>
 
             {/* Table */}
@@ -381,7 +418,7 @@ export function DeviceTypeSetupPage() {
                 <div className="p-4 bg-red-50 border border-red-200 rounded">
                   <p className="text-red-700 text-sm">{deviceError}</p>
                 </div>
-              ) : (
+              ) : hasPermission('View') ? (
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-gray-100 border-b border-gray-200">
@@ -448,11 +485,15 @@ export function DeviceTypeSetupPage() {
                       )}
                     </tbody>
                   </table>
-                </div>
+                </div> ) : (
+                  <div className="text-center py-10 text-gray-500">
+                      You do not have permission to view this list.
+                  </div>
               )}
             </div>
 
             {/* Pagination */}
+            {hasPermission('View') && (
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-gray-600">
                 Showing {sortedData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, sortedData.length)} of {sortedData.length} entries
@@ -484,7 +525,7 @@ export function DeviceTypeSetupPage() {
                   Next
                 </button>
               </div>
-            </div>
+            </div>)}
           </div>
         </div>
       </div>
