@@ -165,6 +165,20 @@ export function RawDataPage() {
     const [loading, setLoading] = useState(false);
     const [tableError, setTableError] = useState('');
 
+    // ── Sorting ──
+    type SortKey = 'empCode' | 'workShiftCode' | 'rawDateIn' | 'rawTimeIn' | 'actualDateIn' | 'rawDateOut' | 'rawTimeOut' | 'dayType' | 'rawotApproved';
+    const [sortKey, setSortKey] = useState<SortKey>('empCode');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+    const handleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
     // ── Hide columns ──
     const [hideColumns, setHideColumns] = useState({
         break1Out: true, break1In: true,
@@ -587,6 +601,48 @@ export function RawDataPage() {
     const timeBlurHandler = (val: string, setter: (v: string) => void) =>
         () => setter(validateTimeFormat(val));
 
+    // ── SortIcon helper ──
+    const SortIcon = ({ col }: { col: SortKey }) => {
+        if (sortKey !== col) return (
+            <span className="inline-flex flex-col ml-1 leading-none" style={{ fontSize: '8px', verticalAlign: 'middle' }}>
+                <span className="text-gray-400">▲</span>
+                <span className="text-gray-400">▼</span>
+            </span>
+        );
+        return (
+            <span className="inline-flex flex-col ml-1 leading-none" style={{ fontSize: '8px', verticalAlign: 'middle' }}>
+                <span className={sortDir === 'asc' ? 'text-blue-600' : 'text-gray-300'}>▲</span>
+                <span className={sortDir === 'desc' ? 'text-blue-600' : 'text-gray-300'}>▼</span>
+            </span>
+        );
+    };
+
+    // ── Derived sorted + filtered list ──
+    // Client-side empCode filter for 'specific' mode (guards against API returning all rows)
+    const filteredByEmp = displayMode === 'specific' && specificEmpCode
+        ? rawDataList.filter(e => e.empCode === specificEmpCode)
+        : rawDataList;
+
+    const sortedList = [...filteredByEmp].sort((a, b) => {
+        let aVal: string | number | boolean = '';
+        let bVal: string | number | boolean = '';
+
+        if (sortKey === 'rawotApproved') {
+            aVal = a.rawotApproved ? 1 : 0;
+            bVal = b.rawotApproved ? 1 : 0;
+        } else if (['rawDateIn', 'rawTimeIn', 'actualDateIn', 'rawDateOut', 'rawTimeOut'].includes(sortKey)) {
+            aVal = a[sortKey] ? new Date(a[sortKey]).getTime() : 0;
+            bVal = b[sortKey] ? new Date(b[sortKey]).getTime() : 0;
+        } else {
+            aVal = (a[sortKey as keyof RawDataEntry] as string) ?? '';
+            bVal = (b[sortKey as keyof RawDataEntry] as string) ?? '';
+        }
+
+        if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER HELPERS
     // ─────────────────────────────────────────────────────────────────────────
@@ -831,21 +887,35 @@ export function RawDataPage() {
                                 <thead>
                                     <tr className="bg-gray-100 border-b-2 border-gray-300">
                                         <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Emp Code ▲</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Workshift</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Date-In</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Time-In</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actual Date/Time In</th>
+                                        {([
+                                            { key: 'empCode',      label: 'Emp Code' },
+                                            { key: 'workShiftCode',label: 'Workshift' },
+                                            { key: 'rawDateIn',    label: 'Date-In' },
+                                            { key: 'rawTimeIn',    label: 'Time-In' },
+                                            { key: 'actualDateIn', label: 'Actual Date/Time In' },
+                                        ] as { key: SortKey; label: string }[]).map(({ key, label }) => (
+                                            <th key={key} onClick={() => handleSort(key)}
+                                                className="px-4 py-2 text-left text-gray-700 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors">
+                                                {label}<SortIcon col={key} />
+                                            </th>
+                                        ))}
                                         {!hideColumns.break1Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break1-Out</th>}
                                         {!hideColumns.break1In && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break1-In</th>}
                                         {!hideColumns.break2Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break2-Out</th>}
                                         {!hideColumns.break2In && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break2-In</th>}
                                         {!hideColumns.break3Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break3-Out</th>}
                                         {!hideColumns.break3In && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break3-In</th>}
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Date-Out</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Time-Out</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Day Type</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">OT Approved</th>
+                                        {([
+                                            { key: 'rawDateOut',    label: 'Date-Out' },
+                                            { key: 'rawTimeOut',    label: 'Time-Out' },
+                                            { key: 'dayType',       label: 'Day Type' },
+                                            { key: 'rawotApproved', label: 'OT Approved' },
+                                        ] as { key: SortKey; label: string }[]).map(({ key, label }) => (
+                                            <th key={key} onClick={() => handleSort(key)}
+                                                className="px-4 py-2 text-left text-gray-700 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors">
+                                                {label}<SortIcon col={key} />
+                                            </th>
+                                        ))}
                                         {!hideColumns.remarks && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Remarks</th>}
                                         {!hideColumns.entryFlag && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Entry Flag</th>}
                                         {!hideColumns.terminalId && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Terminal ID</th>}
@@ -866,14 +936,14 @@ export function RawDataPage() {
                                                 </div>
                                             </td>
                                         </tr>
-                                    ) : rawDataList.length === 0 ? (
+                                    ) : sortedList.length === 0 ? (
                                         <tr>
                                             <td colSpan={25} className="px-6 py-8 text-center text-gray-500">
                                                 No data available. Use the Search button to load records.
                                             </td>
                                         </tr>
                                     ) : (
-                                        rawDataList.map(entry => {
+                                        sortedList.map(entry => {
                                             const di = fromISO(entry.rawDateIn);
                                             const ti = fromISO(entry.rawTimeIn);
                                             const adi = fromISO(entry.actualDateIn);

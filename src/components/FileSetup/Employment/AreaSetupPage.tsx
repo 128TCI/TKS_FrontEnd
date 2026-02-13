@@ -277,7 +277,6 @@ export function AreaSetupPage() {
                     timer: 2000,
                     showConfirmButton: false,
                 });
-                
                 // Refresh the area list
                 await fetchAreaData();
             }

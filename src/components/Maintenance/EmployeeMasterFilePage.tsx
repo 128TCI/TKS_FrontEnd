@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, Pencil, Trash2, Search, Check, X, Save, User, Briefcase } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Pencil, Trash2, Search, Check, X, Save, User, Briefcase, Upload, Camera } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { InlineDatePicker } from '../InlineDatePicker';
 import apiClient from '../../services/apiClient';
@@ -71,6 +71,7 @@ interface Employee {
   tin: string;
   pagibigCode: string;
   photo: string;
+  photoBytes?: string;  // ← ADD THIS LINE
   catCode: string;
   unitCode: string;
   contractual: boolean;
@@ -214,6 +215,10 @@ export function EmployeeMasterFilePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [empStatSearchTerm, setEmpStatSearchTerm] = useState('');
   
+  // Photo upload state
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Lookup data
   const [branchList, setBranchList] = useState<Branch[]>([]);
   const [divisionList, setDivisionList] = useState<Division[]>([]);
@@ -381,8 +386,13 @@ const createEmployee = async (employeeData: any) => {
   setEmployeeError('');
   try {
     const bodyFormData = new FormData();
-    
-    Object.keys(employeeData).forEach((key) => {
+
+// Add photo if selected
+if (photoFile) {
+  bodyFormData.append('Photo', photoFile);
+}
+
+Object.keys(employeeData).forEach((key) => {
       const value = employeeData[key];
       if (value !== null && value !== undefined) {
         if (value instanceof Date) {
@@ -410,7 +420,9 @@ const createEmployee = async (employeeData: any) => {
         timer: 2000,
         showConfirmButton: false,
       });
-
+// Clear photo state
+setPhotoFile(null);
+setPhotoPreview('');
       return response.data;
     }
   } catch (error: any) {
@@ -439,10 +451,16 @@ const updateEmployee = async (id: number, apiData: any) => {
     }
 
     // 2. Create FormData object for [FromForm] compatibility
-    const bodyFormData = new FormData();
-    
-    // 3. Append to FormData (Ensures PascalCase keys from apiData are preserved)
-    Object.keys(apiData).forEach((key) => {
+   // 2. Create FormData object for [FromForm] compatibility
+const bodyFormData = new FormData();
+
+// Add photo if a new one was selected - use lowercase 'photo' to match API field
+if (photoFile) {
+  bodyFormData.append('photo', photoFile);
+}
+
+// 3. Append to FormData (Ensures PascalCase keys from apiData are preserved)
+Object.keys(apiData).forEach((key) => {
       const value = apiData[key];
       if (value !== null && value !== undefined) {
         // Handle dates if they are objects, otherwise stringify
@@ -473,7 +491,7 @@ const updateEmployee = async (id: number, apiData: any) => {
         timer: 2000,
         showConfirmButton: false,
       });
-
+setPhotoFile(null);
       return response.data;
     }
   } catch (error: any) {
@@ -936,13 +954,78 @@ const fetchDepartmentData = async () => {
       age: employee.age.toString(),
       birthPlace: employee.birthPlace,
     });
+  // Set photo preview if employee has photoBytes
+if (employee.photo || (employee as any).photoBytes) {
+  const photoData = (employee as any).photoBytes || employee.photo;
+  
+  // Check if photo already has data:image prefix (base64)
+  if (photoData.startsWith('data:image')) {
+    setPhotoPreview(photoData);
+  } 
+  // If it's just a base64 string without prefix, add it
+  else {
+    setPhotoPreview(`data:image/jpeg;base64,${photoData}`);
+  }
+} else {
+  setPhotoPreview('');
+}
+setPhotoFile(null);
   };
+// Photo handling functions
+const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (file) {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid File',
+        text: 'Please select an image file (JPG, PNG, etc.)',
+      });
+      return;
+    }
 
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'error',
+        title: 'File Too Large',
+        text: 'Please select an image smaller than 5MB',
+      });
+      return;
+    }
+
+    setPhotoFile(file);
+    
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+const handleRemovePhoto = () => {
+  setPhotoFile(null);
+  setPhotoPreview('');
+  if (fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
+
+const handlePhotoClick = () => {
+  if (isEditing) {
+    fileInputRef.current?.click();
+  }
+};
   // ==================== EVENT HANDLERS ====================
   
   const handleCreateNew = () => {
     setIsEditing(true);
     setIsCreatingNew(true);
+    setPhotoFile(null);
+setPhotoPreview('');
     setFormData({
       empID: 0,
       empCode: '',
@@ -2069,16 +2152,83 @@ const handleEmployeeSearchSelect = async (empCode: string, name: string) => {
                   </div>
 
                   {/* Right Column - Photo */}
-                  <div className="space-y-6">
-                    <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                      <h3 className="text-gray-900 mb-4">Photo</h3>
-                      <div className="flex items-center justify-center w-full h-64 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg border-2 border-dashed border-blue-300">
-                        <svg className="w-32 h-32 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
+                {/* Right Column - Photo */}
+<div className="space-y-6">
+  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+    <h3 className="text-gray-900 mb-4">Photo</h3>
+    
+    {/* Hidden file input */}
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/*"
+      onChange={handlePhotoSelect}
+      disabled={!isEditing}
+      className="hidden"
+    />
+
+    {/* Photo Display Area */}
+    <div 
+      className={`relative flex items-center justify-center w-full h-64 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg border-2 border-dashed border-blue-300 overflow-hidden ${
+        isEditing ? 'cursor-pointer hover:border-blue-500 transition-colors' : ''
+      }`}
+      onClick={handlePhotoClick}
+    >
+      {photoPreview ? (
+        <>
+          <img
+            src={photoPreview}
+            alt="Employee"
+            className="w-full h-full object-cover"
+          />
+          {isEditing && (
+            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all flex items-center justify-center">
+              <div className="opacity-0 hover:opacity-100 transition-opacity">
+                <Camera className="w-12 h-12 text-white" />
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center text-blue-400">
+          <User className="w-32 h-32 mb-2" />
+          {isEditing && (
+            <p className="text-sm text-blue-600">Click to upload photo</p>
+          )}
+        </div>
+      )}
+    </div>
+
+    {/* Photo Controls */}
+    {isEditing && (
+      <div className="mt-4 space-y-2">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <Upload className="w-4 h-4" />
+          {photoPreview ? 'Change Photo' : 'Upload Photo'}
+        </button>
+        
+        {(photoPreview || photoFile) && (
+          <button
+            type="button"
+            onClick={handleRemovePhoto}
+            className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+          >
+            <X className="w-4 h-4" />
+            Remove Photo
+          </button>
+        )}
+
+        <p className="text-xs text-gray-500 text-center mt-2">
+          Max size: 5MB • Formats: JPG, PNG, GIF
+        </p>
+      </div>
+    )}
+  </div>
+</div>
                 </div>
               </div>
             )}
