@@ -253,7 +253,10 @@ export function LeaveApplicationModal({
             <LeaveCodeSearchModal
                 isOpen={showLeaveCodeSearch}
                 onClose={() => setShowLeaveCodeSearch(false)}
-                onSelect={onLeaveCodeChange}
+                onSelect={onLeaveCodeChange} 
+                leaveCodeItems={[]} 
+                loading={false} 
+                error={''}            
             />
         </>
     );
