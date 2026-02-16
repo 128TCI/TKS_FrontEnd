@@ -39,6 +39,7 @@ interface MenuItem {
 
 interface SubMenuItem {
   label: string;
+  formName?: string;
   action?: string;
   separator?: boolean;
   isCategory?: boolean;
@@ -230,7 +231,7 @@ const handleAutoLogout = async () => {
           label: 'System',
           isCategory: true,
           children: [
-            { label: 'Company Information', action: 'company-information' }
+            { label: 'Company Information', formName:'', action: 'company-information' }
           ]
         },
         {
@@ -543,6 +544,7 @@ const handleAutoLogout = async () => {
     }
     setExpandedMenu(null);
   };
+  
 
   // Render mega-menu for File Setup (multi-column layout)
   const renderFileSetupMegaMenu = (submenu: SubMenuItem[]) => {
@@ -622,7 +624,8 @@ const handleAutoLogout = async () => {
                     </div>
                   );
                 } else {
-                  // Direct action item
+                  {
+                    // Direct action item
                   return (
                     <button
                       key={childIndex}
@@ -636,6 +639,7 @@ const handleAutoLogout = async () => {
                       {child.label}
                     </button>
                   );
+                  }
                 }
               })}
             </div>

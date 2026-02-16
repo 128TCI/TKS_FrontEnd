@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
+import { decryptData } from '../../../services/encryptionService';
+
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -159,6 +161,40 @@ export function PayrollLocationSetupPage() {
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery]);
+
+    // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getPayrollLocationSetupPermissions();
+    }, []);
+  
+    const getPayrollLocationSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "PayrollLocationSetup"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
     const handleCreateNew = () => {
         setFormData({
@@ -355,25 +391,33 @@ export function PayrollLocationSetupPage() {
                             </div>
                         </div>
 
+                        {/* Controls Row */}
+                        {hasPermission('View') && (
                         <div className="flex items-center gap-4 mb-6">
-                            <button
+                            {hasPermission('Add') && (
+                                <button
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                                 onClick={handleCreateNew}
-                            >
-                                <Plus className="w-4 h-4" />
-                                Create New
-                            </button>
-                            <div className="ml-auto flex items-center gap-2">
-                                <label className="text-gray-700">Search:</label>
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                                />
-                            </div>
-                        </div>
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Create New
+                                </button>
+                            )}
+                            {hasPermission('View') && (
+                                <div className="ml-auto flex items-center gap-2">
+                                    <label className="text-gray-700">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                                    />
+                                </div>
+                            )}
+                        </div>)}
 
+                        {/* Table */}
+                        {hasPermission('View') ? (
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse">
                                 <thead>
@@ -459,8 +503,14 @@ export function PayrollLocationSetupPage() {
                                     )}
                                 </tbody>
                             </table>
-                        </div>
+                        </div>) : (
+                            <div className="text-center py-10 text-gray-500">
+                                You do not have permission to view this list.
+                            </div>
+                        )}
 
+                        {/* Pagination */}
+                        {hasPermission('View') && (
                         <div className="flex items-center justify-between mt-4">
                             <div className="text-gray-600 text-sm">
                                 Showing {sortedData.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
@@ -494,7 +544,7 @@ export function PayrollLocationSetupPage() {
                                     Next
                                 </button>
                             </div>
-                        </div>
+                        </div>)}
 
                         {showCreateModal && (
                             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

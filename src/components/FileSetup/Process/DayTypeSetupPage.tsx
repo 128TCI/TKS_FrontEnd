@@ -3,6 +3,7 @@ import { Save, X, Check } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
+import { decryptData } from '../../../services/encryptionService';
 
 interface DayType {
   label: string;
@@ -47,6 +48,40 @@ export function DayTypeSetupPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getDayTypeSetupPermissions();
+    }, []);
+  
+    const getDayTypeSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "DayTypeSetUp"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
   const dayTypes: DayType[] = [
     { label: 'Regular Day:', fieldName: 'regularDay' },
@@ -203,6 +238,9 @@ export function DayTypeSetupPage() {
             )}
 
             {/* Action Buttons */}
+            {hasPermission('View') ? (
+            <>
+            {hasPermission('Edit') && (
             <div className="flex items-center gap-3 mb-6">
               {!isEditing ? (
                 <button
@@ -231,7 +269,7 @@ export function DayTypeSetupPage() {
                   </button>
                 </>
               )}
-            </div>
+            </div>)}
 
             {/* Day Types Form */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -259,8 +297,14 @@ export function DayTypeSetupPage() {
                 </div>
               </div>
             </div>
+            </>) : (
+              <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+              </div>
+            )} 
 
             {/* Info Box */}
+            {hasPermission('View') && (
             <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -271,7 +315,7 @@ export function DayTypeSetupPage() {
                   <p>Ensure codes are unique and recognizable for proper processing.</p>
                 </div>
               </div>
-            </div>
+            </div>)}
           </div>
         </div>
       </div>

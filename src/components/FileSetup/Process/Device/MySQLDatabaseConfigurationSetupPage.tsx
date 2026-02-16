@@ -3,6 +3,7 @@ import { Search, Plus, X, Check, Calendar, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
 import Swal from 'sweetalert2';
+import { decryptData } from '../../../../services/encryptionService';
 
 interface MySQLConfig {
     id: number;
@@ -159,6 +160,40 @@ export function MySQLDatabaseConfigurationSetupPage() {
     const [selectedId, setSelectedId] = useState<number | null>(null);
 
     const itemsPerPage = 20;
+
+    // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getMySqlDatabaseConfigPermissions();
+    }, []);
+  
+    const getMySqlDatabaseConfigPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "MySQLDbConfigSetup"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
     // Fetch all configs
     useEffect(() => {
@@ -401,23 +436,28 @@ export function MySQLDatabaseConfigurationSetupPage() {
 
                         {/* Controls */}
                         <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-                            <button onClick={handleCreateNew} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                                <Plus className="w-4 h-4" />
-                                Create New
-                            </button>
-                            <div className="flex items-center gap-2">
-                                <label className="text-gray-700 text-sm">Search:</label>
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                                />
-                            </div>
+                            {(hasPermission('Add') && hasPermission('View')) && (
+                                <button onClick={handleCreateNew} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                                    <Plus className="w-4 h-4" />
+                                    Create New
+                                </button>
+                            )}
+                            {hasPermission('View') && (
+                                <div className="flex items-center gap-2">
+                                    <label className="text-gray-700 text-sm">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Table */}
                         <div className="overflow-x-auto">
+                            { hasPermission('View') ? (
                             <table className="w-full border-collapse">
                                 <thead>
                                     <tr className="bg-gray-100 border-b-2 border-gray-300">
@@ -426,7 +466,9 @@ export function MySQLDatabaseConfigurationSetupPage() {
                                         <th className="px-4 py-2 text-left text-gray-700 text-sm">Database Name</th>
                                         <th className="px-4 py-2 text-left text-gray-700 text-sm">Username</th>
                                         <th className="px-4 py-2 text-left text-gray-700 text-sm">Last Date Updated</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 text-sm whitespace-nowrap">Actions</th>
+                                        {(hasPermission('Edit') || hasPermission('Delete')) && (
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm whitespace-nowrap">Actions</th>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -442,17 +484,30 @@ export function MySQLDatabaseConfigurationSetupPage() {
                                                 <td className="px-4 py-2 text-sm">{item.databaseName}</td>
                                                 <td className="px-4 py-2 text-sm">{item.username}</td>
                                                 <td className="px-4 py-2 text-sm">{formatDateDisplay(item.lastDateUpdated)}</td>
+                                                {(hasPermission('Edit') || hasPermission('Delete')) && (
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
-                                                        <button onClick={() => handleEdit(item)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                        <span className="text-gray-300">|</span>
-                                                        <button onClick={() => handleDelete(item)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
+                                                        {hasPermission('Edit') && (
+                                                            <button 
+                                                                onClick={() => handleEdit(item)} 
+                                                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" 
+                                                                title="Edit">
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        {hasPermission("Edit") && hasPermission("Delete") && (
+                                                            <span className="text-gray-300">|</span>
+                                                        )}
+                                                        {hasPermission('Delete') && (
+                                                            <button 
+                                                                onClick={() => handleDelete(item)} 
+                                                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" 
+                                                                title="Delete">
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
-                                                </td>
+                                                </td>)}
                                             </tr>
                                         ))
                                     ) : (
@@ -461,10 +516,15 @@ export function MySQLDatabaseConfigurationSetupPage() {
                                         </tr>
                                     )}
                                 </tbody>
-                            </table>
+                            </table>) : (
+                                <div className="text-center py-10 text-gray-500">
+                                    You do not have permission to view this list.
+                                </div>
+                            )} 
                         </div>
 
                         {/* Pagination */}
+                        {hasPermission('View') && (
                         <div className="flex items-center justify-between mt-4">
                             <div className="text-gray-600 text-sm">
                                 Showing {filteredData.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
@@ -498,7 +558,7 @@ export function MySQLDatabaseConfigurationSetupPage() {
                                     Next
                                 </button>
                             </div>
-                        </div>
+                        </div>)}
 
                         {/* Create / Edit Modal */}
                         {showModal && (

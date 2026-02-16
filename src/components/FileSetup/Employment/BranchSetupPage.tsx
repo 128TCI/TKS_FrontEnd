@@ -1,48 +1,119 @@
-import { useState, useEffect } from 'react';
-import { X, Search, Plus, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
-import { Footer } from '../../Footer/Footer';
-import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
-import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
-import apiClient from '../../../services/apiClient';
-import Swal from 'sweetalert2';
-import { decryptData } from '../../../services/encryptionService';
+import { useState, useEffect } from "react";
+import { X, Search, Plus, Check, ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { Footer } from "../../Footer/Footer";
+import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
+import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
+import apiClient from "../../../services/apiClient";
+import Swal from "sweetalert2";
+import { decryptData } from "../../../services/encryptionService";
 
 export function BranchSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedBranchIndex, setSelectedBranchIndex] = useState<number | null>(null);
-  
+  const [selectedBranchIndex, setSelectedBranchIndex] = useState<number | null>(
+    null,
+  );
+
   // Form fields
-  const [code, setCode] = useState('');
-  const [description, setDescription] = useState('');
-  const [branchManagerCode, setBranchManagerCode] = useState('');
-  const [branchManager, setBranchManager] = useState('');
-  const [deviceName, setDeviceName] = useState('');
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [branchManagerCode, setBranchManagerCode] = useState("");
+  const [branchManager, setBranchManager] = useState("");
+  const [deviceName, setDeviceName] = useState("");
   const [branchId, setBranchId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Modal state
   const [showBranchManagerModal, setShowBranchManagerModal] = useState(false);
   const [showDeviceNameModal, setShowDeviceNameModal] = useState(false);
 
   // Branch List states
-  const [branchList, setBranchList] = useState<Array<{ id?: string; code: string; description: string; branchManager: string; branchManagerCode: string; deviceName: string }>>([]);
+  const [branchList, setBranchList] = useState<
+    Array<{
+      id?: string;
+      code: string;
+      description: string;
+      branchManager: string;
+      branchManagerCode: string;
+      deviceName: string;
+    }>
+  >([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
-  const [branchError, setBranchError] = useState('');
+  const [branchError, setBranchError] = useState("");
 
   // API Data states
   const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
   const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingDevices, setLoadingDevices] = useState(false);
-  const [employeeError, setEmployeeError] = useState('');
-  const [deviceError, setDeviceError] = useState('');
+  const [employeeError, setEmployeeError] = useState("");
+  const [deviceError, setDeviceError] = useState("");
 
   // Permissions
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-  const hasPermission = (accessType: string) => permissions[accessType] === true;
+  const hasPermission = (accessType: string) =>
+    permissions[accessType] === true;
 
+  useEffect(() => {
+    getEmployeeStatusPermissions();
+  }, []);
+
+  const getEmployeeStatusPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "EmployeeStatusSetUp",
+      );
+
+      // Build a map: { Add: true, Edit: true, ... }
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
+
+  useEffect(() => {
+    getBranchPermissions();
+  }, []);
+
+  const getBranchPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "BranchSetup",
+      );
+
+      // Build a map: { Add: true, Edit: true, ... }
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
+
+  // Fetch branch data from API
   useEffect(() => {
     getBranchPermissions();
     fetchBranchData();
@@ -72,9 +143,9 @@ export function BranchSetupPage() {
 
   const fetchBranchData = async () => {
     setLoadingBranches(true);
-    setBranchError('');
+    setBranchError("");
     try {
-      const response = await apiClient.get('/Fs/Employment/BranchSetUp');
+      const response = await apiClient.get("/Fs/Employment/BranchSetUp");
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((branch: any) => ({
           id: branch.braID || branch.id || '',
@@ -88,7 +159,10 @@ export function BranchSetupPage() {
         setBranchList(mappedData);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load branches';
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load branches";
       setBranchError(errorMsg);
     } finally {
       setLoadingBranches(false);
@@ -97,14 +171,14 @@ export function BranchSetupPage() {
 
   const fetchEmployeeData = async () => {
     setLoadingEmployees(true);
-    setEmployeeError('');
+    setEmployeeError("");
     try {
       const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((emp: any) => ({
-          empCode: emp.empCode || emp.code || '',
-          name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-          groupCode: emp.grpCode || ''
+          empCode: emp.empCode || emp.code || "",
+          name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
+          groupCode: emp.grpCode || "",
         }));
         setEmployeeData(mappedData);
       }
@@ -117,7 +191,7 @@ export function BranchSetupPage() {
 
   const fetchDeviceData = async () => {
     setLoadingDevices(true);
-    setDeviceError('');
+    setDeviceError("");
     try {
       const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
       if (response.status === 200 && response.data) {
@@ -168,8 +242,8 @@ export function BranchSetupPage() {
 
   const handleDelete = async (branch: any) => {
     const confirmed = await Swal.fire({
-      icon: 'warning',
-      title: 'Confirm Delete',
+      icon: "warning",
+      title: "Confirm Delete",
       text: `Are you sure you want to delete branch ${branch.code}?`,
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -178,17 +252,54 @@ export function BranchSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/BranchSetUp/${branch.id}`);
-        await Swal.fire({ icon: 'success', title: 'Deleted', timer: 2000, showConfirmButton: false });
+        await Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: "Branch deleted successfully.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // Refresh the branch list
         await fetchBranchData();
       } catch (error: any) {
-        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to delete branch' });
+        const errorMsg =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to delete branch";
+        await Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: errorMsg,
+        });
+        console.error("Error deleting branch:", error);
       }
     }
   };
 
   const handleSubmit = async () => {
     if (!code.trim()) {
-      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a Code.' });
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Please enter a Code.",
+      });
+      return;
+    }
+    // Check for duplicate code (only when creating new or changing code during edit)
+    const isDuplicate = branchList.some((branch, index) => {
+      // When editing, exclude the current record from duplicate check
+      if (isEditMode && selectedBranchIndex === index) {
+        return false;
+      }
+      return branch.code.toLowerCase() === code.trim().toLowerCase();
+    });
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Code",
+        text: "This code is already in use. Please use a different code.",
+      });
       return;
     }
     setSubmitting(true);
@@ -198,8 +309,8 @@ export function BranchSetupPage() {
         braCode: code,
         braDesc: description,
         braMngr: branchManager || null,
-        braMngrCode: branchManagerCode || '',
-        deviceName: deviceName || null
+        braMngrCode: branchManagerCode || "",
+        deviceName: deviceName || null,
       };
 
       if (isEditMode) {
@@ -228,11 +339,12 @@ export function BranchSetupPage() {
     setShowDeviceNameModal(false);
   };
 
-  const filteredBranches = branchList.filter(branch =>
-    branch.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    branch.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    branch.branchManager.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    branch.deviceName.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredBranches = branchList.filter(
+    (branch) =>
+      branch.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      branch.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      branch.branchManager.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      branch.deviceName.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -249,21 +361,52 @@ export function BranchSetupPage() {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex flex-col md:flex-row items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-6 h-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Manage branch locations with branch manager assignments and device configurations.
+                    Manage branch locations with branch manager assignments and
+                    device configurations for comprehensive organizational
+                    structure and time tracking across multiple business
+                    locations.
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                    {['Branch code management', 'Manager assignment', 'Device configuration', 'Multi-location tracking'].map((item, idx) => (
-                      <div key={idx} className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-600">{item}</span>
-                      </div>
-                    ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">
+                        Branch code and description management
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">
+                        Branch manager assignment
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">
+                        Device name configuration
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">
+                        Multi-location tracking
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -348,7 +491,7 @@ export function BranchSetupPage() {
                 <button className="px-3 py-1 bg-blue-600 text-white rounded">1</button>
                 <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Next</button>
               </div>
-            </div>
+            )}
 
             {/* Modal - Better sizing for mobile */}
             {showCreateModal && (
