@@ -55,64 +55,6 @@ export function BranchSetupPage() {
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
 
-  useEffect(() => {
-    getEmployeeStatusPermissions();
-  }, []);
-
-  const getEmployeeStatusPermissions = () => {
-    const rawPayload = localStorage.getItem("loginPayload");
-    if (!rawPayload) return;
-
-    try {
-      const parsedPayload = JSON.parse(rawPayload);
-      const encryptedArray: any[] = parsedPayload.permissions || [];
-
-      const branchEntries = encryptedArray.filter(
-        (p) => decryptData(p.formName) === "EmployeeStatusSetUp",
-      );
-
-      // Build a map: { Add: true, Edit: true, ... }
-      const permMap: Record<string, boolean> = {};
-      branchEntries.forEach((p) => {
-        const accessType = decryptData(p.accessTypeName);
-        if (accessType) permMap[accessType] = true;
-      });
-
-      setPermissions(permMap);
-    } catch (e) {
-      console.error("Error parsing or decrypting payload", e);
-    }
-  };
-
-  useEffect(() => {
-    getBranchPermissions();
-  }, []);
-
-  const getBranchPermissions = () => {
-    const rawPayload = localStorage.getItem("loginPayload");
-    if (!rawPayload) return;
-
-    try {
-      const parsedPayload = JSON.parse(rawPayload);
-      const encryptedArray: any[] = parsedPayload.permissions || [];
-
-      const branchEntries = encryptedArray.filter(
-        (p) => decryptData(p.formName) === "BranchSetup",
-      );
-
-      // Build a map: { Add: true, Edit: true, ... }
-      const permMap: Record<string, boolean> = {};
-      branchEntries.forEach((p) => {
-        const accessType = decryptData(p.accessTypeName);
-        if (accessType) permMap[accessType] = true;
-      });
-
-      setPermissions(permMap);
-    } catch (e) {
-      console.error("Error parsing or decrypting payload", e);
-    }
-  };
-
   // Fetch branch data from API
   useEffect(() => {
     getBranchPermissions();
@@ -491,7 +433,7 @@ export function BranchSetupPage() {
                 <button className="px-3 py-1 bg-blue-600 text-white rounded">1</button>
                 <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Next</button>
               </div>
-            )}
+            </div>
 
             {/* Modal - Better sizing for mobile */}
             {showCreateModal && (
