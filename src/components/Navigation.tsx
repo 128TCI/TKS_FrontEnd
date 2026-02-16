@@ -460,6 +460,7 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
     }
     setExpandedMenu(null);
   };
+  
 
   // Render mega-menu for File Setup (multi-column layout)
   const renderFileSetupMegaMenu = (submenu: SubMenuItem[]) => {
@@ -539,7 +540,8 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
                     </div>
                   );
                 } else {
-                  // Direct action item
+                  {
+                    // Direct action item
                   return (
                     <button
                       key={childIndex}
@@ -553,6 +555,7 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
                       {child.label}
                     </button>
                   );
+                  }
                 }
               })}
             </div>

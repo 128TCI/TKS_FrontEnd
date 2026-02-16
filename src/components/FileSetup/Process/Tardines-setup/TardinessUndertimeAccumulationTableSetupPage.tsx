@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Plus, Check, ArrowLeft } from "lucide-react";
 import { ClipboardList, Clock, Users, Edit, Trash2 } from "lucide-react";
 import { decryptData } from "../../../../services/encryptionService";
+import apiClient from "../../../../services/apiClient";
 
 interface TableEntry {
   id: number;
@@ -11,8 +12,8 @@ interface TableEntry {
 
 interface BracketData {
   Tardiness: TableEntry[];
-  undertime: TableEntry[];
-  accumulation: TableEntry[];
+  Undertime: TableEntry[];
+  Accumulation: TableEntry[];
 }
 
 export function TardinessUndertimeAccumulationTableSetupPage() {
@@ -31,6 +32,12 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
     bracketCode: "",
   });
 
+  const [bracketData, setBracketData] = useState<BracketData>({
+    Tardiness: [],
+    Undertime: [],
+    Accumulation: [],
+  });
+
   // Bracket options based on active tab
   const bracketOptions = {
     Tardiness: ["Tardiness Bracket", "TARDY"],
@@ -38,16 +45,36 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
     Accumulation: ["ACCU"],
   };
 
-  // Sample data for different brackets
-  const [bracketData, setBracketData] = useState<BracketData>({
-    Tardiness: [
-      { id: 1, time: "1.00", equivalent: "22.00" },
-      { id: 2, time: "2.00", equivalent: "2.00" },
-    ],
-    Undertime: [{ id: 1, time: "1.00", equivalent: "1.00" }],
-    Accumulation: [{ id: 1, time: "1.00", equivalent: "30.00" }],
-  });
+  useEffect(() => {
+    fetchBracketData("Tardiness");
+    fetchBracketData("Undertime");
+    fetchBracketData("Accumulation");
+  }, []);
 
+  const fetchBracketData = async (tab: keyof BracketData) => {
+    try {
+      const urlMap = {
+        Tardiness: "/Fs/Process/Tardiness/TardinessSetup",
+        Undertime: "/Fs/Process/Tardiness/UnderTimeSetup",
+        Accumulation: "/Fs/Process/Tardiness/AccumulateSetup",
+      };
+
+      const response = await apiClient.get(urlMap[tab]);
+
+      if (response.status === 200 && response.data) {
+        // Map API response to TableEntry
+        const mappedData: TableEntry[] = response.data.map((item: any) => ({
+          id: item.id,
+          time: item.time,
+          equivalent: item.equivalent,
+        }));
+
+        setBracketData((prev) => ({ ...prev, [tab]: mappedData }));
+      }
+    } catch (err) {
+      console.error(`Failed to fetch ${tab} data:`, err);
+    }
+  };
 
   const itemsPerPage = 25;
   const currentData = bracketData[activeTab];
@@ -365,7 +392,7 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
                       <div className="flex items-center justify-center gap-2">
                         {hasPermission("Edit") && (
                           <button
-                            onClick={() => handleEdit(item)}
+                            onClick={() => handleEdit(item, index)}
                             className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                             title="Edit"
                           >
