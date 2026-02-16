@@ -124,7 +124,7 @@ export function GroupSetupPage() {
     setLoadingEmployees(true);
     setEmployeeError("");
     try {
-      const response = await apiClient.get("/EmployeeMasterFile");
+      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((emp: any) => ({

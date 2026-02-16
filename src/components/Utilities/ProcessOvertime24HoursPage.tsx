@@ -145,6 +145,7 @@ export function ProcessOvertime24HoursPage() {
   const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [overtimeDate, setOvertimeDate] = useState('');  
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
@@ -519,6 +520,16 @@ export function ProcessOvertime24HoursPage() {
       });
       return;
     } 
+     if (!overtimeDate) {
+       await Swal.fire({
+           icon: 'error',
+           title: 'Error',
+           text: 'Please select Overtime Date.',
+           timer: 2000,
+           showConfirmButton: true,
+       });
+       return;
+     }    
 
     try {
       setIsUpdating(true);
@@ -534,6 +545,7 @@ export function ProcessOvertime24HoursPage() {
       setSelectedEmployees([]);
       setDateFrom('');
       setDateTo('');
+      setOvertimeDate('');
     } 
     catch (error) {
       console.error(error);
@@ -589,6 +601,8 @@ export function ProcessOvertime24HoursPage() {
       setDateFrom(date);
     } else if (showCalendar === 'dateTo') {
       setDateTo(date);
+    } else if (showCalendar === 'overtimeDate') {
+      setOvertimeDate(date);
     }
   };
 
@@ -926,14 +940,13 @@ export function ProcessOvertime24HoursPage() {
                       <span className="text-sm text-gray-700">All</span>
                       </label>
                   </div>  
-
                 </div>
 
                 {/* Date Range Section */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-24">Date From:</label>
+                      <label className="text-sm text-gray-700 w-32">Date From:</label>
                       <input
                         type="text"
                         value={dateFrom}
@@ -943,11 +956,11 @@ export function ProcessOvertime24HoursPage() {
                       <CalendarPopover
                         date={dateFrom}
                         onChange={setDateFrom}
-                      />
+                        />
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-24">Date To:</label>
+                      <label className="text-sm text-gray-700 w-32">Date To:</label>
                       <input
                         type="text"
                         value={dateTo}
@@ -955,14 +968,33 @@ export function ProcessOvertime24HoursPage() {
                         className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
                       />
                       <CalendarPopover
-                        date={dateTo}
-                        onChange={setDateTo}
+                          date={dateTo}
+                          onChange={setDateTo}
+                        />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overtime Date Section */}
+                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-700 w-32">Overtime Date:</label>
+                      <input
+                        type="text"
+                        value={overtimeDate}
+                        onChange={(e) => setOvertimeDate(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
+                      />
+                      <CalendarPopover
+                        date={overtimeDate}
+                        onChange={setOvertimeDate}
                       />
                     </div>
 
                     <div className="flex justify-end pt-4 border-t border-gray-200">
                       <button className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2"
-                        onClick={handleUpdate}>
+                        onClick={handleUpdate} disabled={isUpdating}>
                         <Save className="w-4 h-4" />
                         Update
                       </button>

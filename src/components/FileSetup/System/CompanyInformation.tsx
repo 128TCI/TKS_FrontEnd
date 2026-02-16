@@ -577,11 +577,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         </label>
                         <input
                           type="text"
-                          value={formData?.telNo || ""}
-                          onChange={(e) =>
-                            handleInputChange("telNo", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          defaultValue="128PC-87\SQL2022"
+                          className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
                       </div>
@@ -861,8 +858,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <label className="text-gray-700">Server Name:</label>
                           <input
                             type="text"
-                            defaultValue="128PC-65\SQL2022"
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            defaultValue="TIMEKEEP128_VERSION910_Test"
+                            className="w-32 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             readOnly={!isEditing}
                           />
                         </div>

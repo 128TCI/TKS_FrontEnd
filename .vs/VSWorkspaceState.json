@@ -5,8 +5,10 @@
     "\\src\\components",
     "\\src\\components\\Dashboard",
     "\\src\\components\\Export",
-    "\\src\\components\\Maintenance",
-    "\\src\\components\\Modals"
+    "\\src\\components\\FileSetup",
+    "\\src\\components\\FileSetup\\Employment",
+    "\\src\\components\\Maintenance"
   ],
+  "SelectedNode": "\\src\\components\\LeaveApplicationPage.tsx",
   "PreviewInSolutionExplorer": false
 }

@@ -534,7 +534,7 @@ export function UpdateEmployeeOvertimeApplicationPage() {
       });
       return;
     } 
-
+    {/*}
     if (!allowedOTHours ) {
       await Swal.fire({
           icon: 'error',
@@ -545,7 +545,8 @@ export function UpdateEmployeeOvertimeApplicationPage() {
       });
       return;
     } 
-
+    */}
+    
     try {
       setIsUpdating(true);
       await Swal.fire({

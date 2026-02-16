@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import { tksGroupData } from '../data/tksGroupData';
+import apiClient from '../services/apiClient';
 
 interface TKSGroupTableProps {
   selectedCodes: number[];
@@ -11,12 +11,43 @@ interface TKSGroupTableProps {
 type SortField = 'code' | 'description';
 type SortDirection = 'asc' | 'desc';
 
-export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroupTableProps) {
+export function TKSGroupTable({selectedCodes, onToggle, onSelectAll }: TKSGroupTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('code');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const itemsPerPage = 10;
+  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+
+
+  useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        error;
+          try {
+            const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+            if (response.data) {
+              const mappedData = response.data.map((tksGroupList: any) => ({
+              id: tksGroupList.id || tksGroupList.ID || '',
+              groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || '',
+              groupDescription: tksGroupList.groupDescription || tksGroupList.GroupDescription || ''
+            }));
+              setTKSGroupList(mappedData);
+            }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+              setError(errorMsg);
+              console.error('Error fetching TKSGroup:', error);
+            } finally {
+                loading;
+              }
+    };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -28,31 +59,10 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
     setCurrentPage(1);
   };
 
-  const filteredAndSortedData = useMemo(() => {
-    let filtered = tksGroupData.filter(item => 
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    filtered.sort((a, b) => {
-      const aValue = a[sortField].toLowerCase();
-      const bValue = b[sortField].toLowerCase();
-      
-      if (sortField === 'code') {
-        // Numeric sorting for code
-        const aNum = parseInt(aValue) || 0;
-        const bNum = parseInt(bValue) || 0;
-        return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
-      } else {
-        // Alphabetic sorting for description
-        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-      }
-    });
-
-    return filtered;
-  }, [searchTerm, sortField, sortDirection]);
+  const filteredAndSortedData = tksGroupList.filter(tksGroupList =>
+      tksGroupList.groupCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tksGroupList.groupDescription.toLowerCase().includes(searchTerm.toLowerCase()) 
+  );
 
   const totalPages = Math.ceil(filteredAndSortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -101,6 +111,12 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
     );
   };
 
+   useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    //console.log(selectedCodes);
+
   return (
     <div className="lg:col-span-2 bg-gray-50 rounded-lg border border-gray-200 p-5">
       <div className="flex items-center justify-between mb-4">
@@ -134,7 +150,7 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
                 <th className="px-4 py-2 text-left" style={{ width: '40px' }}>
                   <input
                     type="checkbox"
-                    checked={selectedCodes.length === tksGroupData.length}
+                    checked={selectedCodes.length === tksGroupList.length}
                     onChange={onSelectAll}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
@@ -150,7 +166,7 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
                 </th>
                 <th className="px-4 py-2 text-left text-xs text-gray-600">
                   <button
-                    onClick={() => handleSort('description')}
+                    onClick={() => handleSort('code')}
                     className="flex items-center hover:text-gray-900"
                   >
                     Description
@@ -170,8 +186,8 @@ export function TKSGroupTable({ selectedCodes, onToggle, onSelectAll }: TKSGroup
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                   </td>
-                  <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{item.groupCode}</td>
+                  <td className="px-4 py-2 text-sm text-gray-600">{item.groupDescription}</td>
                 </tr>
               ))}
             </tbody>

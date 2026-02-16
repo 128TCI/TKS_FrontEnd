@@ -110,18 +110,18 @@ export function LeaveApplicationModal({
                                     type="text"
                                     value={empCode}
                                     readOnly
-                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-gray-100"
                                 />
                             </div>
 
                             {/* Date */}
                             <div className="flex items-center gap-2">
                                 <label className="w-40 text-gray-700">Date :</label>
-                                <DatePicker
+                                <input
+                                    type="date"
                                     value={date}
-                                    onChange={onDateChange}
-                                    placeholder="MM/DD/YYYY"
-                                    className="flex-1 text-small"
+                                    onChange={(e) => onDateChange(e.target.value)}
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                             </div>
 
@@ -253,7 +253,10 @@ export function LeaveApplicationModal({
             <LeaveCodeSearchModal
                 isOpen={showLeaveCodeSearch}
                 onClose={() => setShowLeaveCodeSearch(false)}
-                onSelect={onLeaveCodeChange}
+                onSelect={onLeaveCodeChange} 
+                leaveCodeItems={[]} 
+                loading={false} 
+                error={''}            
             />
         </>
     );

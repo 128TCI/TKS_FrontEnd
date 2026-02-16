@@ -154,8 +154,8 @@ export function OvertimeApplicationModal({
                                 <div className="flex items-center gap-2">
                                     <label className="w-40 text-gray-700">Date :</label>
                                     <DatePicker
-                                        value={startOvertimeDate}
-                                        onChange={onStartOvertimeDateChange}
+                                        value={startOvertimeDate} // Ensure this is startOvertimeDate, not date
+                                        onChange={onStartOvertimeDateChange} // Ensure this is the specific handler
                                         className="flex-1"
                                     />
                                 </div>
