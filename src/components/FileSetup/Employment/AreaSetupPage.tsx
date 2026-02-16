@@ -109,7 +109,7 @@ export function AreaSetupPage() {
         setLoadingDevices(true);
         setDeviceError('');
         try {
-            const response = await apiClient.get('/BorrowedDeviceName');
+            const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
             if (response.status === 200 && response.data) {
                 // Map API response to expected format
                 const mappedData = response.data.map((device: any) => ({
@@ -555,6 +555,7 @@ export function AreaSetupPage() {
                                                     <input
                                                         type="text"
                                                         value={headCode}
+                                                        maxLength={10}
                                                         onChange={(e) => setHeadCode(e.target.value)}
                                                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                         readOnly

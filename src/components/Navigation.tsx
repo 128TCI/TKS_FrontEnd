@@ -22,6 +22,7 @@ import {
   Menu
 } from 'lucide-react';
 import lifeBankLogo from '../assets/Lifebank.png';
+import { decryptData } from '../services/encryptionService';
 
 interface NavigationProps {
   onLogout: () => void;
@@ -55,6 +56,39 @@ export function Navigation({ onLogout, activeSection, setActiveSection }: Naviga
   const dropdownRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Permissions
+const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+const hasPermission = (accessType: string) => permissions[accessType] === true;
+
+  useEffect(() => {
+    getBranchPermissions();
+  }, []);
+  
+  const getBranchPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+  
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "BranchSetup"
+      );
+  
+      // Build a map: { Add: true, Edit: true, ... }
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+  
+      setPermissions(permMap);
+  
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -72,6 +106,7 @@ export function Navigation({ onLogout, activeSection, setActiveSection }: Naviga
       localStorage.removeItem('authToken');
       localStorage.removeItem('loginTimestamp');
       localStorage.removeItem('loginPayload');
+      localStorage.removeItem('userData');
 
       // Show success message
       await Swal.fire({

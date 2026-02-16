@@ -1,0 +1,14 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\src",
+    "\\src\\components",
+    "\\src\\components\\Dashboard",
+    "\\src\\components\\Export",
+    "\\src\\components\\FileSetup",
+    "\\src\\components\\FileSetup\\Employment",
+    "\\src\\components\\Maintenance"
+  ],
+  "SelectedNode": "\\src\\components\\LeaveApplicationPage.tsx",
+  "PreviewInSolutionExplorer": false
+}
