@@ -5,7 +5,6 @@ import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 interface CalendarPopoverProps {
   date: string;
   onChange: (date: string) => void;
-  minDate?: Date; 
 }
 
 export function CalendarPopover({ date, onChange }: CalendarPopoverProps) {
@@ -36,12 +35,6 @@ export function CalendarPopover({ date, onChange }: CalendarPopoverProps) {
     years.push(year);
   }
 
-  // Generate day options based on current month
-  const days = [];
-  for (let day = 1; day <= daysInMonth; day++) {
-    days.push(day);
-  }
-
   const previousMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
   };
@@ -56,14 +49,6 @@ export function CalendarPopover({ date, onChange }: CalendarPopoverProps) {
 
   const handleYearChange = (year: number) => {
     setCurrentMonth(new Date(year, currentMonth.getMonth(), 1));
-  };
-
-  const handleDayChange = (day: number) => {
-    const month = (currentMonth.getMonth() + 1).toString().padStart(2, '0');
-    const dayStr = day.toString().padStart(2, '0');
-    const year = currentMonth.getFullYear();
-    onChange(`${month}/${dayStr}/${year}`);
-    setOpen(false);
   };
 
   const handleDateClick = (day: number) => {
@@ -83,12 +68,12 @@ export function CalendarPopover({ date, onChange }: CalendarPopoverProps) {
     setOpen(false);
   };
 
-  const calendarDays = [];
+  const days = [];
   for (let i = 0; i < firstDayOfMonth; i++) {
-    calendarDays.push(<div key={`empty-${i}`} className="h-8"></div>);
+    days.push(<div key={`empty-${i}`} className="h-8"></div>);
   }
   for (let day = 1; day <= daysInMonth; day++) {
-    calendarDays.push(
+    days.push(
       <button
         key={day}
         onClick={() => handleDateClick(day)}
@@ -113,7 +98,7 @@ export function CalendarPopover({ date, onChange }: CalendarPopoverProps) {
       
       <Popover.Portal>
         <Popover.Content
-          className="z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl p-4 w-80 animate-in fade-in-0 zoom-in-95"
+          className="z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl p-4 w-72 animate-in fade-in-0 zoom-in-95"
           align="end"
           sideOffset={5}
         >
@@ -135,17 +120,6 @@ export function CalendarPopover({ date, onChange }: CalendarPopoverProps) {
                 {monthNames.map((month, index) => (
                   <option key={month} value={index}>
                     {month}
-                  </option>
-                ))}
-              </select>
-              <select
-                onChange={(e) => handleDayChange(Number(e.target.value))}
-                className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 w-16"
-              >
-                <option value="">Day</option>
-                {days.map((day) => (
-                  <option key={day} value={day}>
-                    {day}
                   </option>
                 ))}
               </select>
@@ -181,7 +155,7 @@ export function CalendarPopover({ date, onChange }: CalendarPopoverProps) {
 
           {/* Calendar days */}
           <div className="grid grid-cols-7 gap-1">
-            {calendarDays}
+            {days}
           </div>
 
           {/* Today button */}
