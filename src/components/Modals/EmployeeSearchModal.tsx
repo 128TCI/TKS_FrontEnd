@@ -53,11 +53,16 @@ export function EmployeeSearchModal({
         }
     }, [isOpen]);
 
-    const filteredEmployees = employees.filter(emp =>
-        emp.empCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.groupCode.toLowerCase().includes(searchTerm.toLowerCase())
+const filteredEmployees = employees.filter(emp => {
+    const search = searchTerm.toLowerCase();
+    
+    return (
+        // Uses ?. to safely access and || '' to treat nulls as empty strings
+        (emp.empCode?.toLowerCase() || "").includes(search) ||
+        (emp.name?.toLowerCase() || "").includes(search) ||
+        (emp.groupCode?.toLowerCase() || "").includes(search)
     );
+});
 
     // Pagination logic
     const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);

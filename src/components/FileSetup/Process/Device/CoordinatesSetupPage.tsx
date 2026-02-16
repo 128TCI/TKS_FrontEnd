@@ -4,6 +4,7 @@ import { Footer } from '../../../Footer/Footer';
 
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import { decryptData } from '../../../../services/encryptionService';
 
 interface Coordinate {
     id: number;
@@ -58,6 +59,40 @@ export function CoordinatesSetupPage() {
         } finally {
             setLoadingCoordinates(false);
         }
+    };
+
+    // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getCoordinateSetUpPermissions();
+    }, []);
+  
+    const getCoordinateSetUpPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "CoordinatesSetUp"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
     };
 
     // Handle ESC key to close create modal only
@@ -294,22 +329,26 @@ export function CoordinatesSetupPage() {
 
                         {/* Controls Row */}
                         <div className="flex items-center gap-4 mb-6">
-                            <button 
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                                onClick={handleCreateNew}
-                            >
-                                <Plus className="w-4 h-4" />
-                                Create New
-                            </button>
-                            <div className="ml-auto flex items-center gap-2">
-                                <label className="text-gray-700">Search:</label>
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                                />
-                            </div>
+                            {(hasPermission('Add') && hasPermission('View')) && (
+                                <button 
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                                    onClick={handleCreateNew}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Create New
+                                </button>
+                            )}
+                            {hasPermission('View') && (
+                                <div className="ml-auto flex items-center gap-2">
+                                    <label className="text-gray-700">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Data Table */}
@@ -322,7 +361,7 @@ export function CoordinatesSetupPage() {
                                 <div className="p-4 bg-red-50 border border-red-200 rounded">
                                     <p className="text-red-700 text-sm">{coordinateError}</p>
                                 </div>
-                            ) : (
+                            ) : hasPermission('View') ? (
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
@@ -331,7 +370,9 @@ export function CoordinatesSetupPage() {
                                             <th className="px-4 py-2 text-left text-gray-700">Latitude</th>
                                             <th className="px-4 py-2 text-left text-gray-700">Longitude</th>
                                             <th className="px-4 py-2 text-left text-gray-700">Distance</th>
+                                            {(hasPermission('Edit') || hasPermission('Delete')) && (
                                             <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -346,25 +387,32 @@ export function CoordinatesSetupPage() {
                                                     <td className="px-4 py-2">{item.latitude}</td>
                                                     <td className="px-4 py-2">{item.longitude}</td>
                                                     <td className="px-4 py-2">{item.distance}</td>
+                                                    {(hasPermission('Edit') || hasPermission('Delete')) && (
                                                     <td className="px-4 py-2 whitespace-nowrap">
                                                         <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleEdit(item, index)}
-                                                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                                                title="Edit"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                            <span className="text-gray-300">|</span>
-                                                            <button
-                                                                onClick={() => handleDelete(item)}
-                                                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
+                                                            {hasPermission('Edit') && (
+                                                                <button
+                                                                    onClick={() => handleEdit(item, index)}
+                                                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                                                    title="Edit"
+                                                                >
+                                                                    <Edit className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                            {hasPermission("Edit") && hasPermission("Delete") && (
+                                                                <span className="text-gray-300">|</span>
+                                                            )}
+                                                            {hasPermission('Delete') && (
+                                                                <button
+                                                                    onClick={() => handleDelete(item)}
+                                                                    className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
-                                                    </td>
+                                                    </td>)}
                                                 </tr>
                                             ))
                                         ) : (
@@ -375,11 +423,15 @@ export function CoordinatesSetupPage() {
                                             </tr>
                                         )}
                                     </tbody>
-                                </table>
+                                </table> ) : (
+                                    <div className="text-center py-10 text-gray-500">
+                                        You do not have permission to view this list.
+                                    </div>
                             )}
                         </div>
 
                         {/* Pagination */}
+                        {hasPermission('View') && (
                         <div className="flex items-center justify-between mt-4">
                             <div className="text-gray-600">
                                 Showing {filteredData.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
@@ -413,7 +465,7 @@ export function CoordinatesSetupPage() {
                                     Next
                                 </button>
                             </div>
-                        </div>
+                        </div>)}
 
                         {/* Create/Edit Modal */}
                         {showCreateModal && (

@@ -39,6 +39,7 @@ interface MenuItem {
 
 interface SubMenuItem {
   label: string;
+  formName?: string;
   action?: string;
   separator?: boolean;
   isCategory?: boolean;
@@ -55,11 +56,95 @@ export function Navigation({ onLogout, activeSection, setActiveSection }: Naviga
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
     // Permissions
 const [permissions, setPermissions] = useState<Record<string, boolean>>({});
 const hasPermission = (accessType: string) => permissions[accessType] === true;
 
+// Auto logout functionality
+useEffect(() => {
+  // Reset inactivity timer
+  const resetInactivityTimer = () => {
+    // Clear existing timeout
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+
+    // Set new timeout
+    inactivityTimeoutRef.current = setTimeout(() => {
+      handleAutoLogout();
+    }, INACTIVITY_TIMEOUT);
+  };
+
+  // Events that indicate user activity
+  const activityEvents = [
+    'mousedown',
+    'mousemove',
+    'keypress',
+    'scroll',
+    'touchstart',
+    'click'
+  ];
+
+  // Add event listeners
+  activityEvents.forEach(event => {
+    document.addEventListener(event, resetInactivityTimer);
+  });
+
+  // Initialize timer
+  resetInactivityTimer();
+
+  // Cleanup
+  return () => {
+    activityEvents.forEach(event => {
+      document.removeEventListener(event, resetInactivityTimer);
+    });
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+  };
+}, []);
+const handleAutoLogout = async () => {
+  setIsLoggingOut(true);
+  try {
+    // Get login payload from localStorage
+    const loginPayloadStr = localStorage.getItem('userData');
+    const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+    const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
+
+    // Call logout API with userId
+    await apiClient.post('UserLogin/logout', {
+      userId: userId
+    });
+
+    // Clear localStorage
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('loginTimestamp');
+    localStorage.removeItem('loginPayload');
+    localStorage.removeItem('userData');
+
+    // Show auto logout message
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Session Expired',
+      text: 'You have been logged out due to inactivity.',
+      timer: 2000,
+      showConfirmButton: false,
+    });
+
+    // Call onLogout to update app state
+    onLogout();
+  } catch (error: any) {
+    console.error('Auto logout error:', error);
+    // Even if API fails, still logout locally
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('loginTimestamp');
+    localStorage.removeItem('loginPayload');
+    localStorage.removeItem('userData');
+    onLogout();
+  }
+};
   useEffect(() => {
     getBranchPermissions();
   }, []);
@@ -146,7 +231,7 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
           label: 'System',
           isCategory: true,
           children: [
-            { label: 'Company Information', action: 'company-information' }
+            { label: 'Company Information', formName:'', action: 'company-information' }
           ]
         },
         {
@@ -459,6 +544,7 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
     }
     setExpandedMenu(null);
   };
+  
 
   // Render mega-menu for File Setup (multi-column layout)
   const renderFileSetupMegaMenu = (submenu: SubMenuItem[]) => {
@@ -538,7 +624,8 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
                     </div>
                   );
                 } else {
-                  // Direct action item
+                  {
+                    // Direct action item
                   return (
                     <button
                       key={childIndex}
@@ -552,6 +639,7 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
                       {child.label}
                     </button>
                   );
+                  }
                 }
               })}
             </div>

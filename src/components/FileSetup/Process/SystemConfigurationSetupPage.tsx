@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, Save, Pencil, X } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
+import { decryptData } from '../../../services/encryptionService';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -83,7 +84,41 @@ export function SystemConfigurationSetupPage() {
     noFlag_Break3: ''
   });
 
-  // ── Fetch config on mount ─────────────────────────────────────────────────
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getSystemConfigSetupPermissions();
+    }, []);
+  
+    const getSystemConfigSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "SystemConfig"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
+
+  // Handle ESC key press
   useEffect(() => {
     fetchSystemConfig();
   }, []);
@@ -281,7 +316,7 @@ export function SystemConfigurationSetupPage() {
 
             {/* Edit/Save Buttons */}
             <div className="mb-6">
-              {!showEditMode && (
+              {!showEditMode && hasPermission("View") && (
                 <button 
                   onClick={() => setShowEditMode(true)}
                   disabled={loading}
@@ -313,10 +348,52 @@ export function SystemConfigurationSetupPage() {
               )}
             </div>
 
-            {/* Loading state */}
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-gray-600">Loading configuration...</div>
+            {/* Configuration Form */}
+            {hasPermission('View') ? (
+            <div className="space-y-6">
+              {/* Old Process Options */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <label className="w-64 text-gray-700">Old Overtime Process :</label>
+                  <div className="flex-1">
+                    <input
+                      type="checkbox"
+                      checked={formData.oldOvertimeProcess}
+                      onChange={(e) => setFormData({ ...formData, oldOvertimeProcess: e.target.checked })}
+                      disabled={!showEditMode}
+                      className={checkboxClass}
+                    />
+                    <p className="text-sm text-green-600 mt-1 ml-6">Use Old Overtime Process</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <label className="w-64 text-gray-700">Old Night Differential Process :</label>
+                  <div className="flex-1">
+                    <input
+                      type="checkbox"
+                      checked={formData.oldNightDifferentialProcess}
+                      onChange={(e) => setFormData({ ...formData, oldNightDifferentialProcess: e.target.checked })}
+                      disabled={!showEditMode}
+                      className={checkboxClass}
+                    />
+                    <p className="text-sm text-green-600 mt-1 ml-6">Use Old Night Differential Process</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <label className="w-64 text-gray-700">Old Tardiness Process :</label>
+                  <div className="flex-1">
+                    <input
+                      type="checkbox"
+                      checked={formData.oldTardinessProcess}
+                      onChange={(e) => setFormData({ ...formData, oldTardinessProcess: e.target.checked })}
+                      disabled={!showEditMode}
+                      className={checkboxClass}
+                    />
+                    <p className="text-sm text-green-600 mt-1 ml-6">Use Old Tardiness Process</p>
+                  </div>
+                </div>
               </div>
             ) : !originalData ? (
               <div className="flex items-center justify-center py-12">
@@ -598,6 +675,10 @@ export function SystemConfigurationSetupPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>) : (
+              <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
               </div>
             )}
           </div>

@@ -3,6 +3,7 @@ import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
 import Swal from 'sweetalert2';
+import { decryptData } from '../../../../services/encryptionService';
 
 interface AllowanceBracketing {
   id: string;
@@ -45,6 +46,40 @@ export function AllowanceBracketingSetupPage() {
   const [loadingEarnings, setLoadingEarnings] = useState(false);
 
   const itemsPerPage = 100;
+
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getAllowanceBracketingSetupPermissions();
+    }, []);
+  
+    const getAllowanceBracketingSetupPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "AllowBracketing"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
   // Fetch allowance bracketing data from API
   useEffect(() => {
@@ -394,46 +429,51 @@ export function AllowanceBracketingSetupPage() {
             <div className="mb-6 space-y-4">
               {/* First Row - Create New and Dropdown */}
               <div className="flex flex-wrap gap-4 items-center">
+                {(hasPermission('Add') && hasPermission('View')) && (
                 <button
                   onClick={handleCreateNew}
                   className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
+                  >
                   <Plus className="w-4 h-4" />
                   Create New
-                </button>
+                </button>)}
+                { hasPermission('View') && (
+                <>
+                  <select
+                    value={dayType}
+                    onChange={(e) => setDayType(e.target.value)}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                  >
+                    {dayTypeOptions.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
 
-                <select
-                  value={dayType}
-                  onChange={(e) => setDayType(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                >
-                  {dayTypeOptions.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeWithinShift}
+                      onChange={(e) => setIncludeWithinShift(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Include Within The Shift</span>
+                  </label>
 
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeWithinShift}
-                    onChange={(e) => setIncludeWithinShift(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">Include Within The Shift</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={byEmploymentStatus}
-                    onChange={(e) => setByEmploymentStatus(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">By Employment Status</span>
-                </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={byEmploymentStatus}
+                      onChange={(e) => setByEmploymentStatus(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">By Employment Status</span>
+                  </label>
+                </>)}
               </div>
+              
 
               {/* Second Row - Search Fields */}
+              {hasPermission('View') && (
               <div className="flex items-center gap-4 mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center gap-2 relative">
                   <label className="text-sm text-gray-700 whitespace-nowrap">Allowance Bracket Code :</label>
@@ -466,7 +506,7 @@ export function AllowanceBracketingSetupPage() {
                     Search
                   </button>
                 </div>
-              </div>
+              </div>)}
             </div>
 
             {/* Table */}
@@ -479,14 +519,18 @@ export function AllowanceBracketingSetupPage() {
                 <div className="p-4 bg-red-50 border border-red-200 rounded">
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
-              ) : (
+              ) : hasPermission('View') ? (
                 <table className="w-full">
                   <thead className="bg-gray-100 border-b border-gray-200">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">No of Hours [hh.mm]</th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Amount</th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Earning Code</th>
-                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                      {(hasPermission('Edit') || hasPermission('Delete')) && (
+                        <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">
+                          Actions
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -496,25 +540,33 @@ export function AllowanceBracketingSetupPage() {
                           <td className="px-6 py-4 text-sm text-gray-900">{item.noOfHrs}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">{item.amount}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">{item.earningCode}</td>
+                          {(hasPermission('Edit')||hasPermission('Delete')) &&(
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <span className="text-gray-300">|</span>
-                              <button
-                                onClick={() => handleDelete(item)}
-                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {hasPermission('Edit') && (
+                                <button
+                                  onClick={() => handleEdit(item)}
+                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                    <Edit className="w-4 h-4" />
+                                </button>
+                              )}
+                              {hasPermission("Edit") && hasPermission("Delete") && (
+                                <span className="text-gray-300">|</span>
+                              )}
+                              {hasPermission('Delete') && (
+                                <button
+                                  onClick={() => handleDelete(item)}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
+                          )}
                         </tr>
                       ))
                     ) : (
@@ -525,11 +577,15 @@ export function AllowanceBracketingSetupPage() {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table> ) : (
+                  <div className="text-center py-10 text-gray-500">
+                    You do not have permission to view this list.
+                  </div>
               )}
             </div>
 
             {/* Pagination */}
+            {hasPermission('View') && (
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-gray-600">
                 Showing {bracketingData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, bracketingData.length)} of {bracketingData.length} entries
@@ -563,7 +619,7 @@ export function AllowanceBracketingSetupPage() {
                   Next
                 </button>
               </div>
-            </div>
+            </div>)}
           </div>
         </div>
       </div>

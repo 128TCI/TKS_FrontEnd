@@ -5,6 +5,7 @@ import { Footer } from '../../Footer/Footer';
 import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
 import Swal from 'sweetalert2';
+import { decryptData } from '../../../services/encryptionService';
 
 export function UnitSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -36,6 +37,40 @@ export function UnitSetupPage() {
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [employeeError, setEmployeeError] = useState('');
   const [deviceError, setDeviceError] = useState('');
+
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getUnitSetUpPermissions();
+    }, []);
+  
+    const getUnitSetUpPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "UnitSetUp"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
 
   // Unit List states
   const [unitList, setUnitList] = useState<Array<{ 
@@ -90,7 +125,7 @@ export function UnitSetupPage() {
     setLoadingEmployees(true);
     setEmployeeError('');
     try {
-      const response = await apiClient.get('/EmployeeMasterFile');
+      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((emp: any) => ({
@@ -411,22 +446,26 @@ export function UnitSetupPage() {
 
             {/* Controls Row */}
             <div className="flex items-center gap-4 mb-6">
-              <button 
+              { (hasPermission('Add') || hasPermission('View')) && (
+                <button 
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                 onClick={handleCreateNew}
-              >
-                <Plus className="w-4 h-4" />
-                Create New
-              </button>
-              <div className="ml-auto flex items-center gap-2">
-                <label className="text-gray-700">Search:</label>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                />
-              </div>
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New
+                </button>
+              )}
+              {hasPermission('View') && (
+                <div className="ml-auto flex items-center gap-2">
+                  <label className="text-gray-700">Search:</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Data Table */}
@@ -439,7 +478,7 @@ export function UnitSetupPage() {
                 <div className="p-4 bg-red-50 border border-red-200 rounded">
                   <p className="text-red-700 text-sm">{unitError}</p>
                 </div>
-              ) : (
+              ) : hasPermission('View') ? (
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-100 border-b-2 border-gray-300">
@@ -447,8 +486,12 @@ export function UnitSetupPage() {
                       <th className="px-4 py-2 text-left text-gray-700">Description</th>
                       <th className="px-4 py-2 text-left text-gray-700">Head</th>
                       <th className="px-4 py-2 text-left text-gray-700">Position</th>
-                      <th className="px-4 py-2 text-left text-gray-700">Device Name</th>
-                      <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
+                      <th className="px-4 py-2 text-left text-gray-700">Device Name</th>  
+                      {(hasPermission('Edit') || hasPermission('Delete')) && (
+                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">
+                          Actions
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -462,16 +505,22 @@ export function UnitSetupPage() {
                         <td className="px-4 py-2">{unit.head}</td>
                         <td className="px-4 py-2">{unit.position}</td>
                         <td className="px-4 py-2">{unit.deviceName}</td>
+                        { (hasPermission('Edit') || hasPermission('Delete')) && (
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEdit(unit, index)}
-                              className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                              title="Edit"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <span className="text-gray-300">|</span>
+                            {hasPermission('Edit') && (
+                              <button
+                                onClick={() => handleEdit(unit, index)}
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            { hasPermission("Edit") && hasPermission("Delete") && (
+                              <span className="text-gray-300">|</span>
+                            )}
+                            {hasPermission('Delete') && (
                             <button
                               onClick={() => handleDelete(unit)}
                               className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
@@ -479,16 +528,21 @@ export function UnitSetupPage() {
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
+                            )}
                           </div>
-                        </td>
+                        </td>)}
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table> ) : (
+                  <div className="text-center py-10 text-gray-500">
+                    You do not have permission to view this list.
+                  </div>
               )}
             </div>
 
             {/* Pagination */}
+            { hasPermission('View') && (
             <div className="flex items-center justify-between mt-4">
               <div className="text-gray-600">
                 Showing {filteredUnits.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredUnits.length)} of {filteredUnits.length} entries
@@ -522,7 +576,7 @@ export function UnitSetupPage() {
                   Next
                 </button>
               </div>
-            </div>
+            </div>)}
 
             {/* Create/Edit Modal */}
             {showCreateModal && (

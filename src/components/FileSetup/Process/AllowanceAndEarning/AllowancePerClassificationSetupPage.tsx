@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, Info, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import { decryptData } from '../../../../services/encryptionService';
 
 
 interface AllowancePerClassification {
@@ -365,6 +366,40 @@ export function AllowancePerClassificationSetupPage() {
     }, [showCreateModal, showEditModal, showDetailsModal,
         showAllowanceCodeModal, showWorkshiftCodeModal, showClassificationCodeModal]);
 
+    // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getAllowancePerClassificationSetUpPermissions();
+    }, []);
+  
+    const getAllowancePerClassificationSetUpPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "AllowancePerClassificationSetUp"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Main Content */}
@@ -420,28 +455,33 @@ export function AllowancePerClassificationSetupPage() {
 
                         {/* Top Controls */}
                         <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-                            <button
-                                onClick={handleCreateNew}
-                                disabled={loading}
-                                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Create New
-                            </button>
+                            {(hasPermission('Add') && hasPermission('View')) && (
+                                <button
+                                    onClick={handleCreateNew}
+                                    disabled={loading}
+                                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Create New
+                                </button>
+                            )}
 
-                            <div className="flex items-center gap-2">
-                                <label className="text-gray-700 text-sm">Search:</label>
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                                />
-                            </div>
+                            {hasPermission('View') && (
+                                <div className="flex items-center gap-2">
+                                    <label className="text-gray-700 text-sm">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Table */}
                         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                            { hasPermission('View') ? (
                             <table className="w-full">
                                 <thead className="bg-gray-100 border-b border-gray-200">
                                     <tr>
@@ -449,7 +489,11 @@ export function AllowancePerClassificationSetupPage() {
                                         <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Allowance Code</th>
                                         <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Workshift Code</th>
                                         <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Classification Code</th>
-                                        <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                                        { (hasPermission('Edit') || hasPermission('Delete')) && (
+                                            <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">
+                                                Actions
+                                            </th>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -466,6 +510,7 @@ export function AllowancePerClassificationSetupPage() {
                                                 <td className="px-6 py-4 text-sm text-gray-600">{item.allowanceCode}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-600">{item.workShiftCode}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-600">{item.classificationCode || '-'}</td>
+                                                {(hasPermission('Edit') || hasPermission('Delete') ) && (
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2">
                                                         <button
@@ -474,15 +519,20 @@ export function AllowancePerClassificationSetupPage() {
                                                         >
                                                             <Info className="w-4 h-4" />
                                                         </button>
-                                                        <span className="text-gray-300">|</span>
-                                                        <button
-                                                            onClick={() => handleEdit(item)}
-                                                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                                            title="Edit"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                        <span className="text-gray-300">|</span>
+                                                        {hasPermission('Edit') && (
+                                                        <span className="text-gray-300">|</span>)}
+                                                        {hasPermission('Edit') && (   
+                                                            <button
+                                                                onClick={() => handleEdit(item)}
+                                                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                                                title="Edit"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        { hasPermission('Delete') && (
+                                                        <span className="text-gray-300">|</span>)}
+                                                        {hasPermission('Delete') && (
                                                         <button
                                                             onClick={() => handleDelete(item.id)}
                                                             className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
@@ -491,8 +541,9 @@ export function AllowancePerClassificationSetupPage() {
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
+                                                        )}
                                                     </div>
-                                                </td>
+                                                </td>)}
                                             </tr>
                                         ))
                                     ) : (
@@ -503,10 +554,15 @@ export function AllowancePerClassificationSetupPage() {
                                         </tr>
                                     )}
                                 </tbody>
-                            </table>
+                            </table> ) : (
+                                <div className="text-center py-10 text-gray-500">
+                                    You do not have permission to view this list.
+                                </div>
+                            )}
                         </div>
 
                         {/* Pagination */}
+                        {hasPermission('View') && (
                         <div className="mt-4 flex items-center justify-between text-sm">
                             <span className="text-gray-600">
                                 Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
@@ -530,7 +586,7 @@ export function AllowancePerClassificationSetupPage() {
                                     Next
                                 </button>
                             </div>
-                        </div>
+                        </div>)}
                     </div>
                 </div>
             </div>

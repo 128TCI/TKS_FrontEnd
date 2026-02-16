@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, ArrowLeft, UserX, LogIn, LogOut, PlayCircle, PauseCircle, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
+import { decryptData } from '../../../services/encryptionService';
 import Swal from 'sweetalert2';
 import apiClient from '../../../services/apiClient';
 
@@ -371,6 +372,40 @@ export function EquivalentHoursDeductionSetupPage() {
     { id: 'no-break2-in' as DeductionType, label: 'For No Break2 In', icon: PauseCircle }
   ];
 
+  // Permissions
+    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+    const hasPermission = (accessType: string) => permissions[accessType] === true;
+  
+    useEffect(() => {
+      getEquivalentHoursDeductionSetUpPermissions();
+    }, []);
+  
+    const getEquivalentHoursDeductionSetUpPermissions = () => {
+      const rawPayload = localStorage.getItem("loginPayload");
+      if (!rawPayload) return;
+  
+      try {
+        const parsedPayload = JSON.parse(rawPayload);
+        const encryptedArray: any[] = parsedPayload.permissions || [];
+  
+        const branchEntries = encryptedArray.filter(
+          (p) => decryptData(p.formName) === "EquivHoursDeduction"
+        );
+  
+        // Build a map: { Add: true, Edit: true, ... }
+        const permMap: Record<string, boolean> = {};
+        branchEntries.forEach((p) => {
+          const accessType = decryptData(p.accessTypeName);
+          if (accessType) permMap[accessType] = true;
+        });
+  
+        setPermissions(permMap);
+  
+      } catch (e) {
+        console.error("Error parsing or decrypting payload", e);
+      }
+    };
+    
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Main Content */}
@@ -418,6 +453,7 @@ export function EquivalentHoursDeductionSetupPage() {
             </div>
 
             {/* Tabs Navigation */}
+            {hasPermission('View') && (
             <div className="flex gap-1 mb-6 border-b border-gray-200">
               {tabs.map(tab => (
                 <button
@@ -440,17 +476,20 @@ export function EquivalentHoursDeductionSetupPage() {
                   )}
                 </button>
               ))}
-            </div>
+            </div>)}
 
             {/* Top Controls */}
+            {(hasPermission('View') && hasPermission('Edit')) && (
             <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-              <button
-                onClick={handleCreateNew}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Create New
-              </button>
+              {hasPermission('Add') && (
+                <button
+                  onClick={handleCreateNew}
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New
+                </button>
+              )}
 
               <div className="flex items-center gap-2">
                 <label className="text-gray-700 text-sm">Search:</label>
@@ -461,81 +500,85 @@ export function EquivalentHoursDeductionSetupPage() {
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
                 />
               </div>
-            </div>
+            </div>)}
 
             {/* Table */}
+            {hasPermission('View') ? (
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              {loadingData ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-gray-600 text-sm">Loading deduction data...</div>
-                </div>
-              ) : dataError ? (
-                <div className="p-4 bg-red-50 border border-red-200 rounded">
-                  <p className="text-red-700 text-sm">{dataError}</p>
-                </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-100 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Monday</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Tuesday</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Wednesday</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Thursday</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Friday</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Saturday</th>
-                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Sunday</th>
-                      <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedData.length > 0 ? (
-                      paginatedData.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.desc}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.monday.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.tuesday.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.wednesday.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.thursday.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.friday.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.saturday.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.sunday.toFixed(2)}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
+              <table className="w-full">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Code</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Description</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Monday</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Tuesday</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Wednesday</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Thursday</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Friday</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Saturday</th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Sunday</th>
+                    {(hasPermission('Edit') || hasPermission('Delete')) && (
+                    <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>)}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {paginatedData.length > 0 ? (
+                    paginatedData.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.monday}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.tuesday}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.wednesday}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.thursday}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.friday}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.saturday}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.sunday}</td>
+                        {(hasPermission('Edit') || hasPermission('Delete')) && (
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            {hasPermission('Edit') && (
                               <button
                                 onClick={() => handleEdit(item)}
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 title="Edit"
                               >
-                                <Edit className="w-4 h-4" />
+                                  <Edit className="w-4 h-4" />
                               </button>
-                              <span className="text-gray-300">|</span>
+                            )}
+                            {hasPermission("Edit") && hasPermission("Delete") && (
+                                <span className="text-gray-300">|</span>
+                            )}
+                            {hasPermission('Delete') && (
                               <button
-                                onClick={() => handleDelete(item)}
+                                onClick={() => handleDelete(item.id)}
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="w-4 h-4" />
                               </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={10} className="px-6 py-16 text-center">
-                          <div className="text-gray-500">No data available in table</div>
-                        </td>
+                            )}
+                          </div>
+                        </td>)}
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-16 text-center">
+                        <div className="text-gray-500">No data available in table</div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>) : (
+              <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+              </div>
+            )}
 
             {/* Pagination */}
+            {hasPermission('View') && (
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-gray-600">
                 Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
@@ -569,7 +612,7 @@ export function EquivalentHoursDeductionSetupPage() {
                   Next
                 </button>
               </div>
-            </div>
+            </div>)}
           </div>
         </div>
       </div>

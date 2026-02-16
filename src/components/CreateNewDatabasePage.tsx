@@ -3,7 +3,7 @@ import { Database, Check, AlertCircle } from 'lucide-react';
 import { Footer } from './Footer/Footer';
 
 export function CreateNewDatabasePage() {
-  const [serverName, setServerName] = useState('128PC-85\\SQL2022');
+  const [serverName, setServerName] = useState('128PC-92\\SQL2022');
   const [databaseName, setDatabaseName] = useState('');
   const [useServerAuth, setUseServerAuth] = useState(true);
   const [username, setUsername] = useState('');
