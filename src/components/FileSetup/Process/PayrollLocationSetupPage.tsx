@@ -49,17 +49,34 @@ export function PayrollLocationSetupPage() {
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
     const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [sortConfig, setSortConfig] = useState<{
+        key: keyof PayrollLocation | null;
+        direction: 'asc' | 'desc';
+    }>({ key: null, direction: 'asc' });
 
     const [formData, setFormData] = useState({
         locCode: '',
         locName: '',
-        payCode: 'Monthly',
+        payCode: 'M',
         noOfDays: '0',
         noOfHours: '0',
         totalPeriod: '0'
     });
 
     const [payrollLocationData, setPayrollLocationData] = useState<PayrollLocation[]>([]);
+
+    // Pay code mapping - stores short codes (M, S, D) but displays full names
+    const payCodeOptions = [
+        { value: 'M', label: 'Monthly' },
+        { value: 'S', label: 'Semi-Monthly' },
+        { value: 'D', label: 'Daily' }
+    ];
+
+    // Helper function to get display label for pay code
+    const getPayCodeLabel = (code: string) => {
+        const option = payCodeOptions.find(opt => opt.value === code);
+        return option ? option.label : code;
+    };
 
     // Fetch data on mount
     useEffect(() => {
@@ -82,18 +99,49 @@ export function PayrollLocationSetupPage() {
         }
     };
 
+    // Sorting function
+    const handleSort = (key: keyof PayrollLocation) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    // Helper function for sort icons
+    const getSortIcon = (columnKey: keyof PayrollLocation) => {
+        if (sortConfig.key !== columnKey) {
+            return '⇅';
+        }
+        return sortConfig.direction === 'asc' ? '▲' : '▼';
+    };
+
     const filteredData = payrollLocationData.filter(item =>
         item.locCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.locName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.payCode?.toLowerCase().includes(searchQuery.toLowerCase())
+        getPayCodeLabel(item.payCode)?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const sortedData = [...filteredData].sort((a, b) => {
+        if (!sortConfig.key) return 0;
+        
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+        
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+        
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
 
     // Pagination
     const itemsPerPage = 20;
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const totalPages = Math.ceil(sortedData.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const paginatedData = filteredData.slice(startIndex, endIndex);
+    const paginatedData = sortedData.slice(startIndex, endIndex);
 
     const getPageNumbers = () => {
         const pages: (number | string)[] = [];
@@ -116,7 +164,7 @@ export function PayrollLocationSetupPage() {
         setFormData({
             locCode: '',
             locName: '',
-            payCode: 'Monthly',
+            payCode: 'M',
             noOfDays: '0',
             noOfHours: '0',
             totalPeriod: '0'
@@ -130,7 +178,7 @@ export function PayrollLocationSetupPage() {
         setFormData({
             locCode: item.locCode || '',
             locName: item.locName || '',
-            payCode: item.payCode || 'Monthly',
+            payCode: item.payCode || 'M',
             noOfDays: item.noOfDays?.toString() || '0',
             noOfHours: item.noOfHours?.toString() || '0',
             totalPeriod: item.totalPeriod?.toString() || '0'
@@ -179,13 +227,14 @@ export function PayrollLocationSetupPage() {
         setSubmitting(true);
         try {
             const payload = {
+                id: 0,
+                locId: 0,
                 locCode: formData.locCode,
                 locName: formData.locName || null,
                 payCode: formData.payCode || null,
                 noOfDays: parseInt(formData.noOfDays) || 0,
                 noOfHours: parseInt(formData.noOfHours) || 0,
                 totalPeriod: parseInt(formData.totalPeriod) || 0,
-                locId: 0,
                 confidential: null,
                 notedBy: null,
                 preparedBy: null,
@@ -215,7 +264,12 @@ export function PayrollLocationSetupPage() {
             };
 
             if (isEditMode && selectedId !== null) {
-                await apiClient.put(`/Fs/Process/PayRollLocationSetUp/${selectedId}`, payload);
+                const updatePayload = {
+                    ...payload,
+                    id: selectedId
+                };
+                
+                await apiClient.put(`/Fs/Process/PayRollLocationSetUp/${selectedId}`, updatePayload);
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -238,7 +292,7 @@ export function PayrollLocationSetupPage() {
             setFormData({
                 locCode: '',
                 locName: '',
-                payCode: 'Monthly',
+                payCode: 'M',
                 noOfDays: '0',
                 noOfHours: '0',
                 totalPeriod: '0'
@@ -247,8 +301,13 @@ export function PayrollLocationSetupPage() {
             setSelectedId(null);
             await fetchData();
         } catch (error: any) {
+            console.error('Error details:', error.response?.data || error.message);
             const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+            await Swal.fire({ 
+                icon: 'error', 
+                title: 'Error', 
+                text: errorMsg 
+            });
         } finally {
             setSubmitting(false);
         }
@@ -319,12 +378,42 @@ export function PayrollLocationSetupPage() {
                             <table className="w-full border-collapse">
                                 <thead>
                                     <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                        <th className="px-4 py-2 text-left text-gray-700">Loc Code ▲</th>
-                                        <th className="px-4 py-2 text-left text-gray-700">Loc Name</th>
-                                        <th className="px-4 py-2 text-left text-gray-700">Pay Code</th>
-                                        <th className="px-4 py-2 text-left text-gray-700">No. of Days</th>
-                                        <th className="px-4 py-2 text-left text-gray-700">No. of Hours</th>
-                                        <th className="px-4 py-2 text-left text-gray-700">Total Period</th>
+                                        <th 
+                                            className="px-4 py-2 text-left text-gray-700 cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('locCode')}
+                                        >
+                                            Loc Code {getSortIcon('locCode')}
+                                        </th>
+                                        <th 
+                                            className="px-4 py-2 text-left text-gray-700 cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('locName')}
+                                        >
+                                            Loc Name {getSortIcon('locName')}
+                                        </th>
+                                        <th 
+                                            className="px-4 py-2 text-left text-gray-700 cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('payCode')}
+                                        >
+                                            Pay Code {getSortIcon('payCode')}
+                                        </th>
+                                        <th 
+                                            className="px-4 py-2 text-left text-gray-700 cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('noOfDays')}
+                                        >
+                                            No. of Days {getSortIcon('noOfDays')}
+                                        </th>
+                                        <th 
+                                            className="px-4 py-2 text-left text-gray-700 cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('noOfHours')}
+                                        >
+                                            No. of Hours {getSortIcon('noOfHours')}
+                                        </th>
+                                        <th 
+                                            className="px-4 py-2 text-left text-gray-700 cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('totalPeriod')}
+                                        >
+                                            Total Period {getSortIcon('totalPeriod')}
+                                        </th>
                                         <th className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">Actions</th>
                                     </tr>
                                 </thead>
@@ -338,7 +427,7 @@ export function PayrollLocationSetupPage() {
                                             <tr key={item.id} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2">{item.locCode}</td>
                                                 <td className="px-4 py-2">{item.locName}</td>
-                                                <td className="px-4 py-2">{item.payCode}</td>
+                                                <td className="px-4 py-2">{getPayCodeLabel(item.payCode)}</td>
                                                 <td className="px-4 py-2">{item.noOfDays}</td>
                                                 <td className="px-4 py-2">{item.noOfHours}</td>
                                                 <td className="px-4 py-2">{item.totalPeriod}</td>
@@ -374,7 +463,7 @@ export function PayrollLocationSetupPage() {
 
                         <div className="flex items-center justify-between mt-4">
                             <div className="text-gray-600 text-sm">
-                                Showing {filteredData.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
+                                Showing {sortedData.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
                             </div>
                             <div className="flex gap-2">
                                 <button
@@ -448,9 +537,11 @@ export function PayrollLocationSetupPage() {
                                                     onChange={(e) => setFormData({ ...formData, payCode: e.target.value })}
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 >
-                                                    <option value="Monthly">Monthly</option>
-                                                    <option value="Semi-Monthly">Semi-Monthly</option>
-                                                    <option value="Daily">Daily</option>
+                                                    {payCodeOptions.map(option => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
                                                 </select>
                                             </div>
 
