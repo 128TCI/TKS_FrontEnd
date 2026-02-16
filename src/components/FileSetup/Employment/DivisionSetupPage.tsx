@@ -94,6 +94,8 @@ export function DivisionSetupPage() {
   // Fetch division data from API
   useEffect(() => {
     fetchDivisionData();
+    fetchEmployeeData();
+    fetchDeviceData();
   }, []);
 
   const fetchDivisionData = async () => {
@@ -125,16 +127,11 @@ export function DivisionSetupPage() {
     }
   };
 
-  // Fetch employee data from API
-  useEffect(() => {
-    fetchEmployeeData();
-  }, []);
-
   const fetchEmployeeData = async () => {
     setLoadingEmployees(true);
     setEmployeeError("");
     try {
-      const response = await apiClient.get("/EmployeeMasterFile");
+      const response = await apiClient.get("/Maintenance/EmployeeMasterFile");
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((emp: any) => ({
@@ -155,11 +152,6 @@ export function DivisionSetupPage() {
       setLoadingEmployees(false);
     }
   };
-
-  // Fetch device data from API
-  useEffect(() => {
-    fetchDeviceData();
-  }, []);
 
   const fetchDeviceData = async () => {
     setLoadingDevices(true);
@@ -197,61 +189,9 @@ export function DivisionSetupPage() {
       }
     };
 
-    // Fetch employee data from API
-    useEffect(() => {
-        fetchEmployeeData();
-    }, []);
-
-    const fetchEmployeeData = async () => {
-        setLoadingEmployees(true);
-        setEmployeeError('');
-        try {
-            const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-            if (response.status === 200 && response.data) {
-                // Map API response to expected format
-                const mappedData = response.data.map((emp: any) => ({
-                    empCode: emp.empCode || emp.code || '',
-                    name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-                    groupCode: emp.grpCode || ''
-                }));
-                setEmployeeData(mappedData);
-            }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-            setEmployeeError(errorMsg);
-            console.error('Error fetching employees:', error);
-        } finally {
-            setLoadingEmployees(false);
-        }
-    };
-
-    // Fetch device data from API
-    useEffect(() => {
-        fetchDeviceData();
-    }, []);
-
-    const fetchDeviceData = async () => {
-        setLoadingDevices(true);
-        setDeviceError('');
-        try {
-           const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
-            if (response.status === 200 && response.data) {
-                // Map API response to expected format
-                const mappedData = response.data.map((device: any) => ({
-                    id: device.id || '',
-                    code: device.code || '',
-                    description: device.description || ''
-                }));
-                setDeviceData(mappedData);
-            }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load devices';
-            setDeviceError(errorMsg);
-            console.error('Error fetching devices:', error);
-        } finally {
-            setLoadingDevices(false);
-        }
-    };
+    if (showCreateModal) {
+      document.addEventListener("keydown", handleEscKey);
+    }
 
     return () => {
       document.removeEventListener("keydown", handleEscKey);
@@ -289,7 +229,7 @@ export function DivisionSetupPage() {
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
-      text: `Are you sure you want to delete division ${division.id}?`,
+      text: `Are you sure you want to delete division ${division.code}?`,
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
@@ -300,7 +240,7 @@ export function DivisionSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(
-          `/Fs/Employment/DivisionSetUp/${division.divID}`,
+          `/Fs/Employment/DivisionSetUp/${division.id}`,
         );
         await Swal.fire({
           icon: "success",
