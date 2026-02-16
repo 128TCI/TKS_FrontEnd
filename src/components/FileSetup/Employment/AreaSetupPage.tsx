@@ -5,102 +5,7 @@ import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
-import { hasSubscribers } from "diagnostics_channel";
 import { decryptData } from "../../../services/encryptionService";
-
-export function AreaSetupPage() {
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [selectedAreaIndex, setSelectedAreaIndex] = useState<number | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 100;
-
-    // Form fields
-    const [areaCode, setAreaCode] = useState('');
-    const [areaCodeError, setAreaCodeError] = useState('');
-    const [description, setDescription] = useState('');
-    const [headCode, setHeadCode] = useState('');
-    const [head, setHead] = useState('');
-    const [deviceName, setDeviceName] = useState('');
-    const [areaId, setAreaId] = useState<string | null>(null);
-    const [submitting, setSubmitting] = useState(false);
-
-    // Modal state
-    const [showHeadCodeModal, setShowHeadCodeModal] = useState(false);
-    const [showDeviceNameModal, setShowDeviceNameModal] = useState(false);
-
-    // API Data states
-    const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-    const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
-    const [loadingEmployees, setLoadingEmployees] = useState(false);
-    const [loadingDevices, setLoadingDevices] = useState(false);
-    const [employeeError, setEmployeeError] = useState('');
-    const [deviceError, setDeviceError] = useState('');
-
-    // Area List states
-    const [areaList, setAreaList] = useState<Array<{ id: string; code: string; description: string; head: string; headCode: string; deviceName: string }>>([]);
-    const [loadingAreas, setLoadingAreas] = useState(false);
-    const [areaError, setAreaError] = useState('');
-
-    // Fetch area data from API
-    useEffect(() => {
-        fetchAreaData();
-    }, []);
-
-    const fetchAreaData = async () => {
-        setLoadingAreas(true);
-        setAreaError('');
-        try {
-            const response = await apiClient.get('/Fs/EmploymentAreaSetUp');
-            if (response.status === 200 && response.data) {
-                // Map API response to expected format
-                const mappedData = response.data.map((area: any) => ({
-                    id: area.id || area.ID || '',
-                    code: area.areaCode || area.AreaCode || '',
-                    description: area.areaDesc || area.AreaDesc || '',
-                    head: area.head || area.Head || '',
-                    headCode: area.headCode || area.HeadCode || '',
-                    deviceName: area.deviceName || area.DeviceName || '',
-                }));
-                setAreaList(mappedData);
-            }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load areas';
-            setAreaError(errorMsg);
-            console.error('Error fetching areas:', error);
-        } finally {
-            setLoadingAreas(false);
-        }
-    };
-
-    // Fetch employee data from API
-    useEffect(() => {
-        fetchEmployeeData();
-    }, []);
-
-    const fetchEmployeeData = async () => {
-        setLoadingEmployees(true);
-        setEmployeeError('');
-        try {
-            const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-            if (response.status === 200 && response.data) {
-                // Map API response to expected format
-                const mappedData = response.data.map((emp: any) => ({
-                    empCode: emp.empCode || emp.code || '',
-                    name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-                    groupCode: emp.grpCode || ''
-                }));
-                setEmployeeData(mappedData);
-            }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-            setEmployeeError(errorMsg);
-            console.error('Error fetching employees:', error);
-        } finally {
-            setLoadingEmployees(false);
-        }
-    };
 
 export function AreaSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -189,6 +94,8 @@ export function AreaSetupPage() {
   // Fetch area data from API
   useEffect(() => {
     fetchAreaData();
+    fetchEmployeeData();
+    fetchDeviceData();
   }, []);
 
   const fetchAreaData = async () => {
@@ -220,16 +127,11 @@ export function AreaSetupPage() {
     }
   };
 
-  // Fetch employee data from API
-  useEffect(() => {
-    fetchEmployeeData();
-  }, []);
-
   const fetchEmployeeData = async () => {
     setLoadingEmployees(true);
     setEmployeeError("");
     try {
-      const response = await apiClient.get("/EmployeeMasterFile");
+      const response = await apiClient.get("/Maintenance/EmployeeMasterFile");
       if (response.status === 200 && response.data) {
         // Map API response to expected format
         const mappedData = response.data.map((emp: any) => ({
@@ -250,11 +152,6 @@ export function AreaSetupPage() {
       setLoadingEmployees(false);
     }
   };
-
-  // Fetch device data from API
-  useEffect(() => {
-    fetchDeviceData();
-  }, []);
 
   const fetchDeviceData = async () => {
     setLoadingDevices(true);
