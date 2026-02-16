@@ -26,7 +26,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
 
     try {
       // Send plain password - HTTPS encrypts the entire request
-      const response = await apiClient.post('Userlogin/login', {
+      const response = await apiClient.post('UserLogin/login', {
         username,
         password, // Send plain password, no encryption needed
         company,

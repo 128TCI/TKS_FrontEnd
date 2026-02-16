@@ -357,7 +357,7 @@ const hasPermission = (accessType: string) => permissions[accessType] === true;
             { label: 'Import Device Code', action: 'import-device-code' },
             { label: 'Import Employee Masterfile', action: 'import-employee-masterfile' },
             { label: 'Import Logs From Device V2', action: 'import-logs-from-device-v2' },
-            { label: 'Update Rawdata', action: 'update-rawdata-import' },
+            { label: 'Update Raw Data', action: 'update-rawdata-import' },
             { label: 'Import Adjustment', action: 'import-adjustment' }
           ]
         },

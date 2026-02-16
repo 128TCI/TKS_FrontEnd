@@ -632,7 +632,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         <label className="text-gray-700">Server Name:</label>
                         <input
                           type="text"
-                          defaultValue="128PC-65\SQL2022"
+                          defaultValue="128PC-87\SQL2022"
                           className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
@@ -660,7 +660,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
-                            defaultValue="TIMEKEEP128"
+                            defaultValue="TIMEKEEP128_VERSION910_Test"
                             className="w-32 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             readOnly={!isEditing}
                           />
