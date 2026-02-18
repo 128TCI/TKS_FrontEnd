@@ -3,11 +3,13 @@ import { X, Plus, Check, ArrowLeft } from "lucide-react";
 import { ClipboardList, Clock, Users, Edit, Trash2 } from "lucide-react";
 import { decryptData } from "../../../../services/encryptionService";
 import apiClient from "../../../../services/apiClient";
+import Swal from "sweetalert2";
 
 interface TableEntry {
   id: number;
   time: string;
   equivalent: string;
+  bracketCode: string;
 }
 
 interface BracketData {
@@ -20,14 +22,26 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
   const [activeTab, setActiveTab] = useState<
     "Tardiness" | "Undertime" | "Accumulation"
   >("Tardiness");
-  const [selectedBracket, setSelectedBracket] = useState("Tardiness Bracket");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [bracketCodeList, setBracketCodeList] = useState<
+    { id: string; bracketCode: string; description: string; flag: string }[]
+  >([]);
+  const [loadingBracketCode, setLoadingBracketCode] = useState(false);
+  const [bracketCodeError, setBracketCodeError] = useState("");
+  const [selectedBracketCode, setSelectedBracketCode] = useState(
+    bracketCodeList[0]?.bracketCode || "",
+  );
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [originalData, setOriginalData] = useState<{
+    late: string;
+    equivalent: string;
+    bracketCode: string;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
-    time: "",
+    late: "",
     equivalent: "",
     bracketCode: "",
   });
@@ -38,17 +52,17 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
     Accumulation: [],
   });
 
-  // Bracket options based on active tab
-  const bracketOptions = {
-    Tardiness: ["Tardiness Bracket", "TARDY"],
-    Undertime: ["UT"],
-    Accumulation: ["ACCU"],
+  const flagMapText: Record<string, string> = {
+    A: "Active",
+    I: "Inactive",
+    // add more if needed
   };
 
   useEffect(() => {
     fetchBracketData("Tardiness");
     fetchBracketData("Undertime");
     fetchBracketData("Accumulation");
+    fetchBracketCodes();
   }, []);
 
   const fetchBracketData = async (tab: keyof BracketData) => {
@@ -65,8 +79,9 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
         // Map API response to TableEntry
         const mappedData: TableEntry[] = response.data.map((item: any) => ({
           id: item.id,
-          time: item.time,
+          time: item.late,
           equivalent: item.equivalent,
+          bracketCode: item.bracketCode || item.code || "",
         }));
 
         setBracketData((prev) => ({ ...prev, [tab]: mappedData }));
@@ -75,9 +90,40 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
       console.error(`Failed to fetch ${tab} data:`, err);
     }
   };
+  const fetchBracketCodes = async () => {
+    setLoadingBracketCode(true);
+    setBracketCodeError("");
+    try {
+      const response = await apiClient.get(
+        "/Fs/Process/Tardiness/BracketCodeSetup",
+      );
+
+      if (response.status === 200 && response.data) {
+        const mappedData = response.data.map((item: any) => ({
+          id: item.id?.toString() || "",
+          bracketCode: item.bracketCode || item.code || "",
+          description: item.description || item.Description || "",
+          flag: item.flag?.toString() || "0",
+        }));
+
+        setBracketCodeList(mappedData);
+      }
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to load bracket codes";
+      setBracketCodeError(errorMsg);
+      console.error("Error fetching bracket codes:", err);
+    } finally {
+      setLoadingBracketCode(false);
+    }
+  };
 
   const itemsPerPage = 25;
-  const currentData = bracketData[activeTab];
+  const currentData = bracketData[activeTab].filter(
+    (item) => item.bracketCode === selectedBracketCode,
+  );
   const totalPages = Math.ceil(currentData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -147,77 +193,195 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
     return activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
   };
 
+  const baseUrlMap = {
+    Tardiness: "/Fs/Process/Tardiness/TardinessSetup",
+    Undertime: "/Fs/Process/Tardiness/UnderTimeSetup",
+    Accumulation: "/Fs/Process/Tardiness/AccumulateSetup",
+  };
+
   const handleCreateNew = () => {
-    setFormData({ time: "", equivalent: "", bracketCode: selectedBracket });
+    // Filter bracket codes based on active tab
+    const filteredBrackets = bracketCodeList.filter((item) => {
+      if (activeTab === "Tardiness") return item.flag === "1";
+      if (activeTab === "Undertime") return item.flag === "2";
+      if (activeTab === "Accumulation") return item.flag === "3";
+      return false;
+    });
+
+    // Default to the currently selected bracket or first in filtered list
+    const defaultBracketCode =
+      selectedBracketCode || filteredBrackets[0]?.bracketCode || "";
+
+    setFormData({
+      late: "",
+      equivalent: "",
+      bracketCode: defaultBracketCode,
+    });
     setIsEditMode(false);
-    setEditingIndex(null);
+    setEditingId(null);
     setShowCreateModal(true);
   };
 
-  const handleEdit = (item: TableEntry, index: number) => {
-    setFormData({
-      time: item.time,
-      equivalent: item.equivalent,
-      bracketCode: selectedBracket,
-    });
-    setEditingIndex(index);
+  const handleEdit = (item: TableEntry) => {
+    const normalizedData = {
+      late: String(item.time ?? ""),
+      equivalent: String(item.equivalent ?? ""),
+      bracketCode: String(item.bracketCode ?? ""),
+    };
+
+    setFormData(normalizedData);
+    setOriginalData(normalizedData);
+    setEditingId(item.id);
     setIsEditMode(true);
     setShowCreateModal(true);
   };
 
-  const handleDelete = (index: number) => {
-    if (confirm("Are you sure you want to delete this entry?")) {
-      setBracketData((prevData) => ({
-        ...prevData,
-        [activeTab]: prevData[activeTab].filter((_, i) => i !== index),
-      }));
+  const handleDelete = async (entryId: number) => {
+    const confirmed = await Swal.fire({
+      icon: "warning",
+      title: "Confirm Delete",
+      text: "Are you sure you want to delete this entry?",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!confirmed.isConfirmed) return;
+
+    try {
+      const baseUrl = baseUrlMap[activeTab]; // use the same map as handleSubmit
+      const response = await apiClient.delete(`${baseUrl}/${entryId}`);
+
+      if (response.status >= 200 && response.status < 300) {
+        // Remove from state immediately
+        setBracketData((prev) => ({
+          ...prev,
+          [activeTab]: prev[activeTab].filter((item) => item.id !== entryId),
+        }));
+
+        await Swal.fire({
+          icon: "success",
+          title: "Deleted",
+          text: "Entry deleted successfully.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
+        await fetchBracketData(activeTab); // refresh
+      }
+    } catch (error: any) {
+      console.error("Delete error:", error);
+
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error?.response?.data?.message || "Failed to delete entry.",
+      });
     }
   };
 
-  const handleSubmit = () => {
-    // Validate required fields
-    if (!formData.time.trim()) {
-      alert("Please enter a time value.");
+
+  const handleSubmit = async () => {
+    const lateValue = String(formData.late ?? "").trim();
+    const equivalentValue = String(formData.equivalent ?? "").trim();
+    const bracketValue = String(
+      formData.bracketCode || selectedBracketCode || "",
+    ).trim();
+
+    // ✅ Validation
+    if (!lateValue) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Please enter a time value.",
+      });
       return;
     }
 
-    if (!formData.equivalent.trim()) {
-      alert("Please enter an equivalent value.");
+    if (!equivalentValue) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Please enter an equivalent value.",
+      });
       return;
     }
 
-    if (isEditMode && editingIndex !== null) {
-      // Update existing record
-      setBracketData((prevData) => ({
-        ...prevData,
-        [activeTab]: prevData[activeTab].map((item, index) =>
-          index === editingIndex
-            ? { time: formData.time, equivalent: formData.equivalent }
-            : item,
-        ),
-      }));
-    } else {
-      // Add new record
-      setBracketData((prevData) => ({
-        ...prevData,
-        [activeTab]: [
-          ...prevData[activeTab],
-          {
-            time: formData.time,
-            equivalent: formData.equivalent,
-          },
-        ],
-      }));
+    // ✅ Prevent update if no changes were made
+    if (
+      isEditMode &&
+      originalData &&
+      lateValue === originalData.late &&
+      equivalentValue === originalData.equivalent &&
+      bracketValue === originalData.bracketCode
+    ) {
+      await Swal.fire({
+        icon: "info",
+        title: "No Changes",
+        text: "No changes were made.",
+      });
+      return;
     }
 
-    // Close modal and reset form
-    setShowCreateModal(false);
-    setIsEditMode(false);
-    setEditingIndex(null);
+    try {
+      const baseUrl = baseUrlMap[activeTab];
+
+      const payload = {
+        id: editingId ?? 0,
+        late: lateValue,
+        equivalent: equivalentValue,
+        bracketCode: bracketValue,
+      };
+
+      if (isEditMode && editingId) {
+        await apiClient.put(`${baseUrl}/${editingId}`, payload);
+
+        await Swal.fire({
+          icon: "success",
+          title: "Updated",
+          text: "Entry updated successfully.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        await apiClient.post(baseUrl, payload);
+
+        await Swal.fire({
+          icon: "success",
+          title: "Created",
+          text: "Entry added successfully.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+
+      await fetchBracketData(activeTab);
+
+      // ✅ Reset state
+      setShowCreateModal(false);
+      setFormData({
+        late: "",
+        equivalent: "",
+        bracketCode: selectedBracketCode,
+      });
+      setIsEditMode(false);
+      setEditingId(null);
+      setOriginalData(null);
+    } catch (error: any) {
+      console.error("Submit error:", error);
+
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error?.response?.data?.message || "Failed to submit entry.",
+      });
+    }
   };
 
   // Handle time input formatting (hh.mm)
-  const handleTimeInput = (value: string, field: "time" | "equivalent") => {
+  const handleTimeInput = (value: string, field: "late" | "equivalent") => {
     // Allow only numbers and dots
     const cleaned = value.replace(/[^\d.]/g, "");
     setFormData({ ...formData, [field]: cleaned });
@@ -244,9 +408,15 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
 
   // Update selected bracket when tab changes
   useEffect(() => {
-    setSelectedBracket(bracketOptions[activeTab][0]);
+    const firstBracket = bracketCodeList.find((item) => {
+      if (activeTab === "Tardiness") return item.flag === "1";
+      if (activeTab === "Undertime") return item.flag === "2";
+      if (activeTab === "Accumulation") return item.flag === "3";
+      return false;
+    });
+    setSelectedBracketCode(firstBracket?.bracketCode || "");
     setCurrentPage(1);
-  }, [activeTab]);
+  }, [activeTab, bracketCodeList]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8">
@@ -342,15 +512,28 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
               </button>
             )}
             <select
-              value={selectedBracket}
-              onChange={(e) => setSelectedBracket(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={selectedBracketCode}
+              onChange={(e) => setSelectedBracketCode(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white w-auto min-w-[150px]"
             >
-              {bracketOptions[activeTab].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
+              {loadingBracketCode ? (
+                <option>Loading...</option>
+              ) : bracketCodeError ? (
+                <option>{bracketCodeError}</option>
+              ) : (
+                bracketCodeList
+                  .filter((item) => {
+                    if (activeTab === "Tardiness") return item.flag === "1";
+                    if (activeTab === "Undertime") return item.flag === "2";
+                    if (activeTab === "Accumulation") return item.flag === "3";
+                    return false;
+                  })
+                  .map((option) => (
+                    <option key={option.id} value={option.bracketCode}>
+                      {option.description}
+                    </option>
+                  ))
+              )}
             </select>
           </div>
         )}
@@ -392,7 +575,7 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
                       <div className="flex items-center justify-center gap-2">
                         {hasPermission("Edit") && (
                           <button
-                            onClick={() => handleEdit(item, index)}
+                            onClick={() => handleEdit(item)}
                             className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                             title="Edit"
                           >
@@ -493,9 +676,9 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
                       </label>
                       <input
                         type="text"
-                        value={formData.time}
+                        value={formData.late}
                         onChange={(e) =>
-                          handleTimeInput(e.target.value, "time")
+                          handleTimeInput(e.target.value, "late")
                         }
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         placeholder="0.00"
@@ -534,11 +717,31 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
                         }
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
                       >
-                        {bracketOptions[activeTab].map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
+                        {loadingBracketCode ? (
+                          <option>Loading...</option>
+                        ) : bracketCodeError ? (
+                          <option>{bracketCodeError}</option>
+                        ) : (
+                          // Filter based on activeTab
+                          bracketCodeList
+                            .filter((item) => {
+                              if (activeTab === "Tardiness")
+                                return item.flag === "1";
+                              if (activeTab === "Undertime")
+                                return item.flag === "2";
+                              if (activeTab === "Accumulation")
+                                return item.flag === "3";
+                              return false;
+                            })
+                            .map((option) => (
+                              <option
+                                key={option.id}
+                                value={option.bracketCode}
+                              >
+                                {option.description}
+                              </option>
+                            ))
+                        )}
                       </select>
                     </div>
                   </div>

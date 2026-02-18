@@ -19,8 +19,9 @@ import {
   Layers
 } from 'lucide-react';
 import { DatePicker } from '../../DateSetup/DatePicker';
+import { OvertimeRatesTabContent } from '../../OvertimeRatesTabContent';
+import { OtherPoliciesTabContent } from '../../OtherPoliciesTabContent';
 import { Footer } from '../../Footer/Footer';
-
 
 export function TimeKeepGroupPage() {
   const checkboxClass = "w-4 h-4 appearance-none border-2 border-gray-400 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
@@ -260,6 +261,10 @@ export function TimeKeepGroupPage() {
     setIsEditMode(true);
     setActiveTab('definition');
   };
+
+  function inputCheker() {
+    console.log('PLEASE')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
