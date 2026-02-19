@@ -256,13 +256,15 @@ function Step1BasicInfo({ formData, setFormData, isEditMode, onOpenTimePicker }:
           disabled={isEditMode}
         />
       </div>
-
       <div className="flex items-center gap-3">
         <label className="w-32 text-gray-700 text-sm shrink-0">Description :</label>
         <input
           type="text"
+          maxLength={300}
           value={formData.description ?? ''}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, description: e.target.value })
+          }
           className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
         />
       </div>
