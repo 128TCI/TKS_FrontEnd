@@ -32,7 +32,7 @@ export function SystemConfigurationSetupPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [originalData, setOriginalData] = useState<SystemConfig | null>(null);
-
+  const checkboxClass = "w-4 h-4 appearance-none border-2 border-gray-400 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
   // Simplified checkbox component for better reliability
   const CustomCheckbox = ({ 
     checked, 
@@ -358,8 +358,8 @@ export function SystemConfigurationSetupPage() {
                   <div className="flex-1">
                     <input
                       type="checkbox"
-                      checked={formData.oldOvertimeProcess}
-                      onChange={(e) => setFormData({ ...formData, oldOvertimeProcess: e.target.checked })}
+                      checked={formData.oldTardinessProc}
+                      onChange={(e) => setFormData({ ...formData, oldTardinessProc: e.target.checked })}
                       disabled={!showEditMode}
                       className={checkboxClass}
                     />
@@ -372,8 +372,8 @@ export function SystemConfigurationSetupPage() {
                   <div className="flex-1">
                     <input
                       type="checkbox"
-                      checked={formData.oldNightDifferentialProcess}
-                      onChange={(e) => setFormData({ ...formData, oldNightDifferentialProcess: e.target.checked })}
+                      checked={formData.oldNighDiffProc}
+                      onChange={(e) => setFormData({ ...formData, oldNighDiffProc: e.target.checked })}
                       disabled={!showEditMode}
                       className={checkboxClass}
                     />
@@ -386,8 +386,8 @@ export function SystemConfigurationSetupPage() {
                   <div className="flex-1">
                     <input
                       type="checkbox"
-                      checked={formData.oldTardinessProcess}
-                      onChange={(e) => setFormData({ ...formData, oldTardinessProcess: e.target.checked })}
+                      checked={formData.oldNighDiffProc}
+                      onChange={(e) => setFormData({ ...formData, oldNighDiffProc: e.target.checked })}
                       disabled={!showEditMode}
                       className={checkboxClass}
                     />

@@ -6,15 +6,53 @@ import { TKSGroupTable } from '../TKSGroupTable';
 import { tksGroupData } from '../../data/tksGroupData';
 import apiClient from '../../services/apiClient';
 import { Search, Trash2, X } from 'lucide-react';
+import * as XLSX from "xlsx";
+import Swal from 'sweetalert2';
+
+interface ImportLogsFromDeviceDto {
+  message: string;
+  rowNumber: number
+  columnNumber: number
+  empCode: string
+    //empName: string;
+  rawDateIn: Date | string 
+  workShiftCode: string
+  dayType: string
+  rawTimeIn: Date | string
+  rawBreak1In: Date | string
+  rawBreak1Out: Date | string
+  rawBreak2In: Date | string
+  rawBreak2Out: Date | string
+  rawBreak3In: Date | string
+  rawBreak3Out: Date | string
+  rawTimeOut: Date | string
+  rawDateOut: Date | string
+  rawOTApproved: boolean
+  id: number
+  terminalID: string
+}
+
+type ResponseResultDto<T> = {
+    isSuccess: boolean,
+    resultData: T,
+    errors: string[],
+    messages: string
+}
+
 
 export function ImportLogsFromDeviceV2Page() {
   const [empCode, setEmpCode] = useState('');
   const [empName, setEmpName] = useState('');
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const [empID, setEmpID] = useState<number>();
+  //const [selectedCodes, setSelectedCodes] = useState<number[]>([2, 3, 4, 5, 6, 7, 8, 9, 10]);
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [selectedSheet, setSelectedSheet] = useState<string>("");
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [sheetData, setSheetData] = useState<any[]>([]);
   //const [consolidateDTR, setConsolidateDTR] = useState(false);
   const [enableDeviceCode, setEnableDeviceCode] = useState(false);
   const [doNotIncludeResigned, setDoNotIncludeResigned] = useState(false);
@@ -27,36 +65,66 @@ export function ImportLogsFromDeviceV2Page() {
   const [fileLoaded, setFileLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'active' | 'inactive' | 'all'>('active');
-
+  const [filterStatus, setFilterStatus] = useState<'1' | '0' | ''>('');
+  const [currentEmpPage, setCurrentEmpPage] = useState(1);
+  const itemsPerPage = 10;
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchModalTerm, setSearchModalTerm] = useState('');
+  const [importDataResult, setImportDataResult] = useState<ImportLogsFromDeviceDto[]>([]);
+  const [getEmployee, setGetEmployee] = useState<Array<{ 
+      empID: number; 
+      empCode: string; 
+      lName: string;
+      fName: string;
+      mName: string;
+      suffix: string;
+    }>>([]);
 
-  const employees = [
-    { id: 1, code: '001', name: 'Juan Dela Cruz' },
-    { id: 2, code: '002', name: 'Maria Santos' },
-    { id: 3, code: '003', name: 'Pedro Reyes' },
-    { id: 4, code: '004', name: 'Ana Garcia' },
-    { id: 5, code: '005', name: 'Jose Hernandez' },
-    { id: 6, code: '006', name: 'Carmen Lopez' },
-    { id: 7, code: '007', name: 'Miguel Torres' },
-    { id: 8, code: '008', name: 'Isabel Ramirez' },
-    { id: 9, code: '009', name: 'Carlos Flores' },
-    { id: 10, code: '010', name: 'Rosa Morales' }
-  ];
+  const fetchEmployee = async () => {
+        //setLoading(true);
+        //error;
+          try {
+          const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/GetActive?active=${filterStatus}`);
+          if (response.data) {
+            const mappedData = response.data.map((getEmployee: any) => ({
+              empID: getEmployee.empID || getEmployee.EmpID || '',
+              empCode: getEmployee.empCode || getEmployee.EmpCode || '',
+              lName: getEmployee.lName || getEmployee.LName || '',
+              fName: getEmployee.fName || getEmployee.fName || '',
+              mName: getEmployee.mName || getEmployee.mName || '',
+              suffix: getEmployee.suffix || getEmployee.suffix || ''
+            }));
+            setGetEmployee(mappedData);
+          }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load Employees';
+              //setError(errorMsg);
+              console.error('Error fetching employees', error);
+            } finally {
+              //loading;
+            }
+      };
+    useEffect(() => {
+        fetchEmployee();
+      }, [filterStatus]);
 
-  const filteredEmployees = employees.filter(emp =>
-    emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  const filteredEmployees = getEmployee.filter(emp =>
+    emp.empCode?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.lName?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.fName?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.mName?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.suffix?.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
 
-  const handleEmployeeSelect = (empCodeValue: string, empNameValue: string) => {
+  const handleEmployeeSelect = (empIDValue: number, empCodeValue: string, empNameValue: string) => {
+    setEmpID(empIDValue);
     setEmpCode(empCodeValue);
     setEmpName(empNameValue);
     setShowSearchModal(false);
     setSearchModalTerm('');
   };
 
+  console.log(empID);
    useEffect(() => {
     fetchData();
   }, []);
@@ -99,27 +167,194 @@ export function ImportLogsFromDeviceV2Page() {
     };
   }, [showSearchModal]);
 
-  const handleCodeToggle = (id: number) => {
-    setSelectedCodes(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedCodes.length === tksGroupData.length) {
-      setSelectedCodes([]);
-    } else {
-      setSelectedCodes(tksGroupData.map(w => w.id));
-    }
-  };
-
+  // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (file) {
+  //     setFileName(file.name);
+  //     setFileLoaded(true);
+  //   }
+  // };
+  const getDefaultSheetName = (sheetNames: string[]) => {
+    return sheetNames.includes("EXCELDTR")
+      ? "EXCELDTR"
+      : sheetNames[0];
+    };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+      const file = e.target.files?.[0] ?? null;
+      if (!file) return;
+    
+      setXlsxFile(file);
       setFileName(file.name);
-      setFileLoaded(true);
-    }
+    
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const data = event.target?.result;
+        if (!data) return;
+    
+        const workbook = XLSX.read(data, { type: "array", cellDates: true});
+    
+        const sheetNames = workbook.SheetNames;
+        const defaultSheet = getDefaultSheetName(sheetNames);
+    
+        const worksheet = workbook.Sheets[defaultSheet];
+        const sheetData = XLSX.utils.sheet_to_json(worksheet, {
+          defval: "",
+        });
+    
+        setWorkbook(workbook);
+        setSheetNames(workbook.SheetNames);
+        setSelectedSheet(defaultSheet);
+        setSheetData(sheetData);
+    
+        console.log("Sheets:", workbook.SheetNames);
+        console.log(sheetData);
+      };
+    
+        reader.readAsArrayBuffer(file);
+    };
+    const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const sheetName = e.target.value;
+      setSelectedSheet(sheetName);
+    
+      if (!workbook) return;
+    
+      const worksheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet, {
+        defval: "", // prevent undefined cells
+      });
+    
+        setSheetData(data);
+        //console.log(data);
+        //setForm(data);
+    };
+  const createXlsxFileFromSheetData = (
+    sheetData: any[],
+    sheetName: string
+  ): File => {
+    const worksheet = XLSX.utils.json_to_sheet(sheetData);
+  
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  
+    const buffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+  
+  return new File([buffer], `${sheetName}.xlsx`, {
+    type:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   };
+  useEffect(() => {
+    if (!sheetData.length || !selectedSheet) return;
+  
+    const file = createXlsxFileFromSheetData(sheetData, selectedSheet);
+    setXlsxFile(file);
+  }, [sheetData, selectedSheet]);
+  
+    const fileLinkCreate = (blob: Blob, filename: string): void => {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    };
+    const downloadTemplate = async () => {
+     //setIsProcessing(true);
+     try {
+          const response = await apiClient.get(`downloads/DownloadTemplate?filename=DTR_Excel_Format.xls`, {
+               responseType: 'blob'
+          });
+          const mimeType = response.headers['content-type'];
+          const blob = new Blob([response.data], { type: mimeType });
+          fileLinkCreate(blob, `DTR_Excel_Format.xls`);
+     } finally {
+          //isProcessing;
+     }
+  }
+  const onClickImport = async ( ) => {
+    if(!xlsxFile) {
+      setError("Please select a file to import.");
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Please select a file to import.',
+      });
+      return;
+    }
+    if(!dateFrom || !dateTo){
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Please select date.',
+      });
+      return;
+    }
+    //setIsProcessing(true);
+    const formData = new FormData();
+    formData.append("dateFrom", dateFrom);
+    formData.append("dateTo", dateTo);
+    //formData.append("isDeleteExistingRecord", String(deleteExisting));
+    //formData.append("listNotEqual", String(listNotEqual));
+    formData.append("file", xlsxFile, fileName)
+    console.log(xlsxFile);
+    try {
+      const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData)
+        setImportDataResult(data.data.resultData);
+        if (data.data.errors.length > 0){
+          console.log(data.data.errors)
+          setImportDataResult([]);
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: data.data.resultData?.[0]?.message ?? data.data.errors,
+          });            
+          //setErrors(data.data.errors);
+        }
+        else{
+          Swal.fire({
+            icon: 'success',
+            title: 'Done',
+            text: 'Import done.',
+            timer: 2000,
+            showConfirmButton: false,
+          });
+        }
+      } finally {
+          //setIsProcessing(false);
+          setFileLoaded(true);
+        }
+  }
+
+  // Employee Pagination logic
+    const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
+    const startEmployeeIndex = (currentEmpPage - 1) * itemsPerPage;
+    const endEmployeeIndex = startEmployeeIndex + itemsPerPage;
+
+    const paginatedEmployees = filteredEmployees.slice(
+        (currentEmpPage - 1) * itemsPerPage,
+        currentEmpPage * itemsPerPage
+    );
+    // Get visible page numbers
+    const getEmployeePageNumbers = () => {
+        const pages = [];
+        const maxVisible = 5;
+        if (totalEmployeePages <= maxVisible) {
+            return Array.from({ length: totalEmployeePages }, (_, i) => i + 1);
+        }
+        pages.push(1);
+        if (currentEmpPage > 3) pages.push('...');
+        const start = Math.max(2, currentEmpPage - 1);
+        const end = Math.min(totalEmployeePages - 1, currentEmpPage + 1);
+        for (let i = start; i <= end; i++) pages.push(i);
+        if (currentEmpPage < totalEmployeePages - 2) pages.push('...');
+        pages.push(totalEmployeePages);
+        return pages;
+    };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -224,6 +459,28 @@ export function ImportLogsFromDeviceV2Page() {
                       <span className="text-sm text-gray-700">Enable Device Code</span>
                     </label>
                   </div>
+                  {selectedDevice === "Excel Format" && (<div>
+                    <label className="block text-gray-700 text-sm mb-2">Worksheet:</label>
+                    <select
+                      value={selectedSheet}
+                      onChange={handleSheetChange}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    > 
+                      {sheetNames.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>)}
+                  {selectedDevice === "Excel Format" && (<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start gap-2">
+                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate}/>
+                      <a href="#" className="text-sm text-blue-600 hover:text-blue-700" onClick={downloadTemplate}>
+                        Download Template
+                      </a>
+                    </div>
+                  </div>)}
                   <div>
                     <label className="block text-gray-700 text-sm mb-2">File Name:</label>
                     <div className="bg-teal-50 border-2 border-teal-200 rounded-lg p-4 flex items-center justify-between">
@@ -314,8 +571,10 @@ export function ImportLogsFromDeviceV2Page() {
 
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
-                    <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2">
-                      <Upload className="w-4 h-4" />
+                    <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      onClick={onClickImport}
+                    >
+                      <Upload className="w-4 h-4" onClick={onClickImport}/>
                       Import
                     </button>
                     {/* <button className="px-6 py-2.5 bg-purple-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2">
@@ -369,8 +628,8 @@ export function ImportLogsFromDeviceV2Page() {
                        <label className="text-gray-700 text-sm">Search:</label>
                        <input
                          type="text"
-                         value={searchModalTerm}
-                         onChange={(e) => setSearchModalTerm(e.target.value)}
+                         value={employeeSearchTerm}
+                         onChange={(e) => setEmployeeSearchTerm(e.target.value)}
                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                        />
                      </div>
@@ -380,21 +639,20 @@ export function ImportLogsFromDeviceV2Page() {
                        <table className="w-full border-collapse text-sm">
                          <thead className="sticky top-0 bg-white">
                            <tr className="bg-gray-100 border-b-2 border-gray-300">
-                             <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode ▲</th>
+                             {/* <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode ▲</th> */}
+                             <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode</th>
                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
-                             <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Group Code</th>
                            </tr>
                          </thead>
                          <tbody>
                            {filteredEmployees.map((emp, index) => (
                              <tr 
-                               key={emp.code}
+                               key={emp.empCode}
                                className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                               onClick={() => handleEmployeeSelect(emp.code, emp.name)}
+                               onClick={() => handleEmployeeSelect(emp.empID, emp.empCode, emp.lName + ", " + emp.fName + " " + emp.mName)}
                              >
-                               <td className="px-3 py-1.5">{emp.id}</td>
-                               <td className="px-3 py-1.5">{emp.name}</td>
-                               <td className="px-3 py-1.5">{emp.code}</td>
+                               <td className="px-3 py-1.5">{emp.empCode}</td>
+                               <td className="px-3 py-1.5">{emp.lName}, {emp.fName} {emp.mName}</td>
                              </tr>
                            ))}
                          </tbody>
@@ -402,26 +660,46 @@ export function ImportLogsFromDeviceV2Page() {
                      </div>
      
                      {/* Pagination */}
-                     <div className="flex items-center justify-between mt-3">
-                       <div className="text-gray-600 text-xs">
-                         Showing 1 to 10 of 1,658 entries
-                       </div>
-                       <div className="flex gap-1">
-                         <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                           Previous
-                         </button>
-                         <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">1</button>
-                         <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">2</button>
-                         <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">3</button>
-                         <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">4</button>
-                         <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">5</button>
-                         <span className="px-1 text-gray-500 text-xs">...</span>
-                         <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">166</button>
-                         <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
-                           Next
-                         </button>
-                       </div>
-                     </div>
+                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
+                        disabled={currentEmpPage === 1}
+                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      {getEmployeePageNumbers().map((page, index) => (
+                        typeof page === 'number' ? (
+                          <button
+                            key={index}
+                            onClick={() => setCurrentEmpPage(page)}
+                            className={`px-2 py-1 rounded text-xs ${
+                              currentEmpPage === page
+                                ? 'bg-blue-500 text-white'
+                                : 'border border-gray-300 hover:bg-gray-100'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ) : (
+                          <span key={index} className="px-2">
+                            {page}
+                          </span>
+                        )
+                      ))}
+                      <button
+                        onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
+                        disabled={currentEmpPage === totalEmployeePages}
+                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
                    </div>
                  </div>
                </div>
