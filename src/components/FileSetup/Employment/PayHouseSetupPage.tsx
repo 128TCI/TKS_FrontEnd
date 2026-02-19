@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
@@ -48,7 +49,10 @@ export function PayHouseSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
-
+    
+  // Form Name
+  const formName = 'Pay House Setup';
+    
   useEffect(() => {
     getPayHouseSetupPermissions();
   }, []);
@@ -253,6 +257,12 @@ export function PayHouseSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/PayHouseSetUp/${payHouse.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted pay house ${payHouse.code}`,
+            messages: `Pay house deleted: ${payHouse.code} - ${payHouse.lineDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -333,6 +343,12 @@ export function PayHouseSetupPage() {
           `/Fs/Employment/PayHouseSetUp/${payHouseId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited pay house ${payload.lineCode}`,
+            messages: `Pay house updated: ${payload.lineCode} - ${payload.lineDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -345,6 +361,12 @@ export function PayHouseSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post("/Fs/Employment/PayHouseSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added pay house ${payload.lineCode}`,
+            messages: `Pay house created: ${payload.lineCode} - ${payload.lineDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

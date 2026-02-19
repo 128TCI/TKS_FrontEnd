@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
@@ -61,6 +62,9 @@ export function LocationSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
+    
+  // Form Name
+  const formName = 'Location Setup';
 
   useEffect(() => {
     getGetLocationSetupPermissions();
@@ -253,6 +257,12 @@ export function LocationSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/LocationSetUp/${location.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted location ${location.code}`,
+            messages: `Location deleted: ${location.code} - ${location.locationDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -348,6 +358,12 @@ export function LocationSetupPage() {
           `/Fs/Employment/LocationSetUp/${locationId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited location ${payload.locationCode}`,
+            messages: `Location updated: ${payload.locationCode} - ${payload.locationDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -358,6 +374,12 @@ export function LocationSetupPage() {
       } else {
         // POST logic
         await apiClient.post("/Fs/Employment/LocationSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added location ${payload.locationCode}`,
+            messages: `Location created: ${payload.locationCode} - ${payload.locationDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

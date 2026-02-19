@@ -117,7 +117,15 @@ export function HomePage({ onLogout }: HomePageProps) {
     'update-time-flag-breaks',
     'unpaid-lunch-deduction',
     'update-flexi-break',
-    'deduct-tardiness-to-overtime'
+    'deduct-tardiness-to-overtime',
+    'timekeep-email-distribution',
+    'include-unworked-holiday-pay-regular-days-hours',
+    'nd-basic-round-down',
+    'saturday-unworked-paid-regular-hours',
+    'sunday-work-ot-if-worked-saturday',
+    'unpost-2-shifts-transaction',
+    'delete-incomplete-logs-2-shifts',
+    'delete-records-raw-data-2-shifts',
   ];
 
   const hasOwnFooter = fullPageSections.includes(activeSection);
