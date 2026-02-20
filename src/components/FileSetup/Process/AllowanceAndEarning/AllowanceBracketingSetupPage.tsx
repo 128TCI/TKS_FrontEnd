@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
@@ -188,6 +189,15 @@ export function AllowanceBracketingSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${item.id}`);
+
+        // ── Audit Trail Log ──
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted allowance bracketing entry ${item.code}`,
+          messages: `Deleted entry details: ${JSON.stringify(item)}`,
+          formName: 'Allowance Bracketing',
+        });
+
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -198,11 +208,7 @@ export function AllowanceBracketingSetupPage() {
         await fetchBracketingData();
       } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Failed to delete entry';
-        await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: errorMsg,
-        });
+        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
         console.error('Error deleting entry:', error);
       }
     }
@@ -211,7 +217,6 @@ export function AllowanceBracketingSetupPage() {
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields
     if (!formData.noOfHours || !formData.amount || !formData.earningCode) {
       await Swal.fire({
         icon: 'warning',
@@ -236,6 +241,15 @@ export function AllowanceBracketingSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp', payload);
+
+      // ── Audit Trail Log ──
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created allowance bracketing entry ${payload.code}`,
+        messages: `Created entry details: ${JSON.stringify(payload)}`,
+        formName: 'Allowance Bracketing',
+      });
+
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -243,17 +257,13 @@ export function AllowanceBracketingSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
+
       await fetchBracketingData();
       setShowCreateModal(false);
       setFormData({ noOfHours: '', amount: '', earningCode: '' });
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error creating entry:', error);
     } finally {
       setSubmitting(false);
@@ -262,10 +272,8 @@ export function AllowanceBracketingSetupPage() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!editingItem) return;
 
-    // Validate required fields
     if (!formData.noOfHours || !formData.amount || !formData.earningCode) {
       await Swal.fire({
         icon: 'warning',
@@ -290,6 +298,15 @@ export function AllowanceBracketingSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${editingItem.id}`, payload);
+
+      // ── Audit Trail Log ──
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated allowance bracketing entry ${payload.code}`,
+        messages: `Updated entry details: ${JSON.stringify(payload)}`,
+        formName: 'Allowance Bracketing',
+      });
+
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -297,18 +314,14 @@ export function AllowanceBracketingSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
+
       await fetchBracketingData();
       setShowEditModal(false);
       setEditingItem(null);
       setFormData({ noOfHours: '', amount: '', earningCode: '' });
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error updating entry:', error);
     } finally {
       setSubmitting(false);

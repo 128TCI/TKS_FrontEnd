@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import { Plus, Check, Info, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail'
+import Swal from 'sweetalert2';
 
 import { Workshift, DEFAULT_WORKSHIFT } from '../../../Types/Workshift.types';
 import { WorkshiftFormModal, normalizeWorkshiftForForm } from '../../../Modals/WorkshiftSetupModals/WorkshiftSetupFormModal';
 import { WorkshiftDetailsModal } from '../../../Modals/WorkshiftSetupModals/WorkshiftSetupDetailsModal';
+
+const FORM_NAME = 'Workshift Setup';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -92,12 +96,42 @@ export function WorkshiftSetupPage() {
   };
 
   const handleDelete = async (code: string) => {
-    if (!confirm(`Are you sure you want to delete workshift "${code}"?`)) return;
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Confirm Delete',
+      text: `Are you sure you want to delete workshift "${code}"?`,
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
-      await apiClient.delete(`/Fs/Process/WorkshiftSetUp/${code}`);
-      setWorkshiftData((prev) => prev.filter((item) => item.code !== code));
-    } catch (error) {
+      await apiClient.delete(`/Fs/Process/WorkshiftSetUp/${encodeURIComponent(code)}`);
+
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted workshift ${code}`,
+        messages: `Workshift deleted: ${code}`,
+        formName: FORM_NAME,
+      });
+
+      setWorkshiftData(prev => prev.filter(item => item.code !== code));
+
+      Swal.fire({ icon: 'success', title: 'Deleted', text: `Workshift "${code}" has been deleted.`, timer: 1500, showConfirmButton: false });
+
+    } catch (error: any) {
       console.error('Failed to delete workshift:', error);
+
+      const message =
+        error?.response?.data?.message ||
+        error.message ||
+        'Failed to delete workshift.';
+
+      Swal.fire({ icon: 'error', title: 'Error', text: message });
     }
   };
 

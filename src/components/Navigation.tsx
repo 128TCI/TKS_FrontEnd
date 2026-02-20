@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import apiClient from '../services/apiClient';
+import auditTrail from '../services/auditTrail'
 import Swal from 'sweetalert2';
 import { 
   Home, FileText, Settings, 
@@ -96,46 +97,52 @@ useEffect(() => {
     }
   };
 }, []);
-const handleAutoLogout = async () => {
-  setIsLoggingOut(true);
-  try {
-    // Get login payload from localStorage
-    const loginPayloadStr = localStorage.getItem('userData');
-    const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
-    const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-    // Call logout API with userId
-    await apiClient.post('UserLogin/logout', {
-      userId: userId
-    });
+  const handleAutoLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const loginPayloadStr = localStorage.getItem('userData');
+      const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+      const username = loginPayload.username || loginPayload.userName || 'Unknown';
+      const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-    // Clear localStorage
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('loginTimestamp');
-    localStorage.removeItem('loginPayload');
-    localStorage.removeItem('userData');
+      await apiClient.post('UserLogin/logout', { userId });
+      try {
+        await auditTrail.log({
+          trans: `Employee ${username} logged out (auto).`,
+          messages: `Employee ${username} logged out due to inactivity.`,
+          formName: 'LogOut',
+          accessType: 'LogOut',
+        });
+      } catch (err) {
+        console.error('Audit trail failed for auto logout:', err);
+      }
 
-    // Show auto logout message
-    await Swal.fire({
-      icon: 'warning',
-      title: 'Session Expired',
-      text: 'You have been logged out due to inactivity.',
-      timer: 2000,
-      showConfirmButton: false,
-    });
+      // Clear local storage
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('loginTimestamp');
+      localStorage.removeItem('loginPayload');
+      localStorage.removeItem('userData');
 
-    // Call onLogout to update app state
-    onLogout();
-  } catch (error: any) {
-    console.error('Auto logout error:', error);
-    // Even if API fails, still logout locally
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('loginTimestamp');
-    localStorage.removeItem('loginPayload');
-    localStorage.removeItem('userData');
-    onLogout();
-  }
-};
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Session Expired',
+        text: 'You have been logged out due to inactivity.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      onLogout();
+    } catch (error: any) {
+      console.error('Auto logout error:', error);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('loginTimestamp');
+      localStorage.removeItem('loginPayload');
+      localStorage.removeItem('userData');
+      onLogout();
+    }
+  };
+
   useEffect(() => {
     getBranchPermissions();
   }, []);
@@ -165,26 +172,35 @@ const handleAutoLogout = async () => {
       console.error("Error parsing or decrypting payload", e);
     }
   };
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Get login payload from localStorage
       const loginPayloadStr = localStorage.getItem('userData');
       const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+      const username = loginPayload.username || loginPayload.userName || 'Unknown';
       const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-      // Call logout API with userId
-      await apiClient.post('UserLogin/logout', {
-        userId: userId
-      });
+      await apiClient.post('UserLogin/logout', { userId });
 
-      // Clear localStorage
+      // Audit trail for manual logout
+      try {
+        await auditTrail.log({
+          trans: `Employee ${username} logged out.`,
+          messages: `Employee ${username} logged out.`,
+          formName: 'LogOut',
+          accessType: 'LogOut',
+        });
+      } catch (err) {
+        console.error('Audit trail failed for logout:', err);
+      }
+
+      // Clear local storage
       localStorage.removeItem('authToken');
       localStorage.removeItem('loginTimestamp');
       localStorage.removeItem('loginPayload');
       localStorage.removeItem('userData');
 
-      // Show success message
       await Swal.fire({
         icon: 'success',
         title: 'Logout Successful',
@@ -193,7 +209,6 @@ const handleAutoLogout = async () => {
         showConfirmButton: false,
       });
 
-      // Call onLogout to update app state
       onLogout();
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'Logout failed';

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
@@ -135,6 +136,19 @@ export function EarningSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${item.id}`);
+
+        // ── Audit Trail ──
+        try {
+          await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted earning ${item.code}`,
+            messages: `Deleted earning ID: ${item.id}, Code: ${item.code}`,
+            formName: 'Earnings Setup',
+          });
+        } catch (err) {
+          console.error('Audit trail failed:', err);
+        }
+
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -142,7 +156,7 @@ export function EarningSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the earning list
+
         await fetchEarningData();
       } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Failed to delete earning';
@@ -168,7 +182,6 @@ export function EarningSetupPage() {
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate code - must not be empty and must be max 10 characters
     if (!formData.code.trim() || formData.code.length > 10) {
       await Swal.fire({
         icon: 'warning',
@@ -178,7 +191,6 @@ export function EarningSetupPage() {
       return;
     }
 
-    // Check for duplicate code
     const isDuplicate = earnings.some(
       (earning) => earning.code.toLowerCase() === formData.code.trim().toLowerCase()
     );
@@ -198,11 +210,24 @@ export function EarningSetupPage() {
         earnID: 0,
         earnCode: formData.code,
         earnDesc: formData.description,
-        earnType: 'USR', // Default to USR for user-created earnings
+        earnType: 'USR',
         sysId: null,
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/EarningsSetUp', payload);
+
+      // ── Audit Trail ──
+      try {
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Created earning ${formData.code}`,
+          messages: `Created earning details: ${JSON.stringify(payload)}`,
+          formName: 'Earnings Setup',
+        });
+      } catch (err) {
+        console.error('Audit trail failed:', err);
+      }
+
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -210,11 +235,8 @@ export function EarningSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the earning list
+
       await fetchEarningData();
-      
-      // Close modal and reset form
       setShowCreateModal(false);
       setFormData({ code: '', description: '' });
       setCodeError('');
@@ -233,10 +255,8 @@ export function EarningSetupPage() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!editingItem) return;
 
-    // Validate code - must not be empty and must be max 10 characters
     if (!formData.code.trim() || formData.code.length > 10) {
       await Swal.fire({
         icon: 'warning',
@@ -246,7 +266,6 @@ export function EarningSetupPage() {
       return;
     }
 
-    // Check for duplicate code (excluding current item)
     const isDuplicate = earnings.some(
       (earning) =>
         earning.id !== editingItem.id &&
@@ -273,6 +292,19 @@ export function EarningSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${editingItem.id}`, payload);
+
+      // ── Audit Trail ──
+      try {
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Updated earning ${formData.code}`,
+          messages: `Updated earning details: ${JSON.stringify(payload)}`,
+          formName: 'Earning Setup',
+        });
+      } catch (err) {
+        console.error('Audit trail failed:', err);
+      }
+
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -280,11 +312,8 @@ export function EarningSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the earning list
+
       await fetchEarningData();
-      
-      // Close modal and reset form
       setShowEditModal(false);
       setEditingItem(null);
       setFormData({ code: '', description: '' });

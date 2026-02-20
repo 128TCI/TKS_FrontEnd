@@ -7,9 +7,7 @@ interface WorkshiftDetailsModalProps {
   onEdit: (workshift: Workshift) => void;
 }
 
-// ---------------------------------------------------------------------------
 // Converters
-// ---------------------------------------------------------------------------
 const dbDateTimeToFormTime = (value: string | null | undefined): string => {
   if (!value) return '';
   const match = value.match(/(\d{2}):(\d{2}):\d{2}/);
@@ -44,10 +42,7 @@ const toDisplayDecimal = (value: number | string | null | undefined): string => 
   return dbDecimalToHhmm(value);
 };
 
-// ---------------------------------------------------------------------------
 // Sub-components
-// ---------------------------------------------------------------------------
-
 function TimeStop({ label, value, isLast }: { label: string; value: string; isLast?: boolean }) {
   const display = toDisplayTime(value);
   const empty = !display;
@@ -120,10 +115,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-
-// ---------------------------------------------------------------------------
 // Main modal
-// ---------------------------------------------------------------------------
 export function WorkshiftDetailsModal({ workshift, onClose, onEdit }: WorkshiftDetailsModalProps) {
   const ws = workshift;
 
@@ -286,11 +278,9 @@ export function WorkshiftDetailsModal({ workshift, onClose, onEdit }: WorkshiftD
                   <HourRow label="Tardiness Bracket" value={ws.tardiness as string} />
                   <HourRow label="Undertime Bracket"  value={ws.undertime  as string} />
                 </Card>
-
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
@@ -131,41 +132,46 @@ export function AllowanceBracketCodeSetupPage() {
     setShowCreateModal(true);
   };
 
-  const handleDelete = async (item: any) => {
-    const confirmed = await Swal.fire({
-      icon: 'warning',
-      title: 'Confirm Delete',
-      text: `Are you sure you want to delete allowance bracket code ${item.code}?`,
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
-    });
+const handleDelete = async (item: any) => {
+  const confirmed = await Swal.fire({
+    icon: 'warning',
+    title: 'Confirm Delete',
+    text: `Are you sure you want to delete allowance bracket code ${item.code}?`,
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Delete',
+    cancelButtonText: 'Cancel',
+  });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketCodeSetUp/${item.id}`);
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Allowance bracket code deleted successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the bracket list
-        await fetchBracketData();
-      } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete allowance bracket code';
-        await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: errorMsg,
-        });
-        console.error('Error deleting allowance bracket code:', error);
-      }
-    }
-  };
+  if (!confirmed.isConfirmed) return;
+
+  try {
+    await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketCodeSetUp/${item.id}`);
+    await auditTrail.log({
+      accessType: 'Delete',
+      trans: `Deleted allowance bracket code ${item.code}`,
+      messages: `Allowance bracket code deleted: ${item.code}`,
+      formName: 'Allowance Bracket Setup',
+    });
+    await Swal.fire({
+      icon: 'success',
+      title: 'Success',
+      text: 'Allowance bracket code deleted successfully.',
+      timer: 2000,
+      showConfirmButton: false,
+    });
+    await fetchBracketData();
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || error.message || 'Failed to delete allowance bracket code';
+    await Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: errorMsg,
+    });
+    console.error('Error deleting allowance bracket code:', error);
+  }
+};
 
   const handleCodeChange = (value: string) => {
     setCode(value);
@@ -176,89 +182,91 @@ export function AllowanceBracketCodeSetupPage() {
     }
   };
 
-  const handleSubmit = async () => {
-    // Validate code - must not be empty and must be max 10 characters
-    if (!code.trim() || code.length > 10) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Code must be between 1 and 10 characters.',
-      });
-      return;
-    }
-
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = bracketList.some((bracket, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedIndex === index) {
-        return false;
-      }
-      return bracket.code.toLowerCase() === code.trim().toLowerCase();
+const handleSubmit = async () => {
+  if (!code.trim() || code.length > 10) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Validation Error',
+      text: 'Code must be between 1 and 10 characters.',
     });
+    return;
+  }
 
-    if (isDuplicate) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Duplicate Code',
-        text: 'This code is already in use. Please use a different code.',
+  // Check duplicate
+  const isDuplicate = bracketList.some((bracket, index) => {
+    if (isEditMode && selectedIndex === index) return false;
+    return bracket.code.toLowerCase() === code.trim().toLowerCase();
+  });
+
+  if (isDuplicate) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Duplicate Code',
+      text: 'This code is already in use. Please use a different code.',
+    });
+    return;
+  }
+
+  setSubmitting(true);
+  try {
+    const payload = {
+      id: isEditMode && bracketId ? parseInt(bracketId) : 0,
+      code: code,
+      description: description,
+    };
+
+    if (isEditMode && bracketId) {
+      await apiClient.put(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketCodeSetUp/${payload.id}`, payload);
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated allowance bracket code ${payload.code}`,
+        messages: `Allowance bracket code updated: ${payload.code}`,
+        formName: 'Allowance Bracket Setup',
       });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const payload = {
-        id: isEditMode && bracketId ? parseInt(bracketId) : 0,
-        code: code,
-        description: description,
-      };
-
-      if (isEditMode && bracketId) {
-        // Update existing record via PUT
-        await apiClient.put(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketCodeSetUp/${payload.id}`, payload);
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Allowance bracket code updated successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the bracket list
-        await fetchBracketData();
-      } else {
-        // Create new record via POST
-        await apiClient.post('/Fs/Process/AllowanceAndEarnings/AllowanceBracketCodeSetUp', payload);
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Allowance bracket code created successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the bracket list
-        await fetchBracketData();
-      }
-
-      // Close modal and reset form
-      setShowCreateModal(false);
-      setCode('');
-      setCodeError('');
-      setDescription('');
-      setBracketId(null);
-      setIsEditMode(false);
-      setSelectedIndex(null);
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
       await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
+        icon: 'success',
+        title: 'Success',
+        text: 'Allowance bracket code updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
       });
-      console.error('Error submitting form:', error);
-    } finally {
-      setSubmitting(false);
+    } else {
+      await apiClient.post('/Fs/Process/AllowanceAndEarnings/AllowanceBracketCodeSetUp', payload);
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created allowance bracket code ${payload.code}`,
+        messages: `Allowance bracket code created: ${payload.code}`,
+        formName: 'Allowance Bracket Setup',
+      });
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Allowance bracket code created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
     }
-  };
+    // Reset form & refresh list
+    setShowCreateModal(false);
+    setCode('');
+    setCodeError('');
+    setDescription('');
+    setBracketId(null);
+    setIsEditMode(false);
+    setSelectedIndex(null);
+    await fetchBracketData();
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+    await Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: errorMsg,
+    });
+    console.error('Error submitting form:', error);
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const filteredBrackets = bracketList.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||

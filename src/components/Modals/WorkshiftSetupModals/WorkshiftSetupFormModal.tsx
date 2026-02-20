@@ -4,10 +4,11 @@ import { Workshift } from '../../Types/Workshift.types';
 import { WorkshiftTimePickerModal } from './WorkshiftSetupTimePickerModal';
 import { WorkshiftBracketingSearchModal } from './WorkshiftSetupBracketingSearchModal';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
+import Swal from 'sweetalert2';
 
-// ---------------------------------------------------------------------------
-// Helpers — user input formatting
-// ---------------------------------------------------------------------------
+const FORM_NAME = 'Workshift Setup';
+
 const formatTimeInput = (value: string): string => {
   const numbers = value.replace(/[^\d]/g, '').slice(0, 4);
   if (numbers.length >= 3) return numbers.slice(0, 2) + ':' + numbers.slice(2);
@@ -36,16 +37,6 @@ const formatTimeWithPeriod = (value: string): string => {
   return formatted && period ? `${formatted} ${period}` : formatted;
 };
 
-// ---------------------------------------------------------------------------
-// Helpers — DB → form conversion (call when loading data for edit)
-// ---------------------------------------------------------------------------
-
-/**
- * "1900-01-01T07:00:00"  →  "07:00 AM"
- * "1900-01-01T13:00:00"  →  "01:00 PM"
- * "1900-01-01T00:00:00"  →  "12:00 AM"
- * Handles both T and space separators from the DB.
- */
 const dbDateTimeToFormTime = (value: string | null | undefined): string => {
   if (!value) return '';
   const match = value.match(/(\d{2}):(\d{2}):\d{2}/);
@@ -58,11 +49,6 @@ const dbDateTimeToFormTime = (value: string | null | undefined): string => {
   return `${String(hours).padStart(2, '0')}:${mins} ${period}`;
 };
 
-/**
- * 8.00  →  "08:00"
- * 9.35  →  "09:35"
- * Decimal part is hundredths-as-minutes (not a true hour fraction).
- */
 const dbDecimalToHhmm = (value: number | string | null | undefined): string => {
   if (value === null || value === undefined || value === '') return '';
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -72,15 +58,6 @@ const dbDecimalToHhmm = (value: number | string | null | undefined): string => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
-// ---------------------------------------------------------------------------
-// Helpers — form → DB conversion (call before POST/PUT)
-// ---------------------------------------------------------------------------
-
-/**
- * "07:00 AM"  →  "1900-01-01T07:00:00"
- * "12:00 AM"  →  "1900-01-01T00:00:00"
- * Uses ISO 8601 T separator — required by ASP.NET DateTime? JSON deserializer.
- */
 const formTimeToDbDateTime = (value: string | null | undefined): string | null => {
   if (!value || !value.trim()) return null;
   const match = value.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -93,10 +70,6 @@ const formTimeToDbDateTime = (value: string | null | undefined): string | null =
   return `1900-01-01T${String(hours).padStart(2, '0')}:${mins}:00`;
 };
 
-/**
- * "08:00"  →  8.00
- * "09:35"  →  9.35
- */
 const hhmmToDbDecimal = (value: string | null | undefined): number | null => {
   if (!value || !value.trim()) return null;
   const match = value.match(/(\d+):(\d{2})/);
@@ -106,10 +79,7 @@ const hhmmToDbDecimal = (value: string | null | undefined): number | null => {
   return parseFloat(`${hours}.${String(minutes).padStart(2, '0')}`);
 };
 
-// ---------------------------------------------------------------------------
 // Field lists
-// ---------------------------------------------------------------------------
-
 const DB_DATETIME_FIELDS: (keyof Workshift)[] = [
   'timeIn', 'timeOut',
   'break1Out', 'break1In',
@@ -127,13 +97,9 @@ const DB_DECIMAL_FIELDS: (keyof Workshift)[] = [
   'requiredHoursPayIfPaidLeave', 'brkRoundUpNearest', 'maxAllowableBreak2',
 ];
 
-/**
- * Call this on raw API data before passing into formData / setFormData.
- */
 export const normalizeWorkshiftForForm = (raw: Record<string, unknown>): Workshift => {
   const result = { ...raw } as Record<string, unknown>;
 
-  // Null-safe all fields first so React never sees null as a controlled input value
   for (const key of Object.keys(result)) {
     if (result[key] === null || result[key] === undefined) {
       result[key] = '';
@@ -150,9 +116,6 @@ export const normalizeWorkshiftForForm = (raw: Record<string, unknown>): Workshi
   return result as unknown as Workshift;
 };
 
-/**
- * Call this just before apiClient.post() / apiClient.put().
- */
 const denormalizeWorkshiftForApi = (form: Workshift): Record<string, unknown> => {
   const result = { ...form } as Record<string, unknown>;
 
@@ -166,9 +129,6 @@ const denormalizeWorkshiftForApi = (form: Workshift): Record<string, unknown> =>
     result[field as string] = val?.trim() ? hhmmToDbDecimal(val) : null;
   }
 
-  // Final pass — any field still holding "" was a DB-only field that got
-  // null-safed to "" by normalizeWorkshiftForForm. Send null instead so
-  // ASP.NET's DateTime?/decimal? deserializer doesn't reject empty strings.
   for (const key of Object.keys(result)) {
     if (result[key] === '') {
       result[key] = null;
@@ -178,18 +138,13 @@ const denormalizeWorkshiftForApi = (form: Workshift): Record<string, unknown> =>
   return result;
 };
 
-// ---------------------------------------------------------------------------
 // Step metadata
-// ---------------------------------------------------------------------------
 const STEPS = [
   { id: 1, label: 'Basic Info',      description: 'Code, description, and shift times'   },
   { id: 2, label: 'Hour Config',     description: 'Standard hours and attendance rules'  },
   { id: 3, label: 'Break & Bracket', description: 'Break rules and tardiness bracketing' },
 ];
 
-// ---------------------------------------------------------------------------
-// Sub-component: time field row (used in step 1)
-// ---------------------------------------------------------------------------
 interface TimeFieldProps {
   label: string;
   value: string;
@@ -221,9 +176,7 @@ function TimeFieldRow({ label, value, field, formData, setFormData, onOpenTimePi
   );
 }
 
-// ---------------------------------------------------------------------------
 // Step 1 — Basic Info
-// ---------------------------------------------------------------------------
 interface Step1Props {
   formData: Workshift;
   setFormData: (d: Workshift) => void;
@@ -252,7 +205,8 @@ function Step1BasicInfo({ formData, setFormData, isEditMode, onOpenTimePicker }:
           type="text"
           value={formData.code ?? ''}
           onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+          maxLength={10}
+          className={`flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:text-gray-500 ${isEditMode ? 'cursor-not-allowed' : ''}`}
           disabled={isEditMode}
         />
       </div>
@@ -379,9 +333,7 @@ function Step1BasicInfo({ formData, setFormData, isEditMode, onOpenTimePicker }:
   );
 }
 
-// ---------------------------------------------------------------------------
 // Step 2 — Hour Configuration
-// ---------------------------------------------------------------------------
 interface Step2Props {
   formData: Workshift;
   setFormData: (d: Workshift) => void;
@@ -466,9 +418,7 @@ function Step2HourConfig({ formData, setFormData, onOpenTimePicker }: Step2Props
   );
 }
 
-// ---------------------------------------------------------------------------
 // Step 3 — Break Rules & Bracketing
-// ---------------------------------------------------------------------------
 interface Step3Props {
   formData: Workshift;
   setFormData: (d: Workshift) => void;
@@ -581,9 +531,7 @@ function Step3BreakAndBracket({ formData, setFormData, onOpenSearch, onClearBrac
   );
 }
 
-// ---------------------------------------------------------------------------
 // Main modal
-// ---------------------------------------------------------------------------
 export interface WorkshiftFormModalProps {
   isEditMode:    boolean;
   editingCode:   string;
@@ -663,8 +611,11 @@ export function WorkshiftFormModal({
   // ── Step validation ──────────────────────────────────────────────────────
   const canProceed = (): boolean => {
     if (currentStep === 1) {
-      if (!formData.code?.trim())        { alert('Please enter a Code.');        return false; }
-      if (!formData.description?.trim()) { alert('Please enter a Description.'); return false; }
+      if (!formData.code?.trim())
+        return (Swal.fire('Missing Code', 'Please enter a Code.', 'warning'), false);
+
+      if (!formData.description?.trim())
+        return (Swal.fire('Missing Description', 'Please enter a Description.', 'warning'), false);
     }
     return true;
   };
@@ -672,37 +623,98 @@ export function WorkshiftFormModal({
   const goNext = () => { if (canProceed()) setCurrentStep((s) => Math.min(s + 1, STEPS.length)); };
   const goPrev = () => setCurrentStep((s) => Math.max(s - 1, 1));
 
-  // ── API submit ───────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!formData.code?.trim()) {
-      alert('Please enter a Code.');
-      return;
-    }
-    if (!formData.description?.trim()) {
-      alert('Please enter a Description.');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Validation',
+        text: 'Please enter a Code.',
+      });
       return;
     }
 
-    // Only check duplicates on create, not on edit
-    if (!isEditMode && existingCodes.includes(formData.code)) {
-      alert('A Workshift with this Code already exists.');
+    if (!formData.description?.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Validation',
+        text: 'Please enter a Description.',
+      });
       return;
+    }
+
+    if (!isEditMode && existingCodes.includes(formData.code)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Duplicate Entry',
+        text: 'A Workshift with this Code already exists.',
+      });
+      return;
+    }
+
+    // ── Confirm ONLY when editing ─────────────────────────────
+    if (isEditMode) {
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Confirm Update',
+        text: `Are you sure you want to update workshift ${formData.code}?`,
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Update',
+        cancelButtonText: 'Cancel',
+      });
+
+      if (!result.isConfirmed) return;
     }
 
     setIsSaving(true);
+
     try {
       const payload = denormalizeWorkshiftForApi(formData);
 
       if (isEditMode) {
-        await apiClient.put(`/Fs/Process/WorkshiftSetUp/${editingCode}`, payload);
+        await apiClient.put(
+          `/Fs/Process/WorkshiftSetUp/${encodeURIComponent(editingCode)}`,
+          payload
+        );
+
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Edited workshift ${formData.code}`,
+          messages: `Workshift updated: ${formData.code}`,
+          formName: FORM_NAME,
+        });
+
+        Swal.fire({icon: 'success', title: 'Updated', text: 'Workshift updated successfully.', timer: 1500, showConfirmButton: false,});
+
       } else {
         await apiClient.post('/Fs/Process/WorkshiftSetUp', payload);
+
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Added workshift ${formData.code}`,
+          messages: `Workshift created: ${formData.code}`,
+          formName: FORM_NAME,
+        });
+
+        Swal.fire({icon: 'success', title: 'Created', text: 'Workshift created successfully.', timer: 1500, showConfirmButton: false,});
       }
 
       onSuccess({ ...formData });
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Failed to save workshift:', error);
-      alert('Failed to save workshift. Please try again.');
+
+      const message =
+        error?.response?.data?.message ||
+        error.message ||
+        'Failed to save workshift. Please try again.';
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: message,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -844,6 +856,8 @@ export function WorkshiftFormModal({
           }}
           onMinuteIncrement={() => setSelectedMinute((m) => (m === 59 ? 0  : m + 1))}
           onMinuteDecrement={() => setSelectedMinute((m) => (m === 0  ? 59 : m - 1))}
+          onHourChange={(h) => setSelectedHour(h)}
+          onMinuteChange={(m) => setSelectedMinute(m)}
           onPeriodChange={setSelectedPeriod}
           onConfirm={handleTimeConfirm}
           onClose={() => setShowTimePicker(false)}

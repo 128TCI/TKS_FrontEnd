@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Building2, User, Lock } from 'lucide-react';
 import apiClient from '../services/apiClient';
+import auditTrail from '../services/auditTrail'
 import lifeBankHeader from '../assets/Lifebank.png';
 import techLogo from '../assets/128Tech_Logo.jpg';
 import Swal from 'sweetalert2';
@@ -19,37 +20,41 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
- const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      // Send plain password - HTTPS encrypts the entire request
       const response = await apiClient.post('UserLogin/login', {
         username,
-        password, // Send plain password, no encryption needed
+        password,
         company,
         windowsAuth,
       });
 
       if (response.status === 200) {
-        // Store token
-        if (response.data.token) {
-          localStorage.setItem('authToken', response.data.token);
-          localStorage.setItem('loginTimestamp', new Date().getTime().toString());
+        const userData = response.data.user || {};
+        const userId = userData.userID || userData.userId || userData.id || 0;
+
+        // Store tokens & payload
+        if (response.data.token) localStorage.setItem('authToken', response.data.token);
+        localStorage.setItem('loginTimestamp', new Date().getTime().toString());
+        localStorage.setItem('loginPayload', JSON.stringify(response.data));
+        if (userData) localStorage.setItem('userData', JSON.stringify(userData));
+
+        // ── AUDIT TRAIL LOG ──
+        try {
+          await auditTrail.log({
+            trans: `Employee ${userData.username || username} logged in.`,
+            messages: `Employee ${userData.username || username} logged in.`,
+            formName: 'LogIn',
+            accessType: 'LogIn',
+          });
+        } catch (err) {
+          console.error('Audit trail login failed:', err);
         }
-        
-        // Store entire login payload for later use (userId for logout, etc.)
-        if (response.data) {
-          localStorage.setItem('loginPayload', JSON.stringify(response.data));
-        }
-        
-        // Store user data
-        if (response.data.user) {
-          localStorage.setItem('userData', JSON.stringify(response.data.user));
-        }
-        
+
         await Swal.fire({
           icon: 'success',
           title: 'Login Successful',
@@ -57,7 +62,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
           timer: 2000,
           showConfirmButton: false,
         });
-        
+
         onLogin();
       }
     } catch (err: any) {

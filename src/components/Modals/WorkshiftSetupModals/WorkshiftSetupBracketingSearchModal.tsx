@@ -10,15 +10,12 @@ const ENDPOINTS = {
   undertime:  '/Fs/Process/Tardiness/UnderTimeSetup',
 } as const;
 
-// ---------------------------------------------------------------------------
-// Matches TardinessSetupDTO / UnderTimeSetupDTO exactly.
-// ASP.NET default serialization → camelCase: id, late, equivalent, bracketCode
-// ---------------------------------------------------------------------------
+
 interface BracketRow {
   id:          number;
-  late:        number;    // decimal in DB — minutes late threshold
-  equivalent:  number | null;  // decimal? in DB — deduction equivalent
-  bracketCode: string;   // ← this is what gets written into the workshift form
+  late:        number;    
+  equivalent:  number | null;  
+  bracketCode: string;   
 }
 
 interface WorkshiftBracketingSearchModalProps {
@@ -37,7 +34,6 @@ export function WorkshiftBracketingSearchModal({
   const [error,     setError]     = useState<string | null>(null);
   const [query,     setQuery]     = useState('');
 
-  // ── Fetch on open ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -49,7 +45,6 @@ export function WorkshiftBracketingSearchModal({
         const res = await apiClient.get(ENDPOINTS[searchType]);
 
         if (!cancelled) {
-          // Handle both plain array and { data: [...] } wrapper
           const rows: BracketRow[] =
             Array.isArray(res.data)       ? res.data      :
             Array.isArray(res.data?.data) ? res.data.data :

@@ -3,6 +3,7 @@ import { Search, Plus, X, Check, ArrowLeft, Calendar, Edit, Trash2 } from 'lucid
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
 interface AMSDatabase {
@@ -357,225 +358,136 @@ export function AMSDatabaseConfigurationSetupPage() {
     };
 
     const handleDelete = async (item: AMSDatabase) => {
-        const confirmed = await Swal.fire({
-            icon: 'warning',
-            title: 'Confirm Delete',
-            text: `Are you sure you want to delete database configuration "${item.description}"?`,
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Delete',
-            cancelButtonText: 'Cancel',
+    const confirmed = await Swal.fire({
+        icon: 'warning',
+        title: 'Confirm Delete',
+        text: `Are you sure you want to delete database configuration "${item.description}"?`,
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+        try {
+        await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
+
+        // Audit trail
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Database configuration "${item.description}" deleted.`,
+            messages: `Database configuration "${item.description}" deleted.`,
+            formName: 'AMSDbConfig',
         });
 
-        if (confirmed.isConfirmed) {
-            try {
-                await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'Success',
-                    text: 'Database configuration deleted successfully.',
-                    timer: 2000,
-                    showConfirmButton: false,
-                });
-                await fetchAMSDatabases();
-            } catch (error: any) {
-                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete database configuration';
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: errorMsg,
-                });
-                console.error('Error deleting database configuration:', error);
-            }
+        await Swal.fire({
+            icon: 'success',
+            title: 'Success',
+            text: 'Database configuration deleted successfully.',
+            timer: 2000,
+            showConfirmButton: false,
+        });
+
+        await fetchAMSDatabases();
+        } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete database configuration';
+        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+        console.error('Error deleting database configuration:', error);
         }
+    }
     };
 
     const handleSubmitCreate = async (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
+    if (!formData.description.trim() || !formData.server.trim() || !formData.databaseName.trim() || !formData.username.trim()) {
+        await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'All required fields must be filled.' });
+        return;
+    }
 
-        // Validate required fields
-        if (!formData.description.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Description is required.',
-            });
-            return;
-        }
+    setSubmitting(true);
+    try {
+        const payload = {
+        id: 0,
+        ...formData,
+        dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
+        };
 
-        if (!formData.server.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Server is required.',
-            });
-            return;
-        }
+        await apiClient.post('/Fs/Process/Device/AMSDbConfigSetUp', payload);
 
-        if (!formData.databaseName.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Database Name is required.',
-            });
-            return;
-        }
+        // Audit trail
+        await auditTrail.log({
+        accessType: 'Create',
+        trans: `Database configuration "${formData.description}" created.`,
+        messages: `Database configuration "${formData.description}" created.`,
+        formName: 'AMSDbConfig',
+        });
 
-        if (!formData.username.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Username is required.',
-            });
-            return;
-        }
+        await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Database configuration created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+        });
 
-        setSubmitting(true);
-        try {
-            const payload = {
-                id: 0,
-                description: formData.description,
-                server: formData.server,
-                databaseName: formData.databaseName,
-                username: formData.username,
-                password: formData.password,
-                lastDateUpdated: formData.lastDateUpdated || new Date().toISOString(),
-                withDeviceCode: formData.withDeviceCode,
-                tableName: formData.tableName,
-                empCode: formData.empCodeColumn,
-                timeStamp: formData.timeStampColumn,
-                flag: formData.flagColumn,
-                flagCode: formData.flagCode,
-                isAutomaticEmpCode: formData.automaticEmpCode,
-                employeeCodeTable: formData.empCodeTableName,
-                employeeCodeCol: formData.empCodeColumnName,
-                empoyeeCodeIDCol: formData.empCodeIDColumn,
-                dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
-                lastDateUpdateReplica: '',
-                lastDateUpdateTo: formData.lastDateUpdatedTo || new Date().toISOString(),
-                lastDateUpdateFlag: formData.specificRange,
-                lastDateUpdateFrom: formData.lastDateUpdatedFrom || new Date().toISOString(),
-                deviceNameCol: formData.deviceNameColumn
-            };
-
-            await apiClient.post('/Fs/Process/Device/AMSDbConfigSetUp', payload);
-            await Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: 'Database configuration created successfully.',
-                timer: 2000,
-                showConfirmButton: false,
-            });
-
-            await fetchAMSDatabases();
-            setShowCreateModal(false);
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: errorMsg,
-            });
-            console.error('Error creating database configuration:', error);
-        } finally {
-            setSubmitting(false);
-        }
+        await fetchAMSDatabases();
+        setShowCreateModal(false);
+    } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+        console.error('Error creating database configuration:', error);
+    } finally {
+        setSubmitting(false);
+    }
     };
 
     const handleSubmitEdit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
+    if (!editingItem) return;
+    if (!formData.description.trim() || !formData.server.trim() || !formData.databaseName.trim() || !formData.username.trim()) {
+        await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'All required fields must be filled.' });
+        return;
+    }
 
-        if (!editingItem) return;
+    setSubmitting(true);
+    try {
+        const payload = {
+        id: editingItem.id,
+        ...formData,
+        password: formData.password || editingItem.password,
+        lastDateUpdated: formData.lastDateUpdated || editingItem.lastDateUpdated,
+        dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
+        };
 
-        // Validate required fields
-        if (!formData.description.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Description is required.',
-            });
-            return;
-        }
+        await apiClient.put(`/Fs/Process/Device/AMSDbConfigSetUp/${editingItem.id}`, payload);
 
-        if (!formData.server.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Server is required.',
-            });
-            return;
-        }
+        // Audit trail
+        await auditTrail.log({
+        accessType: 'Update',
+        trans: `Database configuration "${formData.description}" updated.`,
+        messages: `Database configuration "${formData.description}" updated.`,
+        formName: 'AMSDbConfig',
+        });
 
-        if (!formData.databaseName.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Database Name is required.',
-            });
-            return;
-        }
+        await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Database configuration updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+        });
 
-        if (!formData.username.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Username is required.',
-            });
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            const payload = {
-                id: editingItem.id,
-                description: formData.description,
-                server: formData.server,
-                databaseName: formData.databaseName,
-                username: formData.username,
-                password: formData.password || editingItem.password,
-                lastDateUpdated: formData.lastDateUpdated || editingItem.lastDateUpdated,
-                withDeviceCode: formData.withDeviceCode,
-                tableName: formData.tableName,
-                empCode: formData.empCodeColumn,
-                timeStamp: formData.timeStampColumn,
-                flag: formData.flagColumn,
-                flagCode: formData.flagCode,
-                isAutomaticEmpCode: formData.automaticEmpCode,
-                employeeCodeTable: formData.empCodeTableName,
-                employeeCodeCol: formData.empCodeColumnName,
-                empoyeeCodeIDCol: formData.empCodeIDColumn,
-                dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
-                lastDateUpdateReplica: editingItem.lastDateUpdateReplica,
-                lastDateUpdateTo: formData.lastDateUpdatedTo || editingItem.lastDateUpdateTo,
-                lastDateUpdateFlag: formData.specificRange,
-                lastDateUpdateFrom: formData.lastDateUpdatedFrom || editingItem.lastDateUpdateFrom,
-                deviceNameCol: formData.deviceNameColumn
-            };
-
-            await apiClient.put(`/Fs/Process/Device/AMSDbConfigSetUp/${editingItem.id}`, payload);
-            await Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: 'Database configuration updated successfully.',
-                timer: 2000,
-                showConfirmButton: false,
-            });
-
-            await fetchAMSDatabases();
-            setShowEditModal(false);
-            setEditingItem(null);
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: errorMsg,
-            });
-            console.error('Error updating database configuration:', error);
-        } finally {
-            setSubmitting(false);
-        }
+        await fetchAMSDatabases();
+        setShowEditModal(false);
+        setEditingItem(null);
+    } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+        console.error('Error updating database configuration:', error);
+    } finally {
+        setSubmitting(false);
+    }
     };
 
     const handleCloseModal = () => {
