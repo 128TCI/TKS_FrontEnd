@@ -6,6 +6,7 @@ import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Earnings SetUp';
 interface Earning {
   id: string;
   code: string;
@@ -136,14 +137,12 @@ export function EarningSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${item.id}`);
-
-        // ── Audit Trail ──
         try {
           await auditTrail.log({
             accessType: 'Delete',
             trans: `Deleted earning ${item.code}`,
             messages: `Deleted earning ID: ${item.id}, Code: ${item.code}`,
-            formName: 'Earnings Setup',
+            formName: formName,
           });
         } catch (err) {
           console.error('Audit trail failed:', err);
@@ -215,14 +214,12 @@ export function EarningSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/EarningsSetUp', payload);
-
-      // ── Audit Trail ──
       try {
         await auditTrail.log({
           accessType: 'Add',
           trans: `Created earning ${formData.code}`,
           messages: `Created earning details: ${JSON.stringify(payload)}`,
-          formName: 'Earnings Setup',
+          formName: formName,
         });
       } catch (err) {
         console.error('Audit trail failed:', err);
@@ -292,14 +289,12 @@ export function EarningSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${editingItem.id}`, payload);
-
-      // ── Audit Trail ──
       try {
         await auditTrail.log({
           accessType: 'Edit',
           trans: `Updated earning ${formData.code}`,
           messages: `Updated earning details: ${JSON.stringify(payload)}`,
-          formName: 'Earning Setup',
+          formName: formName,
         });
       } catch (err) {
         console.error('Audit trail failed:', err);

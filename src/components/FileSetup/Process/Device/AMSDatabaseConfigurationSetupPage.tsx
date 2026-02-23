@@ -6,6 +6,7 @@ import apiClient from '../../../../services/apiClient';
 import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'AMS Database Configuration SetUp';
 interface AMSDatabase {
     id: number;
     description: string;
@@ -378,7 +379,7 @@ export function AMSDatabaseConfigurationSetupPage() {
             accessType: 'Delete',
             trans: `Database configuration "${item.description}" deleted.`,
             messages: `Database configuration "${item.description}" deleted.`,
-            formName: 'AMSDbConfig',
+            formName: formName,
         });
 
         await Swal.fire({
@@ -414,13 +415,11 @@ export function AMSDatabaseConfigurationSetupPage() {
         };
 
         await apiClient.post('/Fs/Process/Device/AMSDbConfigSetUp', payload);
-
-        // Audit trail
         await auditTrail.log({
         accessType: 'Create',
         trans: `Database configuration "${formData.description}" created.`,
         messages: `Database configuration "${formData.description}" created.`,
-        formName: 'AMSDbConfig',
+        formName: formName,
         });
 
         await Swal.fire({
@@ -461,15 +460,12 @@ export function AMSDatabaseConfigurationSetupPage() {
         };
 
         await apiClient.put(`/Fs/Process/Device/AMSDbConfigSetUp/${editingItem.id}`, payload);
-
-        // Audit trail
         await auditTrail.log({
         accessType: 'Update',
         trans: `Database configuration "${formData.description}" updated.`,
         messages: `Database configuration "${formData.description}" updated.`,
-        formName: 'AMSDbConfig',
+        formName: formName,
         });
-
         await Swal.fire({
         icon: 'success',
         title: 'Success',

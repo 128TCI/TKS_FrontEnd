@@ -7,7 +7,8 @@ import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Online Approval SetUp';
 export function OnlineApprovalSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,10 +49,7 @@ export function OnlineApprovalSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
-    
-  // Form Name
-  const formName = 'Online Approval Setup';
-    
+
   useEffect(() => {
     getOnlineApprovalSetupPermissions();
   }, []);

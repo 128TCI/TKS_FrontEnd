@@ -3,8 +3,10 @@ import { Search, Check } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Device Type SetUp';
 interface DeviceType {
   id: number; // Temporary ID for React keys (based on index)
   deviceName: string;
@@ -169,7 +171,12 @@ export function DeviceTypeSetupPage() {
         const deleteUrl = `${API_ACTIVE_DEVICES}/${device.deviceType2Id}`;
         console.log('DELETE URL:', deleteUrl);
         await apiClient.delete(deleteUrl);
-        
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Device ${device.deviceName} removed from active devices`,
+          messages: `Device ID: ${device.deviceType2Id}`,
+          formName
+        });
         // Update local state immediately using deviceName to find
         setDevices(prev => {
           const idx = prev.findIndex(d => d.deviceName === deviceName);
@@ -198,6 +205,12 @@ export function DeviceTypeSetupPage() {
         // Get the new ID from response if available
         const newDeviceType2Id = response.data?.id || null;
         console.log('New DeviceType2 ID:', newDeviceType2Id);
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Device ${device.deviceName} added to active devices`,
+          messages: `DeviceType2 ID: ${newDeviceType2Id}`,
+          formName
+        });
         
         // Update local state immediately using deviceName to find
         setDevices(prev => {
@@ -248,6 +261,12 @@ export function DeviceTypeSetupPage() {
             console.log('Deleting active device with ID:', device.deviceType2Id);
             try {
               await apiClient.delete(`${API_ACTIVE_DEVICES}/${device.deviceType2Id}`);
+              await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Device ${device.deviceName} removed from active devices (bulk)`,
+                messages: `DeviceType2 ID: ${device.deviceType2Id}`,
+                formName
+              });
               
               // Update local state after each successful delete using deviceName to find
               setDevices(prev => {
@@ -281,6 +300,12 @@ export function DeviceTypeSetupPage() {
               
               // Get the new ID from response if available
               const newDeviceType2Id = response.data?.id || null;
+              await auditTrail.log({
+                accessType: 'Add',
+                trans: `Device ${device.deviceName} added to active devices (bulk)`,
+                messages: `DeviceType2 ID: ${newDeviceType2Id}`,
+                formName
+              });
               
               // Update local state after each successful post using deviceName to find
               setDevices(prev => {

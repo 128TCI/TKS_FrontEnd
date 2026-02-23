@@ -6,6 +6,7 @@ import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
 
+const formName = 'Company Information SetUp';
 interface CompanyInformationProps {
   onBack?: () => void;
 }
@@ -157,7 +158,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
           accessType: "Edit",
           trans: "Updated company information",
           messages: `Company information updated: ${JSON.stringify(updatedData)}`,
-          formName: "Company Information",
+          formName: formName,
         });
 
         await Swal.fire({

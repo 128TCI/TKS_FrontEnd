@@ -27,7 +27,7 @@ interface ApiRestDayResponse {
 
 const ITEMS_PER_PAGE = 25;
 const DAYS_OF_WEEK   = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const FORM_NAME      = 'Rest Day Setup';
+const formName      = 'Rest Day SetUp';
 
 const EMPTY_FORM = {
   referenceNo: '',
@@ -137,7 +137,7 @@ export function RestDaySetupPage() {
         accessType: 'Delete',
         trans: `Deleted rest day setup ${row.referenceNo}`,
         messages: `Rest day setup deleted: ${row.referenceNo}`,
-        formName: FORM_NAME,
+        formName: formName,
       });
       await fetchRestDays();
       Swal.fire({ icon: 'success', title: 'Deleted', text: `Rest day setup "${row.referenceNo}" has been deleted.`, timer: 1500, showConfirmButton: false });
@@ -178,7 +178,7 @@ export function RestDaySetupPage() {
           accessType: 'Edit',
           trans: `Edited rest day setup ${payload.referenceNo}`,
           messages: `Rest day setup updated: ${payload.referenceNo}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
         resetForm();
         await fetchRestDays();
@@ -189,7 +189,7 @@ export function RestDaySetupPage() {
           accessType: 'Add',
           trans: `Added rest day setup ${payload.referenceNo}`,
           messages: `Rest day setup created: ${payload.referenceNo}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
         resetForm();
         await fetchRestDays();

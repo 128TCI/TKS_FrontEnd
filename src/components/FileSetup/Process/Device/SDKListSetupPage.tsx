@@ -4,8 +4,10 @@ import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName ='SDK List SetUp';
 interface SDKItem {
   id: number;
   ipAdd: string;
@@ -178,6 +180,12 @@ export function SDKListSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/Device/SDKListSetUp/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted SDK item "${item.ipAdd}"`,
+          messages: `SDK item "${item.ipAdd}" removed`,
+          formName
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'SDK item deleted successfully.', timer: 2000, showConfirmButton: false });
         await fetchSDKList();
       } catch (error: any) {
@@ -199,6 +207,12 @@ export function SDKListSetupPage() {
     setSubmitting(true);
     try {
       await apiClient.post('/Fs/Process/Device/SDKListSetUp', { id: 0, ...formData });
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created SDK item "${formData.ipAdd}"`,
+        messages: `SDK item "${formData.ipAdd}" created`,
+        formName
+      });
       await Swal.fire({ icon: 'success', title: 'Success', text: 'SDK item created successfully.', timer: 2000, showConfirmButton: false });
       await fetchSDKList();
       setShowCreateModal(false);
@@ -223,6 +237,12 @@ export function SDKListSetupPage() {
     setSubmitting(true);
     try {
       await apiClient.put(`/Fs/Process/Device/SDKListSetUp/${editingItem.id}`, { id: editingItem.id, ...formData });
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated SDK item "${formData.ipAdd}" (ID: ${editingItem.id})`,
+        messages: `SDK item "${formData.ipAdd}" updated`,
+        formName
+      });
       await Swal.fire({ icon: 'success', title: 'Success', text: 'SDK item updated successfully.', timer: 2000, showConfirmButton: false });
       await fetchSDKList();
       setShowEditModal(false);

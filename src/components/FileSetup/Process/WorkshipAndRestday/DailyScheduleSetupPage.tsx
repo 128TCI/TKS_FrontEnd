@@ -29,7 +29,7 @@ interface ApiDailyScheduleResponse {
 
 const ITEMS_PER_PAGE          = 25;
 const WORKSHIFT_ITEMS_PER_PAGE = 10;
-const FORM_NAME               = 'Daily Schedule Setup';
+const formName               = 'Daily Schedule SetUp';
 
 export function DailyScheduleSetupPage() {
   const [showCreateModal, setShowCreateModal]   = useState(false);
@@ -168,7 +168,7 @@ export function DailyScheduleSetupPage() {
         accessType: 'Delete',
         trans: `Deleted daily schedule ${item.referenceNo}`,
         messages: `Daily schedule deleted: ${item.referenceNo}`,
-        formName: FORM_NAME,
+        formName: formName,
       });
       await fetchDailySchedules();
       Swal.fire({ icon: 'success', title: 'Deleted', text: `Daily schedule "${item.referenceNo}" has been deleted.`, timer: 1500, showConfirmButton: false });
@@ -210,7 +210,7 @@ export function DailyScheduleSetupPage() {
           accessType: 'Edit',
           trans: `Edited daily schedule ${payload.referenceNo}`,
           messages: `Daily schedule updated: ${payload.referenceNo}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
         resetForm();
         await fetchDailySchedules();
@@ -221,7 +221,7 @@ export function DailyScheduleSetupPage() {
           accessType: 'Add',
           trans: `Added daily schedule ${payload.referenceNo}`,
           messages: `Daily schedule created: ${payload.referenceNo}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
         resetForm();
         await fetchDailySchedules();

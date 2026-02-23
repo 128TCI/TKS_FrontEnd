@@ -7,7 +7,8 @@ import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Division SetUp';
 export function DivisionSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,9 +49,6 @@ export function DivisionSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
-
-  // Form Name
-  const formName = 'Division Setup';
 
   useEffect(() => {
     getDivisionSetupPermissions();

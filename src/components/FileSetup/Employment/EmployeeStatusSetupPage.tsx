@@ -5,7 +5,8 @@ import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Employee Status SetUp';
 export function EmployeeStatusSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,9 +34,6 @@ export function EmployeeStatusSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
-
-  // Form Name
-  const formName = 'Employee Status Setup';
 
   useEffect(() => {
     getEmployeeStatusPermissions();

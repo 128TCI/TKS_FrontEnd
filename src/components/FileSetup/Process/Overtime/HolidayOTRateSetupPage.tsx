@@ -1,20 +1,15 @@
 import { useState, useEffect } from "react";
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  Save,
-  XCircle,
-  ArrowUpDown,
-  Check,
-  Search,
-  X,
-} from "lucide-react";
+  Plus,  Pencil,  Trash2,
+  Save,  XCircle,  ArrowUpDown,
+  Check,  Search,  X,} from "lucide-react";
 import { Footer } from "../../../Footer/Footer";
 import Swal from "sweetalert2";
 import apiClient from "../../../../services/apiClient";
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from "../../../../services/encryptionService";
 
+const formName = 'Holiday OT Rate SetUp';
 interface HolidayOTRate {
   id: number;
   code: string;
@@ -324,6 +319,12 @@ export function HolidayOTRateSetupPage() {
           `/Fs/Process/Overtime/HolidayOTRateSetUp/${existingRecords[selectedRow].id}`,
           payload,
         );
+        await auditTrail.log({
+          accessType: "Edit",
+          trans: `Updated Holiday OT rate "${formData.code} - ${formData.desc}"`,
+          messages: `Holiday OT rate "${formData.code} - ${formData.desc}" updated`,
+          formName
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -336,6 +337,12 @@ export function HolidayOTRateSetupPage() {
           "/Fs/Process/Overtime/HolidayOTRateSetUp",
           payload,
         );
+        await auditTrail.log({
+          accessType: "Add",
+          trans: `Created Holiday OT rate "${formData.code} - ${formData.desc}"`,
+          messages: `Holiday OT rate "${formData.code} - ${formData.desc}" created`,
+          formName
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -423,6 +430,12 @@ export function HolidayOTRateSetupPage() {
         await apiClient.delete(
           `/Fs/Process/Overtime/HolidayOTRateSetUp/${record.id}`,
         );
+        await auditTrail.log({
+          accessType: "Delete",
+          trans: `Deleted Holiday OT rate "${record.code} - ${record.desc}"`,
+          messages: `Holiday OT rate "${record.code} - ${record.desc}" removed`,
+          formName
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

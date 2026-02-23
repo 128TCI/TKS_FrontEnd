@@ -6,6 +6,7 @@ import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Allowance Bracketing SetUp';
 interface AllowanceBracketing {
   id: string;
   dayType: string;
@@ -189,13 +190,11 @@ export function AllowanceBracketingSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${item.id}`);
-
-        // ── Audit Trail Log ──
         await auditTrail.log({
           accessType: 'Delete',
           trans: `Deleted allowance bracketing entry ${item.code}`,
           messages: `Deleted entry details: ${JSON.stringify(item)}`,
-          formName: 'Allowance Bracketing',
+          formName: formName,
         });
 
         await Swal.fire({
@@ -241,13 +240,11 @@ export function AllowanceBracketingSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp', payload);
-
-      // ── Audit Trail Log ──
       await auditTrail.log({
         accessType: 'Add',
         trans: `Created allowance bracketing entry ${payload.code}`,
         messages: `Created entry details: ${JSON.stringify(payload)}`,
-        formName: 'Allowance Bracketing',
+        formName: formName,
       });
 
       await Swal.fire({
@@ -298,13 +295,11 @@ export function AllowanceBracketingSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${editingItem.id}`, payload);
-
-      // ── Audit Trail Log ──
       await auditTrail.log({
         accessType: 'Edit',
         trans: `Updated allowance bracketing entry ${payload.code}`,
         messages: `Updated entry details: ${JSON.stringify(payload)}`,
-        formName: 'Allowance Bracketing',
+        formName: formName,
       });
 
       await Swal.fire({

@@ -6,6 +6,7 @@ import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Classification SetUp';
 interface Classification {
   id: string;
   code: string;
@@ -132,14 +133,12 @@ export function ClassificationSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/ClassificationSetUp/${item.id}`);
-
-        // ── Audit Trail ──
         try {
           await auditTrail.log({
             accessType: 'Delete',
             trans: `Deleted classification ${item.code}`,
             messages: `Deleted classification ID: ${item.id}, Code: ${item.code}`,
-            formName: 'Classification Setup',
+            formName: formName,
           });
         } catch (err) {
           console.error('Audit trail failed:', err);
@@ -209,14 +208,12 @@ export function ClassificationSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp', payload);
-
-      // ── Audit Trail ──
       try {
         await auditTrail.log({
           accessType: 'Add',
           trans: `Created classification ${formData.code}`,
           messages: `Created classification details: ${JSON.stringify(payload)}`,
-          formName: 'Classification Setup',
+          formName: formName,
         });
       } catch (err) {
         console.error('Audit trail failed:', err);
@@ -285,14 +282,12 @@ export function ClassificationSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/ClassificationSetUp/${editingItem.id}`, payload);
-
-      // ── Audit Trail ──
       try {
         await auditTrail.log({
           accessType: 'Edit',
           trans: `Updated classification ${formData.code}`,
           messages: `Updated classification details: ${JSON.stringify(payload)}`,
-          formName: 'Classification Setup',
+          formName: formName,
         });
       } catch (err) {
         console.error('Audit trail failed:', err);

@@ -3,7 +3,9 @@ import { X, Plus, Search, ArrowLeft, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 
+const formName = 'Overtime File SetUp';
 interface OvertimeSetupProps {
     onBack?: () => void;
 }
@@ -136,6 +138,12 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
         if (confirmed.isConfirmed) {
             try {
                 await apiClient.delete(`/Fs/Process/Overtime/OverTimeFileSetUp/${item.otfid}`);
+                await auditTrail.log({
+                    accessType: 'Delete',
+                    trans: `Deleted overtime code "${item.otfCode} - ${item.description}"`,
+                    messages: `Overtime code "${item.otfCode} - ${item.description}" removed`,
+                    formName
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -209,6 +217,12 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
             };
 
             await apiClient.post('/Fs/Process/Overtime/OverTimeFileSetUp', payload);
+            await auditTrail.log({
+            accessType: 'Add',
+            trans: `Created overtime code "${formData.otfCode} - ${formData.description}"`,
+            messages: `Overtime code "${formData.otfCode} - ${formData.description}" created`,
+            formName
+            });
             await Swal.fire({
                 icon: 'success',
                 title: 'Success',
@@ -288,6 +302,12 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
             };
 
             await apiClient.put(`/Fs/Process/Overtime/OverTimeFileSetUp/${editingItem.otfid}`, payload);
+            await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Updated overtime code "${formData.otfCode} - ${formData.description}"`,
+            messages: `Overtime code "${formData.otfCode} - ${formData.description}" updated`,
+            formName
+            });
             await Swal.fire({
                 icon: 'success',
                 title: 'Success',

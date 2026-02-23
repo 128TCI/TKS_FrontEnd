@@ -7,7 +7,7 @@ import apiClient from '../../../services/apiClient';
 import auditTrail from '../../../services/auditTrail';
 import Swal from 'sweetalert2';
 
-const FORM_NAME = 'Workshift Setup';
+const formName = 'Workshift SetUp';
 
 const formatTimeInput = (value: string): string => {
   const numbers = value.replace(/[^\d]/g, '').slice(0, 4);
@@ -682,7 +682,7 @@ export function WorkshiftFormModal({
           accessType: 'Edit',
           trans: `Edited workshift ${formData.code}`,
           messages: `Workshift updated: ${formData.code}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
 
         Swal.fire({icon: 'success', title: 'Updated', text: 'Workshift updated successfully.', timer: 1500, showConfirmButton: false,});
@@ -694,7 +694,7 @@ export function WorkshiftFormModal({
           accessType: 'Add',
           trans: `Added workshift ${formData.code}`,
           messages: `Workshift created: ${formData.code}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
 
         Swal.fire({icon: 'success', title: 'Created', text: 'Workshift created successfully.', timer: 1500, showConfirmButton: false,});

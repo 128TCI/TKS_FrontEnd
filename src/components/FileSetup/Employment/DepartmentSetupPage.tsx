@@ -7,7 +7,8 @@ import apiClient from "../../../services/apiClient";
 import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Department SetUp';
 // Division Search Modal Component
 function DivisionSearchModal({
   isOpen,
@@ -212,8 +213,7 @@ export function DepartmentSetupPage() {
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
 
-  // Form Name
-  const formName = 'Department Setup';
+
 
   useEffect(() => {
     getDepartmentSetupPermissions();

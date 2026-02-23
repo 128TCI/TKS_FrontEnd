@@ -7,7 +7,8 @@ import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Job Level SetUp';
 export function JobLevelSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,10 +38,6 @@ export function JobLevelSetupPage() {
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
 
-      
-  // Form Name
-  const formName = 'Job Level Setup';
-    
   useEffect(() => {
     getJobLevelSetupPermissions();
   }, []);

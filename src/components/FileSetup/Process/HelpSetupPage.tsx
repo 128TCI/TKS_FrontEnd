@@ -4,7 +4,9 @@ import { Footer } from '../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../services/apiClient';
 import { decryptData } from '../../../services/encryptionService';
+import auditTrail from '../../../services/auditTrail';
 
+const formName = 'Help SetUp';
 interface HelpItem {
   id: number;
   code: string;
@@ -149,6 +151,12 @@ export function HelpSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/HelpSetUp/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted Help Item "${item.code}"`,
+          messages: 'Help item deleted successfully',
+          formName,
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Help item deleted successfully.', timer: 2000, showConfirmButton: false });
         await fetchHelpItems();
       } catch (error: any) {
@@ -194,7 +202,12 @@ export function HelpSetupPage() {
       await apiClient.post('/Fs/Process/HelpSetUp', formDataPayload, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created Help Item "${formData.code}"`,
+        messages: 'Help item created successfully',
+        formName,
+      });
       await Swal.fire({ icon: 'success', title: 'Success', text: 'Help item created successfully.', timer: 2000, showConfirmButton: false });
       await fetchHelpItems();
       setShowCreateModal(false);
@@ -234,7 +247,12 @@ export function HelpSetupPage() {
       await apiClient.put(`/Fs/Process/HelpSetUp/${editingItem.id}`, formDataPayload, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated Help Item "${formData.code}"`,
+        messages: 'Help item updated successfully',
+        formName,
+      });
       await Swal.fire({ icon: 'success', title: 'Success', text: 'Help item updated successfully.', timer: 2000, showConfirmButton: false });
       await fetchHelpItems();
       setShowEditModal(false);

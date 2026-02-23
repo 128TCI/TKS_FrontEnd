@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { X, Search, Check, Plus, Info, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 
+const formName = 'Regular Day OT Rate SetUp';
 interface RegularOvertimeRecord {
   id: number;
   code: string;
@@ -195,6 +197,12 @@ export function RegularOvertimeSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/Overtime/RegularDayOTRateSetUp/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted regular OT "${item.code} - ${item.desc}"`,
+          messages: `Regular OT "${item.code} - ${item.desc}" removed`,
+          formName
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Record deleted successfully.', timer: 2000, showConfirmButton: false });
         await fetchRegularOvertimeData();
       } catch (error: any) {
@@ -244,9 +252,21 @@ export function RegularOvertimeSetupPage() {
 
       if (editingItem) {
         await apiClient.put(`/Fs/Process/Overtime/RegularDayOTRateSetUp/${editingItem.id}`, payload);
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Updated regular OT "${formData.code} - ${formData.desc}"`,
+          messages: `Regular OT "${formData.code} - ${formData.desc}" updated`,
+          formName
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Record updated successfully.', timer: 2000, showConfirmButton: false });
       } else {
         await apiClient.post('/Fs/Process/Overtime/RegularDayOTRateSetUp', payload);
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Created regular OT "${formData.code} - ${formData.desc}"`,
+          messages: `Regular OT "${formData.code} - ${formData.desc}" created`,
+          formName
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Record created successfully.', timer: 2000, showConfirmButton: false });
       }
 

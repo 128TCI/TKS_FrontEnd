@@ -9,7 +9,7 @@ import { Workshift, DEFAULT_WORKSHIFT } from '../../../Types/Workshift.types';
 import { WorkshiftFormModal, normalizeWorkshiftForForm } from '../../../Modals/WorkshiftSetupModals/WorkshiftSetupFormModal';
 import { WorkshiftDetailsModal } from '../../../Modals/WorkshiftSetupModals/WorkshiftSetupDetailsModal';
 
-const FORM_NAME = 'Workshift Setup';
+const formName = 'Workshift SetUp';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -116,7 +116,7 @@ export function WorkshiftSetupPage() {
         accessType: 'Delete',
         trans: `Deleted workshift ${code}`,
         messages: `Workshift deleted: ${code}`,
-        formName: FORM_NAME,
+        formName: formName,
       });
 
       setWorkshiftData(prev => prev.filter(item => item.code !== code));

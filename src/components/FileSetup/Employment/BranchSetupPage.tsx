@@ -7,7 +7,8 @@ import apiClient from "../../../services/apiClient";
 import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Branch SetUp';
 export function BranchSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,9 +57,6 @@ export function BranchSetupPage() {
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
 
-  // Form Name
-  const formName = 'Branch Setup';
-  
   // Fetch branch data from API
   useEffect(() => {
     getBranchPermissions();

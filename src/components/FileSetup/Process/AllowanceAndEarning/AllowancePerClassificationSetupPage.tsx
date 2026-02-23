@@ -5,6 +5,7 @@ import apiClient from '../../../../services/apiClient';
 import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Allowance Per Classification SetUp';
 
 interface AllowancePerClassification {
     id: number;
@@ -264,14 +265,12 @@ export function AllowancePerClassificationSetupPage() {
         setLoading(true);
         const response = await apiClient.delete(`${API_BASE_URL}/${id}`);
         if (response.status === 200 || response.status === 204) {
-
-            // ── Audit Trail Log ──
             try {
             await auditTrail.log({
                 accessType: 'Delete',
                 trans: `Deleted allowance entry ID ${id}`,
                 messages: `Deleted entry ID: ${id}`,
-                formName: 'Allowance Per Classification',
+                formName: formName,
             });
             } catch (err) {
             console.error('Audit trail failed:', err);
@@ -296,14 +295,12 @@ export function AllowancePerClassificationSetupPage() {
         const payload = { ...formData, classificationCode: formData.classificationCode || null };
         const response = await apiClient.post(API_BASE_URL, payload);
         if (response.status === 200 || response.status === 201) {
-
-        // ── Audit Trail Log ──
         try {
             await auditTrail.log({
             accessType: 'Add',
             trans: `Created allowance entry ${payload.classificationCode ?? 'N/A'}`,
             messages: `Created entry details: ${JSON.stringify(payload)}`,
-            formName: 'Allowance Per Classification',
+            formName: formName,
             });
         } catch (err) {
             console.error('Audit trail failed:', err);
@@ -330,14 +327,12 @@ export function AllowancePerClassificationSetupPage() {
         const payload = { ...formData, classificationCode: formData.classificationCode || null };
         const response = await apiClient.put(`${API_BASE_URL}/${editingItem.id}`, payload);
         if (response.status === 200) {
-
-        // ── Audit Trail Log ──
         try {
             await auditTrail.log({
             accessType: 'Edit',
             trans: `Updated allowance entry ID ${editingItem.id}`,
             messages: `Updated entry details: ${JSON.stringify(payload)}`,
-            formName: 'Allowance Per Classification',
+            formName: formName,
             });
         } catch (err) {
             console.error('Audit trail failed:', err);

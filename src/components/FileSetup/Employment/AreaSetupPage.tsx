@@ -8,6 +8,7 @@ import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
 
+const formName = 'Area SetUp';
 export function AreaSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -62,9 +63,6 @@ export function AreaSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
-
-  // Form Name
-  const formName = 'Area Setup';
 
   useEffect(() => {
     getAreaSetupPermissions();

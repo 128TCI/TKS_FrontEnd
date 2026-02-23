@@ -6,6 +6,7 @@ import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Allowance Bracket Code SetUp';
 export function AllowanceBracketCodeSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -152,7 +153,7 @@ const handleDelete = async (item: any) => {
       accessType: 'Delete',
       trans: `Deleted allowance bracket code ${item.code}`,
       messages: `Allowance bracket code deleted: ${item.code}`,
-      formName: 'Allowance Bracket Setup',
+      formName: formName,
     });
     await Swal.fire({
       icon: 'success',
@@ -221,7 +222,7 @@ const handleSubmit = async () => {
         accessType: 'Edit',
         trans: `Updated allowance bracket code ${payload.code}`,
         messages: `Allowance bracket code updated: ${payload.code}`,
-        formName: 'Allowance Bracket Setup',
+        formName: formName,
       });
       await Swal.fire({
         icon: 'success',
@@ -236,7 +237,7 @@ const handleSubmit = async () => {
         accessType: 'Add',
         trans: `Created allowance bracket code ${payload.code}`,
         messages: `Allowance bracket code created: ${payload.code}`,
-        formName: 'Allowance Bracket Setup',
+        formName: formName,
       });
       await Swal.fire({
         icon: 'success',

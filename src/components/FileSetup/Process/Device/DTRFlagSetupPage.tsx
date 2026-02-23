@@ -4,8 +4,10 @@ import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'DTR Flag SetUp';
 interface DTRFlag {
   id: number;
   flagCode: string;
@@ -169,6 +171,12 @@ export function DTRFlagSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/Device/DTRFlagSetUp/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `DTR flag "${item.flagCode}" deleted`,
+          messages: `DTRFlag ID: ${item.id}`,
+          formName
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -233,6 +241,12 @@ export function DTRFlagSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/Device/DTRFlagSetUp', payload);
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `DTR flag "${formData.flagCode}" created`,
+        messages: `Payload: ${JSON.stringify(payload)}`,
+        formName
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -303,6 +317,12 @@ export function DTRFlagSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/Device/DTRFlagSetUp/${editingItem.id}`, payload);
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `DTR flag "${formData.flagCode}" updated`,
+        messages: `Payload: ${JSON.stringify(payload)}`,
+        formName
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',

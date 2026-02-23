@@ -21,7 +21,7 @@ interface ApiResponse {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ITEMS_PER_PAGE = 25;
-const FORM_NAME      = 'Unpaid Lunch Deduction Bracket Setup';
+const formName      = 'Unpaid Lunch Deduction Bracket SetUp';
 
 const EMPTY_FORM = { otHours: '', lunchDeduction: '' };
 
@@ -156,7 +156,7 @@ export function UnpaidLunchDeductionBracketSetupPage() {
         accessType: 'Delete',
         trans: `Deleted unpaid lunch deduction bracket ID ${row.id}`,
         messages: `Bracket deleted — OTHours: ${decimalToHHMM(row.otHours)}, LunchDeduction: ${decimalToHHMM(row.lunchDeduction)}`,
-        formName: FORM_NAME,
+        formName: formName,
       });
       await fetchData();
       Swal.fire({ icon: 'success', title: 'Deleted', text: 'Record has been deleted.', timer: 1500, showConfirmButton: false });
@@ -211,7 +211,7 @@ export function UnpaidLunchDeductionBracketSetupPage() {
           accessType: 'Edit',
           trans: `Edited unpaid lunch deduction bracket ID ${editingId}`,
           messages: `Bracket updated — OTHours: ${formData.otHours}, LunchDeduction: ${formData.lunchDeduction}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
         resetForm();
         await fetchData();
@@ -222,7 +222,7 @@ export function UnpaidLunchDeductionBracketSetupPage() {
           accessType: 'Add',
           trans: `Added unpaid lunch deduction bracket`,
           messages: `Bracket created — OTHours: ${formData.otHours}, LunchDeduction: ${formData.lunchDeduction}`,
-          formName: FORM_NAME,
+          formName: formName,
         });
         resetForm();
         await fetchData();
