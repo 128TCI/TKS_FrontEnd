@@ -372,8 +372,6 @@ export function ExportPayrollDataPage() {
             : "",
     };
 
-    console.log(filters);
-
     const query = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (Array.isArray(value)) {
