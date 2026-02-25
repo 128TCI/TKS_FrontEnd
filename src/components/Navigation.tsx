@@ -1121,7 +1121,7 @@ useEffect(() => {
   return (
     <>
       {/* LifeBank Foundation Header */}
-      <div className="bg-white border-b border-cyan-200 shadow-sm">
+      {/* <div className="bg-white border-b border-cyan-200 shadow-sm">
         <div className="px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -1138,7 +1138,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <nav className="bg-green-600 border-b border-green-600 sticky top-0 z-50 shadow-lg">
         <div className="px-4 lg:px-6">
@@ -1149,7 +1149,7 @@ useEffect(() => {
                 <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
               </div>
               <div>
-                <h1 className="text-white text-lg">128 Timekeeping</h1>
+                <h1 className="text-white text-lg">DEMO ACCOUNT</h1>
               </div>
             </div>
 

@@ -21,6 +21,7 @@ interface ImportOvertimeApplicationDto {
   startOTPM: Date | string | null
   minHRSOTBreak: number
   earlyOTStartTimeRestHol: Date | string | null
+  tksGroup: string
   reason: string
   remarks: string
   approvedOTBreaksHrs: number
@@ -550,7 +551,7 @@ const onClickImport = async ( ) => {
                       <td className="px-4 py-2">{item.dateFrom ? new Date(item.dateFrom).toLocaleDateString() : '-'}</td>
                       <td className="px-4 py-2">{item.dateTo ? new Date(item.dateTo).toLocaleDateString() : '-'}</td>
                       <td className="px-4 py-2">{item.numOTHoursApproved}</td>
-                      <td className="px-4 py-2">{selectedCodes}</td>
+                      <td className="px-4 py-2">{item.tksGroup}</td>
                       <td className="px-4 py-2">{item.reason}</td>
                       <td className="px-4 py-2">{item.remarks}</td>
                       <td className="px-4 py-2">{item.appliedBeforeShiftDate ? new Date(item.appliedBeforeShiftDate).toLocaleDateString() : '-'}</td>

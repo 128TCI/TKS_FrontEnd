@@ -81,9 +81,8 @@ import { DeleteRecordsRawData2ShiftsPage } from '../Utilities/DeleteRecordsRawDa
 
 //Process Sub-Menu
 import { ProcessPage } from '../Process/ProcessPage';
-import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
 
-import { DailyTimeRecordMonitoringPage } from '../DailyTimeRecordMonitoringPage';
+import { DailyTimeRecordMonitoringPage } from '../Reports/DailyTimeRecordMonitoringPage';
 import { TKSGroupSetupDefinitionPage } from '../TKSGroupSetupDefinitionPage';
 import { CompanyInformation } from '../../components/FileSetup/System/CompanyInformation';
 import { CalendarSetup } from '../FileSetup/Process/CalendarSetup';
@@ -154,6 +153,8 @@ import { MySQLDatabaseConfigurationSetupPage } from '../FileSetup/Process/Device
 import { EmployeeMasterFilePage } from '../Maintenance/EmployeeMasterFilePage';
 import { EmployeeTimekeepConfigPage } from '../Maintenance/EmployeeTimekeepConfigPage';
 import { RawDataPage } from '../Maintenance/RawDataPage';
+import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
+
 
 interface DashboardContentProps {
     activeSection: string;

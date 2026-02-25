@@ -342,100 +342,110 @@ export function SDKListSetupPage() {
           </div>
         </form>
 
-        {/* ── Flag Code Search Modal (AMS-style with full details) ── */}
-        {showFlagModal && (
-          <div className="absolute inset-0 bg-transparent flex items-center justify-center z-[10] rounded-lg p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
-                <h2 className="text-gray-900">Search</h2>
-                <button
-                  type="button"
-                  onClick={() => setShowFlagModal(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+       {/* ── Flag Code Search Modal (Size Matched to Parent) ── */}
+{showFlagModal && (
+  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-[10] rounded-lg">
+    {/* Changed max-w-5xl to max-w-3xl to match the parent modal size */}
+    <div className="bg-white border border-gray-200 rounded-lg shadow-2xl w-full max-w-3xl max-h-[95%] flex flex-col mx-4">
+      
+      {/* ── Header (Matching main modal style) ── */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
+        <h2 className="text-gray-900 font-semibold">Search DTR Flag</h2>
+        <button
+          type="button"
+          onClick={() => setShowFlagModal(false)}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-              <div className="p-6">
-                <h3 className="text-blue-600 mb-4">DTR Flag</h3>
-
-                {/* Search */}
-                <div className="flex items-center justify-end gap-2 mb-4">
-                  <label className="text-gray-700 text-sm">Search:</label>
-                  <input
-                    type="text"
-                    autoFocus
-                    value={flagSearchTerm}
-                    onChange={(e) => setFlagSearchTerm(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                  />
-                </div>
-
-                {/* Table */}
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-                  {loadingFlags ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="text-gray-600 text-sm">Loading flag codes...</div>
-                    </div>
-                  ) : (
-                    <table className="w-full">
-                      <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Flag Code</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Time In</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Time Out</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break1 Out</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break1 In</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break2 Out</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break2 In</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break3 Out</th>
-                          <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase">Break3 In</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {(() => {
-                          const filtered = dtrFlags.filter(f => 
-                            f.flagCode.toLowerCase().includes(flagSearchTerm.toLowerCase())
-                          );
-                          return filtered.length > 0 ? (
-                            filtered.map((flag) => (
-                              <tr
-                                key={flag.id}
-                                className="hover:bg-blue-50 cursor-pointer transition-colors"
-                                onClick={() => {
-                                  setFormData(prev => ({ ...prev, flagCode: flag.flagCode }));
-                                  setShowFlagModal(false);
-                                }}
-                              >
-                                <td className="px-4 py-3 text-sm text-blue-600 hover:underline">{flag.flagCode}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.timeIn}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.timeOut}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break1Out}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break1In}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break2Out}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break2In}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break3Out}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{flag.break3In}</td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                                No flag codes available
-                              </td>
-                            </tr>
-                          );
-                        })()}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            </div>
+      <div className="p-6 flex flex-col flex-1 overflow-hidden">
+        {/* Search Bar Area */}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-blue-600 font-medium">Select a Flag Code</h3>
+          <div className="flex items-center gap-2">
+            <label className="text-gray-700 text-sm">Search:</label>
+            <input
+              type="text"
+              autoFocus
+              value={flagSearchTerm}
+              onChange={(e) => setFlagSearchTerm(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48 md:w-64"
+            />
           </div>
-        )}
+        </div>
+
+        {/* Table Area (with fixed height/scroll) */}
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1 flex flex-col">
+          <div className="overflow-y-auto max-h-[400px]">
+            {loadingFlags ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-100 border-b border-gray-200 sticky top-0 z-20">
+                  <tr>
+                    <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Flag Code</th>
+                    <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Time In</th>
+                    <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Time Out</th>
+                    <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Break 1</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(() => {
+                    const filtered = dtrFlags.filter(f => 
+                      f.flagCode.toLowerCase().includes(flagSearchTerm.toLowerCase())
+                    );
+                    return filtered.length > 0 ? (
+                      filtered.map((flag) => (
+                        <tr
+                          key={flag.id}
+                          className="hover:bg-blue-50 cursor-pointer transition-colors group"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, flagCode: flag.flagCode }));
+                            setShowFlagModal(false);
+                          }}
+                        >
+                          <td className="px-4 py-3 text-sm font-medium text-blue-600 group-hover:underline">
+                            {flag.flagCode}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{flag.timeIn}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{flag.timeOut}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {flag.break1Out} - {flag.break1In}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-12 text-center text-gray-500">
+                          No flag codes found matching "{flagSearchTerm}"
+                        </td>
+                      </tr>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Footer for the sub-modal */}
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowFlagModal(false)}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
         {/* ── end Flag Code Search Modal ── */}
       </div>
     </div>

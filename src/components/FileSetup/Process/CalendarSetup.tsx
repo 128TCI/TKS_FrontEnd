@@ -68,9 +68,14 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
 
   const holidayTypeOptions = [
     { value: 'Legal Holiday', label: 'Legal Holiday' },
-    { value: 'Special Holiday', label: 'Special Holiday' },
-    { value: 'Special1', label: 'Special1' },
-    { value: 'Special2', label: 'Special2' },
+  { value: 'Special Holiday', label: 'Special Holiday' },
+  { value: 'Calamity', label: 'Calamity' },
+  { value: 'Calamity 2', label: 'Calamity 2' },
+  { value: 'No Grace Period', label: 'No Grace Period' },
+  { value: 'Early Dismissal', label: 'Early Dismissal' },
+  { value: 'Double Legal Holiday', label: 'Double Legal Holiday' },
+  { value: 'Special Holiday 2', label: 'Special Holiday 2' },
+  { value: 'Non-Working Holiday', label: 'Non-Working Holiday' },
   ];
 
   // Permissions
@@ -596,78 +601,81 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
                   <div className="p-6">
                     <h3 className="text-blue-600 mb-4 font-semibold">Holiday Calendar</h3>
 
-                    {/* Form Fields */}
-                    <div className="space-y-3 text-sm mb-6">
-                      <div className="flex items-center">
-                        <span className="text-gray-700 font-medium w-40">Year :</span>
-                        <input
-                          type="text"
-                          value={formData.year}
-                          onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                          className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
-                        />
-                      </div>
+                   {/* Form Fields */}
+<div className="space-y-3 text-sm mb-6">
+  <div className="flex items-center">
+    <span className="text-gray-700 font-medium w-40">Year :</span>
+    <select
+      value={formData.year}
+      onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+      className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
+    >
+      {years.map(year => (
+        <option key={year} value={year}>{year}</option>
+      ))}
+    </select>
+  </div>
 
-                      <div className="flex items-center">
-                        <span className="text-gray-700 font-medium w-40">Month :</span>
-                        <select 
-                          value={formData.month}
-                          onChange={(e) => setFormData({ ...formData, month: e.target.value })}
-                          className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
-                        >
-                          {monthNames.map(month => (
-                            <option key={month} value={month}>{month}</option>
-                          ))}
-                        </select>
-                      </div>
+  <div className="flex items-center">
+    <span className="text-gray-700 font-medium w-40">Month :</span>
+    <select
+      value={formData.month}
+      onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+      className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+    >
+      {monthNames.map(month => (
+        <option key={month} value={month}>{month}</option>
+      ))}
+    </select>
+  </div>
 
-                      <div className="flex items-center">
-                        <span className="text-gray-700 font-medium w-40">Day :</span>
-                        <select 
-                          value={formData.day}
-                          onChange={(e) => setFormData({ ...formData, day: e.target.value })}
-                          className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"
-                        >
-                          {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                            <option key={day} value={day.toString()}>{day}</option>
-                          ))}
-                        </select>
-                      </div>
+  <div className="flex items-center">
+    <span className="text-gray-700 font-medium w-40">Day :</span>
+    <select
+      value={formData.day}
+      onChange={(e) => setFormData({ ...formData, day: e.target.value })}
+      className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"
+    >
+      {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+        <option key={day} value={day.toString()}>{day}</option>
+      ))}
+    </select>
+  </div>
 
-                      <div className="flex items-center">
-                        <span className="text-gray-700 font-medium w-40">Description :</span>
-                        <input
-                          type="text"
-                          value={formData.description}
-                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
+  <div className="flex items-center">
+    <span className="text-gray-700 font-medium w-40">Description :</span>
+    <input
+      type="text"
+      value={formData.description}
+      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+      className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
 
-                      <div className="flex items-center">
-                        <span className="text-gray-700 font-medium w-40">Holiday Type :</span>
-                        <select 
-                          value={formData.holidayType}
-                          onChange={(e) => setFormData({ ...formData, holidayType: e.target.value })}
-                          className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
-                        >
-                          {holidayTypeOptions.map(option => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                      </div>
+  <div className="flex items-center">
+    <span className="text-gray-700 font-medium w-40">Holiday Type :</span>
+    <select
+      value={formData.holidayType}
+      onChange={(e) => setFormData({ ...formData, holidayType: e.target.value })}
+      className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+    >
+      {holidayTypeOptions.map(option => (
+        <option key={option.value} value={option.value}>{option.label}</option>
+      ))}
+    </select>
+  </div>
 
-                      <div className="flex items-center">
-                        <span className="text-gray-700 font-medium w-40">Time :</span>
-                        <input
-                          type="text"
-                          value={formData.time}
-                          onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                          className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
-                          placeholder="Optional"
-                        />
-                      </div>
-                    </div>
+  <div className="flex items-center">
+    <span className="text-gray-700 font-medium w-40">Time :</span>
+    <input
+      type="text"
+      value={formData.time}
+      onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+      className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
+      placeholder="Optional"
+    />
+  </div>
+</div>
 
                     {/* Branch Selection Section */}
                     <div className="mb-6">
