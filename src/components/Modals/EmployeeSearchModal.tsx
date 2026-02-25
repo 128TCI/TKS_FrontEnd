@@ -10,7 +10,7 @@ interface Employee {
 interface EmployeeSearchModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelect: (empCode: string, name: string) => void;
+    onSelect: (empCode: string, name: string, groupCode: string) => void;
     employees: Employee[];
     loading: boolean;
     error: string;
@@ -159,7 +159,7 @@ const filteredEmployees = employees.filter(emp => {
                                                     key={emp.empCode}
                                                     className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
                                                     onClick={() => {
-                                                        onSelect(emp.empCode, emp.name);
+                                                        onSelect(emp.empCode, emp.name, emp.groupCode);
                                                         onClose();
                                                     }}
                                                 >

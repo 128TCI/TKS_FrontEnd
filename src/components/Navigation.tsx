@@ -1256,8 +1256,7 @@ useEffect(() => {
 
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
-            <div className="lg:hidden pb-3 space-y-1 max-h-[calc(100vh-10rem)] overflow-y-auto mobile-menu-scroll">
-              {menuItems.map((item) => (
+              <div className="xl:hidden pb-3 space-y-1 max-h-[calc(100vh-10rem)] overflow-y-auto mobile-menu-scroll">              {menuItems.map((item) => (
                 <div key={item.id}>
                   <button
                     onClick={() => handleMobileMenuClick(item.id)}

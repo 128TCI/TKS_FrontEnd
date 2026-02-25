@@ -971,7 +971,7 @@ const handleRestDaySubmit = async () => {
 const fetchDailySchedules = async () => {
   setDailyScheduleLoading(true);
   try {
-    const response = await apiClient.get('/Fs/Process/Dailyschedule');
+    const response = await apiClient.get('/Fs/Process/DailyScheduleSetup');
     if (response.status === 200 && response.data) {
       setDailySchedules(response.data);
     }
