@@ -4,7 +4,9 @@ import { Footer } from '../../Footer/Footer';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../services/encryptionService';
+import auditTrail from '../../../services/auditTrail';
 
+const formName = 'Day Type SetUp';
 interface DayType {
   label: string;
   fieldName: string;
@@ -137,7 +139,12 @@ export function DayTypeSetupPage() {
         setFormData(updatedData);
         setOriginalData(updatedData);
         setIsEditing(false);
-        
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Updated Day Type "${updatedData.code || updatedData.description}"`,
+          messages: `Day Type updated successfully`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',

@@ -4,9 +4,11 @@ import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Department SetUp';
 // Division Search Modal Component
 function DivisionSearchModal({
   isOpen,
@@ -210,6 +212,8 @@ export function DepartmentSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
+
+
 
   useEffect(() => {
     getDepartmentSetupPermissions();
@@ -436,9 +440,13 @@ export function DepartmentSetupPage() {
 
     if (confirmed.isConfirmed) {
       try {
-        await apiClient.delete(
-          `/Fs/Employment/DepartmentSetUp/${department.id}`,
-        );
+        await apiClient.delete(`/Fs/Employment/DepartmentSetUp/${department.id}`,);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted department ${department.code}`,
+          messages: `Department deleted: ${department.code} - ${department.description}`,
+          formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -532,6 +540,12 @@ export function DepartmentSetupPage() {
           `/Fs/Employment/DepartmentSetUp/${payload.depID}`,
           payload,
         );
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Edited department ${payload.depCode}`,
+          messages: `Department updated: ${payload.depCode} - ${payload.depDesc}`,
+          formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -542,6 +556,12 @@ export function DepartmentSetupPage() {
         await fetchDepartmentData();
       } else {
         await apiClient.post("/Fs/Employment/DepartmentSetUp", payload);
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Added department ${payload.depCode}`,
+          messages: `Department created ${payload.depCode} - ${payload.depDesc}`,
+          formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

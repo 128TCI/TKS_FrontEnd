@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Employee Designation SetUp';
 export function EmployeeDesignationSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [jobLevelSearchTerm, setJobLevelSearchTerm] = useState("");
@@ -246,6 +248,12 @@ export function EmployeeDesignationSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/Designation/${designation.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted designation ${designation.code}`,
+            messages: `Designation deleted: ${designation.code} - ${designation.description}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -322,6 +330,12 @@ export function EmployeeDesignationSetupPage() {
           `/Fs/Employment/DesignationSetUp/${designationId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited designation ${payload.desCode}`,
+            messages: `Designation updated: ${payload.desCode} - ${payload.desDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -334,6 +348,12 @@ export function EmployeeDesignationSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post("/Fs/Employment/DesignationSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added designation ${payload.desCode}`,
+            messages: `Designation created: ${payload.desCode} - ${payload.desDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

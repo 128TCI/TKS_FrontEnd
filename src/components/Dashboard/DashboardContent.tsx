@@ -67,14 +67,22 @@ import { PostProcessedTimekeepingPage } from '../Utilities/PostProcessedTimekeep
 import { UpdateTimeFlagBreaksPage } from '../Utilities/UpdateTimeFlagBreaksPage';
 import { UnpaidLunchDeductionPage } from '../Utilities/UnpaidLunchDeductionPage';
 import { DeductTardinessToOvertimePage } from '../Utilities/DeductTardinessToOvertimePage';
-
+// Utility On Reports
+import { TimekeepEmailDistributionPage } from '../Utilities/TimekeepEmailDistributionPage';
+// Utility On 2 Shifts In A Day
+import { IncludeUnworkedHolidayPayRegularDaysHoursPage } from '../Utilities/IncludeUnworkedHolidayPayRegularDaysHoursPage';
+import { NDBasicRoundDownPage } from '../Utilities/NDBasicRoundDownPage';
+import { SaturdayUnworkedPaidRegularHoursPage } from '../Utilities/SaturdayUnworkedPaidRegularHoursPage';
+import { SundayWorkOTIfWorkedSaturdayPage } from '../Utilities/SundayWorkOTIfWorkedSaturdayPage';
+import { Unpost2ShiftsTransactionPage } from '../Utilities/Unpost2ShiftsTransactionPage';
+import { DeleteIncompleteLogs2ShiftsPage } from '../Utilities/DeleteIncompleteLogs2ShiftsPage';
+import { DeleteRecordsRawData2ShiftsPage } from '../Utilities/DeleteRecordsRawData2ShiftsPage';
 
 
 //Process Sub-Menu
 import { ProcessPage } from '../Process/ProcessPage';
-import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
 
-import { DailyTimeRecordMonitoringPage } from '../DailyTimeRecordMonitoringPage';
+import { DailyTimeRecordMonitoringPage } from '../Reports/DailyTimeRecordMonitoringPage';
 import { TKSGroupSetupDefinitionPage } from '../TKSGroupSetupDefinitionPage';
 import { CompanyInformation } from '../../components/FileSetup/System/CompanyInformation';
 import { CalendarSetup } from '../FileSetup/Process/CalendarSetup';
@@ -145,6 +153,8 @@ import { MySQLDatabaseConfigurationSetupPage } from '../FileSetup/Process/Device
 import { EmployeeMasterFilePage } from '../Maintenance/EmployeeMasterFilePage';
 import { EmployeeTimekeepConfigPage } from '../Maintenance/EmployeeTimekeepConfigPage';
 import { RawDataPage } from '../Maintenance/RawDataPage';
+import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
+
 
 interface DashboardContentProps {
     activeSection: string;
@@ -614,6 +624,37 @@ export function DashboardContent({ activeSection }: DashboardContentProps) {
         return <PayrollDTRAllowancePage />;
     }
 
+    if (activeSection === 'timekeep-email-distribution') {
+        return <TimekeepEmailDistributionPage />;
+    }
+
+    if (activeSection === 'include-unworked-holiday-pay-regular-days-hours') {
+        return <IncludeUnworkedHolidayPayRegularDaysHoursPage />;
+    }
+
+    if (activeSection === 'nd-basic-round-down') {
+        return <NDBasicRoundDownPage />;
+    }
+
+    if (activeSection === 'saturday-unworked-paid-regular-hours') {
+        return <SaturdayUnworkedPaidRegularHoursPage />;
+    }
+
+    if (activeSection === 'sunday-work-ot-if-worked-saturday') {
+        return <SundayWorkOTIfWorkedSaturdayPage />;
+    }
+
+    if (activeSection === 'unpost-2-shifts-transaction') {
+        return <Unpost2ShiftsTransactionPage />;
+    }
+
+    if (activeSection === 'delete-incomplete-logs-2-shifts') {
+        return <DeleteIncompleteLogs2ShiftsPage />;
+    }
+
+    if (activeSection === 'delete-records-raw-data-2-shifts') {
+        return <DeleteRecordsRawData2ShiftsPage />;
+    }
     if (activeSection !== 'home') {
         return (
             <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8">

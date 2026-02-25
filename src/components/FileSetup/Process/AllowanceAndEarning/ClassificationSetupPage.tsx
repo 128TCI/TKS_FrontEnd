@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Classification SetUp';
 interface Classification {
   id: string;
   code: string;
@@ -131,6 +133,17 @@ export function ClassificationSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/ClassificationSetUp/${item.id}`);
+        try {
+          await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted classification ${item.code}`,
+            messages: `Deleted classification ID: ${item.id}, Code: ${item.code}`,
+            formName: formName,
+          });
+        } catch (err) {
+          console.error('Audit trail failed:', err);
+        }
+
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -138,7 +151,7 @@ export function ClassificationSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the classification list
+
         await fetchClassificationData();
       } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Failed to delete classification';
@@ -164,7 +177,6 @@ export function ClassificationSetupPage() {
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate code - must not be empty and must be max 10 characters
     if (!formData.code.trim() || formData.code.length > 10) {
       await Swal.fire({
         icon: 'warning',
@@ -174,7 +186,6 @@ export function ClassificationSetupPage() {
       return;
     }
 
-    // Check for duplicate code
     const isDuplicate = classifications.some(
       (classification) => classification.code.toLowerCase() === formData.code.trim().toLowerCase()
     );
@@ -197,6 +208,17 @@ export function ClassificationSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp', payload);
+      try {
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Created classification ${formData.code}`,
+          messages: `Created classification details: ${JSON.stringify(payload)}`,
+          formName: formName,
+        });
+      } catch (err) {
+        console.error('Audit trail failed:', err);
+      }
+
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -204,11 +226,8 @@ export function ClassificationSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the classification list
+
       await fetchClassificationData();
-      
-      // Close modal and reset form
       setShowCreateModal(false);
       setFormData({ code: '', description: '' });
       setCodeError('');
@@ -230,7 +249,6 @@ export function ClassificationSetupPage() {
 
     if (!editingItem) return;
 
-    // Validate code - must not be empty and must be max 10 characters
     if (!formData.code.trim() || formData.code.length > 10) {
       await Swal.fire({
         icon: 'warning',
@@ -240,7 +258,6 @@ export function ClassificationSetupPage() {
       return;
     }
 
-    // Check for duplicate code (excluding current item)
     const isDuplicate = classifications.some(
       (classification) =>
         classification.id !== editingItem.id &&
@@ -265,6 +282,17 @@ export function ClassificationSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/ClassificationSetUp/${editingItem.id}`, payload);
+      try {
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Updated classification ${formData.code}`,
+          messages: `Updated classification details: ${JSON.stringify(payload)}`,
+          formName: formName,
+        });
+      } catch (err) {
+        console.error('Audit trail failed:', err);
+      }
+
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -272,11 +300,8 @@ export function ClassificationSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the classification list
+
       await fetchClassificationData();
-      
-      // Close modal and reset form
       setShowEditModal(false);
       setEditingItem(null);
       setFormData({ code: '', description: '' });

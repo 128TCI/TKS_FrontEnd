@@ -3,8 +3,10 @@ import { X, Plus, Check, ArrowLeft, Edit, Trash2 } from "lucide-react";
 import { Footer } from "../../../Footer/Footer";
 import { decryptData } from "../../../../services/encryptionService";
 import apiClient from "../../../../services/apiClient";
+import auditTrail from '../../../../services/auditTrail';
 import Swal from "sweetalert2";
 
+const formName = 'Bracket Code SetUp';
 interface BracketCode {
   code: string;
   description: string;
@@ -194,7 +196,12 @@ export function BracketCodeSetupPage() {
       await apiClient.delete(
         `/Fs/Process/Tardiness/BracketCodeSetup/${item.id}`,
       );
-
+      await auditTrail.log({
+        accessType: "Delete",
+        trans: `Deleted allowance bracket code "${item.bracketCode}"`,
+        messages: `Allowance bracket "${item.bracketCode}" removed`,
+        formName,
+      });
       await Swal.fire({
         icon: "success",
         title: "Success",
@@ -277,7 +284,12 @@ export function BracketCodeSetupPage() {
           `/Fs/Process/Tardiness/BracketCodeSetup/${payload.id}`,
           payload,
         );
-
+        await auditTrail.log({
+          accessType: "Edit",
+          trans: `Updated allowance bracket code "${payload.bracketCode}"`,
+          messages: `Allowance bracket "${payload.bracketCode}" updated`,
+          formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Updated",
@@ -287,7 +299,12 @@ export function BracketCodeSetupPage() {
         });
       } else {
         await apiClient.post("/Fs/Process/Tardiness/BracketCodeSetup", payload);
-
+        await auditTrail.log({
+          accessType: "Add",
+          trans: `Created allowance bracket code "${payload.bracketCode}"`,
+          messages: `Allowance bracket "${payload.bracketCode}" created`,
+          formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Created",

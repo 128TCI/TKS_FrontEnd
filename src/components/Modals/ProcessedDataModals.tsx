@@ -1,6 +1,8 @@
-import { X, Search, Check, ArrowLeft } from 'lucide-react';
-
-// Leave Type Search Modal Component
+import { X, Search, Calendar, Clock, Check, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { CalendarPopup } from '../CalendarPopup';
+import { TimePicker } from '../Modals/TimePickerModal';
 interface LeaveTypeSearchModalProps {
   show: boolean;
   onClose: () => void;
@@ -1411,276 +1413,7 @@ export function OvertimeModal({
   );
 }
 
-// Tardiness Modal Component
-interface TardinessModalProps {
-  show: boolean;
-  onClose: () => void;
-  isEditMode: boolean;
-  empCode: string;
-  setEmpCode: (value: string) => void;
-  dateFrom: string;
-  setDateFrom: (value: string) => void;
-  dateTo: string;
-  setDateTo: (value: string) => void;
-  timeIn: string;
-  setTimeIn: (value: string) => void;
-  timeOut: string;
-  setTimeOut: (value: string) => void;
-  workshiftCode: string;
-  setWorkshiftCode: (value: string) => void;
-  tardiness: string;
-  setTardiness: (value: string) => void;
-  tardinessWithinGracePeriod: string;
-  setTardinessWithinGracePeriod: (value: string) => void;
-  actualTardiness: string;
-  setActualTardiness: (value: string) => void;
-  remarks: string;
-  setRemarks: (value: string) => void;
-  offsetOTFlag: boolean;
-  setOffsetOTFlag: (value: boolean) => void;
-  exemptionRpt: string;
-  setExemptionRpt: (value: string) => void;
-  onSubmit: () => void;
-  onWorkshiftSearch: () => void;
-}
 
-export function TardinessModal({
-  show,
-  onClose,
-  isEditMode,
-  empCode,
-  setEmpCode,
-  dateFrom,
-  setDateFrom,
-  dateTo,
-  setDateTo,
-  timeIn,
-  setTimeIn,
-  timeOut,
-  setTimeOut,
-  workshiftCode,
-  setWorkshiftCode,
-  tardiness,
-  setTardiness,
-  tardinessWithinGracePeriod,
-  setTardinessWithinGracePeriod,
-  actualTardiness,
-  setActualTardiness,
-  remarks,
-  setRemarks,
-  offsetOTFlag,
-  setOffsetOTFlag,
-  exemptionRpt,
-  setExemptionRpt,
-  onSubmit,
-  onWorkshiftSearch
-}: TardinessModalProps) {
-  if (!show) return null;
-
-  return (
-    <>
-      {/* Modal Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/30 z-10"
-        onClick={onClose}
-      ></div>
-
-      {/* Modal Dialog */}
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-          {/* Modal Header */}
-          <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-            <h2 className="text-gray-800">{isEditMode ? 'Edit Record' : 'Create New'}</h2>
-            <button 
-              onClick={onClose}
-              className="text-gray-600 hover:text-gray-800"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Modal Content */}
-          <div className="p-4">
-            <h3 className="text-blue-600 mb-3">Processed Tardiness</h3>
-            
-              {/* Form Fields */}
-              <div className="space-y-3">
-                  {/* Employee Code */}
-                  <div className="flex items-center gap-2">
-                    <label className="w-40 text-gray-700">EmpCode :</label>
-                    <input
-                      type="text"
-                      value={empCode}
-                      onChange={(e) => setEmpCode(e.target.value)}
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
-              {/* Date From */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Date From :</label>
-                <input
-                  type="text"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Date To */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Date To :</label>
-                <input
-                  type="text"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Time In */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Time In :</label>
-                <input
-                  type="text"
-                  value={timeIn}
-                  onChange={(e) => setTimeIn(e.target.value)}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Time Out */}
-              <div className="flex items-center gap-2 col-span-2">
-                <label className="w-40 text-gray-700">Time Out :</label>
-                <input
-                  type="text"
-                  value={timeOut}
-                  onChange={(e) => setTimeOut(e.target.value)}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Workshift Code */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Workshift Code :</label>
-                <input
-                  type="text"
-                  value={workshiftCode}
-                  onChange={(e) => setWorkshiftCode(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <button 
-                  onClick={onWorkshiftSearch}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <Search className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => setWorkshiftCode('')}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Tardiness */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Tardiness :</label>
-                <input
-                  type="text"
-                  value={tardiness}
-                  onChange={(e) => setTardiness(e.target.value)}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="[hh.mm]"
-                />
-                <span className="text-gray-500 text-sm">[hh.mm]</span>
-              </div>
-
-              {/* Tardiness Within Grace Period */}
-              <div className="flex items-center gap-2">
-                <label className="w-55 text-gray-700">Tardiness Within Grace Period :</label>
-                <input
-                  type="text"
-                  value={tardinessWithinGracePeriod}
-                  onChange={(e) => setTardinessWithinGracePeriod(e.target.value)}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="[hh.mm]"
-                />
-                <span className="text-gray-500 text-sm">[hh.mm]</span>
-              </div>
-
-              {/* Actual Tardiness */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Actual Tardiness :</label>
-                <input
-                  type="text"
-                  value={actualTardiness}
-                  onChange={(e) => setActualTardiness(e.target.value)}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="[hh.mm]"
-                />
-                <span className="text-gray-500 text-sm">[hh.mm]</span>
-              </div>
-
-              {/* Remarks */}
-              <div className="flex items-center gap-22">
-                <label className="w-40 text-gray-700">Remarks :</label>
-                <input
-                  type="text"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Offset OT Flag */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Offset OT Flag :</label>
-                <input
-                  type="checkbox"
-                  checked={offsetOTFlag}
-                  onChange={(e) => setOffsetOTFlag(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Exemption Rpt */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">Exemption Rpt :</label>
-                <select
-                  value={exemptionRpt}
-                  onChange={(e) => setExemptionRpt(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value=""></option>
-                  <option value="Approved">Approved</option>
-                  <option value="Disapproved">Disapproved</option>
-                  <option value="Disapproved by HR">Disapproved by HR</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={onSubmit}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-              >
-                {isEditMode ? 'Update' : 'Submit'}
-              </button>
-              <button
-                onClick={onClose}
-                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-              >
-                Back to List
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
 
 // Leave and Absences Modal Component
 interface LeaveAbsencesModalProps {
@@ -1900,7 +1633,6 @@ export function LeaveAbsencesModal({
   );
 }
 
-// No Of Hours Per Day Modal Component
 interface NoOfHoursModalProps {
   show: boolean;
   onClose: () => void;
@@ -1936,124 +1668,665 @@ export function NoOfHoursModal({
   onSubmit,
   onWorkshiftSearch
 }: NoOfHoursModalProps) {
+  const [showDateInCalendar,  setShowDateInCalendar]  = useState(false);
+  const [showDateOutCalendar, setShowDateOutCalendar] = useState(false);
+  const [showTimeInPicker,    setShowTimeInPicker]    = useState(false);
+  const [showTimeOutPicker,   setShowTimeOutPicker]   = useState(false);
+
+  const splitDateTime = (value: string) => {
+    const parts = value.trim().split(' ');
+    return { datePart: parts[0] ?? '', timePart: parts.length > 1 ? parts.slice(1).join(' ') : '' };
+  };
+
+  const closeAllPickers = () => {
+    setShowDateInCalendar(false);
+    setShowDateOutCalendar(false);
+    setShowTimeInPicker(false);
+    setShowTimeOutPicker(false);
+  };
+
+  useEffect(() => {
+    if (!show) closeAllPickers();
+  }, [show]);
+
+  const handleDateInSelect = (pickedDate: string) => {
+    const { timePart } = splitDateTime(dateIn);
+    setDateIn(timePart ? `${pickedDate} ${timePart}` : pickedDate);
+    setShowDateInCalendar(false);
+  };
+
+  const handleDateOutSelect = (pickedDate: string) => {
+    const { timePart } = splitDateTime(dateOut);
+    setDateOut(timePart ? `${pickedDate} ${timePart}` : pickedDate);
+    setShowDateOutCalendar(false);
+  };
+
+  const handleTimeInSelect = (pickedTime: string) => {
+    const { datePart } = splitDateTime(dateIn);
+    setDateIn(datePart ? `${datePart} ${pickedTime}` : pickedTime);
+    setShowTimeInPicker(false);
+  };
+
+  const handleTimeOutSelect = (pickedTime: string) => {
+    const { datePart } = splitDateTime(dateOut);
+    setDateOut(datePart ? `${datePart} ${pickedTime}` : pickedTime);
+    setShowTimeOutPicker(false);
+  };
+
   if (!show) return null;
 
   return (
     <>
-      {/* Modal Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/30 z-10"
-        onClick={onClose}
-      ></div>
+      <div className="fixed inset-0 bg-black/30 z-10" onClick={onClose} />
 
-      {/* Modal Dialog */}
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-          {/* Modal Header */}
+
+          {/* Header */}
           <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
             <h2 className="text-gray-800">{isEditMode ? 'Edit Record' : 'Create New'}</h2>
-            <button 
-              onClick={onClose}
-              className="text-gray-600 hover:text-gray-800"
-            >
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Modal Content */}
           <div className="p-4">
             <h3 className="text-blue-600 mb-3">Adjustments</h3>
-            
-              {/* Form Fields */}
-              <div className="space-y-3">
-                  {/* Employee Code */}
-                  <div className="flex items-center gap-2">
-                    <label className="w-40 text-gray-700">EmpCode :</label>
-                    <input
-                      type="text"
-                      value={empCode}
-                      onChange={(e) => setEmpCode(e.target.value)}
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
+            <div className="space-y-3">
 
-              {/* Workshift Code */}
-              <div className="flex items-center gap-2 col-span-2">
+              {/* EmpCode */}
+              <div className="flex items-center gap-2">
+                <label className="w-40 text-gray-700">EmpCode :</label>
+                <input type="text" value={empCode} onChange={(e) => setEmpCode(e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+
+              {/* Workshift */}
+              <div className="flex items-center gap-2">
                 <label className="w-40 text-gray-700">Workshift Code :</label>
-                <input
-                  type="text"
-                  value={workshiftCode}
-                  onChange={(e) => setWorkshiftCode(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <button 
-                  onClick={onWorkshiftSearch}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
+                <input type="text" value={workshiftCode} onChange={(e) => setWorkshiftCode(e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <button onClick={onWorkshiftSearch} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700">
                   <Search className="w-4 h-4" />
                 </button>
-                <button 
-                  onClick={() => setWorkshiftCode('')}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
+                <button onClick={() => setWorkshiftCode('')} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Date In */}
-              <div className="flex items-center gap-2 col-span-2">
+              <div className="flex items-center gap-2">
                 <label className="w-40 text-gray-700">Date In :</label>
-                <input
-                  type="text"
-                  value={dateIn}
-                  onChange={(e) => setDateIn(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+                <input type="text" value={dateIn} onChange={(e) => setDateIn(e.target.value)}
+                  placeholder="MM/DD/YYYY HH:MM AM"
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <button onClick={() => { closeAllPickers(); setShowDateInCalendar(v => !v); }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  <Calendar className="w-4 h-4" />
+                </button>
+                <button onClick={() => { closeAllPickers(); setShowTimeInPicker(v => !v); }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  <Clock className="w-4 h-4" />
+                </button>
+                <button onClick={() => setDateIn('')} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Date Out */}
-              <div className="flex items-center gap-2 col-span-2">
+              <div className="flex items-center gap-2">
                 <label className="w-40 text-gray-700">Date Out :</label>
-                <input
-                  type="text"
-                  value={dateOut}
-                  onChange={(e) => setDateOut(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+                <input type="text" value={dateOut} onChange={(e) => setDateOut(e.target.value)}
+                  placeholder="MM/DD/YYYY HH:MM AM"
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <button onClick={() => { closeAllPickers(); setShowDateOutCalendar(v => !v); }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  <Calendar className="w-4 h-4" />
+                </button>
+                <button onClick={() => { closeAllPickers(); setShowTimeOutPicker(v => !v); }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  <Clock className="w-4 h-4" />
+                </button>
+                <button onClick={() => setDateOut('')} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
               {/* No. Of Hours */}
-              <div className="flex items-center gap-2 col-span-2">
+              <div className="flex items-center gap-2">
                 <label className="w-40 text-gray-700">No. Of Hours :</label>
-                <input
-                  type="text"
-                  value={noOfHours}
-                  onChange={(e) => setNoOfHours(e.target.value)}
+                <input type="text" value={noOfHours} onChange={(e) => setNoOfHours(e.target.value)}
                   className="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="[hh.mm]"
-                />
+                  placeholder="[hh.mm]" />
                 <span className="text-gray-500 text-sm">[hh.mm]</span>
               </div>
+
             </div>
 
-            {/* Modal Actions */}
             <div className="flex gap-3 mt-4">
-              <button
-                onClick={onSubmit}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
-              >
+              <button onClick={onSubmit} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
                 {isEditMode ? 'Update' : 'Submit'}
               </button>
-              <button
-                onClick={onClose}
-                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-              >
+              <button onClick={onClose} className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm">
                 Back to List
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {showDateInCalendar && createPortal(
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+          <CalendarPopup onDateSelect={handleDateInSelect} onClose={() => setShowDateInCalendar(false)} />
+        </div>,
+        document.body
+      )}
+
+      {showTimeInPicker && createPortal(
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+          <TimePicker onTimeSelect={handleTimeInSelect} onClose={() => setShowTimeInPicker(false)}
+            initialTime={splitDateTime(dateIn).timePart} />
+        </div>,
+        document.body
+      )}
+
+      {showDateOutCalendar && createPortal(
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+          <CalendarPopup onDateSelect={handleDateOutSelect} onClose={() => setShowDateOutCalendar(false)} />
+        </div>,
+        document.body
+      )}
+
+      {showTimeOutPicker && createPortal(
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+          <TimePicker onTimeSelect={handleTimeOutSelect} onClose={() => setShowTimeOutPicker(false)}
+            initialTime={splitDateTime(dateOut).timePart} />
+        </div>,
+        document.body
+      )}
     </>
   );
+}
+
+// ─── Tardiness Modal Component ───────────────────────────────────────────────
+interface TardinessModalProps {
+    show:                               boolean;
+    onClose:                            () => void;
+    isEditMode:                         boolean;
+    // ── Identity ──────────────────────────────────────────────────────────────
+    empCode:                            string;
+    setEmpCode:                         (v: string)  => void;
+    dateFrom:                           string;
+    setDateFrom:                        (v: string)  => void;
+    dateTo:                             string;
+    setDateTo:                          (v: string)  => void;
+    timeIn:                             string;
+    setTimeIn:                          (v: string)  => void;
+    timeOut:                            string;
+    setTimeOut:                         (v: string)  => void;
+    workShiftCode:                      string;
+    setWorkShiftCode:                   (v: string)  => void;
+    onWorkshiftSearch:                  () => void;
+    tardiness:                          string;
+    setTardiness:                       (v: string)  => void;
+    tardinessHHMM:                      string;
+    setTardinessHHMM:                   (v: string)  => void;
+    tardinessWithinGracePeriod:         string;
+    setTardinessWithinGracePeriod:      (v: string)  => void;
+    tardinessWithinGracePeriodHHMM:     string;
+    setTardinessWithinGracePeriodHHMM:  (v: string)  => void;
+    actualTardiness:                    string;
+    setActualTardiness:                 (v: string)  => void;
+    actualTardinessHHMM:                string;
+    setActualTardinessHHMM:             (v: string)  => void;
+    // ── Misc ──────────────────────────────────────────────────────────────────
+    remarks:                            string;
+    setRemarks:                         (v: string)  => void;
+    groupCode:                          string;
+    setGroupCode:                       (v: string)  => void;
+    offSetOTFlag:                       boolean;
+    setOffSetOTFlag:                    (v: boolean) => void;
+    exemptionRpt:                       string;
+    setExemptionRpt:                    (v: string)  => void;
+    glCode:                             string;
+    setGLCode:                          (v: string)  => void;
+    // ── Actions ───────────────────────────────────────────────────────────────
+    onSubmit:                           () => void;
+}
+
+export function TardinessModal({
+    show,
+    onClose,
+    isEditMode,
+    empCode,           setEmpCode,
+    dateFrom,          setDateFrom,
+    dateTo,            setDateTo,
+    timeIn,            setTimeIn,
+    timeOut,           setTimeOut,
+    workShiftCode,     setWorkShiftCode,   onWorkshiftSearch,
+    tardiness,         setTardiness,
+    tardinessHHMM,     setTardinessHHMM,
+    tardinessWithinGracePeriod,         setTardinessWithinGracePeriod,
+    tardinessWithinGracePeriodHHMM,     setTardinessWithinGracePeriodHHMM,
+    actualTardiness,   setActualTardiness,
+    actualTardinessHHMM, setActualTardinessHHMM,
+    remarks,           setRemarks,
+    groupCode,         setGroupCode,
+    offSetOTFlag,      setOffSetOTFlag,
+    exemptionRpt,      setExemptionRpt,
+    glCode,            setGLCode,
+    onSubmit,
+}: TardinessModalProps) {
+
+    // ── Calendar / Time picker visibility ─────────────────────────────────────
+    const [showDateFromCalendar, setShowDateFromCalendar] = useState(false);
+    const [showDateToCalendar,   setShowDateToCalendar]   = useState(false);
+    const [showTimeInPicker,     setShowTimeInPicker]     = useState(false);
+    const [showTimeOutPicker,    setShowTimeOutPicker]    = useState(false);
+
+
+    const splitDateTime = (value: string) => {
+        const parts = value.trim().split(' ');
+        return {
+            datePart: parts[0] ?? '',
+            timePart: parts.length > 1 ? parts.slice(1).join(' ') : '',
+        };
+    };
+
+    const closeAllPickers = () => {
+        setShowDateFromCalendar(false);
+        setShowDateToCalendar(false);
+        setShowTimeInPicker(false);
+        setShowTimeOutPicker(false);
+    };
+
+    useEffect(() => {
+        if (!show) closeAllPickers();
+    }, [show]);
+
+    // ── DateFrom handlers ─────────────────────────────────────────────────────
+    const handleDateFromSelect = (picked: string) => {
+        const { timePart } = splitDateTime(dateFrom);
+        setDateFrom(timePart ? `${picked} ${timePart}` : picked);
+        setShowDateFromCalendar(false);
+    };
+
+    // ── DateTo handlers ───────────────────────────────────────────────────────
+    const handleDateToSelect = (picked: string) => {
+        const { timePart } = splitDateTime(dateTo);
+        setDateTo(timePart ? `${picked} ${timePart}` : picked);
+        setShowDateToCalendar(false);
+    };
+
+    const handleTimeInSelect  = (picked: string) => { setTimeIn(picked);  setShowTimeInPicker(false);  };
+    const handleTimeOutSelect = (picked: string) => { setTimeOut(picked); setShowTimeOutPicker(false); };
+
+    if (!show) return null;
+
+    // ── Shared input class ────────────────────────────────────────────────────
+    const inputCls  = "flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500";
+    const shortCls  = "w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500";
+    const iconBtn   = (color: string) =>
+        `px-3 py-1.5 ${color} text-white rounded-lg transition-colors`;
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/30 z-10" onClick={onClose} />
+
+            {/* Dialog */}
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+
+                    {/* Header */}
+                    <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                        <h2 className="text-gray-800">
+                            {isEditMode ? 'Edit Record' : 'Create New'}
+                        </h2>
+                        <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-4">
+                        <h3 className="text-blue-600 mb-3">Processed Tardiness</h3>
+
+                        <div className="space-y-3">
+
+                            {/* EmpCode */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">EmpCode :</label>
+                                <input
+                                    type="text"
+                                    value={empCode}
+                                    onChange={(e) => setEmpCode(e.target.value)}
+                                    className={inputCls}
+                                />
+                            </div>
+
+                            {/* Date From */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Date From :</label>
+                                <input
+                                    type="text"
+                                    value={dateFrom}
+                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    placeholder="MM/DD/YYYY"
+                                    className={inputCls}
+                                />
+                                <button
+                                    onClick={() => { closeAllPickers(); setShowDateFromCalendar(v => !v); }}
+                                    className={iconBtn('bg-blue-600 hover:bg-blue-700')}
+                                >
+                                    <Calendar className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setDateFrom('')}
+                                    className={iconBtn('bg-red-600 hover:bg-red-700')}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Date To */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Date To :</label>
+                                <input
+                                    type="text"
+                                    value={dateTo}
+                                    onChange={(e) => setDateTo(e.target.value)}
+                                    placeholder="MM/DD/YYYY"
+                                    className={inputCls}
+                                />
+                                <button
+                                    onClick={() => { closeAllPickers(); setShowDateToCalendar(v => !v); }}
+                                    className={iconBtn('bg-blue-600 hover:bg-blue-700')}
+                                >
+                                    <Calendar className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setDateTo('')}
+                                    className={iconBtn('bg-red-600 hover:bg-red-700')}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Time In */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Time In :</label>
+                                <input
+                                    type="text"
+                                    value={timeIn}
+                                    onChange={(e) => setTimeIn(e.target.value)}
+                                    placeholder="HH:MM AM/PM"
+                                    className={inputCls}
+                                />
+                                <button
+                                    onClick={() => { closeAllPickers(); setShowTimeInPicker(v => !v); }}
+                                    className={iconBtn('bg-blue-600 hover:bg-blue-700')}
+                                >
+                                    <Clock className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setTimeIn('')}
+                                    className={iconBtn('bg-red-600 hover:bg-red-700')}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Time Out */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Time Out :</label>
+                                <input
+                                    type="text"
+                                    value={timeOut}
+                                    onChange={(e) => setTimeOut(e.target.value)}
+                                    placeholder="HH:MM AM/PM"
+                                    className={inputCls}
+                                />
+                                <button
+                                    onClick={() => { closeAllPickers(); setShowTimeOutPicker(v => !v); }}
+                                    className={iconBtn('bg-blue-600 hover:bg-blue-700')}
+                                >
+                                    <Clock className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setTimeOut('')}
+                                    className={iconBtn('bg-red-600 hover:bg-red-700')}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Workshift Code */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Workshift Code :</label>
+                                <input
+                                    type="text"
+                                    value={workShiftCode}
+                                    onChange={(e) => setWorkShiftCode(e.target.value)}
+                                    className={inputCls}
+                                />
+                                <button
+                                    onClick={onWorkshiftSearch}
+                                    className={iconBtn('bg-green-600 hover:bg-green-700')}
+                                >
+                                    <Search className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setWorkShiftCode('')}
+                                    className={iconBtn('bg-red-600 hover:bg-red-700')}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Tardiness */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Tardiness :</label>
+                                <input
+                                    type="text"
+                                    value={tardiness}
+                                    onChange={(e) => setTardiness(e.target.value)}
+                                    placeholder="[hh.mm]"
+                                    className={shortCls}
+                                />
+                                <span className="text-gray-500 text-sm">[hh.mm]</span>
+                            </div>
+
+                            {/* Tardiness HHMM */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Tardiness HHMM :</label>
+                                <input
+                                    type="text"
+                                    value={tardinessHHMM}
+                                    onChange={(e) => setTardinessHHMM(e.target.value)}
+                                    placeholder="[hh.mm]"
+                                    className={shortCls}
+                                />
+                                <span className="text-gray-500 text-sm">[hh.mm]</span>
+                            </div>
+
+                            {/* Tardiness Within Grace Period */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Tardiness Within Grace Period :</label>
+                                <input
+                                    type="text"
+                                    value={tardinessWithinGracePeriod}
+                                    onChange={(e) => setTardinessWithinGracePeriod(e.target.value)}
+                                    placeholder="[hh.mm]"
+                                    className={shortCls}
+                                />
+                                <span className="text-gray-500 text-sm">[hh.mm]</span>
+                            </div>
+
+                            {/* Tardiness Within Grace Period HHMM */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Grace Period HHMM :</label>
+                                <input
+                                    type="text"
+                                    value={tardinessWithinGracePeriodHHMM}
+                                    onChange={(e) => setTardinessWithinGracePeriodHHMM(e.target.value)}
+                                    placeholder="[hh.mm]"
+                                    className={shortCls}
+                                />
+                                <span className="text-gray-500 text-sm">[hh.mm]</span>
+                            </div>
+
+                            {/* Actual Tardiness */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Actual Tardiness :</label>
+                                <input
+                                    type="text"
+                                    value={actualTardiness}
+                                    onChange={(e) => setActualTardiness(e.target.value)}
+                                    placeholder="[hh.mm]"
+                                    className={shortCls}
+                                />
+                                <span className="text-gray-500 text-sm">[hh.mm]</span>
+                            </div>
+
+                            {/* Actual Tardiness HHMM */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Actual Tardiness HHMM :</label>
+                                <input
+                                    type="text"
+                                    value={actualTardinessHHMM}
+                                    onChange={(e) => setActualTardinessHHMM(e.target.value)}
+                                    placeholder="[hh.mm]"
+                                    className={shortCls}
+                                />
+                                <span className="text-gray-500 text-sm">[hh.mm]</span>
+                            </div>
+
+                            {/* Remarks */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Remarks :</label>
+                                <input
+                                    type="text"
+                                    value={remarks}
+                                    onChange={(e) => setRemarks(e.target.value)}
+                                    className={inputCls}
+                                />
+                            </div>
+
+                            {/* Group Code */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Group Code :</label>
+                                <input
+                                    type="text"
+                                    value={groupCode}
+                                    onChange={(e) => setGroupCode(e.target.value)}
+                                    className={inputCls}
+                                />
+                            </div>
+
+                            {/* Offset OT Flag */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Offset OT Flag :</label>
+                                <input
+                                    type="checkbox"
+                                    checked={offSetOTFlag}
+                                    onChange={(e) => setOffSetOTFlag(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                            </div>
+
+                            {/* Exemption Rpt */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">Exemption Rpt :</label>
+                                <select
+                                    value={exemptionRpt}
+                                    onChange={(e) => setExemptionRpt(e.target.value)}
+                                    className={inputCls}
+                                >
+                                    <option value=""></option>
+                                    <option value="Approved">Approved</option>
+                                    <option value="Disapproved">Disapproved</option>
+                                    <option value="Disapproved by HR">Disapproved by HR</option>
+                                </select>
+                            </div>
+
+                            {/* GL Code */}
+                            <div className="flex items-center gap-2">
+                                <label className="w-56 text-gray-700">GL Code :</label>
+                                <input
+                                    type="text"
+                                    value={glCode}
+                                    onChange={(e) => setGLCode(e.target.value)}
+                                    className={inputCls}
+                                    disabled={isEditMode}
+                                    title={isEditMode ? 'GL Code cannot be changed after creation' : ''}
+                                />
+                            </div>
+
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 mt-4">
+                            <button
+                                onClick={onSubmit}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                            >
+                                {isEditMode ? 'Update' : 'Submit'}
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                            >
+                                Back to List
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Portals ────────────────────────────────────────────────────── */}
+
+            {showDateFromCalendar && createPortal(
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                    <CalendarPopup
+                        onDateSelect={handleDateFromSelect}
+                        onClose={() => setShowDateFromCalendar(false)}
+                    />
+                </div>,
+                document.body
+            )}
+
+            {showDateToCalendar && createPortal(
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                    <CalendarPopup
+                        onDateSelect={handleDateToSelect}
+                        onClose={() => setShowDateToCalendar(false)}
+                    />
+                </div>,
+                document.body
+            )}
+
+            {showTimeInPicker && createPortal(
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                    <TimePicker
+                        onTimeSelect={handleTimeInSelect}
+                        onClose={() => setShowTimeInPicker(false)}
+                        initialTime={timeIn}
+                    />
+                </div>,
+                document.body
+            )}
+
+            {showTimeOutPicker && createPortal(
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                    <TimePicker
+                        onTimeSelect={handleTimeOutSelect}
+                        onClose={() => setShowTimeOutPicker(false)}
+                        initialTime={timeOut}
+                    />
+                </div>,
+                document.body
+            )}
+        </>
+    );
 }

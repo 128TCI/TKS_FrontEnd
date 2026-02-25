@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
 import { decryptData } from '../../../services/encryptionService';
+import auditTrail from '../../../services/auditTrail';
 
-
+const formName = 'Leave Type SetUp'
 interface LeaveType {
   id: number;
   code: string;

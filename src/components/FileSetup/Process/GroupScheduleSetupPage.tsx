@@ -5,7 +5,9 @@ import { decryptData } from '../../../services/encryptionService';
 
 import Swal from 'sweetalert2';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 
+const formName = 'Group Schedule SetUp';
 interface GroupSchedule {
   groupScheduleID: number;
   groupScheduleCode: string;
@@ -134,6 +136,12 @@ export function GroupScheduleSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/GroupScheduleSetUp/${item.groupScheduleID}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted Group Schedule "${item.groupScheduleCode} - ${item.groupScheduleDesc}"`,
+          messages: 'Group schedule deleted successfully',
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -190,6 +198,12 @@ export function GroupScheduleSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/GroupScheduleSetUp', payload);
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created Group Schedule "${payload.groupScheduleCode} - ${payload.groupScheduleDesc}"`,
+        messages: 'Group schedule created successfully',
+        formName,
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -252,6 +266,12 @@ export function GroupScheduleSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/GroupScheduleSetUp/${editingItem.groupScheduleID}`, payload);
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated Group Schedule "${payload.groupScheduleCode} - ${payload.groupScheduleDesc}"`,
+        messages: 'Group schedule updated successfully',
+        formName,
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -395,9 +415,9 @@ export function GroupScheduleSetupPage() {
                 <tbody className="divide-y divide-gray-100">
                   {paginatedData.length > 0 ? (
                     paginatedData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
+                      <tr key={item.groupScheduleID} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 text-sm text-gray-900">{item.groupScheduleCode}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.groupScheduleDesc}</td>
                         {(hasPermission('Edit') || hasPermission('Delete')) && (
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
@@ -415,7 +435,7 @@ export function GroupScheduleSetupPage() {
                             )}
                             {hasPermission('Delete') && (
                               <button
-                                onClick={() => handleDelete(item.id)}
+                                onClick={() => handleDelete(item)}
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
                               >

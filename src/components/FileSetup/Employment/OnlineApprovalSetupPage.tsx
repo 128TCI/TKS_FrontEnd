@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Online Approval SetUp';
 export function OnlineApprovalSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -260,6 +262,12 @@ export function OnlineApprovalSetupPage() {
         await apiClient.delete(
           `/Fs/Employment/OnlineApprovalSetUp/${approval.id}`,
         );
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted online approval ${approval.code}`,
+            messages: `Online approval deleted: ${approval.code} - ${approval.onlineAppDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -349,6 +357,12 @@ export function OnlineApprovalSetupPage() {
           `/Fs/Employment/OnlineApprovalSetUp/${approvalId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited online approval ${payload.onlineAppCode}`,
+            messages: `Online approval updated: ${payload.onlineAppCode} - ${payload.onlineAppDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -361,6 +375,12 @@ export function OnlineApprovalSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post("/Fs/Employment/OnlineApprovalSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added online approval ${payload.onlineAppCode}`,
+            messages: `Online approval created: ${payload.onlineAppCode} - ${payload.onlineAppDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

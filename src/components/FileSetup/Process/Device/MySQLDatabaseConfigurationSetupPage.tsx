@@ -2,8 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, X, Check, Calendar, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
+
+const formName = 'MySQL Database Configuration SetUp';
 
 interface MySQLConfig {
     id: number;
@@ -304,6 +307,12 @@ export function MySQLDatabaseConfigurationSetupPage() {
         if (confirmed.isConfirmed) {
             try {
                 await apiClient.delete(`/Fs/Process/Device/MySQLDbConfigSetUp/${item.id}`);
+                await auditTrail.log({
+                    accessType: 'Delete',
+                    trans: `Deleted MySQL config "${item.description}" (ID: ${item.id})`,
+                    messages: `Configuration "${item.description}" deleted`,
+                    formName
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -343,6 +352,12 @@ export function MySQLDatabaseConfigurationSetupPage() {
 
             if (isEditMode && selectedId !== null) {
                 await apiClient.put(`/Fs/Process/Device/MySQLDbConfigSetUp/${selectedId}`, payload);
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated MySQL config "${formData.description}" (ID: ${selectedId})`,
+                    messages: `Configuration "${formData.description}" updated`,
+                    formName
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -352,6 +367,12 @@ export function MySQLDatabaseConfigurationSetupPage() {
                 });
             } else {
                 await apiClient.post('/Fs/Process/Device/MySQLDbConfigSetUp', payload);
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created MySQL config "${formData.description}"`,
+                    messages: `Configuration "${formData.description}" created`,
+                    formName
+                });              
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',

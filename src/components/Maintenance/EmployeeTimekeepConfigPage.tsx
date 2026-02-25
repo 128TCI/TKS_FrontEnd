@@ -523,39 +523,26 @@ const [overtimeIsOTBeforeShiftNextDay, setOvertimeIsOTBeforeShiftNextDay] = useS
   };
 
   // Fetch Exemptions by Employee Code
-  const fetchExemptionsByEmpCode = async (empCodeParam: string) => {
-    if (!empCodeParam) return;
+ const fetchExemptionsByEmpCode = async (empCodeParam: string) => {
+  if (!empCodeParam) return;
+  
+  setExemptionsLoading(true);
+  try {
+    const response = await apiClient.get('/Maintenance/EmployeeExemptions');
     
-    setExemptionsLoading(true);
-    try {
-      const response = await apiClient.get('/Maintenance/EmployeeExemptions', {
-        params: { empCode: empCodeParam }
-      });
+    if (response.status === 200 && response.data) {
+      // API returns an array directly
+      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
       
-      if (response.status === 200 && response.data) {
-        if (response.data.items && response.data.items.length > 0) {
-          const exemption = response.data.items[0];
-          setExemptionsData(exemption);
-        } else {
-          // Initialize with default values
-          setExemptionsData({
-            id: 0,
-            empCode: empCodeParam,
-            tardiness: false,
-            undertime: false,
-            nightDiffBasic: false,
-            overtime: false,
-            absences: false,
-            otherEarnAndAllow: false,
-            holidayPay: false,
-            unprodWorkHoliday: false
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error('Error fetching exemptions:', error);
-      if (error.response?.status === 404) {
-        // Initialize with default values
+      const found = allItems.find((item: any) =>
+        (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase()
+      );
+      
+      if (found) {
+        console.log(found)
+        setExemptionsData(found);
+      } else {
+        // No record found, initialize defaults for POST
         setExemptionsData({
           id: 0,
           empCode: empCodeParam,
@@ -569,10 +556,25 @@ const [overtimeIsOTBeforeShiftNextDay, setOvertimeIsOTBeforeShiftNextDay] = useS
           unprodWorkHoliday: false
         });
       }
-    } finally {
-      setExemptionsLoading(false);
     }
-  };
+  } catch (error: any) {
+    console.error('Error fetching exemptions:', error);
+    setExemptionsData({
+      id: 0,
+      empCode: empCodeParam,
+      tardiness: false,
+      undertime: false,
+      nightDiffBasic: false,
+      overtime: false,
+      absences: false,
+      otherEarnAndAllow: false,
+      holidayPay: false,
+      unprodWorkHoliday: false
+    });
+  } finally {
+    setExemptionsLoading(false);
+  }
+};
 
   // Fetch Leave Applications by Employee Code
  const fetchLeaveApplicationsByEmpCode = async (empCodeParam: string) => {
@@ -971,7 +973,7 @@ const handleRestDaySubmit = async () => {
 const fetchDailySchedules = async () => {
   setDailyScheduleLoading(true);
   try {
-    const response = await apiClient.get('/Fs/Process/Dailyschedule');
+    const response = await apiClient.get('/Fs/Process/DailyScheduleSetup');
     if (response.status === 200 && response.data) {
       setDailySchedules(response.data);
     }
@@ -1601,7 +1603,17 @@ const fetchContractualByEmpCode = async (empCodeParam: string) => {
 const createContractual = async (contractualData: Partial<Contractual>) => {
   setContractualLoading(true);
   try {
-    const response = await apiClient.post('/Maintenance/EmployeeContractual', contractualData);
+   const payload = {
+      id: 0,
+      empCode: contractualData.empCode,
+      dateFr: contractualData.dateFr 
+        ? new Date(contractualData.dateFr).toISOString()   // ✅ ISO format
+        : null,
+      dateTo: contractualData.dateTo 
+        ? new Date(contractualData.dateTo).toISOString()   // ✅ ISO format
+        : null,
+    };
+    const response = await apiClient.post('/Maintenance/EmployeeContractual', payload);
     
     if (response.status === 200 || response.status === 201) {
       await Swal.fire({
@@ -1708,7 +1720,7 @@ const handleContractualSubmit = async () => {
   try {
     const contractualData: Partial<Contractual> = {
       empCode: empCode,
-      dateFr: contractualDateFrom,
+      dateFr: contractualDateFrom,   // ✅ matches API field name
       dateTo: contractualDateTo
     };
 
@@ -1753,7 +1765,17 @@ const fetchSuspensionByEmpCode = async (empCodeParam: string) => {
 const createSuspension = async (suspensionData: Partial<Suspension>) => {
   setSuspensionLoading(true);
   try {
-    const response = await apiClient.post('/Maintenance/EmployeeSuspension', suspensionData);
+     const payload = {
+      id: 0,
+      empCode: suspensionData.empCode,
+      dateFrom: suspensionData.dateFrom 
+        ? new Date(suspensionData.dateFrom).toISOString()  // ✅ ISO format
+        : null,
+      dateTo: suspensionData.dateTo 
+        ? new Date(suspensionData.dateTo).toISOString()    // ✅ ISO format
+        : null,
+    };
+    const response = await apiClient.post('/Maintenance/EmployeeSuspension', payload);
     
     if (response.status === 200 || response.status === 201) {
       await Swal.fire({
@@ -1914,6 +1936,10 @@ const handleSuspensionSubmit = async () => {
   const updateBasicConfig = async (id: number, configData: Partial<EmployeeBasicConfig>) => {
     setBasicConfigLoading(true);
     try {
+      const payload = {
+      ...configData,
+      id: id,  // ✅ ADD THIS - backend requires id in body too
+    };
       const response = await apiClient.put(`/Maintenance/EmployeeBasicConfiguration/${id}`, configData);
       
       if (response.status === 200 || response.status === 204) {
@@ -1944,44 +1970,58 @@ const handleSuspensionSubmit = async () => {
   };
 
   // Save Exemptions
-  const saveExemptions = async () => {
-    if (!exemptionsData) return;
+ const saveExemptions = async () => {
+  if (!exemptionsData) return;
+  
+  setExemptionsLoading(true);
+  try {
+    let response;
     
-    setExemptionsLoading(true);
-    try {
-      let response;
-      if (exemptionsData.id === 0) {
-        // Create new
-        response = await apiClient.post('/Maintenance/EmployeeExemptions', exemptionsData);
-      } else {
-        // Update existing
-        response = await apiClient.put(`/Maintenance/EmployeeExemptions/${exemptionsData.id}`, exemptionsData);
-      }
-      
-      if (response.status === 200 || response.status === 201 || response.status === 204) {
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Exemptions saved successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        
-        await fetchExemptionsByEmpCode(empCode);
-        setIsEditMode(false);
-      }
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to save exemptions';
-      
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
-    } finally {
-      setExemptionsLoading(false);
+    if (exemptionsData.id === 0) {
+      // No existing record — POST to create
+      response = await apiClient.post('/Maintenance/EmployeeExemptions', exemptionsData);
+    } else {
+      // Existing record found — PUT by id to avoid duplicate
+      response = await apiClient.put(
+        `/Maintenance/EmployeeExemptions/${exemptionsData.id}`,
+        {
+          id: exemptionsData.id,           // ✅ include id in body
+          empCode: exemptionsData.empCode,
+          tardiness: exemptionsData.tardiness,
+          undertime: exemptionsData.undertime,
+          nightDiffBasic: exemptionsData.nightDiffBasic,
+          overtime: exemptionsData.overtime,
+          absences: exemptionsData.absences,
+          otherEarnAndAllow: exemptionsData.otherEarnAndAllow,
+          holidayPay: exemptionsData.holidayPay,
+          unprodWorkHoliday: exemptionsData.unprodWorkHoliday,
+        }
+      );
     }
-  };
+    
+    if (response.status === 200 || response.status === 201 || response.status === 204) {
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Exemptions saved successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      await fetchExemptionsByEmpCode(empCode);
+      setIsEditMode(false);
+    }
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || error.message || 'Failed to save exemptions';
+    await Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: errorMsg,
+    });
+  } finally {
+    setExemptionsLoading(false);
+  }
+};
 
   // Create Leave Application
   const createLeaveApplication = async (leaveData: Partial<LeaveApplication>) => {

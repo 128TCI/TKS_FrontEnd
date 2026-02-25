@@ -4,9 +4,11 @@ import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Branch SetUp';
 export function BranchSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -200,6 +202,12 @@ export function BranchSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/BranchSetUp/${branch.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted branch ${branch.code}`,
+            messages: `Branch deleted: ${branch.code} - ${branch.description}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -263,8 +271,20 @@ export function BranchSetupPage() {
 
       if (isEditMode) {
         await apiClient.put(`/Fs/Employment/BranchSetUp/${branchId}`, payload);
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited branch ${payload.braCode}`,
+            messages: `Branch updated: ${payload.braCode} - ${payload.braDesc}`,
+            formName,
+        });
       } else {
-        await apiClient.post("/Fs/Employment/BranchSetUp", payload);
+        await apiClient.post('/Fs/Employment/BranchSetUp', payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added branch ${payload.braCode}`,
+            messages: `Branch created: ${payload.braCode} - ${payload.braDesc}`,
+            formName,
+        });
       }
       await Swal.fire({
         icon: "success",

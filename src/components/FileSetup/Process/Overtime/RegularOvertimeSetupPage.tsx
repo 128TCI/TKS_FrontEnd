@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Check, Plus, Info, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 
+const formName = 'Regular Day OT Rate SetUp';
 interface RegularOvertimeRecord {
   id: number;
   code: string;
@@ -54,16 +57,13 @@ export function RegularOvertimeSetupPage() {
     doleRegDay: ''
   });
 
-  // Regular Overtime records
   const [regularOvertimeData, setRegularOvertimeData] = useState<RegularOvertimeRecord[]>([]);
   const [loadingROT, setLoadingROT] = useState(false);
   const [rotError, setROTError] = useState('');
 
-  // OT Codes from API
   const [otCodesData, setOTCodesData] = useState<OTCode[]>([]);
   const [loadingOTCodes, setLoadingOTCodes] = useState(false);
 
-  // ── Fetch Regular Day OT records ─────────────────────────────────────────
   useEffect(() => {
     fetchRegularOvertimeData();
   }, []);
@@ -85,7 +85,6 @@ export function RegularOvertimeSetupPage() {
     }
   };
 
-  // ── Fetch OT Codes ────────────────────────────────────────────────────────
   const fetchOTCodes = async () => {
     setLoadingOTCodes(true);
     try {
@@ -100,7 +99,6 @@ export function RegularOvertimeSetupPage() {
     }
   };
 
-  // ── Filter / paginate ─────────────────────────────────────────────────────
   const filteredMainData = regularOvertimeData.filter(item =>
     item.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.desc.toLowerCase().includes(searchQuery.toLowerCase())
@@ -125,7 +123,6 @@ export function RegularOvertimeSetupPage() {
 
   useEffect(() => { setCurrentPage(1); }, [searchQuery]);
 
-  // ── Modal openers ─────────────────────────────────────────────────────────
   const handleCreateNew = () => {
     setFormData({
       code: '',
@@ -161,12 +158,11 @@ export function RegularOvertimeSetupPage() {
     setShowDetailsModal(true);
   };
 
-  // ── OT code search modal ──────────────────────────────────────────────────
   const handleOpenSearch = (field: string) => {
     setSearchField(field);
     setOtSearchQuery('');
     setOtSearchPage(1);
-    fetchOTCodes(); // Fetch fresh data when opening
+    fetchOTCodes();
     setShowSearchModal(true);
   };
 
@@ -179,7 +175,6 @@ export function RegularOvertimeSetupPage() {
     setFormData(prev => ({ ...prev, [field]: '' }));
   };
 
-  // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (item: RegularOvertimeRecord) => {
     const confirmed = await Swal.fire({
       icon: 'warning',
@@ -195,6 +190,12 @@ export function RegularOvertimeSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/Overtime/RegularDayOTRateSetUp/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted regular OT "${item.code} - ${item.desc}"`,
+          messages: `Regular OT "${item.code} - ${item.desc}" removed`,
+          formName
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Record deleted successfully.', timer: 2000, showConfirmButton: false });
         await fetchRegularOvertimeData();
       } catch (error: any) {
@@ -203,7 +204,6 @@ export function RegularOvertimeSetupPage() {
     }
   };
 
-  // ── Submit (create or update) ─────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!formData.code.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
@@ -244,9 +244,21 @@ export function RegularOvertimeSetupPage() {
 
       if (editingItem) {
         await apiClient.put(`/Fs/Process/Overtime/RegularDayOTRateSetUp/${editingItem.id}`, payload);
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Updated regular OT "${formData.code} - ${formData.desc}"`,
+          messages: `Regular OT "${formData.code} - ${formData.desc}" updated`,
+          formName
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Record updated successfully.', timer: 2000, showConfirmButton: false });
       } else {
         await apiClient.post('/Fs/Process/Overtime/RegularDayOTRateSetUp', payload);
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Created regular OT "${formData.code} - ${formData.desc}"`,
+          messages: `Regular OT "${formData.code} - ${formData.desc}" created`,
+          formName
+        });
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Record created successfully.', timer: 2000, showConfirmButton: false });
       }
 
@@ -260,7 +272,6 @@ export function RegularOvertimeSetupPage() {
     }
   };
 
-  // ── Close ─────────────────────────────────────────────────────────────────
   const handleCloseModal = () => {
     setShowCreateModal(false);
     setShowSearchModal(false);
@@ -269,7 +280,6 @@ export function RegularOvertimeSetupPage() {
     setSelectedRecord(null);
   };
 
-  // ── ESC key ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -284,10 +294,9 @@ export function RegularOvertimeSetupPage() {
     return () => document.removeEventListener('keydown', handleEscKey);
   }, [showSearchModal, showCreateModal, showDetailsModal]);
 
-  // ── Render field row with search + clear buttons ─────────────────────────
   const renderFieldRow = (label: string, field: keyof typeof formData) => (
     <div className="flex items-center gap-3">
-      <label className="w-64 text-gray-700 text-sm">{label} :</label>
+      <label className="w-56 text-gray-700 text-sm">{label} :</label>
       <input
         type="text"
         value={formData[field]}
@@ -311,9 +320,107 @@ export function RegularOvertimeSetupPage() {
     </div>
   );
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // MAIN RENDER
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── OT Search Modal — rendered via portal directly onto document.body ──
+  const searchModalContent = showSearchModal ? createPortal(
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl flex flex-col" style={{ maxHeight: '85vh' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg flex-shrink-0">
+          <h2 className="text-gray-800 text-lg font-semibold">Overtime Code</h2>
+          <button onClick={() => setShowSearchModal(false)} className="text-gray-600 hover:text-gray-800">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Search field */}
+        <div className="px-6 py-3 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2 justify-end">
+            <label className="text-gray-700 text-sm">Search:</label>
+            <input
+              type="text"
+              value={otSearchQuery}
+              onChange={(e) => { setOtSearchQuery(e.target.value); setOtSearchPage(1); }}
+              className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-80"
+              placeholder="Search by code or description..."
+              autoFocus
+            />
+          </div>
+        </div>
+
+        {/* Table (scrollable) */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {loadingOTCodes ? (
+            <div className="py-8 text-center text-gray-500 text-sm">Loading OT codes...</div>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead className="bg-gray-100 border-b-2 border-gray-300 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left text-gray-700 text-sm">Code ▲</th>
+                  <th className="px-4 py-2 text-left text-gray-700 text-sm">Description ▲</th>
+                  <th className="px-4 py-2 text-right text-gray-700 text-sm">Rate ▲</th>
+                  <th className="px-4 py-2 text-right text-gray-700 text-sm">Default Amount ▲</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentOTCodes.length > 0 ? currentOTCodes.map((item) => (
+                  <tr
+                    key={item.otfid}
+                    onClick={() => handleSelectOTCode(item.otfCode)}
+                    className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                  >
+                    <td className="px-4 py-2 text-sm text-blue-600 font-medium">{item.otfCode}</td>
+                    <td className="px-4 py-2 text-sm">{item.description}</td>
+                    <td className="px-4 py-2 text-sm text-right">{item.rate1.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-sm text-right">{item.defAmt.toFixed(2)}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">No OT codes found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Pagination */}
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 rounded-b-lg flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="text-gray-600 text-sm">
+              Showing {otStartIndex + 1} to {Math.min(otEndIndex, filteredOTCodes.length)} of {filteredOTCodes.length} entries
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setOtSearchPage(prev => Math.max(1, prev - 1))}
+                disabled={otSearchPage === 1}
+                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm"
+              >
+                Previous
+              </button>
+              {[...Array(Math.min(5, otTotalPages))].map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setOtSearchPage(i + 1)}
+                  className={`px-3 py-1 rounded text-sm ${otSearchPage === i + 1 ? 'bg-orange-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setOtSearchPage(prev => Math.min(otTotalPages, prev + 1))}
+                disabled={otSearchPage === otTotalPages || otTotalPages === 0}
+                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 p-6">
@@ -432,7 +539,7 @@ export function RegularOvertimeSetupPage() {
         </div>
       </div>
 
-      {/* ── Create/Edit Modal ────────────────────────────────────────────── */}
+      {/* ── Create/Edit Modal ── */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
@@ -451,7 +558,7 @@ export function RegularOvertimeSetupPage() {
               <div className="space-y-2">
                 {/* Code */}
                 <div className="flex items-center gap-3">
-                  <label className="w-64 text-gray-700 text-sm">Code :</label>
+                  <label className="w-56 text-gray-700 text-sm">Code :</label>
                   <input
                     type="text"
                     value={formData.code}
@@ -465,7 +572,7 @@ export function RegularOvertimeSetupPage() {
 
                 {/* Description */}
                 <div className="flex items-center gap-3">
-                  <label className="w-64 text-gray-700 text-sm">Description :</label>
+                  <label className="w-56 text-gray-700 text-sm">Description :</label>
                   <input
                     type="text"
                     value={formData.desc}
@@ -474,7 +581,6 @@ export function RegularOvertimeSetupPage() {
                   />
                 </div>
 
-                {/* All searchable fields */}
                 {renderFieldRow('After the Shift', 'afterTheShift')}
                 {renderFieldRow('Within the Shift with ND', 'withinTheShiftND')}
                 {renderFieldRow('After the Shift with ND', 'afterTheShiftND')}
@@ -501,138 +607,14 @@ export function RegularOvertimeSetupPage() {
                 </button>
               </div>
             </div>
-
-            {/* ── OT Code Search Modal (nested on top) ─────────────────── */}
-            {showSearchModal && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-[10] rounded-lg p-4">
-                <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl" style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-6 py-3 border-b border-gray-300 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-lg flex-shrink-0">
-                    <h2 className="text-gray-900 text-lg font-semibold">Overtime Code</h2>
-                    <button onClick={() => setShowSearchModal(false)} className="text-gray-600 hover:text-gray-900 transition-colors">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Search field */}
-                  <div className="px-6 py-4 bg-white border-b border-gray-200 flex-shrink-0">
-                    <div className="flex items-center gap-3 justify-end">
-                      <label className="text-gray-700 font-medium">Search:</label>
-                      <input 
-                        type="text" 
-                        value={otSearchQuery} 
-                        onChange={(e) => setOtSearchQuery(e.target.value)} 
-                        className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
-                        placeholder="Search by code or description..."
-                      />
-                    </div>
-                  </div>
-
-                  {/* Table (scrollable) */}
-                  <div className="flex-1 overflow-y-auto bg-gray-50">
-                    {loadingOTCodes ? (
-                      <div className="py-12 text-center text-gray-500">Loading OT codes...</div>
-                    ) : (
-                      <div className="px-6 py-4">
-                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="bg-gray-100 border-b border-gray-300">
-                                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                                  Code <span className="text-gray-400">▲</span>
-                                </th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                                  Description <span className="text-gray-400">▲</span>
-                                </th>
-                                <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">
-                                  Rate <span className="text-gray-400">▲</span>
-                                </th>
-                                <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">
-                                  Default Amount <span className="text-gray-400">▲</span>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                              {currentOTCodes.length > 0 ? currentOTCodes.map((item, index) => (
-                                <tr 
-                                  key={item.otfid} 
-                                  onClick={() => handleSelectOTCode(item.otfCode)} 
-                                  className={`cursor-pointer transition-colors ${
-                                    index % 2 === 0 ? 'bg-blue-50/30' : 'bg-white'
-                                  } hover:bg-blue-100`}
-                                >
-                                  <td className="px-6 py-3 text-sm text-blue-600 font-semibold">
-                                    {item.otfCode}
-                                  </td>
-                                  <td className="px-6 py-3 text-sm text-gray-900">
-                                    {item.description}
-                                  </td>
-                                  <td className="px-6 py-3 text-sm text-gray-900 text-center">
-                                    {item.rate1.toFixed(2)}
-                                  </td>
-                                  <td className="px-6 py-3 text-sm text-gray-900 text-center">
-                                    {item.defAmt.toFixed(2)}
-                                  </td>
-                                </tr>
-                              )) : (
-                                <tr>
-                                  <td colSpan={4} className="py-12 text-center text-gray-500">
-                                    No OT codes found.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Pagination */}
-                  <div className="px-6 py-4 border-t border-gray-300 bg-white rounded-b-lg flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                      <div className="text-gray-600 text-sm">
-                        Showing {otStartIndex + 1} to {Math.min(otEndIndex, filteredOTCodes.length)} of {filteredOTCodes.length} entries
-                      </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => setOtSearchPage(prev => Math.max(1, prev - 1))} 
-                          disabled={otSearchPage === 1} 
-                          className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                        >
-                          Previous
-                        </button>
-                        {[...Array(Math.min(5, otTotalPages))].map((_, i) => (
-                          <button 
-                            key={i} 
-                            onClick={() => setOtSearchPage(i + 1)} 
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                              otSearchPage === i + 1 
-                                ? 'bg-orange-500 text-white shadow-sm' 
-                                : 'border border-gray-300 hover:bg-gray-50'
-                            }`}
-                          >
-                            {i + 1}
-                          </button>
-                        ))}
-                        <button 
-                          onClick={() => setOtSearchPage(prev => Math.min(otTotalPages, prev + 1))} 
-                          disabled={otSearchPage === otTotalPages} 
-                          className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* ── Details Modal ─────────────────────────────────────────────────── */}
+      {/* OT Search Modal rendered via portal onto document.body */}
+      {searchModalContent}
+
+      {/* ── Details Modal ── */}
       {showDetailsModal && selectedRecord && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto">
@@ -646,7 +628,7 @@ export function RegularOvertimeSetupPage() {
 
             {/* Body */}
             <div className="p-6">
-              <h3 className="text-blue-600 text-xl font-semibold mb-6">Regular Day OT Rate Setup</h3>
+              <h3 className="text-blue-600 mb-3">Regular Day OT Rate Setup</h3>
               <div className="space-y-3">
                 <div className="flex items-start"><span className="font-bold text-gray-900 w-80">Code :</span><span className="text-gray-700">{selectedRecord.code}</span></div>
                 <div className="flex items-start"><span className="font-bold text-gray-900 w-80">Description :</span><span className="text-gray-700">{selectedRecord.desc}</span></div>

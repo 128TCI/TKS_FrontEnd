@@ -5,7 +5,9 @@ import { decryptData } from '../../../services/encryptionService';
 
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
+import auditTrail from '../../../services/auditTrail';
 
+const formName = 'Payroll Location SetUp';
 interface PayrollLocation {
     id: number;
     locId: number;
@@ -71,7 +73,8 @@ export function PayrollLocationSetupPage() {
     const payCodeOptions = [
         { value: 'M', label: 'Monthly' },
         { value: 'S', label: 'Semi-Monthly' },
-        { value: 'D', label: 'Daily' }
+        { value: 'D', label: 'Daily' },
+        { value: 'W', label: 'Weekly' }
     ];
 
     // Helper function to get display label for pay code
@@ -239,6 +242,12 @@ export function PayrollLocationSetupPage() {
         if (confirmed.isConfirmed) {
             try {
                 await apiClient.delete(`/Fs/Process/PayRollLocationSetUp/${item.id}`);
+                await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted Payroll Location "${item.locCode}"`,
+                messages: 'Payroll location deleted successfully',
+                formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -306,6 +315,12 @@ export function PayrollLocationSetupPage() {
                 };
                 
                 await apiClient.put(`/Fs/Process/PayRollLocationSetUp/${selectedId}`, updatePayload);
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated Payroll Location "${formData.locCode}"`,
+                    messages: 'Payroll location updated successfully',
+                    formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -315,6 +330,12 @@ export function PayrollLocationSetupPage() {
                 });
             } else {
                 await apiClient.post('/Fs/Process/PayRollLocationSetUp', payload);
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created Payroll Location "${formData.locCode}"`,
+                    messages: 'Payroll location created successfully',
+                    formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',

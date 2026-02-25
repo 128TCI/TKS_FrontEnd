@@ -1,7 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { FileText, Check, Search, X, ChevronUp, ChevronDown, Calendar, Clock, RotateCcw, Download } from 'lucide-react';
 import { Footer } from './Footer/Footer';
-
+import { UserSearchModal } from '../components/Modals/UserSearchModal';
+import { FormNameSearchModal } from '../components/Modals/FormNameSearchModal';
+ 
+import apiClient from '../services/apiClient';
 interface AuditLog {
   id: number;
   date: string;
@@ -154,6 +157,7 @@ function TimePickerPopup({ value, onChange, onClose, position }: TimePickerPopup
   const [hours, setHours] = useState('10');
   const [minutes, setMinutes] = useState('00');
   const [seconds, setSeconds] = useState('00');
+  const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -166,8 +170,33 @@ function TimePickerPopup({ value, onChange, onClose, position }: TimePickerPopup
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
+  // Initialize from current value if provided
+  useEffect(() => {
+    if (value) {
+      const [h, m, s] = value.split(':');
+      const hour = parseInt(h);
+      if (hour >= 12) {
+        setPeriod('PM');
+        setHours(hour === 12 ? '12' : String(hour - 12));
+      } else {
+        setPeriod('AM');
+        setHours(hour === 0 ? '12' : String(hour));
+      }
+      setMinutes(m);
+      setSeconds(s);
+    }
+  }, [value]);
+
   const handleOk = () => {
-    const timeString = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+    // Convert to 24-hour format
+    let hour24 = parseInt(hours);
+    if (period === 'AM') {
+      if (hour24 === 12) hour24 = 0;
+    } else {
+      if (hour24 !== 12) hour24 += 12;
+    }
+    
+    const timeString = `${String(hour24).padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
     onChange(timeString);
     onClose();
   };
@@ -176,45 +205,99 @@ function TimePickerPopup({ value, onChange, onClose, position }: TimePickerPopup
     <div
       ref={popupRef}
       className="absolute bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-50"
-      style={{ top: position.top, left: position.left, width: '200px' }}
+      style={{ top: position.top, left: position.left, width: '320px' }}
     >
-      <div className="mb-3">
-        <label className="block text-xs text-gray-600 mb-2">Time</label>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min="0"
-            max="23"
-            value={hours}
-            onChange={(e) => setHours(e.target.value)}
-            className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center"
-            placeholder="HH"
-          />
-          <span className="text-gray-600">:</span>
-          <input
-            type="number"
-            min="0"
-            max="59"
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
-            className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center"
-            placeholder="MM"
-          />
-          <span className="text-gray-600">:</span>
-          <input
-            type="number"
-            min="0"
-            max="59"
-            value={seconds}
-            onChange={(e) => setSeconds(e.target.value)}
-            className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center"
-            placeholder="SS"
-          />
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-3">Select Time</label>
+        <div className="flex items-center justify-center gap-2">
+          <div className="flex flex-col items-center">
+            <label className="text-xs text-gray-500 mb-1">Hours</label>
+            <input
+              type="number"
+              min="1"
+              max="12"
+              value={hours}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (val >= 1 && val <= 12) {
+                  setHours(e.target.value);
+                } else if (e.target.value === '') {
+                  setHours('');
+                }
+              }}
+              className="w-16 px-2 py-2 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="HH"
+            />
+          </div>
+          <span className="text-gray-600 text-lg mt-5">:</span>
+          <div className="flex flex-col items-center">
+            <label className="text-xs text-gray-500 mb-1">Minutes</label>
+            <input
+              type="number"
+              min="0"
+              max="59"
+              value={minutes}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (val >= 0 && val <= 59) {
+                  setMinutes(e.target.value);
+                } else if (e.target.value === '') {
+                  setMinutes('');
+                }
+              }}
+              className="w-16 px-2 py-2 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="MM"
+            />
+          </div>
+          <span className="text-gray-600 text-lg mt-5">:</span>
+          <div className="flex flex-col items-center">
+            <label className="text-xs text-gray-500 mb-1">Seconds</label>
+            <input
+              type="number"
+              min="0"
+              max="59"
+              value={seconds}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (val >= 0 && val <= 59) {
+                  setSeconds(e.target.value);
+                } else if (e.target.value === '') {
+                  setSeconds('');
+                }
+              }}
+              className="w-16 px-2 py-2 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="SS"
+            />
+          </div>
+        </div>
+        
+        {/* AM/PM Selector */}
+        <div className="flex justify-center mt-4 gap-2">
+          <button
+            onClick={() => setPeriod('AM')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              period === 'AM'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            AM
+          </button>
+          <button
+            onClick={() => setPeriod('PM')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              period === 'PM'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            PM
+          </button>
         </div>
       </div>
       <button
         onClick={handleOk}
-        className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
+        className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
       >
         OK
       </button>
@@ -223,6 +306,7 @@ function TimePickerPopup({ value, onChange, onClose, position }: TimePickerPopup
 }
 
 export function AuditTrailPage() {
+  const formName = 'Audit Trail';
   const [dateFrom, setDateFrom] = useState('12/26/2025');
   const [timeFrom, setTimeFrom] = useState('10:00:00');
   const [dateTo, setDateTo] = useState('12/26/2025');
@@ -236,65 +320,141 @@ export function AuditTrailPage() {
   const [showTimePicker, setShowTimePicker] = useState<'timeFrom' | 'timeTo' | null>(null);
   const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
   const [timePickerPosition, setTimePickerPosition] = useState({ top: 0, left: 0 });
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isFormNameModalOpen, setIsFormNameModalOpen] = useState(false);
+  const [isFiltered, setIsFiltered] = useState(false);
 
-  // Mock data
-  const auditLogs: AuditLog[] = [
-    {
-      id: 1,
-      date: '12/26/2025 10:30:15',
-      user: 'admin',
-      pcName: 'WORKSTATION-01',
-      formName: 'EmployeeForm',
-      accessType: 'Edit',
-      activity: 'Update Record',
-      message: 'Updated employee #12345 information'
-    },
-    {
-      id: 2,
-      date: '12/26/2025 10:25:42',
-      user: 'jdoe',
-      pcName: 'WORKSTATION-02',
-      formName: 'AttendanceForm',
-      accessType: 'View',
-      activity: 'View Record',
-      message: 'Viewed attendance logs for 12/26/2025'
-    },
-    {
-      id: 3,
-      date: '12/26/2025 10:20:33',
-      user: 'admin',
-      pcName: 'WORKSTATION-01',
-      formName: 'PayrollForm',
-      accessType: 'Create',
-      activity: 'Create Record',
-      message: 'Created new payroll batch #2025-12'
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        // Convert from 1-indexed page to 0-indexed for API
+        const apiPage = currentPage - 1;
+        if (isFiltered) {
+          await fetchAuditTrailFiltered(apiPage);
+        } else {
+          await fetchAuditTrail(apiPage);
+        }
+      } catch {}
+      finally { setLoading(false); }
+    };
+
+    fetchData();
+  }, [currentPage, isFiltered]);
+
+
+  const fetchAuditTrail = async (pageNumber = 0) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await apiClient.get(
+        `/AuditTrail/GetAuditTrail/All?page=${pageNumber}&pageSize=${itemsPerPage}`
+      );
+
+      if (response.status === 200 && response.data) {
+        const mappedData: AuditLog[] = response.data.data.map((item: any) => ({
+          id: item.id || 0,
+          date: item.date || '',
+          user: item.userId || '',
+          pcName: item.machine || '',
+          formName: item.formName || '',
+          accessType: item.accessType || '',
+          activity: item.trans || '',
+          message: item.messages || ''
+        }));
+
+        setFilteredLogs(mappedData);
+        setTotalCount(response.data.totalCount);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch audit trail');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>(auditLogs);
+  const fetchAuditTrailFiltered = async (pageNumber = 0) => {
+    setLoading(true);
+    setError('');
+    try {
+      // Parse the date and time and create proper Date objects
+      const parseDateFrom = () => {
+        const [month, day, year] = dateFrom.split('/');
+        const [hours, minutes, seconds] = timeFrom.split(':');
+        return new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hours),
+          parseInt(minutes),
+          parseInt(seconds)
+        );
+      };
+
+      const parseDateTo = () => {
+        const [month, day, year] = dateTo.split('/');
+        const [hours, minutes, seconds] = timeTo.split(':');
+        return new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hours),
+          parseInt(minutes),
+          parseInt(seconds)
+        );
+      };
+
+      const payload = {
+        DateFrom: parseDateFrom().toISOString(),  // PascalCase to match C# DTO exactly
+        DateTo: parseDateTo().toISOString(),
+        FormName: formNameFilter || '',
+        UserId: userFilter || '',
+        Activity: activityFilter || '',
+        DisplayStart: pageNumber * itemsPerPage,
+        DisplayLength: itemsPerPage
+      };
+
+      console.log('Sending payload:', payload); // Debug log
+
+      const response = await apiClient.post('/AuditTrail/GetAuditTrail/Filtered', payload);
+
+      if (response.status === 200 && response.data) {
+        const mappedData: AuditLog[] = response.data.data.map((item: any) => ({
+          id: item.id || 0,
+          date: item.date || '',
+          user: item.userId || '',
+          pcName: item.machine || '',
+          formName: item.formName || '',
+          accessType: item.accessType || '',
+          activity: item.trans || '',
+          message: item.messages || ''
+        }));
+
+        setFilteredLogs(mappedData);  // update immediately
+        setTotalCount(response.data.totalCount);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to search audit trail');
+      setFilteredLogs([]);  // reset on error
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleSearch = () => {
-    let filtered = auditLogs;
-
-    if (formNameFilter) {
-      filtered = filtered.filter(log => 
-        log.formName.toLowerCase().includes(formNameFilter.toLowerCase())
-      );
-    }
-
-    if (activityFilter) {
-      filtered = filtered.filter(log => 
-        log.activity.toLowerCase().includes(activityFilter.toLowerCase())
-      );
-    }
-
-    if (userFilter) {
-      filtered = filtered.filter(log => 
-        log.user.toLowerCase().includes(userFilter.toLowerCase())
-      );
-    }
-
-    setFilteredLogs(filtered);
+    setIsFiltered(true);
+    setCurrentPage(1); 
   };
 
   const handleReset = () => {
@@ -305,7 +465,8 @@ export function AuditTrailPage() {
     setFormNameFilter('');
     setActivityFilter('');
     setUserFilter('');
-    setFilteredLogs(auditLogs);
+    setIsFiltered(false);
+    setCurrentPage(1);
   };
 
   const handleSort = (field: keyof AuditLog) => {
@@ -333,6 +494,67 @@ export function AuditTrailPage() {
     );
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalCount);
+
+  // Get visible page numbers with ellipsis
+  const getPageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
+
+  // Apply sorting to the data
+  const sortedLogs = useMemo(() => {
+    if (filteredLogs.length === 0) return [];
+    
+    return [...filteredLogs].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      // Handle different data types
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        const comparison = aValue.toLowerCase().localeCompare(bValue.toLowerCase());
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
+      
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      
+      // For dates
+      if (sortField === 'date') {
+        const dateA = new Date(aValue).getTime();
+        const dateB = new Date(bValue).getTime();
+        return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      
+      return 0;
+    });
+  }, [filteredLogs, sortField, sortDirection]);
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Main Content */}
@@ -340,7 +562,7 @@ export function AuditTrailPage() {
         <div className="max-w-7xl mx-auto relative">
           {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
-            <h1 className="text-white">Audit Trail</h1>
+            <h1 className="text-white">{formName}</h1>
           </div>
 
           {/* Content Container */}
@@ -492,7 +714,7 @@ export function AuditTrailPage() {
                           className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                         <button
-                          onClick={handleSearch}
+                          onClick={() => setIsFormNameModalOpen(true)} 
                           className="p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                         >
                           <Search className="w-4 h-4" />
@@ -530,7 +752,7 @@ export function AuditTrailPage() {
                           className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                         <button
-                          onClick={handleSearch}
+                          onClick={() => setIsUserModalOpen(true)} 
                           className="p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                         >
                           <Search className="w-4 h-4" />
@@ -639,10 +861,35 @@ export function AuditTrailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredLogs.length > 0 ? (
-                      filteredLogs.map((log) => (
+                    {loading ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-12 text-center text-gray-500 text-sm">
+                          Loading audit trail...
+                        </td>
+                      </tr>
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-12 text-center text-red-500 text-sm">
+                          {error}
+                        </td>
+                      </tr>
+                    ) : sortedLogs.length > 0 ? (
+                      sortedLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{log.date}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {(() => {
+                              const parsed = new Date(log.date);
+                              if (isNaN(parsed.getTime())) return '-';
+                              return new Intl.DateTimeFormat('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              }).format(parsed);
+                            })()}
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-900">{log.user}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">{log.pcName}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">{log.formName}</td>
@@ -662,16 +909,41 @@ export function AuditTrailPage() {
                 </table>
               </div>
 
-              {/* Pagination */}
-              <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                <span className="text-xs text-gray-500">
-                  Showing {filteredLogs.length} {filteredLogs.length === 1 ? 'entry' : 'entries'}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs">
+              {/* Improved Pagination */}
+              <div className="flex items-center justify-between mt-4 px-4 pb-4">
+                <div className="text-gray-600 text-sm">
+                  Showing {sortedLogs.length === 0 ? 0 : startIndex + 1} to {endIndex} of {totalCount} entries
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                  >
                     Previous
                   </button>
-                  <button className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs">
+                  {getPageNumbers().map((page, idx) => (
+                    page === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 text-gray-500 text-sm">...</span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page as number)}
+                        className={`px-3 py-1 rounded transition-colors text-sm ${
+                          currentPage === page
+                            ? "bg-blue-600 text-white"
+                            : "border border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                  >
                     Next
                   </button>
                 </div>
@@ -715,6 +987,23 @@ export function AuditTrailPage() {
           position={timePickerPosition}
         />
       )}
+      {/* User Search Popup */}
+      <UserSearchModal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        onSelect={(id, username) => {
+          setUserFilter(username);  
+          setIsUserModalOpen(false);    
+        }}
+      />
+      <FormNameSearchModal
+        isOpen={isFormNameModalOpen}
+        onClose={() => setIsFormNameModalOpen(false)}
+        onSelect={(name) => {
+          setFormNameFilter(name);        
+          setIsFormNameModalOpen(false);  
+        }}
+      />
     </div>
   );
 }

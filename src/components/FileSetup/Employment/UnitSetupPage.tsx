@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { X, Search, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from '../../Footer/Footer';
 import { EmployeeSearchModal } from '../../Modals/EmployeeSearchModal';
 import { DeviceSearchModal } from '../../Modals/DeviceSearchModal';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../services/encryptionService';
-
+  // Form Name
+  const formName = 'Unit SetUp';
 export function UnitSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,7 +43,7 @@ export function UnitSetupPage() {
   // Permissions
     const [permissions, setPermissions] = useState<Record<string, boolean>>({});
     const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
+    
     useEffect(() => {
       getUnitSetUpPermissions();
     }, []);
@@ -246,6 +248,12 @@ export function UnitSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/UnitSetUp/${unit.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted unit ${unit.code}`,
+            messages: `Unit deleted: ${unit.code} - ${unit.unitDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -320,6 +328,12 @@ export function UnitSetupPage() {
       if (isEditMode && unitId) {
         // Update existing record via PUT
         await apiClient.put(`/Fs/Employment/UnitSetUp/${unitId}`, payload);
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited unit ${payload.unitCode}`,
+            messages: `Unit updated: ${payload.unitCode} - ${payload.unitDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -332,6 +346,12 @@ export function UnitSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post('/Fs/Employment/UnitSetUp', payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added unit ${payload.unitCode}`,
+            messages: `Unit created: ${payload.unitCode} - ${payload.unitDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',

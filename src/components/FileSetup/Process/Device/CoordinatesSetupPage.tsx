@@ -4,7 +4,10 @@ import { Footer } from '../../../Footer/Footer';
 
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
+
+const formName = 'Coordinates SetUp';
 
 interface Coordinate {
     id: number;
@@ -152,6 +155,12 @@ export function CoordinatesSetupPage() {
         if (confirmed.isConfirmed) {
             try {
                 await apiClient.delete(`${API_BASE_URL}/${coordinate.id}`);
+                await auditTrail.log({
+                    accessType: 'Delete',
+                    trans: `Coordinate ${coordinate.code} deleted`,
+                    messages: `Coordinate ${coordinate.code} deleted`,
+                    formName: formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -159,10 +168,12 @@ export function CoordinatesSetupPage() {
                     timer: 2000,
                     showConfirmButton: false,
                 });
-                // Refresh the coordinate list
                 await fetchCoordinates();
             } catch (error: any) {
-                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete coordinate';
+                const errorMsg =
+                    error.response?.data?.message ||
+                    error.message ||
+                    'Failed to delete coordinate';
                 await Swal.fire({
                     icon: 'error',
                     title: 'Error',
@@ -174,7 +185,6 @@ export function CoordinatesSetupPage() {
     };
 
     const handleSubmit = async () => {
-        // Validate code - must not be empty
         if (!code.trim()) {
             await Swal.fire({
                 icon: 'warning',
@@ -184,12 +194,8 @@ export function CoordinatesSetupPage() {
             return;
         }
 
-        // Check for duplicate code (only when creating new or changing code during edit)
         const isDuplicate = coordinates.some((coordinate, index) => {
-            // When editing, exclude the current record from duplicate check
-            if (isEditMode && selectedCoordinateIndex === index) {
-                return false;
-            }
+            if (isEditMode && selectedCoordinateIndex === index) return false;
             return coordinate.code.toLowerCase() === code.trim().toLowerCase();
         });
 
@@ -197,12 +203,13 @@ export function CoordinatesSetupPage() {
             await Swal.fire({
                 icon: 'error',
                 title: 'Duplicate Code',
-                text: 'This code is already in use. Please use a different code.',
+                text: 'This code is already in use.',
             });
             return;
         }
 
         setSubmitting(true);
+
         try {
             const payload = {
                 id: isEditMode && coordinateId ? coordinateId : 0,
@@ -214,8 +221,13 @@ export function CoordinatesSetupPage() {
             };
 
             if (isEditMode && coordinateId) {
-                // Update existing record via PUT
                 await apiClient.put(`${API_BASE_URL}/${coordinateId}`, payload);
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Coordinate ${code} updated`,
+                    messages: `Coordinate ${code} updated`,
+                    formName: formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -223,11 +235,14 @@ export function CoordinatesSetupPage() {
                     timer: 2000,
                     showConfirmButton: false,
                 });
-                // Refresh the coordinate list
-                await fetchCoordinates();
             } else {
-                // Create new record via POST
                 await apiClient.post(API_BASE_URL, payload);
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Coordinate ${code} created`,
+                    messages: `Coordinate ${code} created`,
+                    formName: formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Success',
@@ -235,11 +250,11 @@ export function CoordinatesSetupPage() {
                     timer: 2000,
                     showConfirmButton: false,
                 });
-                // Refresh the coordinate list
-                await fetchCoordinates();
             }
 
-            // Close modal and reset form
+            await fetchCoordinates();
+
+            // Reset form
             setShowCreateModal(false);
             setCode('');
             setDescription('');
@@ -249,14 +264,21 @@ export function CoordinatesSetupPage() {
             setCoordinateId(null);
             setIsEditMode(false);
             setSelectedCoordinateIndex(null);
+
         } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
+            const errorMsg =
+                error.response?.data?.message ||
+                error.message ||
+                'An error occurred';
+
             await Swal.fire({
                 icon: 'error',
                 title: 'Error',
                 text: errorMsg,
             });
+
             console.error('Error submitting form:', error);
+
         } finally {
             setSubmitting(false);
         }
