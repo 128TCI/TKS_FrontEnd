@@ -563,7 +563,7 @@ const onClickImport = async ( ) => {
                       <td className="px-4 py-2">{item.numApprovedHrs}</td>
                       <td className="px-4 py-2">{item.leaveCode}</td>
                       <td className="px-4 py-2">{item.period}</td>
-                      <td className="px-4 py-2">{selectedCodes}</td>
+                      <td className="px-4 py-2">{item.tksGroup}</td>
                     </tr>
                     ))}
                   </tbody>

@@ -73,7 +73,7 @@ import { DeductTardinessToOvertimePage } from '../Utilities/DeductTardinessToOve
 //Process Sub-Menu
 import { ProcessPage } from '../Process/ProcessPage';
 
-import { DailyTimeRecordMonitoringPage } from '../DailyTimeRecordMonitoringPage';
+import { DailyTimeRecordMonitoringPage } from '../Reports/DailyTimeRecordMonitoringPage';
 import { TKSGroupSetupDefinitionPage } from '../TKSGroupSetupDefinitionPage';
 import { CompanyInformation } from '../../components/FileSetup/System/CompanyInformation';
 import { CalendarSetup } from '../FileSetup/Process/CalendarSetup';

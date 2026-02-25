@@ -6,7 +6,38 @@ import { TKSGroupTable } from '../TKSGroupTable';
 import { tksGroupData } from '../../data/tksGroupData';
 import apiClient from '../../services/apiClient';
 import { Search, Trash2, X, TableOfContents } from 'lucide-react';
+import Swal from 'sweetalert2';
 import * as XLSX from "xlsx";
+
+interface ImportLogsFromDeviceDto {
+  message: string;
+  rowNumber: number
+  columnNumber: number
+  empCode: string
+    //empName: string;
+  rawDateIn: Date | string 
+  workShiftCode: string
+  dayType: string
+  rawTimeIn: Date | string
+  rawBreak1In: Date | string
+  rawBreak1Out: Date | string
+  rawBreak2In: Date | string
+  rawBreak2Out: Date | string
+  rawBreak3In: Date | string
+  rawBreak3Out: Date | string
+  rawTimeOut: Date | string
+  rawDateOut: Date | string
+  rawOTApproved: boolean
+  id: number
+  terminalID: string
+}
+
+type ResponseResultDto<T> = {
+    isSuccess: boolean,
+    resultData: T,
+    errors: string[],
+    messages: string
+}
 
 export function UpdateRawDataPage() {
   const [empCode, setEmpCode] = useState<string[]>([]);
@@ -29,6 +60,7 @@ export function UpdateRawDataPage() {
   const [deleteExistingLogs, setDeleteExistingLogs] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [device, setDevice] = useState<Array<{ deviceName: string;}>>([]);
+  const [importDataResult, setImportDataResult] = useState<ImportLogsFromDeviceDto[]>([]);
   const [getEmployee, setGetEmployee] = useState<Array<{ 
     empID: number; 
     empCode: string; 
@@ -232,7 +264,7 @@ export function UpdateRawDataPage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get(`/EmployeeMasterFile/GetActive?active=${filterStatus}`);
+      const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/GetActive?active=${filterStatus}`);
       if (response.data) {
         const mappedData = response.data.map((getEmployee: any) => ({
           empID: getEmployee.empID || getEmployee.EmpID || '',
@@ -245,9 +277,9 @@ export function UpdateRawDataPage() {
         setGetEmployee(mappedData);
       }
       } catch (error: any) {
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to Devices';
+          const errorMsg = error.response?.data?.message || error.message || 'Failed to load Employees';
           setError(errorMsg);
-          console.error('Error fetching Devices', error);
+          console.error('Error fetching employees', error);
         } finally {
           loading;
         }
@@ -404,6 +436,59 @@ export function UpdateRawDataPage() {
      } finally {
           isProcessing;
      }
+  }
+const onClickImport = async ( ) => {
+      if(!xlsxFile) {
+        setError("Please select a file to import.");
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Please select a file to import.',
+        });
+        return;
+      }
+      if(!dateFrom || !dateTo){
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Please select date.',
+        });
+        return;
+      }
+      //setIsProcessing(true);
+      const formData = new FormData();
+      formData.append("dateFrom", dateFrom);
+      formData.append("dateTo", dateTo);
+      //formData.append("isDeleteExistingRecord", String(deleteExisting));
+      //formData.append("listNotEqual", String(listNotEqual));
+      formData.append("file", xlsxFile, fileName)
+      console.log(xlsxFile);
+      try {
+        const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData)
+          setImportDataResult(data.data.resultData);
+          if (data.data.errors.length > 0){
+            console.log(data.data.errors)
+            setImportDataResult([]);
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: data.data.resultData?.[0]?.message ?? data.data.errors,
+            });            
+            //setErrors(data.data.errors);
+          }
+          else{
+            Swal.fire({
+              icon: 'success',
+              title: 'Done',
+              text: 'Import done.',
+              timer: 2000,
+              showConfirmButton: false,
+            });
+          }
+        } finally {
+            //setIsProcessing(false);
+            setFileLoaded(true);
+          }
   }
 
   return (

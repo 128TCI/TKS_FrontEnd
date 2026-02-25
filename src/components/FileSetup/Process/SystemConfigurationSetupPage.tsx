@@ -32,7 +32,7 @@ export function SystemConfigurationSetupPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [originalData, setOriginalData] = useState<SystemConfig | null>(null);
-
+  const checkboxClass = "w-4 h-4 appearance-none border-2 border-gray-400 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
   // Simplified checkbox component for better reliability
   const CustomCheckbox = ({
     checked,

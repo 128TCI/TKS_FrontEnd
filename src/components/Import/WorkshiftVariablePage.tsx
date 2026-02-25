@@ -17,6 +17,7 @@ interface ImportWorkshiftRestdayDto {
     dateTo: Date | string | null
     workshiftCode: string
     restDay: string;
+    tkGroup: string
 }
 interface ImportWorkshiftRestdayFormDto {
     dateFrom: "",
@@ -542,7 +543,7 @@ export function WorkshiftVariablePage() {
                       <td className="px-4 py-2">{item.dateFrom ? new Date(item.dateFrom).toLocaleDateString() : '-'}</td>
                       <td className="px-4 py-2">{item.dateTo ? new Date(item.dateTo).toLocaleDateString() : '-'}</td>
                       <td className="px-4 py-2">{item.workshiftCode}</td>
-                      <td className="px-4 py-2">{selectedCodes}</td>
+                      <td className="px-4 py-2">{item.tkGroup}</td>
                     </tr>
                     ))}
                   </tbody>
