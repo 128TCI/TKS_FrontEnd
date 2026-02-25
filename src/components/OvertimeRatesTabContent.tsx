@@ -1,5 +1,7 @@
 import { X, Search, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useTablePagination } from '../hooks/useTablePagination';
+import apiClient from '../services/apiClient';
 
 interface OvertimeRatesTabContentProps {
   tksGroupCode: string;
@@ -13,8 +15,83 @@ interface OvertimeRatesTabContentProps {
   setLegalHolidayOT: (value: string) => void;
   specialHolidayOT: string;
   setSpecialHolidayOT: (value: string) => void;
+  doubleLegalHolidayOT: string;
+  setDoubleLegalHolidayOT: (value: string) => void;
+  specialHolidayOT2: string;
+  setSpecialHolidayOT2: (value: string) => void;
+  nonWorkingHolidayOT: string;
+  setNonWorkingHolidayOT: (value: string) => void; 
+  regularDayOTLateFiling: string;
+  setRegularDayOTLateFiling: (value: string) => void;
+  restDayOTLateFiling: string;
+  setRestDayOTLateFiling: (value: string) => void;
+  legalHolidayOTLateFiling: string;
+  setLegalHolidayOTLateFiling: (value: string) => void;
+  specialHolidayOTLateFiling: string;
+  setSpecialHolidayOTLateFiling: (value: string) => void;
+  doubleLegalHolidayOTLateFiling: string;
+  setDoubleLegalHolidayOTLateFiling: (value: string) => void;
+  specialHoliday2OTLateFiling: string;
+  setSpecialHoliday2OTLateFiling: (value: string) => void;
+  nonWorkingHolidayOTLateFiling: string;
+  setNonWorkingHolidayOTLateFiling: (value: string) => void; 
   otBreakMinHours: string;
   setOtBreakMinHours: (value: string) => void;
+}
+
+interface RegularOTRatesItem {
+  id: number;
+  code: string; 
+  description: string;
+  afterTheShift: string;
+  withinTheShiftND: string;
+  afterTheShiftND: string;
+  oTPremiumAfterTheShift: string;
+  doleRegDay: string;
+} 
+
+interface RestDayOTRatesItem { 
+  id: number;
+  code: string;
+  description: string;
+  withinTheShift: string;
+  afterTheShift: string;
+  withinTheShiftWithND: string;
+  afterTheShiftWithND: string;
+  oTPremiumWithinTheShiftWithND: string;
+  oTPremiumAfterTheShiftWithND: string;
+  equivOTCode: string;
+  equivOTCodeAfterShiftForNoOfHrs: string;
+  equivOTCodeAfterShiftNDForNoOfHrs: string;
+}
+
+export interface HolidayOTRatesItem {
+  id: number;
+  code: string;
+  description: string;
+  withinTheShift: string;
+  afterTheShift: string;
+  withinTheShiftWithND: string;
+  afterTheShiftWithND: string;
+  withinTheShiftAndRestday: string;
+  afterTheShiftAndRestday: string;
+  withinTheShiftAndRestdayWithND: string;
+  afterTheShiftAndRestdayWithND: string;
+  unworkedHolidayPay: string;
+  unworkedHolidayPayRestday: string;
+  holidayType: string;
+  unprodWorkHolidayRegDay: string;
+  unprodWorkHolidayRestDay: string;
+  otPremiumWithinTheShiftWithND: string;
+  otPremiumAfterTheShiftWithND: string;
+  otPremiumWithinTheShiftAndRestdayWithND: string;
+  otPremiumAfterTheShiftAndRestdayWithND: string;
+  eqOTCodeWinShf: string;
+  eqOTCodeWinShfRest: string;
+  eqOTCodeAftrShfForNoOfHrs: string;
+  eqOTCodeAftrShfRDForNoOfHrs: string;
+  eqOTCodeAftrShfNDForNoOfHrs: string;
+  eqOTCodeAftrShfRDNDForNoOfHrs: string;
 }
 
 export function OvertimeRatesTabContent({ 
@@ -29,6 +106,26 @@ export function OvertimeRatesTabContent({
   setLegalHolidayOT,
   specialHolidayOT,
   setSpecialHolidayOT,
+  doubleLegalHolidayOT,
+  setDoubleLegalHolidayOT,
+  specialHolidayOT2,
+  setSpecialHolidayOT2,
+  nonWorkingHolidayOT,
+  setNonWorkingHolidayOT,
+  regularDayOTLateFiling,
+  setRegularDayOTLateFiling,
+  restDayOTLateFiling,
+  setRestDayOTLateFiling,
+  legalHolidayOTLateFiling,
+  setLegalHolidayOTLateFiling,
+  specialHolidayOTLateFiling,
+  setSpecialHolidayOTLateFiling,
+  doubleLegalHolidayOTLateFiling,
+  setDoubleLegalHolidayOTLateFiling,
+  specialHoliday2OTLateFiling,
+  setSpecialHoliday2OTLateFiling,
+  nonWorkingHolidayOTLateFiling,
+  setNonWorkingHolidayOTLateFiling,
   otBreakMinHours,
   setOtBreakMinHours
 }: OvertimeRatesTabContentProps) {
@@ -43,6 +140,22 @@ export function OvertimeRatesTabContent({
   const [birthdayPay, setBirthdayPay] = useState('');
   const [showBirthdayPayModal, setShowBirthdayPayModal] = useState(false);
   const [birthdayPaySearchTerm, setBirthdayPaySearchTerm] = useState('');
+
+  // Overtime Rates Modals
+  const [showRegDayOvertimeRatesModal, setShowRegDayOvertimeRatesModal] = useState(false);
+  const [regDayOvertimeRateSearchTerm, setRegDayOvertimeRateSearchTerm] = useState("");
+  const [showRestDayOvertimeRatesModal, setShowRestDayOvertimeRatesModal] = useState(false);
+  const [restDayOverTimeRateSearchTerm, setRestDayOvertimeRateSearchTerm] = useState("");
+  const [showLegalHolidayOTRatesModal, setShowLegalHolidayOTRatesModal] = useState(false);
+  const [legalHolidayOTRateSearchTerm, setLegalHolidayOTRateSearchTerm] = useState("");
+  const [showSpecialHolidayOTRatesModal, setShowSpecialHolidayOTRatesModal] = useState(false);
+  const [specialHolidayOTRateSearchTerm, setSpecialHolidayOTRateSearchTerm] = useState("");
+  const [showDoubleLegalHolidayOTRatesModal, setShowDoubleLegalHolidayOTRatesModal] = useState(false);
+  const [doubleLegalHolidayOTRateSearchTerm, setDoubleLegalHolidayOTRateSearchTerm] = useState("");
+  const [showSpecialHoliday2OTRatesModal, setShowSpecialHoliday2OTRatesModal] = useState(false);
+  const [specialHoliday2OTRateSearchTerm, setSpecialHoliday2OTRateSearchTerm] = useState("");
+  const [showNonWorkingHolidayOTRatesModal, setShowNonWorkingHolidayOTRatesModal] = useState(false);
+  const [nonWorkingHolidayOTRateSearchTerm, setNonWorkingHolidayOTRateSearchTerm] = useState("");
   
   // OT Allowances state
   const [minOTHrs, setMinOTHrs] = useState('');
@@ -55,6 +168,16 @@ export function OvertimeRatesTabContent({
     amount: string;
     earningCode: string;
   }>>([]);
+
+  const itemsPerPage = 10;
+  const [isLateFiling, setLateFiling] = useState(false);
+  const [regularOTRatesList, setRegularOTRatesList] = useState<RegularOTRatesItem[]>([]);
+  const [restDayOTRatesList, setRestDayOTRatesList] = useState<RestDayOTRatesItem[]>([]);
+  const [legalHolidayOTRatesList, setLegalHolidayOTRatesList] = useState<HolidayOTRatesItem[]>([]);
+  const [specialHolidayOTRatesList, setSpecialHolidayOTRatesList] = useState<HolidayOTRatesItem[]>([]);
+  const [doubleLegalHolidayOTRatesList, setDoubleLegalHolidayOTRatesList] = useState<HolidayOTRatesItem[]>([]);
+  const [specialHoliday2OTRatesList, setSpecialHoliday2OTRatesList] = useState<HolidayOTRatesItem[]>([]);
+  const [nonWorkingHolidayOTRatesList, setNonWorkingHolidayOTRatesList] = useState<HolidayOTRatesItem[]>([]);
   
   // Mock earning codes data
   const earningCodes = [
@@ -69,6 +192,267 @@ export function OvertimeRatesTabContent({
     { code: 'E09', description: 'Onsite Rollform Allowance' },
     { code: 'E10', description: 'Overwithheld' },
   ];
+
+  // Regular Overtime Rates Search and Pagination
+  const {
+    paginatedData: filteredRegOTRateList,
+    totalPages: regOTRateTotalPages,
+    currentPage: currentRegOTRatePage,
+    setCurrentPage: setCurrentRegOTRatePage,
+    getPageNumbers: getRegOTRatePageNumbers
+  } = useTablePagination(
+    regularOTRatesList,
+    regDayOvertimeRateSearchTerm,
+    (item, search) =>
+      item.code?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
+  );
+
+  const regOTRateStartIndex = (currentRegOTRatePage - 1) * itemsPerPage;
+  const regOTRateEndIndex = regOTRateStartIndex + itemsPerPage;
+
+  // Regular Overtime Rates Search and Pagination
+  const {
+    paginatedData: filteredRestDayOTRateList,
+    totalPages: restDayOTRateTotalPages,
+    currentPage: currentRestDayOTRatePage,
+    setCurrentPage: setCurrentRestDayOTRatePage,
+    getPageNumbers: getRestDayOTRatePageNumbers
+  } = useTablePagination(
+    restDayOTRatesList,
+    restDayOverTimeRateSearchTerm,
+    (item, search) =>
+      item.code?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
+  );
+
+  const restDayOTRateStartIndex = (currentRestDayOTRatePage - 1) * itemsPerPage;
+  const restDayOTRateEndIndex = restDayOTRateStartIndex + itemsPerPage;
+
+  // Legal Holiday Overtime Rates Search and Pagination
+  const {
+    paginatedData: filteredLegalHolidayOTRateList,
+    totalPages: legalHolidayOTRateTotalPages,
+    currentPage: currentLegalHolidayOTRatePage,
+    setCurrentPage: setCurrentLegalHolidayOTRatePage,
+    getPageNumbers: getLegalHolidayOTRatePageNumbers
+  } = useTablePagination(
+    legalHolidayOTRatesList,
+    legalHolidayOTRateSearchTerm,
+    (item, search) =>
+      item.code?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
+  );
+
+  const legalHolidayOTRateStartIndex = (currentLegalHolidayOTRatePage - 1) * itemsPerPage;
+  const legalHolidayOTRateEndIndex = legalHolidayOTRateStartIndex + itemsPerPage;
+
+  // Special Holiday Overtime Rates Search and Pagination
+  const {
+    paginatedData: filteredSpecialHolidayOTRateList,
+    totalPages: specialHolidayOTRateTotalPages,
+    currentPage: currentSpecialHolidayOTRatePage,
+    setCurrentPage: setCurrentSpecialHolidayOTRatePage,
+    getPageNumbers: getSpecialHolidayOTRatePageNumbers
+  } = useTablePagination(
+    specialHolidayOTRatesList,
+    specialHolidayOTRateSearchTerm,
+    (item, search) =>
+      item.code?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
+  );
+
+  const specialHolidayOTRateStartIndex = (currentSpecialHolidayOTRatePage - 1) * itemsPerPage;
+  const specialHolidayOTRateEndIndex = specialHolidayOTRateStartIndex + itemsPerPage;
+
+
+  // Double Legal Holiday Overtime Rates Search and Pagination
+  const {
+    paginatedData: filteredDoubleLegalHolidayOTRateList,
+    totalPages: doubleLegalHolidayOTRateTotalPages,
+    currentPage: currentDoubleLegalHolidayOTRatePage,
+    setCurrentPage: setCurrentDoubleLegalHolidayOTRatePage,
+    getPageNumbers: getDoubleLegalHolidayOTRatePageNumbers
+  } = useTablePagination(
+    doubleLegalHolidayOTRatesList,
+    doubleLegalHolidayOTRateSearchTerm,
+    (item, search) =>
+      item.code?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
+  );
+
+  const doubleLegalHolidayOTRateStartIndex = (currentDoubleLegalHolidayOTRatePage - 1) * itemsPerPage;
+  const doubleLegalHolidayOTRateEndIndex = doubleLegalHolidayOTRateStartIndex + itemsPerPage;
+
+  // Special Holiday 2 Overtime Rates Search and Pagination
+  const {
+    paginatedData: filteredSpecialHoliday2OTRateList,
+    totalPages: specialHoliday2OTRateTotalPages,
+    currentPage: currentSpecialHoliday2OTRatePage,
+    setCurrentPage: setCurrentSpecialHoliday2OTRatePage,
+    getPageNumbers: getSpecialHoliday2OTRatePageNumbers
+  } = useTablePagination(
+    specialHoliday2OTRatesList,
+    specialHoliday2OTRateSearchTerm,
+    (item, search) =>
+      item.code?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
+  );
+
+  const specialHoliday2OTRateStartIndex = (currentSpecialHoliday2OTRatePage - 1) * itemsPerPage;
+  const specialHoliday2OTRateEndIndex = specialHoliday2OTRateStartIndex + itemsPerPage;
+
+  // Non-Working Overtime Rates Search and Pagination
+  const {
+    paginatedData: filteredNonWorkingOTRateList,
+    totalPages: nonWorkingOTRateTotalPages,
+    currentPage: currentNonWorkingOTRatePage,
+    setCurrentPage: setCurrentNonWorkingOTRatePage,
+    getPageNumbers: getNonWorkingOTRatePageNumbers
+  } = useTablePagination(
+    nonWorkingHolidayOTRatesList,
+    nonWorkingHolidayOTRateSearchTerm,
+    (item, search) =>
+      item.code?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
+  );
+
+  const nonWorkingOTRateStartIndex = (currentNonWorkingOTRatePage - 1) * itemsPerPage;
+  const nonWorkingOTRateEndIndex = nonWorkingOTRateStartIndex + itemsPerPage;
+
+  // Fetch RegularDayOTRateSetUp
+  const fetchRegularDayOTRateSetUp = async (): Promise<RegularOTRatesItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/Overtime/RegularDayOTRateSetUp"
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      description: item.desc,
+      afterTheShift: item.afterTheShift,
+      withinTheShiftND: item.withinTheShiftND,
+      afterTheShiftND: item.afterTheShiftND,
+      oTPremiumAfterTheShift: item.otPremiumAfterTheShift,
+      oTPremiumWithinTheShift: item.otPremiumWithinTheShift,
+      doleRegDay: item.doleRegDay,
+    }));
+  };
+
+  // Fetch RestDayOTRateSetUp
+  const fetchRestDayOTRateSetUp = async (): Promise<RestDayOTRatesItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/Overtime/RestDayOTRateSetUp"
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      description: item.desc,
+      withinTheShift: item.withinTheShift,
+      afterTheShift: item.afterTheShift,
+      withinTheShiftWithND: item.withinTheShiftWithND,
+      afterTheShiftWithND: item.afterTheShiftWithND,
+      oTPremiumWithinTheShiftWithND: item.otPremiumWithinTheShiftWithND,
+      oTPremiumAfterTheShiftWithND: item.otPremiumAfterTheShiftWithND,
+      equiOTCode: item.equiOTCode,
+      eqOTCodeAfterShiftForNoOfHours: item.eqOTCodeAftrShfForNoOfHrs,
+      eqOTCodeAfterShiftNDForNoOfHours: item.eqOTCodeAftrShfNDForNoOfHrs
+    }));
+  };
+
+  const fetchHolidayOTRateSetUp = async (): Promise<HolidayOTRatesItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/Overtime/HolidayOTRateSetUp"
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      description: item.desc,
+      withinTheShift: item.withintheShift,
+      afterTheShift: item.aftetheShift,
+      withinTheShiftWithND: item.withintheShiftwithND,
+      afterTheShiftWithND: item.aftertheShiftwithND,
+      withinTheShiftAndRestday: item.withintheShiftandRestday,
+      afterTheShiftAndRestday: item.aftertheShiftandRestday,
+      withinTheShiftAndRestdayWithND: item.withintheShiftandRestdaywithND,
+      afterTheShiftAndRestdayWithND: item.aftertheShiftandRestdaywithND,
+      unworkedHolidayPay: item.unworkedHolidayPay,
+      unworkedHolidayPayRestday: item.unworkedHolidayPayRestday,
+      holidayType: item.holidayType,
+      unprodWorkHolidayRegDay: item.unprodWorkHolidayRegDay,
+      unprodWorkHolidayRestDay: item.unprodWorkHolidayRestDay,
+      otPremiumWithinTheShiftWithND: item.otPremiumWithintheShiftwithND,
+      otPremiumAfterTheShiftWithND: item.otPremiumAftertheShiftwithND,
+      otPremiumWithinTheShiftAndRestdayWithND: item.otPremiumWithintheShiftandRestdaywithND,
+      otPremiumAfterTheShiftAndRestdayWithND: item.otPremiumAftertheShiftandRestdaywithND,
+      eqOTCodeWinShf: item.eqOTCodeWinShf,
+      eqOTCodeWinShfRest: item.eqOTCodeWinShfRest,
+      eqOTCodeAftrShfForNoOfHrs: item.eqOTCodeAftrShfForNoOfHrs,
+      eqOTCodeAftrShfRDForNoOfHrs: item.eqOTCodeAftrShfRDForNoOfHrs,
+      eqOTCodeAftrShfNDForNoOfHrs: item.eqOTCodeAftrShfNDForNoOfHrs,
+      eqOTCodeAftrShfRDNDForNoOfHrs: item.eqOTCodeAftrShfRDNDForNoOfHrs,
+    }));
+  };
+
+  useEffect(() => {
+    const loadOvertimeFileSetup = async () => {
+      const items = await fetchRegularDayOTRateSetUp();
+      setRegularOTRatesList(items);
+    };
+
+    const loadRestDayOTRateSetUp = async () => {
+      const items = await fetchRestDayOTRateSetUp();
+      setRestDayOTRatesList(items); 
+    }
+
+    const loadLegalHolidayOTRateSetUp = async () => { 
+      const items = await fetchHolidayOTRateSetUp();
+      const filtered = items.filter(item => item.code === 'LEGAL' || item.code === 'LEGAL_D');
+      setLegalHolidayOTRatesList(filtered);
+    };
+
+    const loadSpecialHolidayOTRateSetUp = async () => { 
+      const items = await fetchHolidayOTRateSetUp();
+      const filtered = items.filter(item => item.code === 'SPECIAL' || item.code === 'SPECIAL_D');
+      setSpecialHolidayOTRatesList(filtered);
+    }
+
+    const loadDoubleLegalHolidayOTRateSetUp = async () => { 
+      const items = await fetchHolidayOTRateSetUp();
+      const filtered = items.filter(item => item.code === 'DOUBLE LEGAL'); // Assuming 'DOUBLE LEGAL' is the code for Double Legal Holiday in your data
+      setDoubleLegalHolidayOTRatesList(filtered);
+      console.log('Double Legal Holiday OT Rates:', filtered);
+    }
+
+    const loadSpecialHoliday2OTRateSetUp = async () => { 
+      const items = await fetchHolidayOTRateSetUp(); 
+      const filtered = items.filter(item => item.code === 'SPECIAL2'); // Assuming 'SPECIALL2' is the code for Special Holiday 2 in your data
+      setSpecialHoliday2OTRatesList(filtered);
+    }
+
+    const loadNonWorkingHolidayOTRateSetUp = async () => { 
+      const items = await fetchHolidayOTRateSetUp(); 
+      const filtered = items.filter(item => item.code === 'NON WORKING'); // Assuming 'NON WORKING' is the code for Non-Working Holiday in your data
+      setNonWorkingHolidayOTRatesList(filtered);  
+    }
+
+    loadOvertimeFileSetup();
+    loadRestDayOTRateSetUp();
+    loadLegalHolidayOTRateSetUp();
+    loadSpecialHolidayOTRateSetUp();
+    loadDoubleLegalHolidayOTRateSetUp();
+    loadSpecialHoliday2OTRateSetUp();
+    loadNonWorkingHolidayOTRateSetUp();
+  }, []);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -175,8 +559,12 @@ export function OvertimeRatesTabContent({
               />
               {isEditMode && (
                 <>
-                  <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                  <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                  <button
+                    onClick={() => setShowRegDayOvertimeRatesModal(true)} 
+                    className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setRegularDayOT('')}
+                    className={clearButtonClass}><X className="w-4 h-4" /></button>
                 </>
               )}
             </div>
@@ -192,8 +580,12 @@ export function OvertimeRatesTabContent({
               />
               {isEditMode && (
                 <>
-                  <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                  <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => {setShowRestDayOvertimeRatesModal(true)}}
+                    className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setRestDayOT('')}
+                    className={clearButtonClass}><X className="w-4 h-4" /></button>
                 </>
               )}
             </div>
@@ -209,8 +601,12 @@ export function OvertimeRatesTabContent({
               />
               {isEditMode && (
                 <>
-                  <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                  <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setShowLegalHolidayOTRatesModal(true)}
+                    className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setLegalHolidayOT('')}
+                    className={clearButtonClass}><X className="w-4 h-4" /></button>
                 </>
               )}
             </div>
@@ -226,8 +622,12 @@ export function OvertimeRatesTabContent({
               />
               {isEditMode && (
                 <>
-                  <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                  <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setShowSpecialHolidayOTRatesModal(true)}
+                    className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setSpecialHolidayOT('')}
+                    className={clearButtonClass}><X className="w-4 h-4" /></button>
                 </>
               )}
             </div>
@@ -236,13 +636,19 @@ export function OvertimeRatesTabContent({
               <label className="w-48 text-gray-700 text-sm text-right">Double Legal Holiday</label>
               <input
                 type="text"
+                value={doubleLegalHolidayOT}
+                onChange={(e) => setDoubleLegalHolidayOT(e.target.value) }
                 readOnly={!isEditMode}
                 className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-gray-50' : ''}`}
               />
               {isEditMode && (
                 <>
-                  <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                  <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                  <button 
+                    onClick={ () => setShowDoubleLegalHolidayOTRatesModal(true)}
+                    className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setDoubleLegalHolidayOT('')}
+                    className={clearButtonClass}><X className="w-4 h-4" /></button>
                 </>
               )}
             </div>
@@ -251,13 +657,19 @@ export function OvertimeRatesTabContent({
               <label className="w-48 text-gray-700 text-sm text-right">Special Holiday 2</label>
               <input
                 type="text"
+                value={specialHolidayOT2}
+                onChange={(e) => setSpecialHolidayOT2(e.target.value)}
                 readOnly={!isEditMode}
                 className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-gray-50' : ''}`}
               />
               {isEditMode && (
                 <>
-                  <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                  <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setShowSpecialHoliday2OTRatesModal(true)}
+                    className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setSpecialHolidayOT2('')}
+                    className={clearButtonClass}><X className="w-4 h-4" /></button>
                 </>
               )}
             </div>
@@ -266,13 +678,19 @@ export function OvertimeRatesTabContent({
               <label className="w-48 text-gray-700 text-sm text-right">Non-Working Holiday</label>
               <input
                 type="text"
+                value={nonWorkingHolidayOT}
+                onChange={(e) => setNonWorkingHolidayOT(e.target.value)}
                 readOnly={!isEditMode}
                 className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-gray-50' : ''}`}
               />
               {isEditMode && (
                 <>
-                  <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                  <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setShowNonWorkingHolidayOTRatesModal(true)}
+                    className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                  <button 
+                    onClick={() => setNonWorkingHolidayOT('')}
+                    className={clearButtonClass}><X className="w-4 h-4" /></button>
                 </>
               )}
             </div>
@@ -285,42 +703,45 @@ export function OvertimeRatesTabContent({
           <div className="space-y-3">
             <label className="flex items-center gap-3">
               <span className="text-gray-700 text-sm w-56">Use OT Premium BreakDown</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" 
+                className="w-4 h-4 mt-1"
+                disabled={!isEditMode} 
+                defaultChecked={true} />
             </label>
 
             <label className="flex items-center gap-3">
               <span className="text-gray-700 text-sm w-56">Use Actual Day Type</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
             </label>
 
             <label className="flex items-center gap-3">
               <span className="text-gray-700 text-sm w-56">Holiday With Workshift</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
             </label>
 
             <label className="flex items-center gap-3">
               <span className="text-gray-700 text-sm w-56">Deduct MealBreak in OT Comp.</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
             </label>
 
             <label className="flex items-center gap-3">
               <span className="text-gray-700 text-sm w-56">Compute OT for Break2Out/Break2In</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
             </label>
 
             <label className="flex items-center gap-3">
               <span className="text-gray-700 text-sm w-56">Enable 24-hr OT</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
             </label>
 
             <label className="flex items-start gap-3">
               <span className="text-gray-700 text-sm w-56 pt-1">Include Unworked Holiday Pay in the Regular Days/Hours</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
             </label>
 
             <label className="flex items-start gap-3">
               <span className="text-gray-700 text-sm w-56 pt-1">Sunday Work is considered OT if Worked on Saturday</span>
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
             </label>
           </div>
         </div>
@@ -337,13 +758,22 @@ export function OvertimeRatesTabContent({
                 <label className="w-48 text-gray-700 text-sm text-right">Regular Day Overtime Rates</label>
                 <input
                   type="text"
+                  value={regularDayOTLateFiling}
+                  onChange={(e) => setRegularDayOTLateFiling(e.target.value)}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-white' : ''}`}
                 />
                 {isEditMode && (
                   <>
-                    <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                    <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => {
+                        setShowRegDayOvertimeRatesModal(true);
+                        setLateFiling(true);
+                      }}
+                      className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => setRegularDayOTLateFiling('')}
+                      className={clearButtonClass}><X className="w-4 h-4" /></button>
                   </>
                 )}
               </div>
@@ -352,13 +782,22 @@ export function OvertimeRatesTabContent({
                 <label className="w-48 text-gray-700 text-sm text-right">Rest Day Overtime Rates</label>
                 <input
                   type="text"
+                  value={restDayOTLateFiling}
+                  onChange={(e) => setRestDayOTLateFiling(e.target.value)}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-white' : ''}`}
                 />
                 {isEditMode && (
                   <>
-                    <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                    <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => {
+                        setShowRestDayOvertimeRatesModal(true);
+                        setLateFiling(true);
+                      }}
+                      className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => setRestDayOTLateFiling('')}
+                      className={clearButtonClass}><X className="w-4 h-4" /></button>
                   </>
                 )}
               </div>
@@ -367,13 +806,22 @@ export function OvertimeRatesTabContent({
                 <label className="w-48 text-gray-700 text-sm text-right">Legal Holiday Overtime Rates</label>
                 <input
                   type="text"
+                  value={legalHolidayOTLateFiling}
+                  onChange={(e) => setLegalHolidayOTLateFiling(e.target.value)}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-white' : ''}`}
                 />
                 {isEditMode && (
                   <>
-                    <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                    <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => {
+                        setShowLegalHolidayOTRatesModal(true);
+                        setLateFiling(true);
+                      }}
+                      className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => setLegalHolidayOTLateFiling('')}
+                      className={clearButtonClass}><X className="w-4 h-4" /></button>
                   </>
                 )}
               </div>
@@ -382,13 +830,22 @@ export function OvertimeRatesTabContent({
                 <label className="w-48 text-gray-700 text-sm text-right">Special Holiday Overtime Rates</label>
                 <input
                   type="text"
+                  value={specialHolidayOTLateFiling}
+                  onChange={(e) => setSpecialHolidayOTLateFiling(e.target.value)}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-white' : ''}`}
                 />
                 {isEditMode && (
                   <>
-                    <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                    <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => {
+                        setShowSpecialHolidayOTRatesModal(true);
+                        setLateFiling(true);
+                      }}
+                      className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => setSpecialHolidayOTLateFiling('')}
+                      className={clearButtonClass}><X className="w-4 h-4" /></button>
                   </>
                 )}
               </div>
@@ -397,13 +854,22 @@ export function OvertimeRatesTabContent({
                 <label className="w-48 text-gray-700 text-sm text-right">Double Legal Holiday</label>
                 <input
                   type="text"
+                  value={doubleLegalHolidayOTLateFiling}
+                  onChange={(e) => setDoubleLegalHolidayOTLateFiling(e.target.value)}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-white' : ''}`}
                 />
                 {isEditMode && (
                   <>
-                    <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                    <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => {
+                        setShowDoubleLegalHolidayOTRatesModal(true);
+                        setLateFiling(true);
+                      }}
+                      className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => setDoubleLegalHolidayOTLateFiling('')}
+                      className={clearButtonClass}><X className="w-4 h-4" /></button>
                   </>
                 )}
               </div>
@@ -412,13 +878,22 @@ export function OvertimeRatesTabContent({
                 <label className="w-48 text-gray-700 text-sm text-right">Special Holiday 2</label>
                 <input
                   type="text"
+                  value={specialHoliday2OTLateFiling}
+                  onChange={(e) => setSpecialHoliday2OTLateFiling(e.target.value)}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-white' : ''}`}
                 />
                 {isEditMode && (
                   <>
-                    <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                    <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => {
+                        setShowSpecialHoliday2OTRatesModal(true);
+                        setLateFiling(true);
+                      }}
+                      className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => setSpecialHoliday2OTLateFiling('')}
+                      className={clearButtonClass}><X className="w-4 h-4" /></button>
                   </>
                 )}
               </div>
@@ -427,13 +902,22 @@ export function OvertimeRatesTabContent({
                 <label className="w-48 text-gray-700 text-sm text-right">Non-Working Holiday</label>
                 <input
                   type="text"
+                  value={nonWorkingHolidayOTLateFiling}
+                  onChange={(e) => setNonWorkingHolidayOTLateFiling(e.target.value)}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? 'bg-white' : ''}`}
                 />
                 {isEditMode && (
                   <>
-                    <button className={searchButtonClass}><Search className="w-4 h-4" /></button>
-                    <button className={clearButtonClass}><X className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => {
+                        setShowNonWorkingHolidayOTRatesModal(true);
+                        setLateFiling(true);
+                      }}
+                      className={searchButtonClass}><Search className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => setNonWorkingHolidayOTLateFiling('')}
+                      className={clearButtonClass}><X className="w-4 h-4" /></button>
                   </>
                 )}
               </div>
@@ -472,51 +956,51 @@ export function OvertimeRatesTabContent({
                 <label className="text-gray-700 text-sm mb-2 block">Applies To:</label>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 pl-4">
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Regular Day</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Rest Day</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Legal Holiday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Legal Holiday Falling On Restday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Special Holiday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Special Holiday Falling On Restday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Double Legal Holiday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Double Legal Holiday Falling On Restday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Special 2 Holiday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Special 2 Holiday Falling On Restday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Non-Working Holiday</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                    <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                     <span className="text-gray-700 text-sm">Non-Working Holiday Falling On Restday</span>
                   </label>
                 </div>
@@ -636,7 +1120,7 @@ export function OvertimeRatesTabContent({
               </div>
 
               <label className="flex items-center gap-3">
-                <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                 <span className="text-gray-700 text-sm">Overtime Per CutOff</span>
               </label>
 
@@ -734,7 +1218,7 @@ export function OvertimeRatesTabContent({
 
               <div className="border-t border-gray-300 pt-3 mt-3 space-y-3">
                 <label className="flex items-start gap-3">
-                  <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+                  <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
                   <span className="text-gray-700 text-sm">
                     Use Over Time Authorization
                     <br />
@@ -743,7 +1227,7 @@ export function OvertimeRatesTabContent({
                 </label>
 
                 <label className="flex items-start gap-3">
-                  <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+                  <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
                   <span className="text-gray-700 text-sm">
                     Special OT Computation
                     <br />
@@ -875,48 +1359,48 @@ export function OvertimeRatesTabContent({
           <div className="flex items-center gap-6">
             <label className="text-gray-700 text-sm">Holiday Pay</label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
               <span className="text-gray-700 text-sm">Legal</span>
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
               <span className="text-gray-700 text-sm">Special</span>
             </label>
           </div>
 
           <div className="pl-8 space-y-2">
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
               <span className="text-gray-700 text-sm">Compute Holiday Pay for Monthly</span>
             </label>
 
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
               <span className="text-gray-700 text-sm">No Pay if Absent Before Holiday</span>
             </label>
 
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
               <span className="text-gray-700 text-sm">Compute Holiday Pay If Worked Before Holiday Even on RestDay</span>
             </label>
 
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
               <span className="text-gray-700 text-sm">Compute Holiday Pay If Worked Before Holiday Even on Legal Holiday</span>
             </label>
 
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
               <span className="text-gray-700 text-sm">Compute Holiday Pay If Worked Before Holiday Even on Special Holiday</span>
             </label>
 
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
               <span className="text-gray-700 text-sm">No Pay If Absent After Holiday</span>
             </label>
 
             <label className="flex items-center gap-2">
-              <input type="checkbox" className={checkboxClass} disabled={!isEditMode} defaultChecked={true} />
+              <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} defaultChecked={true} />
               <span className="text-gray-700 text-sm">Compute Holiday Pay If With Paid Leave Prior To Holiday</span>
             </label>
 
@@ -932,7 +1416,7 @@ export function OvertimeRatesTabContent({
           </div>
 
           <label className="flex items-center gap-2">
-            <input type="checkbox" className={checkboxClass} disabled={!isEditMode} />
+            <input type="checkbox" className="w-4 h-4 mt-1" disabled={!isEditMode} />
             <span className="text-gray-700 text-sm">First 8 Hours Base on Shift during Restday and Holidays</span>
           </label>
         </div>
@@ -1134,6 +1618,1008 @@ export function OvertimeRatesTabContent({
                     Next
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regular OT Rate Search Modal */}
+      {showRegDayOvertimeRatesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowRegDayOvertimeRatesModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Search
+              </h2>
+              <button
+                onClick={() => setShowRegDayOvertimeRatesModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Overtime Code Title and Search */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-blue-600 mb-3">Regular Day OT Rates</h3>
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={regDayOvertimeRateSearchTerm}
+                  onChange={(e) => setRegDayOvertimeRateSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder=""
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRegOTRateList.map((item, index) => (
+                    <tr
+                        key={`${item.id}-${index}`}
+                        className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          (isLateFiling) ? setRegularDayOTLateFiling(item.code) : setRegularDayOT(item.code);
+                          setShowRegDayOvertimeRatesModal(false);
+                        }}
+                      >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredRegOTRateList.length === 0 ? 0 : regOTRateStartIndex + 1} to{" "}
+                {Math.min(regOTRateEndIndex, filteredRegOTRateList.length)} of{" "}
+                {filteredRegOTRateList.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentRegOTRatePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentRegOTRatePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getRegOTRatePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentRegOTRatePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentRegOTRatePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentRegOTRatePage((prev) =>
+                      Math.min(prev + 1, regOTRateTotalPages),
+                    )
+                  }
+                  disabled={
+                    currentRegOTRatePage === regOTRateTotalPages ||
+                    regOTRateTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legal Holiday OT Rates Search Modal */}
+      {showLegalHolidayOTRatesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowLegalHolidayOTRatesModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Search
+              </h2>
+              <button
+                onClick={() => setShowLegalHolidayOTRatesModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Legal Holiday OT Rates Title and Search */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-blue-600 mb-3">Legal Holiday OT Rates</h3>
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={legalHolidayOTRateSearchTerm}
+                  onChange={(e) => setLegalHolidayOTRateSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder=""
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLegalHolidayOTRateList.map((item, index) => (
+                    <tr
+                        key={`${item.id}-${index}`}
+                        className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          (isLateFiling) ? setLegalHolidayOTLateFiling(item.code) : setLegalHolidayOT(item.code);
+                          setShowLegalHolidayOTRatesModal(false);
+                        }}
+                      >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredLegalHolidayOTRateList.length === 0 ? 0 : legalHolidayOTRateStartIndex + 1} to{" "}
+                {Math.min(legalHolidayOTRateEndIndex, filteredLegalHolidayOTRateList.length)} of{" "}
+                {filteredLegalHolidayOTRateList.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentLegalHolidayOTRatePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentLegalHolidayOTRatePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getLegalHolidayOTRatePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentLegalHolidayOTRatePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentLegalHolidayOTRatePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentLegalHolidayOTRatePage((prev) =>
+                      Math.min(prev + 1, legalHolidayOTRateTotalPages),
+                    )
+                  }
+                  disabled={
+                    currentLegalHolidayOTRatePage === legalHolidayOTRateTotalPages ||
+                    legalHolidayOTRateTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Special Holiday OT Rates Search Modal */}
+      {showSpecialHolidayOTRatesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowSpecialHolidayOTRatesModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Search
+              </h2>
+              <button
+                onClick={() => setShowSpecialHolidayOTRatesModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Overtime Code Title and Search */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-blue-600 mb-3">Special Holiday OT Rates</h3>
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={specialHolidayOTRateSearchTerm}
+                  onChange={(e) => setSpecialHolidayOTRateSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder=""
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSpecialHolidayOTRateList.map((item, index) => (
+                    <tr
+                        key={`${item.id}-${index}`}
+                        className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          (isLateFiling) ? setSpecialHolidayOTLateFiling(item.code) : setSpecialHolidayOT(item.code);
+                          setShowSpecialHolidayOTRatesModal(false);
+                        }}
+                      >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredSpecialHolidayOTRateList.length === 0 ? 0 : specialHolidayOTRateStartIndex + 1} to{" "}
+                {Math.min(specialHolidayOTRateEndIndex, filteredSpecialHolidayOTRateList.length)} of{" "}
+                {filteredSpecialHolidayOTRateList.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentSpecialHolidayOTRatePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentSpecialHolidayOTRatePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getSpecialHolidayOTRatePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentSpecialHolidayOTRatePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentSpecialHolidayOTRatePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentSpecialHolidayOTRatePage((prev) =>
+                      Math.min(prev + 1, specialHolidayOTRateTotalPages),
+                    )
+                  }
+                  disabled={
+                    currentSpecialHolidayOTRatePage === specialHolidayOTRateTotalPages ||
+                    specialHolidayOTRateTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Double Legal Holiday OT Rates Search Modal */}
+      {showDoubleLegalHolidayOTRatesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowDoubleLegalHolidayOTRatesModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Search
+              </h2>
+              <button
+                onClick={() => setShowDoubleLegalHolidayOTRatesModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Double Legal Holiday OT Rates Title and Search */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-blue-600 mb-3">Double Legal Holiday OT Rates</h3>
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={doubleLegalHolidayOTRateSearchTerm}
+                  onChange={(e) => setDoubleLegalHolidayOTRateSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder=""
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDoubleLegalHolidayOTRateList.map((item, index) => (
+                    <tr
+                        key={`${item.id}-${index}`}
+                        className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          (isLateFiling) ? setDoubleLegalHolidayOTLateFiling(item.code) : setDoubleLegalHolidayOT(item.code);
+                          setShowDoubleLegalHolidayOTRatesModal(false);
+                        }}
+                      >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredDoubleLegalHolidayOTRateList.length === 0 ? 0 : doubleLegalHolidayOTRateStartIndex + 1} to{" "}
+                {Math.min(doubleLegalHolidayOTRateEndIndex, filteredDoubleLegalHolidayOTRateList.length)} of{" "}
+                {filteredDoubleLegalHolidayOTRateList.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentDoubleLegalHolidayOTRatePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentDoubleLegalHolidayOTRatePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getDoubleLegalHolidayOTRatePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentDoubleLegalHolidayOTRatePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentDoubleLegalHolidayOTRatePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentDoubleLegalHolidayOTRatePage((prev) =>
+                      Math.min(prev + 1, doubleLegalHolidayOTRateTotalPages),
+                    )
+                  }
+                  disabled={
+                    currentDoubleLegalHolidayOTRatePage === doubleLegalHolidayOTRateTotalPages ||
+                    doubleLegalHolidayOTRateTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Special Holiday 2 OT Rates Search Modal */}
+      {showSpecialHoliday2OTRatesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowSpecialHoliday2OTRatesModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Search
+              </h2>
+              <button
+                onClick={() => setShowSpecialHoliday2OTRatesModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Special Holiday 2 OT Rates Title and Search */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-blue-600 mb-3">Special Holiday 2 OT Rates</h3>
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={specialHoliday2OTRateSearchTerm}
+                  onChange={(e) => setSpecialHoliday2OTRateSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder=""
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSpecialHoliday2OTRateList.map((item, index) => (
+                    <tr
+                        key={`${item.id}-${index}`}
+                        className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          (isLateFiling) ? setSpecialHoliday2OTLateFiling(item.code) : setSpecialHolidayOT2(item.code);
+                          setShowSpecialHoliday2OTRatesModal(false);
+                        }}
+                      >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredSpecialHoliday2OTRateList.length === 0 ? 0 : specialHoliday2OTRateStartIndex + 1} to{" "}
+                {Math.min(specialHoliday2OTRateEndIndex, filteredSpecialHoliday2OTRateList.length)} of{" "}
+                {filteredSpecialHoliday2OTRateList.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentSpecialHoliday2OTRatePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentSpecialHoliday2OTRatePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getSpecialHoliday2OTRatePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentSpecialHoliday2OTRatePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentSpecialHoliday2OTRatePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentSpecialHoliday2OTRatePage((prev) =>
+                      Math.min(prev + 1, specialHoliday2OTRateTotalPages),
+                    )
+                  }
+                  disabled={
+                    currentSpecialHoliday2OTRatePage === specialHoliday2OTRateTotalPages ||
+                    specialHoliday2OTRateTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Non Working OT Rates Search Modal */}
+      {showNonWorkingHolidayOTRatesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowNonWorkingHolidayOTRatesModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Search
+              </h2>
+              <button
+                onClick={() => setShowNonWorkingHolidayOTRatesModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Non Working OT Rates Title and Search */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-blue-600 mb-3">Non Working Holiday OT Rates</h3>
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={nonWorkingHolidayOTRateSearchTerm}
+                  onChange={(e) => setNonWorkingHolidayOTRateSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder=""
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredNonWorkingOTRateList.map((item, index) => (
+                    <tr
+                        key={`${item.id}-${index}`}
+                        className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          (isLateFiling) ? setNonWorkingHolidayOTLateFiling(item.code) :  setNonWorkingHolidayOT(item.code);
+                          setShowNonWorkingHolidayOTRatesModal(false);
+                        }}
+                      >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredNonWorkingOTRateList.length === 0 ? 0 :  nonWorkingOTRateStartIndex + 1} to{" "}
+                {Math.min(nonWorkingOTRateEndIndex, filteredNonWorkingOTRateList.length)} of{" "}
+                {filteredNonWorkingOTRateList.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentNonWorkingOTRatePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentNonWorkingOTRatePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getNonWorkingOTRatePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >``
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentNonWorkingOTRatePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentNonWorkingOTRatePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentNonWorkingOTRatePage((prev) =>
+                      Math.min(prev + 1, nonWorkingOTRateTotalPages),
+                    )
+                  }
+                  disabled={
+                    currentNonWorkingOTRatePage === nonWorkingOTRateTotalPages ||
+                    nonWorkingOTRateTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest Day OT Search Modal */}
+      {showRestDayOvertimeRatesModal && ( // REST DAY MODAL
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowRestDayOvertimeRatesModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Search
+              </h2>
+              <button
+                onClick={() => setShowRestDayOvertimeRatesModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Rest Day OT Title and Search */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-blue-600 mb-3">Rest Day OT Rates</h3>
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={restDayOverTimeRateSearchTerm}
+                  onChange={(e) => setRestDayOvertimeRateSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder=""
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRestDayOTRateList.map((item, index) => (
+                    <tr
+                        key={`${item.id}-${index}`}
+                        className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          (isLateFiling) ? setRestDayOTLateFiling(item.code) : setRestDayOT(item.code);
+                          setShowRestDayOvertimeRatesModal(false);
+                        }}
+                      >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredRestDayOTRateList.length === 0 ? 0 : restDayOTRateStartIndex + 1} to{" "}
+                {Math.min(restDayOTRateEndIndex, filteredRestDayOTRateList.length)} of{" "}
+                {filteredRestDayOTRateList.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentRestDayOTRatePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentRestDayOTRatePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getRestDayOTRatePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentRestDayOTRatePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentRestDayOTRatePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentRestDayOTRatePage((prev) =>
+                      Math.min(prev + 1, restDayOTRateTotalPages),
+                    )
+                  }
+                  disabled={
+                    currentRestDayOTRatePage === restDayOTRateTotalPages ||
+                    restDayOTRateTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
               </div>
             </div>
           </div>

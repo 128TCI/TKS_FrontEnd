@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import {
   Search,
   X,
@@ -23,6 +23,8 @@ import { OvertimeRatesTabContent } from "../../OvertimeRatesTabContent";
 import { OtherPoliciesTabContent } from "../../OtherPoliciesTabContent";
 import { Footer } from "../../Footer/Footer";
 import apiClient from "../../../services/apiClient";
+import { useTablePagination } from "../../../hooks/useTablePagination";
+
 import Swal from "sweetalert2";
 
 interface GroupItem {
@@ -141,10 +143,8 @@ export function TimeKeepGroupPage() {
   const [tksGroupSearchTerm, setTksGroupSearchTerm] = useState("");
   const [tksGroupCode, setTksGroupCode] = useState("1");
   const [tksGroupDescription, setTksGroupDescription] = useState("");
-  const [showPayrollLocationModal, setShowPayrollLocationModal] =
-    useState(false);
-  const [payrollLocationSearchTerm, setPayrollLocationSearchTerm] =
-    useState("");
+  const [showPayrollLocationModal, setShowPayrollLocationModal] =useState(false);
+  const [payrollLocationSearchTerm, setPayrollLocationSearchTerm] =useState("");
   const [payrollLocationCode, setPayrollLocationCode] = useState("");
   const [payrollDescription, setPayrollDescription] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -160,14 +160,19 @@ export function TimeKeepGroupPage() {
   const [forNoLoginSearchTerm, setForNoLoginSearchTerm] = useState("");
   const [showForNoLogoutModal, setShowForNoLogoutModal] = useState(false);
   const [forNoLogoutSearchTerm, setForNoLogoutSearchTerm] = useState("");
+  const [showForNoBreak2InModal, setShowForNoBreak2InModal] = useState(false);
+  const [forNoBreak2InSearchTerm, setForNoBreak2InSearchTerm] = useState("");
+  const [showForNoBreak2OutModal, setShowForNoBreak2OutModal] = useState(false);
+  const [forNoBreak2OutSearchTerm, setForNoBreak2OutSearchTerm] = useState("");
+
 
   // Modals for Supervisory GroupCode and OT Code Per Week
-  const [showSupervisoryGroupModal, setShowSupervisoryGroupModal] =
-    useState(false);
-  const [supervisoryGroupSearchTerm, setSupervisoryGroupSearchTerm] =
-    useState("");
+  const [showSupervisoryGroupModal, setShowSupervisoryGroupModal] = useState(false);
+  const [supervisoryGroupSearchTerm, setSupervisoryGroupSearchTerm] = useState("");
   const [showOtCodeModal, setShowOtCodeModal] = useState(false);
   const [otCodeSearchTerm, setOtCodeSearchTerm] = useState("");
+
+  
 
   // Auto Pairing Logs Cut-Off Dates
   const [autoPairingFrom, setAutoPairingFrom] = useState("09/29/2025");
@@ -176,11 +181,9 @@ export function TimeKeepGroupPage() {
   // Login Policy StateF
   const [gracePeriodSemiAnnual, setGracePeriodSemiAnnual] = useState(false);
   const [gracePeriodPerDay, setGracePeriodPerDay] = useState("");
-  const [gracePeriodIncludeTardiness, setGracePeriodIncludeTardiness] =
-    useState(false);
+  const [gracePeriodIncludeTardiness, setGracePeriodIncludeTardiness] =useState(false);
   const [includeBreak2InGrace, setIncludeBreak2InGrace] = useState(false);
-  const [deductibleEvenWithinGrace, setDeductibleEvenWithinGrace] =
-    useState(false);
+  const [deductibleEvenWithinGrace, setDeductibleEvenWithinGrace] =useState(false);
   const [gracePeriodPerSemiAnnual, setGracePeriodPerSemiAnnual] = useState("");
   const [firstHalfDateFrom, setFirstHalfDateFrom] = useState("");
   const [firstHalfDateTo, setFirstHalfDateTo] = useState("");
@@ -188,30 +191,24 @@ export function TimeKeepGroupPage() {
   const [secondHalfDateTo, setSecondHalfDateTo] = useState("");
   const [deductOverBreak, setDeductOverBreak] = useState(true);
   const [gracePeriodCalamity2, setGracePeriodCalamity2] = useState("");
-  const [combineTardinessTimeInBreak2, setCombineTardinessTimeInBreak2] =
-    useState(false);
-  const [computeTardinessNoLogout, setComputeTardinessNoLogout] =
-    useState(false);
+  const [combineTardinessTimeInBreak2, setCombineTardinessTimeInBreak2] = useState(false);
+  const [computeTardinessNoLogout, setComputeTardinessNoLogout] = useState(false);
 
   const [nightDiffStartTime, setNightDiffStartTime] = useState("10:00 PM");
   const [nightDiffEndTime, setNightDiffEndTime] = useState("6:00 AM");
   const [deductMealBreakND, setDeductMealBreakND] = useState(false);
   const [twoShiftsInDay, setTwoShiftsInDay] = useState(true);
   const [hoursIntervalTwoShifts, setHoursIntervalTwoShifts] = useState("2.00");
-  const [allowableGracePeriodMonth, setAllowableGracePeriodMonth] =
-    useState("3");
-  const [excludeAllowableGraceBracket, setExcludeAllowableGraceBracket] =
-    useState(false);
-  const [allowableGraceActualMonth, setAllowableGraceActualMonth] =
-    useState(true);
+  const [allowableGracePeriodMonth, setAllowableGracePeriodMonth] = useState("3");
+  const [excludeAllowableGraceBracket, setExcludeAllowableGraceBracket] = useState(false);
+  const [allowableGraceActualMonth, setAllowableGraceActualMonth] = useState(true);
   const [considerSaturdayPaid, setConsiderSaturdayPaid] = useState(true);
   const [maxDaysPerWeekSaturday, setMaxDaysPerWeekSaturday] = useState("3.00");
   const [allowableTardyExcess, setAllowableTardyExcess] = useState("");
   const [excludeTardinessInGrace, setExcludeTardinessInGrace] = useState(false);
   const [supervisoryGroupCode, setSupervisoryGroupCode] = useState("");
   const [applyOccurancesBreak, setApplyOccurancesBreak] = useState(false);
-  const [maxOccurancesNoDeduction, setMaxOccurancesNoDeduction] =
-    useState("12");
+  const [maxOccurancesNoDeduction, setMaxOccurancesNoDeduction] = useState("12");
   const [gracePeriodOccurance, setGracePeriodOccurance] = useState("");
   const [hoursRequiredPerWeek, setHoursRequiredPerWeek] = useState("");
   const [startOfWeek, setStartOfWeek] = useState("");
@@ -229,10 +226,32 @@ export function TimeKeepGroupPage() {
   const [restDayOT, setRestDayOT] = useState("RDOT");
   const [legalHolidayOT, setLegalHolidayOT] = useState("LEGAL");
   const [specialHolidayOT, setSpecialHolidayOT] = useState("SPECIAL");
+  const [doubleLegalHolidayOT, setDoubleLegalHolidayOT] = useState("DOUBLE LEGAL");
+  const [specialHolidayOT2, setSpecialHolidayOT2] = useState("SPECIAL2")
+  const [nonWorkingHolidayOT, setNonWorkingHolidayOT] = useState("NON WORKING");
+  // Late Filing
+  const [regularDayOTLateFiling, setRegularDayOTLateFiling] = useState("ROT");
+  const [restDayOTLateFiling, setRestDayOTLateFiling] = useState("RDOT");
+  const [legalHolidayOTLateFiling, setLegalHolidayOTLateFiling] = useState("LEGAL");
+  const [specialHolidayOTLateFiling, setSpecialHolidayOTLateFiling] = useState("SPECIAL");
+  const [doubleLegalHolidayOTLateFiling, setDoubleLegalHolidayOTLateFiling] = useState("DOUBLE LEGAL");
+  const [specialHoliday2OTLateFiling, setSpecialHoliday2OTLateFiling] = useState("SPECIAL2")
+  const [nonWorkingHolidayOTLateFiling, setNonWorkingHolidayOTLateFiling] = useState("NON WORKING");
+
   const [useOTPremium, setUseOTPremium] = useState(false);
   const [useActualDayType, setUseActualDayType] = useState(false);
   const [holidayWithWorkshift, setHolidayWithWorkshift] = useState(false);
+
+  // OT Break
   const [otBreakMinHours, setOtBreakMinHours] = useState("0.00");
+  const [regDayMinHrsToCompOT, setRegDayMinHrsToCompOT] = useState("0.00");
+  const [restDayMinHrsToCompOT, setRestDayMinHrsToCompOT] = useState("0.00");
+  const [legalHolidayMinHrsToCompOT, setLegalHolidayMinHrsToCompOT] = useState("0.00");
+  const [specialHolidayMinHrsToCompOT, setSpecialHolidayMinHrsToCompOT] = useState("0.00");
+  const [specialHoliday2MinHrsToCompOT, setSpecialHoliday2MinHrsToCompOT] = useState("0.00");
+  const [doubleLegalHolidayMinHrsToCompOT, setDoubleLegalHolidayMinHrsToCompOT] = useState("0.00");
+  const [nonWorkingHolidayMinHrsToCompOT, setNonWorkingHolidayMinHrsToCompOT] = useState("0.00");
+
 
   // Other Policies State
   const [useDefaultRestday, setUseDefaultRestday] = useState(false);
@@ -243,8 +262,7 @@ export function TimeKeepGroupPage() {
 
   // System Configuration State
   const [showSystemConfigModal, setShowSystemConfigModal] = useState(false);
-  const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] =
-    useState(false);
+  const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] = useState(false);
   const [minBeforeShift, setMinBeforeShift] = useState("0");
   const [minIgnoreMultipleBreak, setMinIgnoreMultipleBreak] = useState("0");
   const [minBeforeMidnightShift, setMinBeforeMidnightShift] = useState("0");
@@ -260,81 +278,34 @@ export function TimeKeepGroupPage() {
   // TKSGroup List states
   const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
   const [tksGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
+  const [currentGroupPage, setCurrentGroupPage] = useState(1);
 
   // Payroll Location List states
-  const [payrollLocationItems, setPayrollLocationItems] = useState<
-    PayrollLocationItem[]
-  >([]);
+  const [payrollLocationList, setPayrollLocationList] = useState<PayrollLocationItem[]>([]);
 
-  const [groupLoginPolicyItems, setGroupLoginPolicyItems] = useState<
-    LoginPolicyItem[]
-  >([]);
+  // Group Login Policy States
+  const [groupLoginPolicyItems, setGroupLoginPolicyItems] = useState<LoginPolicyItem[]>([]);
 
-  // Pagination states for TKSGroup list
-  const [currentGroupPage, setCurrentGroupPage] = useState(1);
-  const [currentPayrollPage, setCurrentPayrollPage] = useState(1);
+  // Cutoff Group States
+  const [cutOffTableSearchTerm, setCutOffTableSearchTerm] = useState("");
+  const [selectedCutOffRows, setSelectedCutOffRows] = useState<string[]>([]);
+
+  //Supervisory Group states
+  const [supervisoryGroupsList, setSupervisoryGroupsList] = useState<GroupItem[]>([]);
+  const [otCodePerWeekList, setOtCodePerWeekList] = useState<OvertimeFileSetupItem[]>([]);
+  const [equivDayAbsentList, setEquivDayAbsentList] = useState<EquivDayItem[]>([],);
+  const [equivDayNoLoginList, setEquivDayNoLoginList] = useState<EquivDayItem[]>([]);
+  const [equivDayNoLogoutList, setEquivDayNoLogoutList] = useState<EquivDayItem[]>([],);
+  const [equivDayForNoBreak2InList, setEquivDayForNoBreak2InList] = useState<EquivDayItem[]>([],);
+  const [equivDayForNoBreak2OutList, setEquivDayForNoBreak2OutList] = useState<EquivDayItem[]>([],);
+ 
+
+  // Pagination Numbers of Page
   const itemsPerPage = 10;
 
-  // Filter Groups
-  const filteredGroups = tksGroupItems.filter(
-    (item) =>
-      (item.tksGroupCode
-        ?.toLowerCase()
-        .includes(tksGroupSearchTerm.toLowerCase()) ??
-        false) ||
-      (item.description
-        ?.toLowerCase()
-        .includes(tksGroupSearchTerm.toLowerCase()) ??
-        false),
-  );
-
-  useEffect(() => {
-    setCurrentGroupPage(1);
-  }, [tksGroupSearchTerm]);
-
-  // Pagination Calculations
-  const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
-
-  const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
-  const endGroupIndex = startGroupIndex + itemsPerPage;
-
-  const paginatedGroups = filteredGroups.slice(startGroupIndex, endGroupIndex);
-
-  const getGroupPageNumbers = () => {
-    const pages = [];
-
-    if (totalGroupPages <= 7) {
-      for (let i = 1; i <= totalGroupPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (currentGroupPage <= 4) {
-        for (let i = 1; i <= 5; i++) pages.push(i);
-        pages.push("...");
-        pages.push(totalGroupPages);
-      } else if (currentGroupPage >= totalGroupPages - 3) {
-        pages.push(1);
-        pages.push("...");
-        for (let i = totalGroupPages - 4; i <= totalGroupPages; i++)
-          pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push("...");
-        for (let i = currentGroupPage - 1; i <= currentGroupPage + 1; i++)
-          pages.push(i);
-        pages.push("...");
-        pages.push(totalGroupPages);
-      }
-    }
-
-    return pages;
-  };
-
-  const [autoPairingTableSearchTerm, setAutoPairingTableSearchTerm] =
-    useState("");
-  const [selectedAutoPairingRows, setSelectedAutoPairingRows] = useState<
-    string[]
-  >([]);
+  
+  const [autoPairingTableSearchTerm, setAutoPairingTableSearchTerm] =useState("");
+  const [selectedAutoPairingRows, setSelectedAutoPairingRows] = useState<string[]>([]);
   const [autoPairingCurrentPage, setAutoPairingCurrentPage] = useState(1);
   const autoPairingPageSize = 10;
 
@@ -413,113 +384,84 @@ export function TimeKeepGroupPage() {
     "December",
   ];
 
-  // State
-  const [cutOffTableSearchTerm, setCutOffTableSearchTerm] = useState("");
-  const [selectedCutOffRows, setSelectedCutOffRows] = useState<string[]>([]);
-  const [cutOffCurrentPage, setCutOffCurrentPage] = useState(1);
-  const cutOffPageSize = 10;
-
-  //Supervisory Group states
-  const [supervisoryGroups, setSupervisoryGroups] = useState<GroupItem[]>([]);
-  const [currentSupervisoryPage, setCurrentSupervisoryPage] = useState(1);
-
-  // OT Code Per Week states
-  const [otCodePerWeekList, setOtCodePerWeekList] = useState<
-    OvertimeFileSetupItem[]
-  >([]);
-  const [currentOtCodePerWeekPage, setCurrentOtCodePerWeekPage] = useState(1);
-
-  // Equivalent Day Absent states
-  const [equivDayAbsentList, setEquivDayAbsentList] = useState<EquivDayItem[]>(
-    [],
-  );
-  const [currentEquivDayAbsentPage, setCurrentEquivDayAbsentPage] = useState(1);
-
-  // Equivalent Day No Login states
-  const [equivDayNoLoginList, setEquivDayNoLoginList] = useState<
-    EquivDayItem[]
-  >([]);
-  const [currentEquivDayNoLoginPage, setCurrentEquivDayNoLoginPage] =
-    useState(1);
-
-  // Equivalent Day No Logout states
-  const [equivDayNoLogoutList, setEquivDayNoLogoutList] = useState<
-    EquivDayItem[]
-  >([]);
-  const [currentEquivDayNoLogoutPage, setCurrentEquivDayNoLogoutPage] =
-    useState(1);
-
-  // Derived from API data
-  const cutOffFilteredData = tksGroupItems.filter(
+  // Filter Groups
+  const filteredGroups = tksGroupItems.filter(
     (item) =>
-      cutOffTableSearchTerm === "" ||
-      item.tksGroupCode
-        .toLowerCase()
-        .includes(cutOffTableSearchTerm.toLowerCase()) ||
-      item.description
-        .toLowerCase()
-        .includes(cutOffTableSearchTerm.toLowerCase()),
+      (item.tksGroupCode
+        ?.toLowerCase()
+        .includes(tksGroupSearchTerm.toLowerCase()) ??
+        false) ||
+      (item.description
+        ?.toLowerCase()
+        .includes(tksGroupSearchTerm.toLowerCase()) ??
+        false),
   );
 
-  const cutOffTotalPages = Math.max(
-    1,
-    Math.ceil(cutOffFilteredData.length / cutOffPageSize),
-  );
-  const cutOffStartIndex = (cutOffCurrentPage - 1) * cutOffPageSize;
-  const cutOffEndIndex = cutOffStartIndex + cutOffPageSize;
-  const cutOffPaginatedData = cutOffFilteredData.slice(
-    cutOffStartIndex,
-    cutOffEndIndex,
-  );
-
-  // Reset page when search changes
   useEffect(() => {
-    setCutOffCurrentPage(1);
-  }, [cutOffTableSearchTerm]);
+    setCurrentGroupPage(1);
+  }, [tksGroupSearchTerm]);
 
-  // Page numbers helper (same pattern as your other tables)
-  const getCutOffPageNumbers = (): (number | string)[] => {
+  // Pagination Calculations For Tks Group
+  const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
+  const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
+  const endGroupIndex = startGroupIndex + itemsPerPage;
+  const paginatedGroups = filteredGroups.slice(startGroupIndex, endGroupIndex);
+
+  const getGroupPageNumbers = () => {
     const pages: (number | string)[] = [];
-    if (cutOffTotalPages <= 7) {
-      for (let i = 1; i <= cutOffTotalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (cutOffCurrentPage > 3) pages.push("...");
-      for (
-        let i = Math.max(2, cutOffCurrentPage - 1);
-        i <= Math.min(cutOffTotalPages - 1, cutOffCurrentPage + 1);
-        i++
+    for (let i = 1; i <= totalGroupPages; i++) {
+      if (
+        i === 1 ||
+        i === totalGroupPages ||
+        (i >= currentGroupPage - 1 &&
+          i <= currentGroupPage + 1)
       ) {
         pages.push(i);
+      } else if (pages[pages.length - 1] !== "...") {
+        pages.push("...");
       }
-      if (cutOffCurrentPage < cutOffTotalPages - 2) pages.push("...");
-      pages.push(cutOffTotalPages);
     }
     return pages;
   };
 
-  const filteredSupervisoryGroups = supervisoryGroups.filter(
-    (item) =>
-      supervisoryGroupSearchTerm === "" ||
-      item.tksGroupCode
-        .toLowerCase()
-        .includes(supervisoryGroupSearchTerm.toLowerCase()) ||
-      item.description
-        .toLowerCase()
-        .includes(supervisoryGroupSearchTerm.toLowerCase()),
+  // CuttOff Group Pagination and Search
+  const {
+    paginatedData: filteredCutOffData,
+    totalPages: cutOffTotalPages,
+    currentPage: cutOffCurrentPage,
+    setCurrentPage: setCutOffCurrentPage,
+    getPageNumbers: getCutOffPageNumbers
+  } = useTablePagination(
+    tksGroupItems,
+    cutOffTableSearchTerm,
+    (item, search) =>
+      item.tksGroupCode?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
   );
 
-  const totalSupervisoryPages = Math.ceil(
-    filteredSupervisoryGroups.length / itemsPerPage,
-  );
+  const cutOffStartIndex = (cutOffCurrentPage - 1) * itemsPerPage;
+  const cutOffEndIndex = cutOffStartIndex + itemsPerPage;
 
-  const startSupervisoryIndex = (currentSupervisoryPage - 1) * itemsPerPage;
 
-  const endSupervisoryIndex = startSupervisoryIndex + itemsPerPage;
 
-  const paginatedSupervisoryGroups = filteredSupervisoryGroups.slice(
-    startSupervisoryIndex,
-    endSupervisoryIndex,
+  useEffect(() => {
+    setCutOffCurrentPage(1);
+  }, [cutOffTableSearchTerm]);
+
+  // For Supervisory Groups
+  const {
+    paginatedData: filteredSupervisoryGroups,
+    totalPages: totalSupervisoryPages,
+    currentPage: currentSupervisoryPage,
+    setCurrentPage: setCurrentSupervisoryPage,
+  } = useTablePagination(
+    supervisoryGroupsList,
+    supervisoryGroupSearchTerm,
+    (item, search) =>
+      item.tksGroupCode?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search),
+    itemsPerPage
   );
 
   const getSupervisoryPageNumbers = (): number[] => {
@@ -530,103 +472,191 @@ export function TimeKeepGroupPage() {
     return pages;
   };
 
-  const filteredOtCodes = otCodePerWeekList.filter((item) => {
-    const search = otCodeSearchTerm.toLowerCase();
 
-    return (
-      search === "" ||
-      item.oTFileSetupCode?.toLowerCase().includes(search) ||
-      item.description?.toLowerCase().includes(search) ||
-      Number(item.rateOne ?? 0)
-        .toFixed(2)
-        .includes(search) ||
-      Number(item.defaultAmount ?? 0)
-        .toFixed(2)
-        .includes(search)
-    );
-  });
+  const startSupervisoryIndex = (currentSupervisoryPage - 1) * itemsPerPage;
+  const endSupervisoryIndex = startSupervisoryIndex + itemsPerPage;
 
-  const totalOtPages = Math.ceil(filteredOtCodes.length / itemsPerPage);
-
-  const startOtIndex = (currentOtCodePerWeekPage - 1) * itemsPerPage;
-  const endOtIndex = startOtIndex + itemsPerPage;
-
-  const paginatedOtCodes = filteredOtCodes.slice(startOtIndex, endOtIndex);
-
-  const getOtPageNumbers = (): (number | string)[] => {
-    const pages: (number | string)[] = [];
-
-    if (totalOtPages <= 7) {
-      for (let i = 1; i <= totalOtPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-
-      if (currentOtCodePerWeekPage > 3) {
-        pages.push("...");
-      }
-
-      for (
-        let i = Math.max(2, currentOtCodePerWeekPage - 1);
-        i <= Math.min(totalOtPages - 1, currentOtCodePerWeekPage + 1);
-        i++
-      ) {
-        pages.push(i);
-      }
-
-      if (currentOtCodePerWeekPage < totalOtPages - 2) {
-        pages.push("...");
-      }
-
-      pages.push(totalOtPages);
-    }
-
-    return pages;
-  };
-
-  const filteredEquivDayAbsent = equivDayAbsentList.filter(
-    (item) =>
-      forAbsentSearchTerm === "" ||
-      item.code.toLowerCase().includes(forAbsentSearchTerm.toLowerCase()) ||
-      item.description
-        .toLowerCase()
-        .includes(forAbsentSearchTerm.toLowerCase()) ||
+  // For OT Code Per Week Pagination and Search
+  const {
+    filteredData: filteredOtCodes,
+    paginatedData: paginatedOtCodes,
+    totalPages: totalOtCodesPages,
+    currentPage: currentOtCodePerWeekPage,
+    setCurrentPage: setCurrentOtCodePerWeekPage,
+    getPageNumbers: getOtCodesPageNumbers,
+  } = useTablePagination(
+    otCodePerWeekList,
+    otCodeSearchTerm,
+    (item, search) =>
+      item.oTFileSetupCode.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
         (val) =>
           typeof val === "number" &&
-          val.toString().includes(forAbsentSearchTerm),
+          val.toFixed(2).includes(search)
       ),
+    itemsPerPage
   );
 
-  const totalEquivDayAbsentPages = Math.ceil(
-    filteredEquivDayAbsent.length / itemsPerPage,
-  );
-  const startEquivIndex = (currentEquivDayAbsentPage - 1) * itemsPerPage;
-  const endEquivIndex = startEquivIndex + itemsPerPage;
-  const paginatedEquivDayAbsent = filteredEquivDayAbsent.slice(
-    startEquivIndex,
-    endEquivIndex,
+  const startOtCodesIndex = (currentOtCodePerWeekPage - 1) * itemsPerPage;
+  const endOtCodesIndex = startOtCodesIndex + itemsPerPage;
+
+  // For Payroll Location Pagination and Search
+  const {
+    filteredData: filteredPayrollLocations,
+    paginatedData: paginatedPayrollLocations,
+    totalPages: totalPayrollLocationsPages,
+    currentPage: currentPayrollLocationsPage,
+    setCurrentPage: setCurrentPayrollLocationsPage,
+    getPageNumbers: getPayrollLocationsPageNumbers,
+  } = useTablePagination(
+    payrollLocationList,
+    payrollLocationSearchTerm,
+    (item, search) =>
+      item.locationCode.toLowerCase().includes(search) ||
+      item.locationName.toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) =>
+          typeof val === "number" &&
+          val.toFixed(2).includes(search)
+      ),
+    itemsPerPage
   );
 
-  // Function to generate page numbers like OT modal
-  const getEquivDayAbsentPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    for (let i = 1; i <= totalEquivDayAbsentPages; i++) {
-      if (
-        i === 1 ||
-        i === totalEquivDayAbsentPages ||
-        (i >= currentEquivDayAbsentPage - 1 &&
-          i <= currentEquivDayAbsentPage + 1)
-      ) {
-        pages.push(i);
-      } else if (pages[pages.length - 1] !== "...") {
-        pages.push("...");
-      }
-    }
-    return pages;
-  };
+  const startPayrollLocationsIndex = (currentPayrollLocationsPage - 1) * itemsPerPage;
+  const endPayrollLocationsIndex = startPayrollLocationsIndex + itemsPerPage;
 
+  useEffect(() => {
+    setCurrentPayrollLocationsPage(1);
+  }, [payrollLocationSearchTerm]);
+
+  // For Absent Pagination and Search
+  const {
+    filteredData: filteredEquivDayAbsent,
+    paginatedData: paginatedEquivDayAbsent,
+    totalPages: totalEquivDayAbsentPages,
+    currentPage: currentEquivDayAbsentPage,
+    setCurrentPage: setCurrentEquivDayAbsentPage,
+    getPageNumbers: getEquivDayAbsentPageNumbers,
+  } = useTablePagination(
+    equivDayAbsentList,
+    forAbsentSearchTerm,
+    (item, search) =>
+      item.code.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) =>
+          typeof val === "number" &&
+          val.toFixed(2).includes(search)
+      ),
+    itemsPerPage
+  );
+
+  const startEquivDayAbsentIndex = (currentEquivDayAbsentPage - 1) * itemsPerPage;
+  const endEquivDayAbsentIndex = startEquivDayAbsentIndex + itemsPerPage;
+
+  // For No Login Pagination and Search
+  const {
+    filteredData: filteredEquivDayNoLogin,
+    paginatedData: paginatedEquivDayNoLogin,
+    totalPages: totalEquivDayNoLoginPages,
+    currentPage: currentEquivDayNoLoginPage,
+    setCurrentPage: setCurrentEquivDayNoLoginPage,
+    getPageNumbers: getEquivDayNoLoginPageNumbers,
+  } = useTablePagination(
+    equivDayNoLoginList,
+    forNoLoginSearchTerm,
+    (item, search) =>
+      item.code.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) =>
+          typeof val === "number" &&
+          val.toFixed(2).includes(search)
+      ),
+    itemsPerPage
+  );
+
+  const startEquivDayNoLoginIndex = (currentEquivDayNoLoginPage - 1) * itemsPerPage;
+  const endEquivDayNoLoginIndex = startEquivDayNoLoginIndex + itemsPerPage;
+
+
+  // For No Logout Pagination and Search
+  const {
+    filteredData: filteredEquivDayNoLogout,
+    paginatedData: paginatedEquivDayNoLogout,
+    totalPages: totalEquivDayNoLogoutPages,
+    currentPage: currentEquivDayNoLogoutPage,
+    setCurrentPage: setCurrentEquivDayNoLogoutPage,
+    getPageNumbers: getEquivDayNoLogoutPageNumbers,
+  } = useTablePagination(
+    equivDayNoLogoutList,
+    forNoLogoutSearchTerm,
+    (item, search) =>
+      item.code.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) =>
+          typeof val === "number" &&
+          val.toFixed(2).includes(search)
+      ),
+    itemsPerPage
+  );
+
+  const startEquivDayNoLogoutIndex = (currentEquivDayNoLogoutPage - 1) * itemsPerPage;
+  const endEquivDayNoLogoutIndex = startEquivDayNoLogoutIndex + itemsPerPage;
+
+  // For No Break 2 In Pagination and Search
+  const {
+    filteredData: filteredEquivDayNoBreak2In,
+    paginatedData: paginatedEquivDayNoBreak2In,
+    totalPages: totalEquivDayNoBreak2InPages,
+    currentPage: currentEquivDayForNoBreak2InPage,
+    setCurrentPage: setCurrentEquivDayForNoBreak2InPage,
+    getPageNumbers: getEquivDayNoBreak2InPageNumbers,
+  } = useTablePagination(
+    equivDayForNoBreak2InList,
+    forNoBreak2InSearchTerm,
+    (item, search) =>
+      item.code.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) =>
+          typeof val === "number" &&
+          val.toFixed(2).includes(search)
+      ),
+    itemsPerPage
+  );
+
+  const startEquivDayNoBreak2InIndex = (currentEquivDayForNoBreak2InPage - 1) * itemsPerPage;
+  const endEquivDayNoBreak2InIndex = startEquivDayNoBreak2InIndex + itemsPerPage;
+
+
+  // For No Break 2 OutPagination and Search
+  const {
+    filteredData: filteredEquivDayNoBreak2Out,
+    paginatedData: paginatedEquivDayNoBreak2Out,
+    totalPages: totalEquivDayNoBreak2OutPages,
+    currentPage: currentEquivDayForNoBreak2OutPage,
+    setCurrentPage: setCurrentEquivDayForNoBreak2OutPage,
+    getPageNumbers: getEquivDayNoBreak2OutPageNumbers,
+  } = useTablePagination(
+    equivDayForNoBreak2OutList,
+    forNoBreak2OutSearchTerm,
+    (item, search) =>
+      item.code.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) =>
+          typeof val === "number" &&
+          val.toFixed(2).includes(search)
+      ),
+    itemsPerPage
+  );
+
+  const startEquivDayNoBreak2OutIndex = (currentEquivDayForNoBreak2OutPage - 1) * itemsPerPage;
+  const endEquivDayNoBreak2OutIndex = startEquivDayNoBreak2OutIndex + itemsPerPage;
+  
   // Converts "2021-05-05T00:00:00" → "05/05/2021"
   const formatApiDate = (apiDate: string | null | undefined) => {
     if (!apiDate) return "";
@@ -680,6 +710,25 @@ export function TimeKeepGroupPage() {
     loadOvertimeFileSetup();
   }, []);
 
+  const fetchPayrollLocationData = async (): Promise<PayrollLocationItem[]> => {
+    const response = await apiClient.get("/Fs/Process/PayrollLocationSetUp");
+
+    return response.data.map((item: any) => ({
+      id: item.ID || item.id,
+      locationCode: item.locCode ?? "",
+      locationName: item.locName ?? "",
+    }));
+  };
+
+  useEffect(() => {
+    const loadPayrollLocation = async () => {
+      const items = await fetchPayrollLocationData();
+      setPayrollLocationList(items);
+    };
+
+    loadPayrollLocation();
+  }, []);
+
   // Generic fetch function
   const fetchEquivDayData = async (
     endpoint: string,
@@ -710,16 +759,28 @@ export function TimeKeepGroupPage() {
         "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogin",
       );
       setEquivDayNoLoginList(forNoLoginItems);
-      console.log("For No Login Items:", forNoLoginItems); 
 
       const forNoLogoutItems = await fetchEquivDayData(
         "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogout",
       );
       setEquivDayNoLogoutList(forNoLogoutItems);
+
+      const forNoBreak2InItems = await fetchEquivDayData(
+        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2In",
+      );
+      setEquivDayForNoBreak2InList(forNoBreak2InItems);
+
+      const forNoBreak2OutItems = await fetchEquivDayData(
+        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2Out",
+      );
+      setEquivDayForNoBreak2OutList(forNoBreak2OutItems);
     };
 
     loadData();
   }, []);
+
+
+  
 
   const populateFromGroup = (firstGroup: GroupItem) => {
     setTksGroupCode(firstGroup.tksGroupCode ?? "");
@@ -740,8 +801,7 @@ export function TimeKeepGroupPage() {
     const loadTKSGroup = async () => {
       const items = await fetchTKSGroupData();
       setTKSGroupItems(items); // Set TKSGroup items to state
-      setSupervisoryGroups(items); // Set Supervisory Groups
-
+      setSupervisoryGroupsList(items); // Set Supervisory Groups
       if (items.length > 0) {
         populateFromGroup(items[0]);
       }
@@ -749,24 +809,6 @@ export function TimeKeepGroupPage() {
     loadTKSGroup();
   }, []);
 
-  const fetchPayrollLocationData = async (): Promise<PayrollLocationItem[]> => {
-    const response = await apiClient.get("/Fs/Process/PayrollLocationSetUp");
-
-    return response.data.map((item: any) => ({
-      id: item.ID || item.id,
-      locationCode: item.locCode ?? "",
-      locationName: item.locName ?? "",
-    }));
-  };
-
-  useEffect(() => {
-    const loadPayrollLocation = async () => {
-      const items = await fetchPayrollLocationData();
-      setPayrollLocationItems(items);
-    };
-
-    loadPayrollLocation();
-  }, []);
 
   const formatTimeTo12Hour = (isoString: string | null): string => {
     if (!isoString) return "";
@@ -799,21 +841,13 @@ export function TimeKeepGroupPage() {
     setDeductMealBreakND(item.deductMealBreakinNDComput ?? false);
     setTwoShiftsInDay(item.twoShiftsInADay ?? false);
     setHoursIntervalTwoShifts(item.twoShiftsInADayInterval?.toString() ?? "");
-    setAllowableGracePeriodMonth(
-      item.numberAllowGracePrdInAMonth?.toString() ?? "",
-    );
+    setAllowableGracePeriodMonth(item.numberAllowGracePrdInAMonth?.toString() ?? "",);
     setExcludeAllowableGraceBracket(item.excludeAllowGracePrdFlag ?? false);
-    setAllowableGraceActualMonth(
-      item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
-    );
+    setAllowableGraceActualMonth(item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,);
     setConsiderSaturdayPaid(item.saturdayPdRegHrsFlag ?? false);
     setMaxDaysPerWeekSaturday(item.maxDaysPerWeekSatWrk?.toString() ?? "");
-    setAllowableTardyExcess(
-      item.numberAllowTardyExcessGracePrd?.toString() ?? "",
-    );
-    setExcludeTardinessInGrace(
-      item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,
-    );
+    setAllowableTardyExcess(item.numberAllowTardyExcessGracePrd?.toString() ?? "",);
+    setExcludeTardinessInGrace(item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,);
     setSupervisoryGroupCode(item.supGroupCode ?? "");
     setApplyOccurancesBreak(item.computeShrtBrkTardy ?? false);
     setMaxOccurancesNoDeduction(item.maxTimePerMonth?.toString() ?? "");
@@ -833,15 +867,12 @@ export function TimeKeepGroupPage() {
     groupCode?: string,
   ): Promise<LoginPolicyItem[] | LoginPolicyItem | null> => {
     try {
-      // Base URL
       const url = "/Fs/Process/GroupSetupLoginPolicy";
 
-      // Fetch all items (we will filter in frontend)
       const response = await apiClient.get(url);
 
       if (!response.data) return groupCode ? null : [];
 
-      // Map API response to LoginPolicyItem
       const mapped: LoginPolicyItem[] = response.data.map((item: any) => ({
         id: item.id ?? 0,
         groupCode: item.groupCode ?? "",
@@ -859,10 +890,8 @@ export function TimeKeepGroupPage() {
         deductMealBreakinNDComput: item.deductMealBreakinNDComput ?? false,
         incRestdayinNDComput: item.incRestdayinNDComput ?? false,
         incHolidayinNDComput: item.incHolidayinNDComput ?? false,
-        restdayNDComputBasedOnDateIn:
-          item.restdayNDComputBasedOnDateIn ?? false,
-        holidayNDComputbasedOnDateIn:
-          item.holidayNDComputbasedOnDateIn ?? false,
+        restdayNDComputBasedOnDateIn: item.restdayNDComputBasedOnDateIn ?? false,
+        holidayNDComputbasedOnDateIn: item.holidayNDComputbasedOnDateIn ?? false,
         tardinessMaxHours: item.tardinessMaxHours ?? null,
         undertimeMaxHours: item.undertimeMaxHours ?? null,
         undertimeHoursFromTardy: item.undertimeHoursFromTardy ?? null,
@@ -894,23 +923,17 @@ export function TimeKeepGroupPage() {
         maxDaysPerWeekSatWrk: item.maxDaysPerWeekSatWrk ?? null,
         saturdayPdRegHrsFlag: item.saturdayPdRegHrsFlag ?? false,
         excludeAllowGracePrdFlag: item.excludeAllowGracePrdFlag ?? false,
-        allowableGracePrdInAMonthBasedActualMonthFlag:
-          item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
-        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag:
-          item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ??
-          false,
-        numberAllowTardyExcessGracePrd:
-          item.numberAllowTardyExcessGracePrd ?? null,
+        allowableGracePrdInAMonthBasedActualMonthFlag: item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
+        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag: item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,
+        numberAllowTardyExcessGracePrd: item.numberAllowTardyExcessGracePrd ?? null,
         supGroupCode: item.supGroupCode ?? "",
       }));
 
-      // If a specific groupCode is requested, return only that item
       if (groupCode) {
         const found = mapped.find((x) => x.groupCode === groupCode);
         return found ?? null;
       }
 
-      // Otherwise, return all items
       return mapped;
     } catch (error) {
       console.error("Error fetching group login policy data", error);
@@ -928,34 +951,7 @@ export function TimeKeepGroupPage() {
     loadGroupLoginSetupPolicy();
   }, []);
 
-  const filteredPayrollLocations = payrollLocationItems.filter(
-    (item) =>
-      (item.locationCode
-        ?.toLowerCase()
-        .includes(payrollLocationSearchTerm.toLowerCase()) ??
-        false) ||
-      (item.locationName
-        ?.toLowerCase()
-        .includes(payrollLocationSearchTerm.toLowerCase()) ??
-        false),
-  );
 
-  useEffect(() => {
-    setCurrentPayrollPage(1);
-  }, [payrollLocationSearchTerm]);
-
-  const totalPayrollPages = Math.ceil(
-    filteredPayrollLocations.length / itemsPerPage,
-  );
-
-  const startPayrollIndex = (currentPayrollPage - 1) * itemsPerPage;
-
-  const endPayrollIndex = startPayrollIndex + itemsPerPage;
-
-  const paginatedPayrollLocations = filteredPayrollLocations.slice(
-    startPayrollIndex,
-    endPayrollIndex,
-  );
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -1459,8 +1455,8 @@ export function TimeKeepGroupPage() {
                                       <input
                                         type="checkbox"
                                         checked={
-                                          cutOffFilteredData.length > 0 &&
-                                          cutOffFilteredData.every(
+                                          filteredCutOffData.length > 0 &&
+                                          filteredCutOffData.every(
                                             (item: GroupItem) =>
                                               selectedCutOffRows.includes(
                                                 item.id.toString(),
@@ -1470,7 +1466,7 @@ export function TimeKeepGroupPage() {
                                         onChange={(e) => {
                                           if (e.target.checked) {
                                             setSelectedCutOffRows(
-                                              cutOffFilteredData.map(
+                                              filteredCutOffData.map(
                                                 (i: GroupItem) =>
                                                   i.id.toString(),
                                               ),
@@ -1494,7 +1490,7 @@ export function TimeKeepGroupPage() {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                  {cutOffPaginatedData.map(
+                                  {filteredCutOffData.map(
                                     (item: GroupItem, index: number) => (
                                       <tr
                                         key={item.id}
@@ -1535,7 +1531,7 @@ export function TimeKeepGroupPage() {
                                     ),
                                   )}
 
-                                  {cutOffPaginatedData.length === 0 && (
+                                  {filteredCutOffData.length === 0 && (
                                     <tr>
                                       <td
                                         colSpan={3}
@@ -1554,15 +1550,15 @@ export function TimeKeepGroupPage() {
                           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                             <span>
                               Showing{" "}
-                              {cutOffFilteredData.length === 0
+                              {filteredCutOffData.length === 0
                                 ? 0
                                 : cutOffStartIndex + 1}{" "}
                               to{" "}
                               {Math.min(
                                 cutOffEndIndex,
-                                cutOffFilteredData.length,
+                                filteredCutOffData.length,
                               )}{" "}
-                              of {cutOffFilteredData.length} entries
+                              of {filteredCutOffData.length} entries
                             </span>
                             <div className="flex items-center gap-1">
                               <button
@@ -2541,10 +2537,14 @@ export function TimeKeepGroupPage() {
                       />
                       {isEditMode && (
                         <>
-                          <button className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                          <button 
+                            onClick={() => setShowForNoBreak2OutModal(true)}
+                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                             <Search className="w-4 h-4" />
                           </button>
-                          <button className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                          <button 
+                            onClick={() => setForNoBreak2Out("")}
+                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                             <X className="w-4 h-4" />
                           </button>
                         </>
@@ -2593,10 +2593,13 @@ export function TimeKeepGroupPage() {
                       />
                       {isEditMode && (
                         <>
-                          <button className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                          <button className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            onClick={() => setShowForNoBreak2InModal(true)}>
                             <Search className="w-4 h-4" />
                           </button>
-                          <button className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                          <button 
+                            onClick={() => setForNoBreak2In("")}
+                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                             <X className="w-4 h-4" />
                           </button>
                         </>
@@ -2650,6 +2653,26 @@ export function TimeKeepGroupPage() {
                 setLegalHolidayOT={setLegalHolidayOT}
                 specialHolidayOT={specialHolidayOT}
                 setSpecialHolidayOT={setSpecialHolidayOT}
+                doubleLegalHolidayOT={doubleLegalHolidayOT}
+                setDoubleLegalHolidayOT={setDoubleLegalHolidayOT}
+                specialHolidayOT2={specialHolidayOT2}
+                setSpecialHolidayOT2={setSpecialHolidayOT2}
+                nonWorkingHolidayOT={nonWorkingHolidayOT}
+                setNonWorkingHolidayOT={setNonWorkingHolidayOT}
+                regularDayOTLateFiling={regularDayOTLateFiling}
+                setRegularDayOTLateFiling={setRegularDayOTLateFiling}
+                restDayOTLateFiling={restDayOTLateFiling}
+                setRestDayOTLateFiling={setRestDayOTLateFiling}
+                legalHolidayOTLateFiling={legalHolidayOTLateFiling}
+                setLegalHolidayOTLateFiling={setLegalHolidayOTLateFiling}
+                specialHolidayOTLateFiling={specialHolidayOTLateFiling}
+                setSpecialHolidayOTLateFiling={setSpecialHolidayOTLateFiling}
+                doubleLegalHolidayOTLateFiling={doubleLegalHolidayOTLateFiling}
+                setDoubleLegalHolidayOTLateFiling={setDoubleLegalHolidayOTLateFiling}
+                specialHoliday2OTLateFiling={specialHoliday2OTLateFiling}
+                setSpecialHoliday2OTLateFiling={setSpecialHoliday2OTLateFiling}
+                nonWorkingHolidayOTLateFiling={nonWorkingHolidayOTLateFiling}
+                setNonWorkingHolidayOTLateFiling={setNonWorkingHolidayOTLateFiling}
                 otBreakMinHours={otBreakMinHours}
                 setOtBreakMinHours={setOtBreakMinHours}
               />
@@ -3093,8 +3116,8 @@ export function TimeKeepGroupPage() {
                     <label className="text-gray-700 font-medium">Search:</label>
                     <input
                       type="text"
-                      value={tksGroupSearchTerm}
-                      onChange={(e) => setTksGroupSearchTerm(e.target.value)}
+                      value={payrollLocationSearchTerm}
+                      onChange={(e) => setPayrollLocationSearchTerm(e.target.value)}
                       className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Search by code or description..."
                     />
@@ -3149,23 +3172,23 @@ export function TimeKeepGroupPage() {
                 <div className="flex items-center justify-between mt-3 px-6 pb-4">
                   <div className="text-gray-600 text-xs">
                     Showing{" "}
-                    {filteredGroups.length === 0 ? 0 : startGroupIndex + 1} to{" "}
-                    {Math.min(endGroupIndex, filteredGroups.length)} of{" "}
-                    {filteredGroups.length} entries
+                    {filteredPayrollLocations.length === 0 ? 0 : startPayrollLocationsIndex + 1} to{" "}
+                    {Math.min(endPayrollLocationsIndex, filteredPayrollLocations.length)} of{" "}
+                    {filteredPayrollLocations.length} entries
                   </div>
 
                   <div className="flex gap-1">
                     <button
                       onClick={() =>
-                        setCurrentGroupPage((prev) => Math.max(prev - 1, 1))
+                        setCurrentPayrollLocationsPage((prev) => Math.max(prev - 1, 1))
                       }
-                      disabled={currentGroupPage === 1}
+                      disabled={currentPayrollLocationsPage === 1}
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Previous
                     </button>
 
-                    {getGroupPageNumbers().map((page, idx) =>
+                    {getPayrollLocationsPageNumbers().map((page, idx) =>
                       page === "..." ? (
                         <span
                           key={`ellipsis-${idx}`}
@@ -3176,9 +3199,9 @@ export function TimeKeepGroupPage() {
                       ) : (
                         <button
                           key={page}
-                          onClick={() => setCurrentGroupPage(page as number)}
+                          onClick={() => setCurrentPayrollLocationsPage(page as number)}
                           className={`px-2 py-1 rounded text-xs ${
-                            currentGroupPage === page
+                            currentPayrollLocationsPage === page
                               ? "bg-blue-600 text-white"
                               : "border border-gray-300 hover:bg-gray-100"
                           }`}
@@ -3190,13 +3213,13 @@ export function TimeKeepGroupPage() {
 
                     <button
                       onClick={() =>
-                        setCurrentGroupPage((prev) =>
-                          Math.min(prev + 1, totalGroupPages),
+                        setCurrentPayrollLocationsPage((prev) =>
+                          Math.min(prev + 1, totalPayrollLocationsPages),
                         )
                       }
                       disabled={
-                        currentGroupPage === totalGroupPages ||
-                        totalGroupPages === 0
+                        currentPayrollLocationsPage === totalPayrollLocationsPages ||
+                        totalPayrollLocationsPages === 0
                       }
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -3340,8 +3363,8 @@ export function TimeKeepGroupPage() {
                     Showing{" "}
                     {filteredEquivDayAbsent.length === 0
                       ? 0
-                      : startEquivIndex + 1}{" "}
-                    to {Math.min(endEquivIndex, filteredEquivDayAbsent.length)}{" "}
+                      : startEquivDayAbsentIndex + 1}{" "}
+                    to {Math.min(endEquivDayAbsentIndex, filteredEquivDayAbsent.length)}{" "}
                     of {filteredEquivDayAbsent.length} entries
                   </div>
 
@@ -3481,7 +3504,7 @@ export function TimeKeepGroupPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedEquivDayAbsent.map((item, index) => (//dito yun
+                      {paginatedEquivDayNoLogin.map((item, index) => (//dito yun
                         <tr
                           key={`${item.id}-${index}`}
                           className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
@@ -3522,15 +3545,65 @@ export function TimeKeepGroupPage() {
                 </div>
 
                 {/* Pagination */}
-                <div className="px-6 py-3 border-t border-gray-200">
-                  <div className="flex items-center justify-end gap-2">
-                    <button className="px-3 py-1 text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                <div className="flex items-center justify-between mt-3 px-6 pb-4">
+                  <div className="text-gray-600 text-xs">
+                    Showing{" "}
+                    {filteredEquivDayNoLogin.length === 0
+                      ? 0
+                      : startEquivDayNoLoginIndex + 1}{" "}
+                    to {Math.min(endEquivDayNoLoginIndex, filteredEquivDayNoLogin.length)}{" "}
+                    of {filteredEquivDayNoLogin.length} entries
+                  </div>
+
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayNoLoginPage((prev) =>
+                          Math.max(prev - 1, 1),
+                        )
+                      }
+                      disabled={currentEquivDayNoLoginPage === 1}
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Previous
                     </button>
-                    <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                      1
-                    </button>
-                    <button className="px-3 py-1 text-gray-700 hover:bg-gray-100 rounded transition-colors">
+
+                    {getEquivDayNoLoginPageNumbers().map((page, idx) =>
+                      typeof page === "string" ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-1 text-gray-500 text-xs"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentEquivDayNoLoginPage(page)}
+                          className={`px-2 py-1 rounded text-xs ${
+                            currentEquivDayNoLoginPage === page
+                              ? "bg-blue-600 text-white"
+                              : "border border-gray-300 hover:bg-gray-100"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
+
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayNoLoginPage((prev) =>
+                          Math.min(prev + 1, totalEquivDayNoLoginPages),
+                        )
+                      }
+                      disabled={
+                        currentEquivDayNoLoginPage ===
+                          totalEquivDayNoLoginPages ||
+                        totalEquivDayNoLoginPages === 0
+                      }
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Next
                     </button>
                   </div>
@@ -3618,48 +3691,106 @@ export function TimeKeepGroupPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {["NOLOGOUT"]
-                        .filter((code) =>
-                          code
-                            .toLowerCase()
-                            .includes(forNoLogoutSearchTerm.toLowerCase()),
-                        )
-                        .map((code, index) => (
-                          <tr
-                            key={index}
-                            className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }`}
-                            onClick={() => {
-                              setForNoLogout(code);
-                              setShowForNoLogoutModal(false);
-                            }}
-                          >
-                            <td className="py-2 text-gray-800">{code}</td>
-                            <td className="py-2 text-gray-800">{code}</td>
-                            <td className="py-2 text-gray-800">8.0</td>
-                            <td className="py-2 text-gray-800">8.0</td>
-                            <td className="py-2 text-gray-800">8.0</td>
-                            <td className="py-2 text-gray-800">8.0</td>
-                            <td className="py-2 text-gray-800">8.0</td>
-                            <td className="py-2 text-gray-800">8.0</td>
-                            <td className="py-2 text-gray-800">8.0</td>
-                          </tr>
-                        ))}
+                      {paginatedEquivDayNoLogout.map((item, index) => (
+                        <tr
+                          key={`${item.id}-${index}`}
+                          className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
+                          onClick={() => {
+                            setForNoLogout(item.code);
+                            setShowForNoLogoutModal(false);
+                          }}
+                        >
+                          <td className="py-2 text-gray-800">{item.code}</td>
+                          <td className="py-2 text-gray-800">
+                            {item.description}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.monday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.tuesday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.wednesday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.thursday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.friday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.saturday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.sunday ?? 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
 
                 {/* Pagination */}
-                <div className="px-6 py-3 border-t border-gray-200">
-                  <div className="flex items-center justify-end gap-2">
-                    <button className="px-3 py-1 text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                <div className="flex items-center justify-between mt-3 px-6 pb-4">
+                  <div className="text-gray-600 text-xs">
+                    Showing{" "}
+                    {filteredEquivDayNoLogout.length === 0
+                      ? 0
+                      : startEquivDayNoLogoutIndex + 1}{" "}
+                    to {Math.min(endEquivDayNoLogoutIndex, filteredEquivDayNoLogout.length)}{" "}
+                    of {filteredEquivDayNoLogout.length} entries
+                  </div>
+
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayNoLogoutPage((prev) =>
+                          Math.max(prev - 1, 1),
+                        )
+                      }
+                      disabled={currentEquivDayNoLogoutPage === 1}
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Previous
                     </button>
-                    <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                      1
-                    </button>
-                    <button className="px-3 py-1 text-gray-700 hover:bg-gray-100 rounded transition-colors">
+
+                    {getEquivDayNoLogoutPageNumbers().map((page, idx) =>
+                      typeof page === "string" ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-1 text-gray-500 text-xs"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentEquivDayNoLogoutPage(page)}
+                          className={`px-2 py-1 rounded text-xs ${
+                            currentEquivDayNoLogoutPage === page
+                              ? "bg-blue-600 text-white"
+                              : "border border-gray-300 hover:bg-gray-100"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
+
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayNoLogoutPage((prev) =>
+                          Math.min(prev + 1, totalEquivDayNoLogoutPages),
+                        )
+                      }
+                      disabled={
+                        currentEquivDayNoLogoutPage ===
+                          totalEquivDayNoLogoutPages ||
+                        totalEquivDayNoLogoutPages === 0
+                      }
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Next
                     </button>
                   </div>
@@ -3667,6 +3798,381 @@ export function TimeKeepGroupPage() {
               </div>
             </div>
           )}
+
+          {/* For No Break 2 In Search Modal */}
+          {showForNoBreak2InModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+              onClick={() => setShowForNoBreak2InModal(false)}
+            >
+              <div
+                className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-800">
+                    Select Code
+                  </h2>
+                  <button
+                    onClick={() => setShowForNoBreak2InModal(false)}
+                    className="text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Search Field */}
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center justify-end gap-3">
+                    <label className="text-gray-700">Search:</label>
+                    <input
+                      type="text"
+                      value={forNoBreak2InSearchTerm}
+                      onChange={(e) => setForNoBreak2InSearchTerm(e.target.value)}
+                      className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder=""
+                    />
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div
+                  className="px-6 py-4"
+                  style={{ maxHeight: "400px", overflowY: "auto" }}
+                >
+                  <table className="w-full">
+                    <thead className="border-b-2 border-gray-300">
+                      <tr>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          <div className="flex items-center gap-1">
+                            Code
+                            <span className="text-blue-600">▲</span>
+                          </div>
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Description
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Monday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Tuesday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Wednesday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Thursday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Friday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Saturday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Sunday
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedEquivDayNoBreak2In.map((item, index) => (
+                        <tr
+                          key={`${item.id}-${index}`}
+                          className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
+                          onClick={() => {
+                            setForNoBreak2In(item.code);
+                            setShowForNoBreak2InModal(false);
+                          }}
+                        >
+                          <td className="py-2 text-gray-800">{item.code}</td>
+                          <td className="py-2 text-gray-800">
+                            {item.description}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.monday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.tuesday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.wednesday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.thursday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.friday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.saturday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.sunday ?? 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="flex items-center justify-between mt-3 px-6 pb-4">
+                  <div className="text-gray-600 text-xs">
+                    Showing{" "}
+                    {filteredEquivDayNoBreak2In.length === 0
+                      ? 0
+                      : startEquivDayNoBreak2InIndex + 1}{" "}
+                    to {Math.min(endEquivDayNoBreak2InIndex, filteredEquivDayNoBreak2In.length)}{" "}
+                    of {filteredEquivDayNoBreak2In.length} entries
+                  </div>
+
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayForNoBreak2InPage((prev) =>
+                          Math.max(prev - 1, 1),
+                        )
+                      }
+                      disabled={currentEquivDayForNoBreak2InPage === 1}
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+
+                    {getEquivDayNoBreak2InPageNumbers().map((page, idx) =>
+                      typeof page === "string" ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-1 text-gray-500 text-xs"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentEquivDayForNoBreak2InPage(page)}
+                          className={`px-2 py-1 rounded text-xs ${
+                            currentEquivDayForNoBreak2InPage === page
+                              ? "bg-blue-600 text-white"
+                              : "border border-gray-300 hover:bg-gray-100"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
+
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayForNoBreak2InPage((prev) =>
+                          Math.min(prev + 1, totalEquivDayNoBreak2InPages),
+                        )
+                      }
+                      disabled={
+                        currentEquivDayForNoBreak2InPage ===
+                          totalEquivDayNoBreak2InPages ||
+                        totalEquivDayNoBreak2InPages === 0
+                      }
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* For No Break 2 In Search Modal */}
+          {showForNoBreak2OutModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+              onClick={() => setShowForNoBreak2OutModal(false)}
+            >
+              <div
+                className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-800">
+                    Select Code
+                  </h2>
+                  <button
+                    onClick={() => setShowForNoBreak2OutModal(false)}
+                    className="text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Search Field */}
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center justify-end gap-3">
+                    <label className="text-gray-700">Search:</label>
+                    <input
+                      type="text"
+                      value={forNoBreak2OutSearchTerm}
+                      onChange={(e) => setForNoBreak2OutSearchTerm(e.target.value)}
+                      className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder=""
+                    />
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div
+                  className="px-6 py-4"
+                  style={{ maxHeight: "400px", overflowY: "auto" }}
+                >
+                  <table className="w-full">
+                    <thead className="border-b-2 border-gray-300">
+                      <tr>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          <div className="flex items-center gap-1">
+                            Code
+                            <span className="text-blue-600">▲</span>
+                          </div>
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Description
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Monday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Tuesday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Wednesday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Thursday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Friday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Saturday
+                        </th>
+                        <th className="text-left py-2 text-gray-700 font-semibold">
+                          Sunday
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedEquivDayNoBreak2Out.map((item, index) => (
+                        <tr
+                          key={`${item.id}-${index}`}
+                          className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
+                          onClick={() => {
+                            setForNoBreak2Out(item.code);
+                            setShowForNoBreak2OutModal(false);
+                          }}
+                        >
+                          <td className="py-2 text-gray-800">{item.code}</td>
+                          <td className="py-2 text-gray-800">
+                            {item.description}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.monday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.tuesday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.wednesday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.thursday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.friday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.saturday ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-800">
+                            {Number(item.sunday ?? 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="flex items-center justify-between mt-3 px-6 pb-4">
+                  <div className="text-gray-600 text-xs">
+                    Showing{" "}
+                    {filteredEquivDayNoBreak2Out.length === 0
+                      ? 0
+                      : startEquivDayNoBreak2OutIndex + 1}{" "}
+                    to {Math.min(endEquivDayNoBreak2OutIndex, filteredEquivDayNoBreak2Out.length)}{" "}
+                    of {filteredEquivDayNoBreak2Out.length} entries
+                  </div>
+
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayForNoBreak2OutPage((prev) =>
+                          Math.max(prev - 1, 1),
+                        )
+                      }
+                      disabled={currentEquivDayForNoBreak2OutPage === 1}
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+
+                    {getEquivDayNoBreak2OutPageNumbers().map((page, idx) =>
+                      typeof page === "string" ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-1 text-gray-500 text-xs"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentEquivDayForNoBreak2OutPage(page)}
+                          className={`px-2 py-1 rounded text-xs ${
+                            currentEquivDayForNoBreak2OutPage === page
+                              ? "bg-blue-600 text-white"
+                              : "border border-gray-300 hover:bg-gray-100"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
+
+                    <button
+                      onClick={() =>
+                        setCurrentEquivDayForNoBreak2OutPage((prev) =>
+                          Math.min(prev + 1, totalEquivDayNoBreak2OutPages),
+                        )
+                      }
+                      disabled={
+                        currentEquivDayForNoBreak2OutPage ===
+                          totalEquivDayNoBreak2OutPages ||
+                        totalEquivDayNoBreak2OutPages === 0
+                      }
+                      className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {/* Supervisory Group Search Modal */}
           {showSupervisoryGroupModal && (
@@ -3726,7 +4232,7 @@ export function TimeKeepGroupPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedSupervisoryGroups.map((item, index) => (
+                      {filteredSupervisoryGroups.map((item, index) => (
                         <tr
                           key={item.id}
                           className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer ${
@@ -3918,8 +4424,8 @@ export function TimeKeepGroupPage() {
                 <div className="flex items-center justify-between mt-3 px-6 pb-4">
                   <div className="text-gray-600 text-xs">
                     Showing{" "}
-                    {filteredOtCodes.length === 0 ? 0 : startOtIndex + 1} to{" "}
-                    {Math.min(endOtIndex, filteredOtCodes.length)} of{" "}
+                    {filteredOtCodes.length === 0 ? 0 : startOtCodesIndex + 1} to{" "}
+                    {Math.min(endOtCodesIndex, filteredOtCodes.length)} of{" "}
                     {filteredOtCodes.length} entries
                   </div>
 
@@ -3936,7 +4442,7 @@ export function TimeKeepGroupPage() {
                       Previous
                     </button>
 
-                    {getOtPageNumbers().map((page, idx) =>
+                    {getOtCodesPageNumbers().map((page, idx) =>
                       typeof page === "string" ? (
                         <span
                           key={`ellipsis-${idx}`}
@@ -3962,12 +4468,12 @@ export function TimeKeepGroupPage() {
                     <button
                       onClick={() =>
                         setCurrentOtCodePerWeekPage((prev) =>
-                          Math.min(prev + 1, totalOtPages),
+                          Math.min(prev + 1, totalOtCodesPages),
                         )
                       }
                       disabled={
-                        currentOtCodePerWeekPage === totalOtPages ||
-                        totalOtPages === 0
+                        currentOtCodePerWeekPage === totalOtCodesPages ||
+                        totalOtCodesPages === 0
                       }
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -3978,6 +4484,7 @@ export function TimeKeepGroupPage() {
               </div>
             </div>
           )}
+
         </div>
       </div>
 
