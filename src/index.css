@@ -289,7 +289,15 @@
     background-color: #0000;
     border-radius: 0;
   }
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
   ::file-selector-button {
     font: inherit;
     font-feature-settings: inherit;

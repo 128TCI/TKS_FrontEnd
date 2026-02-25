@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Section SetUp';
 export function SectionSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,7 +49,7 @@ export function SectionSetupPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
-
+    
   useEffect(() => {
     getSectionSetupPermissions();
   }, []);
@@ -252,6 +254,12 @@ export function SectionSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/SectionSetUp/${section.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted section ${section.code}`,
+            messages: `Section deleted: ${section.code} - ${section.secDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -330,6 +338,12 @@ export function SectionSetupPage() {
           `/Fs/Employment/SectionSetUp/${sectionId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited section ${payload.secCode}`,
+            messages: `Section updated: ${payload.secCode} - ${payload.secDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -342,6 +356,12 @@ export function SectionSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post("/Fs/Employment/SectionSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added section ${payload.secCode}`,
+            messages: `Section created: ${payload.secCode} - ${payload.secDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

@@ -4,7 +4,9 @@ import { Footer } from '../../Footer/Footer';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../services/encryptionService';
+import auditTrail from '../../../services/auditTrail';
 
+const formName = 'Calendar SetUp'
 interface CalendarSetupProps {
   onBack?: () => void;
 }
@@ -235,6 +237,12 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/CalendarSetUp/${holiday.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted holiday "${holiday.description}"`,
+          messages: `Holiday "${holiday.description}" removed`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -297,6 +305,12 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
 
       if (editingHoliday) {
         await apiClient.put(`/Fs/Process/CalendarSetUp/${editingHoliday.id}`, payload);
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Updated holiday "${payload.description}"`,
+          messages: `Holiday "${payload.description}" updated`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -306,6 +320,12 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
         });
       } else {
         await apiClient.post('/Fs/Process/CalendarSetUp', payload);
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Created holiday "${payload.description}"`,
+          messages: `Holiday "${payload.description}" created`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',

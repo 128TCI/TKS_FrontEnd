@@ -4,7 +4,10 @@ import { Footer } from '../../../Footer/Footer';
 
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
+
+const formName = 'Borrowed Device Name SetUp';
 
 interface BorrowedDevice {
   id: number;
@@ -13,7 +16,6 @@ interface BorrowedDevice {
 }
 
 const API_BASE_URL = '/Fs/Process/Device/BorrowedDeviceName';
-
 export function BorrowedDeviceNamePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -140,6 +142,12 @@ export function BorrowedDeviceNamePage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`${API_BASE_URL}/${device.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Device ${device.code} deleted`,
+          messages: `Device ${device.code} deleted`,
+          formName: formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',

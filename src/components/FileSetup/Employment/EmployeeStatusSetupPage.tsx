@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Employee Status SetUp';
 export function EmployeeStatusSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -137,6 +139,12 @@ export function EmployeeStatusSetupPage() {
         await apiClient.delete(
           `/Fs/Employment/EmployeeStatusSetUp/${status.id}`,
         );
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted status ${status.code}`,
+            messages: `Status deleted: ${status.code} - ${status.description}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Deleted",
@@ -190,8 +198,20 @@ export function EmployeeStatusSetupPage() {
           `/Fs/Employment/EmployeeStatusSetUp/${statusId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited status ${payload.empStatCode}`,
+            messages: `Status updated: ${payload.empStatCode} - ${payload.empStatDesc}`,
+            formName,
+        });
       } else {
         await apiClient.post("/Fs/Employment/EmployeeStatusSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added status ${payload.empStatCode}`,
+            messages: `Status created: ${payload.empStatCode} - ${payload.empStatDesc}`,
+            formName,
+        });
       }
 
       await Swal.fire({

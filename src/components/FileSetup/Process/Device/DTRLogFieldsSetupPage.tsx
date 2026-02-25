@@ -3,8 +3,10 @@ import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'DTR Log Fields SetUp';
 interface DTRLogField {
   id: number;
   code: string;
@@ -291,6 +293,12 @@ export function DTRLogFieldsSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/Device/DTRLogFIeldsSetUp/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `DTR log field "${item.code}" (ID: ${item.id}) has been removed from the system`,
+          messages: `Deleted DTR log field "${item.code}"`,
+          formName
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -326,8 +334,27 @@ export function DTRLogFieldsSetupPage() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        id: 0,
+        ...formData
+      };
+
       await apiClient.post('/Fs/Process/Device/DTRLogFIeldsSetUp', { id: 0, ...formData });
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'DTR log field created successfully.', timer: 2000, showConfirmButton: false });
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `DTR log field "${formData.code}" created with details: ${JSON.stringify(formData)}`,
+        messages: `Created DTR log field "${formData.code}"`,
+        formName
+      });
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'DTR log field created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      // Refresh the list
       await fetchDTRLogFields();
       setShowCreateModal(false);
     } catch (error: any) {
@@ -360,8 +387,27 @@ export function DTRLogFieldsSetupPage() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        id: editingItem.id,
+        ...formData
+      };
+
       await apiClient.put(`/Fs/Process/Device/DTRLogFIeldsSetUp/${editingItem.id}`, { id: editingItem.id, ...formData });
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'DTR log field updated successfully.', timer: 2000, showConfirmButton: false });
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `DTR log field "${formData.code}" (ID: ${editingItem.id}) updated with new values: ${JSON.stringify(formData)}`,
+        messages: `Updated DTR log field "${formData.code}"`,
+        formName
+      });
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'DTR log field updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      // Refresh the list
       await fetchDTRLogFields();
       setShowEditModal(false);
       setEditingItem(null);

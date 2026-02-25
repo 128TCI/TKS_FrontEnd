@@ -1,25 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import apiClient from '../services/apiClient';
+import auditTrail from '../services/auditTrail'
 import Swal from 'sweetalert2';
-
 import { 
-  Home, 
-  FileText, 
-  Settings, 
-  Play, 
-  BarChart3, 
-  Download, 
-  Upload, 
-  Wrench, 
-  Shield, 
-  ExternalLink,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  LogOut,
-  User,
-  X,
-  Menu
+  Home, FileText, Settings, 
+  Play, BarChart3, Download, 
+  Upload, Wrench, Shield, 
+  ExternalLink, ChevronDown, ChevronRight,
+  Clock, LogOut, User, X, Menu
 } from 'lucide-react';
 import lifeBankLogo from '../assets/Lifebank.png';
 import { decryptData } from '../services/encryptionService';
@@ -38,7 +26,7 @@ interface MenuItem {
 }
 
 interface SubMenuItem {
-  label: string;
+  label?: string;
   formName?: string;
   action?: string;
   separator?: boolean;
@@ -54,9 +42,13 @@ export function Navigation({ onLogout, activeSection, setActiveSection }: Naviga
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showVersionTooltip, setShowVersionTooltip] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [mobileExpandedSubmenus, setMobileExpandedSubmenus] = useState<Set<string>>(new Set());
+  const [mobileExpandedMainMenu, setMobileExpandedMainMenu] = useState<string | null>(null);
+  const [buttonPositions, setButtonPositions] = useState<{ [key: string]: { left: number; top: number; width: number } }>({});
+  const [dropdownPosition, setDropdownPosition] = useState<{ left: number; top: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
     // Permissions
 const [permissions, setPermissions] = useState<Record<string, boolean>>({});
@@ -105,46 +97,52 @@ useEffect(() => {
     }
   };
 }, []);
-const handleAutoLogout = async () => {
-  setIsLoggingOut(true);
-  try {
-    // Get login payload from localStorage
-    const loginPayloadStr = localStorage.getItem('userData');
-    const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
-    const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-    // Call logout API with userId
-    await apiClient.post('UserLogin/logout', {
-      userId: userId
-    });
+  const handleAutoLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const loginPayloadStr = localStorage.getItem('userData');
+      const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+      const username = loginPayload.username || loginPayload.userName || 'Unknown';
+      const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-    // Clear localStorage
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('loginTimestamp');
-    localStorage.removeItem('loginPayload');
-    localStorage.removeItem('userData');
+      await apiClient.post('UserLogin/logout', { userId });
+      try {
+        await auditTrail.log({
+          trans: `Employee ${username} logged out (auto).`,
+          messages: `Employee ${username} logged out due to inactivity.`,
+          formName: 'LogOut',
+          accessType: 'LogOut',
+        });
+      } catch (err) {
+        console.error('Audit trail failed for auto logout:', err);
+      }
 
-    // Show auto logout message
-    await Swal.fire({
-      icon: 'warning',
-      title: 'Session Expired',
-      text: 'You have been logged out due to inactivity.',
-      timer: 2000,
-      showConfirmButton: false,
-    });
+      // Clear local storage
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('loginTimestamp');
+      localStorage.removeItem('loginPayload');
+      localStorage.removeItem('userData');
 
-    // Call onLogout to update app state
-    onLogout();
-  } catch (error: any) {
-    console.error('Auto logout error:', error);
-    // Even if API fails, still logout locally
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('loginTimestamp');
-    localStorage.removeItem('loginPayload');
-    localStorage.removeItem('userData');
-    onLogout();
-  }
-};
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Session Expired',
+        text: 'You have been logged out due to inactivity.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      onLogout();
+    } catch (error: any) {
+      console.error('Auto logout error:', error);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('loginTimestamp');
+      localStorage.removeItem('loginPayload');
+      localStorage.removeItem('userData');
+      onLogout();
+    }
+  };
+
   useEffect(() => {
     getBranchPermissions();
   }, []);
@@ -174,26 +172,35 @@ const handleAutoLogout = async () => {
       console.error("Error parsing or decrypting payload", e);
     }
   };
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Get login payload from localStorage
       const loginPayloadStr = localStorage.getItem('userData');
       const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+      const username = loginPayload.username || loginPayload.userName || 'Unknown';
       const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-      // Call logout API with userId
-      await apiClient.post('UserLogin/logout', {
-        userId: userId
-      });
+      await apiClient.post('UserLogin/logout', { userId });
 
-      // Clear localStorage
+      // Audit trail for manual logout
+      try {
+        await auditTrail.log({
+          trans: `Employee ${username} logged out.`,
+          messages: `Employee ${username} logged out.`,
+          formName: 'LogOut',
+          accessType: 'LogOut',
+        });
+      } catch (err) {
+        console.error('Audit trail failed for logout:', err);
+      }
+
+      // Clear local storage
       localStorage.removeItem('authToken');
       localStorage.removeItem('loginTimestamp');
       localStorage.removeItem('loginPayload');
       localStorage.removeItem('userData');
 
-      // Show success message
       await Swal.fire({
         icon: 'success',
         title: 'Logout Successful',
@@ -202,7 +209,6 @@ const handleAutoLogout = async () => {
         showConfirmButton: false,
       });
 
-      // Call onLogout to update app state
       onLogout();
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'Logout failed';
@@ -416,6 +422,26 @@ const handleAutoLogout = async () => {
             { label: 'Update Flexi Break', action: 'update-flexi-break' },
             { label: 'Update GL Code Utility', action: 'update-gl-code-utility' }
           ]
+        },
+        {
+          isCategory: true,
+          label: 'Utility On Reports',
+          children: [
+            { label: 'Timekeep Email Distribution', action: 'timekeep-email-distribution' },
+          ]
+        },
+        {
+          isCategory: true,
+          label: 'Utility On 2 Shifts In A Day',
+          children: [
+            { label: 'Include Unworked Holiday Pay in the Regular Days/Hours', action: 'include-unworked-holiday-pay-regular-days-hours' },
+            { label: 'ND Basic Round Down', action: 'nd-basic-round-down' },
+            { label: 'Saturday Unworked Considered as Paid Regular Hours', action: 'saturday-unworked-paid-regular-hours' },
+            { label: 'Sunday Work Is Considered OT if Worked on Saturday', action: 'sunday-work-ot-if-worked-saturday' },
+            { label: 'Unpost 2 Shifts In A Day Transaction', action: 'unpost-2-shifts-transaction' },
+            { label: 'Delete Incomplete Logs 2 Shifts In A Day', action: 'delete-incomplete-logs-2-shifts' },
+            { label: 'Delete Records In Raw Data 2 Shifts In A Day', action: 'delete-records-raw-data-2-shifts' }
+          ]
         }
       ]
     },
@@ -491,19 +517,72 @@ const handleAutoLogout = async () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleMenuClick = (itemId: string) => {
+  const handleMenuClick = (itemId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
     const item = menuItems.find(m => m.id === itemId);
     if (item?.submenu) {
-      setExpandedMenu(expandedMenu === itemId ? null : itemId);
+      if (expandedMenu === itemId) {
+        // Close menu
+        setExpandedMenu(null);
+        setButtonPositions({});
+      } else {
+        // Open menu and calculate position relative to nav container
+        if (event) {
+          const button = event.currentTarget;
+          const buttonRect = button.getBoundingClientRect();
+          const navContainer = button.closest('.px-4.lg\\:px-6'); // Find the nav's padding container
+          
+          if (navContainer) {
+            const navRect = navContainer.getBoundingClientRect();
+            setButtonPositions({
+              [itemId]: {
+                left: buttonRect.left - navRect.left, // Relative to nav container
+                top: buttonRect.bottom - navRect.top,
+                width: buttonRect.width
+              }
+            });
+          }
+        }
+        setExpandedMenu(itemId);
+      }
     } else {
       setActiveSection(itemId);
       setExpandedMenu(null);
+      setMobileMenuOpen(false);
+      setMobileExpandedMainMenu(null);
+      setMobileExpandedSubmenus(new Set());
+      setButtonPositions({});
+    }
+  };
+
+  const handleMobileMenuClick = (itemId: string) => {
+    const item = menuItems.find(m => m.id === itemId);
+    if (item?.submenu) {
+      // Toggle mobile main menu
+      setMobileExpandedMainMenu(mobileExpandedMainMenu === itemId ? null : itemId);
+    } else {
+      setActiveSection(itemId);
+      setMobileMenuOpen(false);
+      setMobileExpandedMainMenu(null);
+      setMobileExpandedSubmenus(new Set());
     }
   };
 
   const handleSubmenuClick = (action: string) => {
     setActiveSection(action);
     setExpandedMenu(null);
+    setMobileMenuOpen(false); 
+    setMobileExpandedMainMenu(null);
+    setMobileExpandedSubmenus(new Set());
+  };
+
+  const toggleMobileSubmenu = (key: string) => {
+    const newExpanded = new Set(mobileExpandedSubmenus);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setMobileExpandedSubmenus(newExpanded);
   };
 
   // Helper function to check if a menu item contains the active section
@@ -899,6 +978,146 @@ const handleAutoLogout = async () => {
     return null;
   };
 
+  // Mobile-specific submenu renderer
+  const renderMobileSubmenuItem = (subItem: SubMenuItem, index: number, parentKey: string = 'mobile-submenu', depth: number = 0) => {
+    const itemKey = `${parentKey}-${index}`;
+    const paddingLeft = `${(depth + 1) * 1}rem`; // Increase indentation per level
+    
+    if (subItem.separator) {
+      return <div key={itemKey} className="my-1 border-t border-gray-300"></div>;
+    }
+    
+    // Category with children
+    if (subItem.isCategory && subItem.children) {
+      const isExpanded = mobileExpandedSubmenus.has(itemKey);
+      
+      return (
+        <div key={itemKey} className="w-full">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleMobileSubmenu(itemKey);
+            }}
+            className="w-full text-left px-3 py-2.5 text-slate-200 font-semibold text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation"
+            style={{ paddingLeft }}
+          >
+            <span className="flex-1">{subItem.label}</span>
+            <ChevronDown 
+              className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          
+          {isExpanded && (
+            <div className="space-y-0.5 mt-0.5 bg-green-800/40 rounded py-1">
+              {subItem.children.map((child, childIndex) => 
+                renderMobileSubmenuItem(child, childIndex, itemKey, depth + 1)
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Item with hasSubmenu (nested submenu) - like "Allowance and Earnings"
+    if (subItem.hasSubmenu && subItem.children) {
+      const isExpanded = mobileExpandedSubmenus.has(itemKey);
+      
+      return (
+        <div key={itemKey} className="w-full">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleMobileSubmenu(itemKey);
+            }}
+            className="w-full text-left px-3 py-2.5 text-slate-200 text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation"
+            style={{ paddingLeft }}
+          >
+            <span className="flex-1">{subItem.label}</span>
+            <ChevronDown 
+              className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          
+          {isExpanded && (
+            <div className="space-y-0.5 mt-0.5 bg-green-800/40 rounded py-1">
+              {subItem.children.map((child, childIndex) => 
+                renderMobileSubmenuItem(child, childIndex, itemKey, depth + 1)
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Item with children (generic nested structure)
+    if (subItem.children) {
+      const isExpanded = mobileExpandedSubmenus.has(itemKey);
+      
+      return (
+        <div key={itemKey} className="w-full">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleMobileSubmenu(itemKey);
+            }}
+            className="w-full text-left px-3 py-2.5 text-slate-200 text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation"
+            style={{ paddingLeft }}
+          >
+            <span className="flex-1">{subItem.label}</span>
+            <ChevronDown 
+              className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          
+          {isExpanded && (
+            <div className="space-y-0.5 mt-0.5 bg-green-800/40 rounded py-1">
+              {subItem.children.map((child, childIndex) => 
+                renderMobileSubmenuItem(child, childIndex, itemKey, depth + 1)
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Regular action item (leaf node)
+    if (subItem.action) {
+      return (
+        <button
+          key={itemKey}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleSubmenuClick(subItem.action || '');
+          }}
+          className={`w-full text-left px-3 py-2.5 text-sm rounded transition-colors touch-manipulation ${
+            activeSection === subItem.action
+              ? 'bg-blue-500 text-white font-medium'
+              : 'text-slate-200 hover:bg-slate-600 active:bg-slate-700'
+          }`}
+          style={{ paddingLeft }}
+        >
+          {subItem.label}
+        </button>
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <>
       {/* LifeBank Foundation Header */}
@@ -935,41 +1154,67 @@ const handleAutoLogout = async () => {
             </div>
 
             {/* Desktop Navigation */}
-            <div ref={dropdownRef} className="hidden lg:flex items-center space-x-1">
-              {menuItems.map((item) => (
-                <div key={item.id} className="relative">
-                  <button
-                    onClick={() => handleMenuClick(item.id)}
-                    className={`flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200 ${
-                      isMenuItemActive(item)
-                        ? 'bg-amber-100 text-gray text-bold'
-                        : 'text-slate-200 hover:bg--amber-100 hover:text-white text-bold'
-                    }`}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    <span className="text-sm">{item.label}</span>
-                    {item.submenu && (
-                      <ChevronDown 
-                        className={`w-4 h-4 transition-transform duration-200 ${
-                          expandedMenu === item.id ? 'rotate-180' : ''
-                        }`}
-                      />
-                    )}
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {item.submenu && expandedMenu === item.id && (
-                    <div className={`absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 animate-slideDown ${
-                      item.id === 'file-setup' || item.id === 'maintenance' || item.id === 'utilities' || item.id === 'import' ? '' : item.id === 'process' ? 'py-2' : 'py-2 w-56'
-                    } ${
-                      item.id === 'process' ? 'w-80' : ''
-                              }`}>
-                              {item.id === 'file-setup' ? renderFileSetupMegaMenu(item.submenu) : item.id === 'maintenance' ? renderMaintenanceMegaMenu(item.submenu) : item.id === 'process' ? renderProcessMegaMenu(item.submenu) : item.id === 'utilities' ? renderUtilitiesMegaMenu(item.submenu) : item.id === 'import' ? renderImportMegaMenu(item.submenu) : item.submenu.map((subItem, index) => renderSubmenuItem(subItem, index))}
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center relative">
+              {/* Scrollable Menu Buttons */}
+              <div className="flex items-center space-x-1 overflow-x-auto nav-scroll max-w-full">
+                {menuItems.map((item) => (
+                  <div key={item.id} className="flex-shrink-0">
+                    <button
+                      onClick={(e) => handleMenuClick(item.id, e)}
+                      className={`flex items-center space-x-2 px-3 py-3 rounded-lg transition-all duration-200 whitespace-nowrap ${
+                        expandedMenu === item.id || isMenuItemActive(item)
+                          ? 'bg-amber-100 text-gray-800 font-semibold'
+                          : 'text-slate-200 hover:bg-green-700 hover:text-white'
+                      }`}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span className="text-sm">{item.label}</span>
+                      {item.submenu && (
+                        <ChevronDown 
+                          className={`w-4 h-4 transition-transform duration-200 ${
+                            expandedMenu === item.id ? 'rotate-180' : ''
+                          }`}
+                        />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            {/* Dropdown Menus - Rendered at nav level, outside scroll container */}
+            {expandedMenu && buttonPositions[expandedMenu] && (
+              <div 
+                ref={dropdownRef}
+                className="absolute z-50"
+                style={{
+                  left: `${buttonPositions[expandedMenu].left}px`,
+                  top: '56px', // Height of nav bar (h-14 = 56px)
+                }}
+              >
+                {menuItems.map((item) => {
+                  if (expandedMenu !== item.id || !item.submenu) return null;
+                  
+                  return (
+                    <div 
+                      key={`dropdown-${item.id}`}
+                      className={`bg-white rounded-lg shadow-xl border border-gray-200 animate-slideDown ${
+                        item.id === 'file-setup' || item.id === 'maintenance' || item.id === 'utilities' || item.id === 'import' ? '' : item.id === 'process' ? 'py-2' : 'py-2 w-56'
+                      } ${
+                        item.id === 'process' ? 'w-80' : ''
+                      }`}
+                    >
+                      {item.id === 'file-setup' ? renderFileSetupMegaMenu(item.submenu) : 
+                       item.id === 'maintenance' ? renderMaintenanceMegaMenu(item.submenu) : 
+                       item.id === 'process' ? renderProcessMegaMenu(item.submenu) : 
+                       item.id === 'utilities' ? renderUtilitiesMegaMenu(item.submenu) : 
+                       item.id === 'import' ? renderImportMegaMenu(item.submenu) : 
+                       item.submenu.map((subItem, index) => renderSubmenuItem(subItem, index))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* User Menu */}
             <div className="flex items-center space-x-3">
@@ -993,7 +1238,7 @@ const handleAutoLogout = async () => {
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
@@ -1010,38 +1255,51 @@ const handleAutoLogout = async () => {
           </div>
 
           {/* Mobile Navigation */}
-          <div className="lg:hidden pb-3 space-y-1">
-            {menuItems.map((item) => (
-              <div key={item.id}>
-                <button
-                  onClick={() => handleMenuClick(item.id)}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 ${
-                    activeSection === item.id
-                      ? 'bg-slate-600 text-white'
-                      : 'text-slate-200 hover:bg-slate-600'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2">
-                    <item.icon className="w-4 h-4" />
-                    <span className="text-sm">{item.label}</span>
-                  </div>
-                  {item.submenu && (
-                    <ChevronDown 
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        expandedMenu === item.id ? 'rotate-180' : ''
-                      }`}
-                    />
+          {mobileMenuOpen && (
+              <div className="xl:hidden pb-3 space-y-1 max-h-[calc(100vh-10rem)] overflow-y-auto mobile-menu-scroll">              {menuItems.map((item) => (
+                <div key={item.id}>
+                  <button
+                    onClick={() => handleMobileMenuClick(item.id)}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 ${
+                      mobileExpandedMainMenu === item.id || isMenuItemActive(item)
+                        ? 'bg-slate-700 text-white font-semibold'
+                        : 'text-slate-200 hover:bg-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <item.icon className="w-4 h-4" />
+                      <span className="text-sm">{item.label}</span>
+                    </div>
+                    {item.submenu && (
+                      <ChevronDown 
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          mobileExpandedMainMenu === item.id ? 'rotate-180' : ''
+                        }`}
+                      />
+                    )}
+                  </button>
+                  
+                  {item.submenu && mobileExpandedMainMenu === item.id && (
+                    <div className="mt-1 space-y-0.5 bg-green-700 rounded-lg p-2">
+                      {item.submenu.map((subItem, index) => 
+                        renderMobileSubmenuItem(subItem, index, `mobile-${item.id}`)
+                      )}
+                    </div>
                   )}
-                </button>
-                
-                {item.submenu && expandedMenu === item.id && (
-                  <div className="ml-6 mt-1 space-y-1 max-h-[60vh] overflow-y-auto">
-                    {item.submenu.map((subItem, index) => renderSubmenuItem(subItem, index))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+              
+              {/* Mobile Logout Button */}
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <style>{`
@@ -1083,6 +1341,39 @@ const handleAutoLogout = async () => {
           }
           .animate-fadeIn {
             animation: fadeIn 0.2s ease-out;
+          }
+
+          /* Custom scrollbar for desktop navigation */
+          .nav-scroll::-webkit-scrollbar {
+            height: 6px;
+          }
+          
+          .nav-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+          }
+          
+          .nav-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+          }
+          
+          .nav-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+          }
+
+          /* Hide scrollbar for mobile menu */
+          .mobile-menu-scroll::-webkit-scrollbar {
+            width: 4px;
+          }
+          
+          .mobile-menu-scroll::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          
+          .mobile-menu-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
           }
         `}</style>
       </nav>

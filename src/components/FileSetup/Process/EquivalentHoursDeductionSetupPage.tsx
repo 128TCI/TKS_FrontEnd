@@ -4,7 +4,9 @@ import { Footer } from '../../Footer/Footer';
 import { decryptData } from '../../../services/encryptionService';
 import Swal from 'sweetalert2';
 import apiClient from '../../../services/apiClient';
+import auditTrail from '../../../services/auditTrail';
 
+const formName = 'Equivalent Hours Deduction SetUp';
 interface DeductionItem {
   id: number;
   code: string;
@@ -173,6 +175,12 @@ export function EquivalentHoursDeductionSetupPage() {
       try {
         const endpoint = API_ENDPOINTS[activeTab];
         await apiClient.delete(`${endpoint}/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted Deduction Item "${item.code} - ${item.desc}"`,
+          messages: `Deduction item deleted successfully`,
+          formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -237,6 +245,12 @@ export function EquivalentHoursDeductionSetupPage() {
 
       const endpoint = API_ENDPOINTS[activeTab];
       await apiClient.post(endpoint, payload);
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created Deduction Item "${payload.code} - ${payload.desc}"`,
+        messages: `Deduction item created successfully`,
+        formName,
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -307,6 +321,12 @@ export function EquivalentHoursDeductionSetupPage() {
 
       const endpoint = API_ENDPOINTS[activeTab];
       await apiClient.put(`${endpoint}/${payload.id}`, payload);
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated Deduction Item "${payload.code} - ${payload.desc}"`,
+        messages: `Deduction item updated successfully`,
+        formName,
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',

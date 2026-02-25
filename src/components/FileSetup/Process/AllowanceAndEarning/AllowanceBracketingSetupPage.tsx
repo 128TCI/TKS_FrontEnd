@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Allowance Bracketing SetUp';
 interface AllowanceBracketing {
   id: string;
   dayType: string;
@@ -269,6 +271,13 @@ export function AllowanceBracketingSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${item.id}`);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted allowance bracketing entry ${item.code}`,
+          messages: `Deleted entry details: ${JSON.stringify(item)}`,
+          formName: formName,
+        });
+
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -308,7 +317,20 @@ export function AllowanceBracketingSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp', payload);
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Allowance bracketing entry created successfully.', timer: 2000, showConfirmButton: false });
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created allowance bracketing entry ${payload.code}`,
+        messages: `Created entry details: ${JSON.stringify(payload)}`,
+        formName: formName,
+      });
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Allowance bracketing entry created successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
 
       await fetchBracketingData();
       setShowCreateModal(false);
@@ -324,7 +346,6 @@ export function AllowanceBracketingSetupPage() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!editingItem) return;
 
     if (!formData.noOfHours || !formData.amount || !formData.earningCode) {
@@ -347,7 +368,20 @@ export function AllowanceBracketingSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp/${editingItem.id}`, payload);
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Allowance bracketing entry updated successfully.', timer: 2000, showConfirmButton: false });
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated allowance bracketing entry ${payload.code}`,
+        messages: `Updated entry details: ${JSON.stringify(payload)}`,
+        formName: formName,
+      });
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Allowance bracketing entry updated successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
 
       await fetchBracketingData();
       setShowEditModal(false);

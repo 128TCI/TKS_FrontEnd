@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Building2, User, Lock } from 'lucide-react';
 import apiClient from '../services/apiClient';
+import auditTrail from '../services/auditTrail'
 import lifeBankHeader from '../assets/Lifebank.png';
 import techLogo from '../assets/128Tech_Logo.jpg';
 import Swal from 'sweetalert2';

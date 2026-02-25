@@ -4,7 +4,9 @@ import { Footer } from '../../Footer/Footer';
 import { decryptData } from '../../../services/encryptionService';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
+import auditTrail from '../../../services/auditTrail';
 
+const formName = 'System Configuration SetUp';
 interface SystemConfig {
   id: number;
   numOfMinBeforeTheShift: number;
@@ -215,6 +217,12 @@ export function SystemConfigurationSetupPage() {
       };
 
       await apiClient.put('/Fs/Process/Device/SystemConfiguration/1', payload);
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: 'System Configuration Update',
+        messages: 'System configuration saved successfully',
+        formName,
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, X, Check, Info, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 
+const formName = 'Allowance Per Classification SetUp';
 
 interface AllowancePerClassification {
     id: number;
@@ -253,68 +255,95 @@ export function AllowancePerClassificationSetupPage() {
     };
 
     const handleDelete = async (id: number) => {
-        if (confirm('Are you sure you want to delete this entry?')) {
+    if (confirm('Are you sure you want to delete this entry?')) {
+        try {
+        setLoading(true);
+        const response = await apiClient.delete(`${API_BASE_URL}/${id}`);
+        if (response.status === 200 || response.status === 204) {
             try {
-                setLoading(true);
-                const response = await apiClient.delete(`${API_BASE_URL}/${id}`);
-                if (response.status === 200 || response.status === 204) {
-                    await fetchAllowancePerClassification();
-                    alert('Entry deleted successfully');
-                }
-            } catch (err: any) {
-                setError(err.message || 'Failed to delete entry');
-                alert('Failed to delete entry');
-            } finally {
-                setLoading(false);
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted allowance entry ID ${id}`,
+                messages: `Deleted entry ID: ${id}`,
+                formName: formName,
+            });
+            } catch (err) {
+            console.error('Audit trail failed:', err);
             }
+
+            await fetchAllowancePerClassification();
+            alert('Entry deleted successfully');
         }
+        } catch (err: any) {
+        setError(err.message || 'Failed to delete entry');
+        alert('Failed to delete entry');
+        } finally {
+        setLoading(false);
+        }
+    }
     };
 
     const handleSubmitCreate = async (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
+    try {
+        setLoading(true);
+        const payload = { ...formData, classificationCode: formData.classificationCode || null };
+        const response = await apiClient.post(API_BASE_URL, payload);
+        if (response.status === 200 || response.status === 201) {
         try {
-            setLoading(true);
-            const payload = {
-                ...formData,
-                classificationCode: formData.classificationCode || null
-            };
-            const response = await apiClient.post(API_BASE_URL, payload);
-            if (response.status === 200 || response.status === 201) {
-                await fetchAllowancePerClassification();
-                setShowCreateModal(false);
-                alert('Entry created successfully');
-            }
-        } catch (err: any) {
-            setError(err.message || 'Failed to create entry');
-            alert('Failed to create entry');
-        } finally {
-            setLoading(false);
+            await auditTrail.log({
+            accessType: 'Add',
+            trans: `Created allowance entry ${payload.classificationCode ?? 'N/A'}`,
+            messages: `Created entry details: ${JSON.stringify(payload)}`,
+            formName: formName,
+            });
+        } catch (err) {
+            console.error('Audit trail failed:', err);
         }
+
+        await fetchAllowancePerClassification();
+        setShowCreateModal(false);
+        alert('Entry created successfully');
+        }
+    } catch (err: any) {
+        setError(err.message || 'Failed to create entry');
+        alert('Failed to create entry');
+    } finally {
+        setLoading(false);
+    }
     };
 
     const handleSubmitEdit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (editingItem) {
-            try {
-                setLoading(true);
-                const payload = {
-                    ...formData,
-                    classificationCode: formData.classificationCode || null
-                };
-                const response = await apiClient.put(`${API_BASE_URL}/${editingItem.id}`, payload);
-                if (response.status === 200) {
-                    await fetchAllowancePerClassification();
-                    setShowEditModal(false);
-                    setEditingItem(null);
-                    alert('Entry updated successfully');
-                }
-            } catch (err: any) {
-                setError(err.message || 'Failed to update entry');
-                alert('Failed to update entry');
-            } finally {
-                setLoading(false);
-            }
+    e.preventDefault();
+    if (!editingItem) return;
+
+    try {
+        setLoading(true);
+        const payload = { ...formData, classificationCode: formData.classificationCode || null };
+        const response = await apiClient.put(`${API_BASE_URL}/${editingItem.id}`, payload);
+        if (response.status === 200) {
+        try {
+            await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Updated allowance entry ID ${editingItem.id}`,
+            messages: `Updated entry details: ${JSON.stringify(payload)}`,
+            formName: formName,
+            });
+        } catch (err) {
+            console.error('Audit trail failed:', err);
         }
+
+        await fetchAllowancePerClassification();
+        setShowEditModal(false);
+        setEditingItem(null);
+        alert('Entry updated successfully');
+        }
+    } catch (err: any) {
+        setError(err.message || 'Failed to update entry');
+        alert('Failed to update entry');
+    } finally {
+        setLoading(false);
+    }
     };
 
     const handleCloseModal = () => {

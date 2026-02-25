@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Division SetUp';
 export function DivisionSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -242,6 +244,12 @@ export function DivisionSetupPage() {
         await apiClient.delete(
           `/Fs/Employment/DivisionSetUp/${division.id}`,
         );
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted division ${division.divCode}`,
+            messages: `Division deleted: ${division.divCode} - ${division.divDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -319,6 +327,12 @@ export function DivisionSetupPage() {
           `/Fs/Employment/DivisionSetUp/${divisionId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited division ${payload.divCode}`,
+            messages: `Division updated: ${payload.divCode} - ${payload.divDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -331,6 +345,12 @@ export function DivisionSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post("/Fs/Employment/DivisionSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added division ${payload.divCode}`,
+            messages: `Division created: ${payload.divCode} - ${payload.divDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

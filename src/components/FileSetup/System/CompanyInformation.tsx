@@ -2,9 +2,11 @@ import { Upload, X, Pencil, Save, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Footer } from "../../Footer/Footer";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
 
+const formName = 'Company Information SetUp';
 interface CompanyInformationProps {
   onBack?: () => void;
 }
@@ -152,6 +154,12 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
         setCompanyData(updatedData);
         setFormData(updatedData);
         setIsEditing(false);
+        await auditTrail.log({
+          accessType: "Edit",
+          trans: "Updated company information",
+          messages: `Company information updated: ${JSON.stringify(updatedData)}`,
+          formName: formName,
+        });
 
         await Swal.fire({
           icon: "success",
@@ -166,11 +174,13 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
         error.response?.data?.message ||
         error.message ||
         "Failed to save changes";
+
       await Swal.fire({
         icon: "error",
         title: "Error",
         text: errorMsg,
       });
+
       console.error("Error updating company information:", error);
     } finally {
       setLoading(false);

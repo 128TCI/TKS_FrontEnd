@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Group SetUp';
 export function GroupSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -203,6 +205,12 @@ export function GroupSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(`/Fs/Employment/GroupSetUp/${group.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted group ${group.code}`,
+            messages: `Group deleted: ${group.code} - ${group.description}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -276,6 +284,12 @@ export function GroupSetupPage() {
       if (isEditMode && groupId) {
         // Update existing record via PUT
         await apiClient.put(`/Fs/Employment/GroupSetUp/${groupId}`, payload);
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited group ${payload.grpCode}`,
+            messages: `Group updated: ${payload.grpCode} - ${payload.grpDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -288,6 +302,12 @@ export function GroupSetupPage() {
       } else {
         // Create new record via POST
         await apiClient.post("/Fs/Employment/GroupSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added group ${payload.grpCode}`,
+            messages: `Group created: ${payload.grpCode} - ${payload.grpDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",

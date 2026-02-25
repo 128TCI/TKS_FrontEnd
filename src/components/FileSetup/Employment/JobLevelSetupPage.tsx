@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-
+  // Form Name
+  const formName = 'Job Level SetUp';
 export function JobLevelSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,22 +67,22 @@ export function JobLevelSetupPage() {
     }
   };
 
-  // Fetch division data from API
+  // Fetch job level data from API
   useEffect(() => {
-    fetchDivisionData();
+    fetchJobLevelData();
   }, []);
 
-  const fetchDivisionData = async () => {
+  const fetchJobLevelData = async () => {
     setLoadingJobLevels(true);
     setJobLevelError("");
     try {
       const response = await apiClient.get("/Fs/Employment/JobLevelSetUp");
       if (response.status === 200 && response.data) {
         // Map API response to expected format
-        const mappedData = response.data.map((division: any) => ({
-          id: division.jobLevelID || "",
-          code: division.jobLevelCode || "",
-          description: division.jobLevelDesc || "",
+        const mappedData = response.data.map((joblevel: any) => ({
+          id: joblevel.jobLevelID || "",
+          code: joblevel.jobLevelCode || "",
+          description: joblevel.jobLevelDesc || "",
         }));
         setLevelList(mappedData);
       }
@@ -88,9 +90,9 @@ export function JobLevelSetupPage() {
       const errorMsg =
         error.response?.data?.message ||
         error.message ||
-        "Failed to load divisions";
+        "Failed to load job level";
       setJobLevelError(errorMsg);
-      console.error("Error fetching divisions:", error);
+      console.error("Error fetching job level:", error);
     } finally {
       setLoadingJobLevels(false);
     }
@@ -123,21 +125,21 @@ export function JobLevelSetupPage() {
     setShowCreateModal(true);
   };
 
-  const handleEdit = (division: any, index: number) => {
+  const handleEdit = (joblevel: any, index: number) => {
     setIsEditMode(true);
     setSelectedLevelIndex(index);
-    setJobLevelId(division.id || null);
-    setCode(division.code);
+    setJobLevelId(joblevel.id || null);
+    setCode(joblevel.code);
     setCodeError("");
-    setDescription(division.description);
+    setDescription(joblevel.description);
     setShowCreateModal(true);
   };
 
-  const handleDelete = async (division: any) => {
+  const handleDelete = async (joblevel: any) => {
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
-      text: `Are you sure you want to delete division ${division.code}?`,
+      text: `Are you sure you want to delete joblevel ${joblevel.code}?`,
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
@@ -148,28 +150,34 @@ export function JobLevelSetupPage() {
     if (confirmed.isConfirmed) {
       try {
         await apiClient.delete(
-          `/Fs/Employment/DivisionSetUp/${division.divID}`,
+          `/Fs/Employment/JobLevelSetUp/${joblevel.divID}`,
         );
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted job level ${joblevel.code}`,
+            messages: `Job Level deleted: ${joblevel.code} - ${joblevel.jobLevelDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
-          text: "Division deleted successfully.",
+          text: "Job Level deleted successfully.",
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the division list
-        await fetchDivisionData();
+        // Refresh the job level list
+        await fetchJobLevelData();
       } catch (error: any) {
         const errorMsg =
           error.response?.data?.message ||
           error.message ||
-          "Failed to delete division";
+          "Failed to delete job level";
         await Swal.fire({
           icon: "error",
           title: "Error",
           text: errorMsg,
         });
-        console.error("Error deleting division:", error);
+        console.error("Error deleting job level:", error);
       }
     }
   };
@@ -224,27 +232,39 @@ export function JobLevelSetupPage() {
           `/Fs/Employment/JobLevelSetUp/${jobLevelId}`,
           payload,
         );
+        await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Edited job level ${payload.jobLevelCode}`,
+            messages: `Job Level updated: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
+            formName,
+        });       
         await Swal.fire({
           icon: "success",
           title: "Success",
-          text: "Division updated successfully.",
+          text: "Job Level updated successfully.",
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the division list
-        await fetchDivisionData();
+        // Refresh the job level list
+        await fetchJobLevelData();
       } else {
         // Create new record via POST
         await apiClient.post("/Fs/Employment/JobLevelSetUp", payload);
+        await auditTrail.log({
+            accessType: 'Add',
+            trans: `Added job level ${payload.jobLevelCode}`,
+            messages: `Job Level created: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
+            formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
-          text: "Division created successfully.",
+          text: "Job Level created successfully.",
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the division list
-        await fetchDivisionData();
+        // Refresh the job level list
+        await fetchJobLevelData();
       }
 
       // Close modal and reset form

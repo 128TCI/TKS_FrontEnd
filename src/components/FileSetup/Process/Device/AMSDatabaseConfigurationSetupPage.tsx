@@ -3,10 +3,12 @@ import { Search, Plus, X, Check, Calendar, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
+import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 import { CalendarPopup } from '../../../CalendarPopup';
 
 
+const formName = 'AMS Database Configuration SetUp';
 interface AMSDatabase {
     id: number;
     description: string;
@@ -231,15 +233,27 @@ export function AMSDatabaseConfigurationSetupPage() {
     };
 
     const handleDelete = async (item: AMSDatabase) => {
-        const confirmed = await Swal.fire({
-            icon: 'warning',
-            title: 'Confirm Delete',
-            text: `Are you sure you want to delete database configuration "${item.description}"?`,
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Delete',
-            cancelButtonText: 'Cancel',
+    const confirmed = await Swal.fire({
+        icon: 'warning',
+        title: 'Confirm Delete',
+        text: `Are you sure you want to delete database configuration "${item.description}"?`,
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+    });
+
+    if (confirmed.isConfirmed) {
+        try {
+        await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
+
+        // Audit trail
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Database configuration "${item.description}" deleted.`,
+            messages: `Database configuration "${item.description}" deleted.`,
+            formName: formName,
         });
         if (confirmed.isConfirmed) {
             try {
@@ -251,6 +265,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                 await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
             }
         }
+    }
     };
 
     const handleSubmitCreate = async (e: React.FormEvent) => {
