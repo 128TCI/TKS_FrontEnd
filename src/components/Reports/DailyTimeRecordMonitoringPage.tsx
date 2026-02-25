@@ -30,6 +30,25 @@ interface ReportFilter {
   userName: string
 }
 
+interface LeaveAbsencesFilter {
+  empCode: string
+  dateFr: string
+  dateTo: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  designation: string []
+  section: string []
+  company: string | null
+  address: string | null
+  leaveType: string | null
+  leaveWithOrWPay: string
+  includeLeaveAdj: boolean
+  status: string
+  mode: string
+}
+
 interface DailyRecord {
   date: string;
   day: string;
@@ -59,8 +78,8 @@ interface EmployeeReport {
 }
 
 export function DailyTimeRecordMonitoringPage() {
-  const [dateFrom, setDateFrom] = useState('3/1/2020');
-  const [dateTo, setDateTo] = useState('03/15/2020');
+  const [dateFrom, setDateFrom] = useState('05/01/2021');
+  const [dateTo, setDateTo] = useState('05/15/2021');
   const [empCode, setEmpCode] = useState('');
   const [empName, setEmpName] = useState('');
   const [searchModalTerm, setSearchModalTerm] = useState('');
@@ -87,10 +106,20 @@ export function DailyTimeRecordMonitoringPage() {
   const [reportType, setReportType] = useState('Accumulation');
   const [toExcelFile, setToExcelFile] = useState(false);
   const [convertToHHMM, setConvertToHHMM] = useState(false);
+  const [includeLeaveAdj, setIncludeLeaveAdj] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'1' | '0' | ''>('1');
+  const [status, setStatus] = useState<'Active' |'InActive'| 'All'>('All');
+  const [mode, setMode] = useState<'Absences' |'Leave'| 'All'>('All');
+  const [withOrWOutPay, setWithOrWOutPay] = useState<'WithPay' |'WithOutPay'| 'All'>('All');
   const itemsPerPage = 10;
+  const [selectedLeaveType, setSelectedLeaveType] = useState('');
+  const [getLeaveType, setGetLeaveType] = useState<Array<{
+    leaveID: number;
+    leaveCode: string;
+    leaveDesc: string;
+  }>>([]);
   const [getEmployee, setGetEmployee] = useState<Array<{ 
     empID: number; 
     empCode: string; 
@@ -282,6 +311,34 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     setSearchModalTerm('');
   };
 
+
+  useEffect(() => {
+    fetchLeaveData();
+  }, []);
+
+  const fetchLeaveData = async () => {
+    //setLoading(true);
+      //error;
+      try {
+      const response = await apiClient.get('/Fs/Process/LeaveTypeSetUp');
+      if (response.data) {
+        const mappedData = response.data.map((getLeaveType: any) => ({
+          //deviceName: device.deviceName || device.DeviceName || ''
+          leaveID: getLeaveType.leaveID || getLeaveType.ID || '',
+          leaveCode: getLeaveType.leaveCode || getLeaveType.LeaveCode || '',
+          leaveDesc: getLeaveType.leaveDesc || getLeaveType.LeaveDesc || '' 
+        }));
+        setGetLeaveType(mappedData);
+      }
+      } catch (error: any) {
+          const errorMsg = error.response?.data?.message || error.message || 'Failed to load Leave Types';
+          //setError(errorMsg);
+          console.error('Error fetching Leave Types', error);
+        } finally {
+          //loading;
+        }
+  };
+
   const fileLinkCreate = (blob: Blob, filename: string): void => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -297,17 +354,36 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     empCode: empCode,
     dateFr: dateFrom ? new Date(dateFrom).toLocaleDateString() : '-',
     dateTo: dateTo ? new Date(dateTo).toLocaleDateString() : '-',
-    groups: selectedItems.toLocaleString().split(","),
-    departments: selectedDepItems.toLocaleString().split(","),
-    divisions: selectedDivItems.toLocaleString().split(","),
-    branch: selectedBranchItems.toLocaleString().split(","),
-    designation: selectedDesItems.toLocaleString().split(","),
-    section: selectedSecItems.toLocaleString().split(","),
+    groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
+    departments: selectedDepItems.length === 0 ? [] : selectedDepItems.toLocaleString().split(","),
+    divisions: selectedDivItems.length === 0 ? [] : selectedDivItems.toLocaleString().split(","),
+    branch: selectedBranchItems.length === 0 ? [] : selectedBranchItems.toLocaleString().split(","),
+    designation: selectedDesItems.length === 0 ? [] : selectedDesItems.toLocaleString().split(","),
+    section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
     company: "",
     address: "",
     userName: "128TCI"
   };
 
+  const leaveAbsenceFilter: LeaveAbsencesFilter = {
+    empCode: empCode,
+    dateFr: dateFrom ? new Date(dateFrom).toLocaleDateString() : '-',
+    dateTo: dateTo ? new Date(dateTo).toLocaleDateString() : '-',
+    //groups: selectedItems.toLocaleString().split(","),
+    groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
+    departments: selectedDepItems.length === 0 ? [] : selectedDepItems.toLocaleString().split(","),
+    divisions: selectedDivItems.length === 0 ? [] : selectedDivItems.toLocaleString().split(","),
+    branch: selectedBranchItems.length === 0 ? [] : selectedBranchItems.toLocaleString().split(","),
+    designation: selectedDesItems.length === 0 ? [] : selectedDesItems.toLocaleString().split(","),
+    section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
+    company: "",
+    address: "",
+    leaveType: selectedLeaveType,
+    leaveWithOrWPay: withOrWOutPay,
+    includeLeaveAdj: includeLeaveAdj,
+    status: status,
+    mode: mode
+  };
 
   function useToQueryParams<T extends Record<string, any>>(obj: T): string {
   const params = new URLSearchParams();
@@ -336,6 +412,146 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         });
         console.log(response.headers);
         const fileName = "AttendanceSummaryReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Daily Time"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        const response = await apiClient.get(`/DailyTimeReport/PrintDailyTimeReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "DailyTimeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Employees Raw In And Out (From Update Rawdata)"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        const response = await apiClient.get(`/EmployeeRawInAndOut/PrintEmployeeRawInAndOut?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "EmployeeRawInAndOutReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Leave And Absences" && mode === "All"){
+      try{      
+        const query = useToQueryParams<LeaveAbsencesFilter>(leaveAbsenceFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/LeaveAndAbsences/PrintLeaveAndAbsences?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "LeaveAndAbsencesReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Leave And Absences" && mode === "Absences"){
+      try{      
+        const query = useToQueryParams<LeaveAbsencesFilter>(leaveAbsenceFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/LeaveAndAbsences/PrintAbsences?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "AbsencesReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Leave And Absences" && mode === "Leave"){
+      try{      
+        const query = useToQueryParams<LeaveAbsencesFilter>(leaveAbsenceFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/LeaveAndAbsences/PrintLeave?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "LeaveReport.xlsx";
         const mimeType = response.headers['content-type']
         const blob = new Blob([response.data], { type: mimeType });
         fileLinkCreate(blob, fileName)
@@ -1251,7 +1467,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
 
                       {/* Checkboxes */}
                       <div className="mb-6 space-y-2">
-                        {reportType != "Attendance Summary" &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                        {/* {reportType != "Attendance Summary" &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
                           <input
                             type="checkbox"
                             checked={toExcelFile}
@@ -1259,7 +1475,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                           />
                           <span className="text-gray-700">To Excel File</span>
-                        </label>)}
+                        </label>)} */}
                         <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
                           <input
                             type="checkbox"
@@ -1269,7 +1485,148 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           />
                           <span className="text-gray-700">Convert To HH:MM</span>
                         </label>
+                        {reportType == "Leave And Absences" &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={includeLeaveAdj}
+                            onChange={(e) => setIncludeLeaveAdj(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700">Include Leave Adjustment</span>
+                        </label>)}
                       </div>
+                      {/* Filter Status For Leave and Absences */}
+                      {reportType == "Leave And Absences" &&(<div>
+                        <span>Status</span>
+                        <div className="mt-4 mb-4 flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveStatus"
+                              value="Active"
+                              checked={status === 'Active'}
+                              onChange={(e) => setStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Active</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveStatus"
+                              value="InActive"
+                              checked={status === 'InActive'}
+                              onChange={(e) => setStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">In Active</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveStatus"
+                              value="All"
+                              checked={status === 'All'}
+                              onChange={(e) => setStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">All</span>
+                          </label>
+                        </div>
+                      </div>)}
+                      {/* Filter Mode For Leave and Absences */}
+                      {reportType == "Leave And Absences" &&(<div>
+                        <span>Options</span>
+                        <div className="mt-4 mb-4 flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveMode"
+                              value="Absences"
+                              checked={mode === 'Absences'}
+                              onChange={(e) => setMode(e.target.value as 'Absences' | 'Leave' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Absences</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveMode"
+                              value="Leave"
+                              checked={mode === 'Leave'}
+                              onChange={(e) => setMode(e.target.value as 'Absences' | 'Leave' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Leave</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveMode"
+                              value="All"
+                              checked={mode === 'All'}
+                              onChange={(e) => setMode(e.target.value as 'Absences' | 'Leave' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">All</span>
+                          </label>
+                        </div>
+                        {/* Leave Type Selection */}
+                        {mode == "Leave" &&(<div>
+                          <label className="block text-gray-700 text-sm mb-2">Leave Type:</label>
+                          <select
+                            value={selectedLeaveType}
+                            onChange={(e) => setSelectedLeaveType(e.target.value)}
+                            className="mb-4 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          >
+                            <option></option>
+                            {getLeaveType.map(getLeaveType => (
+                              <option
+                                key={getLeaveType.leaveCode}
+                                value={getLeaveType.leaveCode}
+                              >
+                                {getLeaveType.leaveDesc}
+                              </option>
+                            ))}
+                          </select>
+                        </div>)}
+                        {mode == "Leave" &&(<div className="mt-4 mb-4 flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="wPay"
+                              value="WithPay"
+                              checked={withOrWOutPay === 'WithPay'}
+                              onChange={(e) => setWithOrWOutPay(e.target.value as 'WithPay' | 'WithOutPay' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">With Pay</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="wPay"
+                              value="WithOutPay"
+                              checked={withOrWOutPay === 'WithOutPay'}
+                              onChange={(e) => setWithOrWOutPay(e.target.value as 'WithPay' | 'WithOutPay' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Without Pay</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="wPay"
+                              value="All"
+                              checked={withOrWOutPay === 'All'}
+                              onChange={(e) => setWithOrWOutPay(e.target.value as 'WithPay' | 'WithOutPay' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">All</span>
+                          </label>
+                        </div>)}
+                      </div>)}
 
                       {/* Display Button */}
                       <button
