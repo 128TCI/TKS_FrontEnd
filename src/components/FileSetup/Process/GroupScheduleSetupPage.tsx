@@ -395,9 +395,9 @@ export function GroupScheduleSetupPage() {
                 <tbody className="divide-y divide-gray-100">
                   {paginatedData.length > 0 ? (
                     paginatedData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
+                      <tr key={item.groupScheduleID} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 text-sm text-gray-900">{item.groupScheduleCode}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.groupScheduleDesc}</td>
                         {(hasPermission('Edit') || hasPermission('Delete')) && (
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
@@ -415,7 +415,7 @@ export function GroupScheduleSetupPage() {
                             )}
                             {hasPermission('Delete') && (
                               <button
-                                onClick={() => handleDelete(item.id)}
+                                onClick={() => handleDelete(item)}
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
                               >

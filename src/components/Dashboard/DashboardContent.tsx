@@ -72,7 +72,6 @@ import { DeductTardinessToOvertimePage } from '../Utilities/DeductTardinessToOve
 
 //Process Sub-Menu
 import { ProcessPage } from '../Process/ProcessPage';
-import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
 
 import { DailyTimeRecordMonitoringPage } from '../Reports/DailyTimeRecordMonitoringPage';
 import { TKSGroupSetupDefinitionPage } from '../TKSGroupSetupDefinitionPage';
@@ -145,6 +144,8 @@ import { MySQLDatabaseConfigurationSetupPage } from '../FileSetup/Process/Device
 import { EmployeeMasterFilePage } from '../Maintenance/EmployeeMasterFilePage';
 import { EmployeeTimekeepConfigPage } from '../Maintenance/EmployeeTimekeepConfigPage';
 import { RawDataPage } from '../Maintenance/RawDataPage';
+import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
+
 
 interface DashboardContentProps {
     activeSection: string;

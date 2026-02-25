@@ -71,7 +71,8 @@ export function PayrollLocationSetupPage() {
     const payCodeOptions = [
         { value: 'M', label: 'Monthly' },
         { value: 'S', label: 'Semi-Monthly' },
-        { value: 'D', label: 'Daily' }
+        { value: 'D', label: 'Daily' },
+        { value: 'W', label: 'Weekly' }
     ];
 
     // Helper function to get display label for pay code

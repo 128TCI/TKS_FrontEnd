@@ -20,6 +20,20 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
         return new Date(year, month, 1).getDay();
     };
 
+    // Generate year options (from 1900 to current year + 10)
+    const years = [];
+    const currentYearNow = new Date().getFullYear();
+    for (let year = 1900; year <= currentYearNow + 10; year++) {
+        years.push(year);
+    }
+
+    // Generate day options based on current month
+    const daysInCurrentMonth = getDaysInMonth(currentMonth, currentYear);
+    const days = [];
+    for (let day = 1; day <= daysInCurrentMonth; day++) {
+        days.push(day);
+    }
+
     const handlePrevMonth = () => {
         if (currentMonth === 0) {
             setCurrentMonth(11);
@@ -38,6 +52,20 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
         }
     };
 
+    const handleMonthChange = (month: number) => {
+        setCurrentMonth(month);
+    };
+
+    const handleYearChange = (year: number) => {
+        setCurrentYear(year);
+    };
+
+    const handleDayChange = (day: number) => {
+        const formattedDate = `${currentMonth + 1}/${day}/${currentYear}`;
+        onDateSelect(formattedDate);
+        onClose();
+    };
+
     const handleDateClick = (day: number) => {
         const formattedDate = `${currentMonth + 1}/${day}/${currentYear}`;
         onDateSelect(formattedDate);
@@ -47,7 +75,7 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
     const renderCalendar = () => {
         const daysInMonth = getDaysInMonth(currentMonth, currentYear);
         const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
-        const days = [];
+        const calendarDays = [];
 
         // Previous month days
         const prevMonthDays = firstDay;
@@ -56,7 +84,7 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
         const daysInPrevMonth = getDaysInMonth(prevMonth, prevMonthYear);
 
         for (let i = prevMonthDays - 1; i >= 0; i--) {
-            days.push(
+            calendarDays.push(
                 <div key={`prev-${i}`} className="text-center py-2 text-gray-400 text-sm">
                     {daysInPrevMonth - i}
                 </div>
@@ -65,7 +93,7 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
 
         // Current month days
         for (let day = 1; day <= daysInMonth; day++) {
-            days.push(
+            calendarDays.push(
                 <div
                     key={day}
                     onClick={() => handleDateClick(day)}
@@ -77,16 +105,16 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
         }
 
         // Next month days
-        const remainingDays = 42 - days.length;
+        const remainingDays = 42 - calendarDays.length;
         for (let day = 1; day <= remainingDays; day++) {
-            days.push(
+            calendarDays.push(
                 <div key={`next-${day}`} className="text-center py-2 text-gray-400 text-sm">
                     {day}
                 </div>
             );
         }
 
-        return days;
+        return calendarDays;
     };
 
     return (
@@ -98,7 +126,7 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
             />
 
             {/* Calendar Popup */}
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-50" style={{ width: '280px' }}>
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-50" style={{ width: '320px' }}>
                 {/* Calendar Header */}
                 <div className="flex items-center justify-between mb-3">
                     <button
@@ -110,8 +138,40 @@ export function CalendarPopup({ onDateSelect, onClose }: CalendarPopupProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
-                    <div className="text-sm font-medium">
-                        {monthNames[currentMonth]} {currentYear}
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={currentMonth}
+                            onChange={(e) => handleMonthChange(Number(e.target.value))}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
+                        >
+                            {monthNames.map((month, index) => (
+                                <option key={month} value={index}>
+                                    {month}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            onChange={(e) => handleDayChange(Number(e.target.value))}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 w-16"
+                        >
+                            <option value="">Day</option>
+                            {days.map((day) => (
+                                <option key={day} value={day}>
+                                    {day}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={currentYear}
+                            onChange={(e) => handleYearChange(Number(e.target.value))}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
+                        >
+                            {years.map((year) => (
+                                <option key={year} value={year}>
+                                    {year}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                     <button
                         onClick={handleNextMonth}

@@ -41,6 +41,19 @@ interface DTRLogField {
   identifierNoOfChar: number;
 }
 
+interface DTRFlag {
+  id: number;
+  flagCode: string;
+  timeIn: string;
+  timeOut: string;
+  break1Out: string;
+  break1In: string;
+  break2Out: string;
+  break2In: string;
+  break3Out: string;
+  break3In: string;
+}
+
 export function DTRLogFieldsSetupPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -89,43 +102,46 @@ export function DTRLogFieldsSetupPage() {
   const [loadingLogFields, setLoadingLogFields] = useState(false);
   const [logFieldsError, setLogFieldsError] = useState('');
 
+  // Flag Code modal states
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [flagSearchTerm, setFlagSearchTerm] = useState('');
+  const [dtrFlags, setDTRFlags] = useState<DTRFlag[]>([]);
+  const [loadingFlags, setLoadingFlags] = useState(false);
+
   const itemsPerPage = 10;
 
   // Permissions
-    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-    const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
-    useEffect(() => {
-      getDTRLogsFieldsSetupPermissions();
-    }, []);
-  
-    const getDTRLogsFieldsSetupPermissions = () => {
-      const rawPayload = localStorage.getItem("loginPayload");
-      if (!rawPayload) return;
-  
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-        const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-        const branchEntries = encryptedArray.filter(
-          (p) => decryptData(p.formName) === "DTRLogFieldsSetup"
-        );
-  
-        // Build a map: { Add: true, Edit: true, ... }
-        const permMap: Record<string, boolean> = {};
-        branchEntries.forEach((p) => {
-          const accessType = decryptData(p.accessTypeName);
-          if (accessType) permMap[accessType] = true;
-        });
-  
-        setPermissions(permMap);
-  
-      } catch (e) {
-        console.error("Error parsing or decrypting payload", e);
-      }
-    };
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
 
-  // Fetch DTR log fields from API
+  useEffect(() => {
+    getDTRLogsFieldsSetupPermissions();
+  }, []);
+
+  const getDTRLogsFieldsSetupPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "DTRLogFieldsSetup"
+      );
+
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
+
   useEffect(() => {
     fetchDTRLogFields();
   }, []);
@@ -146,7 +162,27 @@ export function DTRLogFieldsSetupPage() {
       setLoadingLogFields(false);
     }
   };
-  
+
+  const fetchDTRFlags = async () => {
+    setLoadingFlags(true);
+    try {
+      const response = await apiClient.get('/Fs/Process/Device/DTRFlagSetUp');
+      if (response.status === 200 && response.data) {
+        setDTRFlags(response.data);
+      }
+    } catch (error: any) {
+      console.error('Error fetching DTR flags:', error);
+    } finally {
+      setLoadingFlags(false);
+    }
+  };
+
+  const handleOpenFlagModal = () => {
+    setFlagSearchTerm('');
+    fetchDTRFlags();
+    setShowFlagModal(true);
+  };
+
   const filteredData = logFields.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -159,7 +195,6 @@ export function DTRLogFieldsSetupPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
@@ -263,15 +298,10 @@ export function DTRLogFieldsSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the list
         await fetchDTRLogFields();
       } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Failed to delete DTR log field';
-        await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: errorMsg,
-        });
+        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
         console.error('Error deleting DTR log field:', error);
       }
     }
@@ -279,57 +309,30 @@ export function DTRLogFieldsSetupPage() {
 
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate code
+
     if (!formData.code.trim()) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Code is required.',
-      });
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
       return;
     }
 
-    // Check for duplicate code
-    const isDuplicate = logFields.some(field => 
+    const isDuplicate = logFields.some(field =>
       field.code.toLowerCase() === formData.code.trim().toLowerCase()
     );
 
     if (isDuplicate) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Duplicate Code',
-        text: 'This code is already in use. Please use a different code.',
-      });
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'This code is already in use. Please use a different code.' });
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = {
-        id: 0,
-        ...formData
-      };
-
-      await apiClient.post('/Fs/Process/Device/DTRLogFIeldsSetUp', payload);
-      await Swal.fire({
-        icon: 'success',
-        title: 'Success',
-        text: 'DTR log field created successfully.',
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      
-      // Refresh the list
+      await apiClient.post('/Fs/Process/Device/DTRLogFIeldsSetUp', { id: 0, ...formData });
+      await Swal.fire({ icon: 'success', title: 'Success', text: 'DTR log field created successfully.', timer: 2000, showConfirmButton: false });
       await fetchDTRLogFields();
       setShowCreateModal(false);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error creating DTR log field:', error);
     } finally {
       setSubmitting(false);
@@ -338,61 +341,33 @@ export function DTRLogFieldsSetupPage() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!editingItem) return;
 
-    // Validate code
     if (!formData.code.trim()) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Code is required.',
-      });
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
       return;
     }
 
-    // Check for duplicate code (excluding current item)
-    const isDuplicate = logFields.some(field => 
-      field.id !== editingItem.id && 
+    const isDuplicate = logFields.some(field =>
+      field.id !== editingItem.id &&
       field.code.toLowerCase() === formData.code.trim().toLowerCase()
     );
 
     if (isDuplicate) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Duplicate Code',
-        text: 'This code is already in use. Please use a different code.',
-      });
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'This code is already in use. Please use a different code.' });
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = {
-        id: editingItem.id,
-        ...formData
-      };
-
-      await apiClient.put(`/Fs/Process/Device/DTRLogFIeldsSetUp/${editingItem.id}`, payload);
-      await Swal.fire({
-        icon: 'success',
-        title: 'Success',
-        text: 'DTR log field updated successfully.',
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      
-      // Refresh the list
+      await apiClient.put(`/Fs/Process/Device/DTRLogFIeldsSetUp/${editingItem.id}`, { id: editingItem.id, ...formData });
+      await Swal.fire({ icon: 'success', title: 'Success', text: 'DTR log field updated successfully.', timer: 2000, showConfirmButton: false });
       await fetchDTRLogFields();
       setShowEditModal(false);
       setEditingItem(null);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error updating DTR log field:', error);
     } finally {
       setSubmitting(false);
@@ -403,13 +378,16 @@ export function DTRLogFieldsSetupPage() {
     setShowCreateModal(false);
     setShowEditModal(false);
     setEditingItem(null);
+    setShowFlagModal(false);
   };
 
   // Handle ESC key press
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (showCreateModal) {
+        if (showFlagModal) {
+          setShowFlagModal(false);
+        } else if (showCreateModal) {
           setShowCreateModal(false);
         } else if (showEditModal) {
           setShowEditModal(false);
@@ -418,14 +396,14 @@ export function DTRLogFieldsSetupPage() {
       }
     };
 
-    if (showCreateModal || showEditModal) {
+    if (showCreateModal || showEditModal || showFlagModal) {
       document.addEventListener('keydown', handleEscKey);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showCreateModal, showEditModal]);
+  }, [showCreateModal, showEditModal, showFlagModal]);
 
   const deviceTypes = ['Excel File', 'Text File', 'DAT File', 'CSV File'];
   const deviceFormats = ['Excel Format', 'Comma Separated', 'Tab Delimited', 'Pipe Delimited'];
@@ -433,7 +411,6 @@ export function DTRLogFieldsSetupPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Page Header */}
@@ -441,7 +418,6 @@ export function DTRLogFieldsSetupPage() {
             <h1 className="text-white">DTR Log Fields Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
             {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
@@ -456,22 +432,12 @@ export function DTRLogFieldsSetupPage() {
                     Configure field mappings for importing DTR logs from various file formats. Define data positions, formats, and separators to ensure accurate parsing of employee attendance records from external sources.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Flexible import formats</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Custom field mapping</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Date format configuration</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Multi-device support</span>
-                    </div>
+                    {['Flexible import formats', 'Custom field mapping', 'Date format configuration', 'Multi-device support'].map(t => (
+                      <div key={t} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">{t}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -488,7 +454,6 @@ export function DTRLogFieldsSetupPage() {
                   Create New
                 </button>
               )}
-
               {hasPermission('View') && (
                 <div className="flex items-center gap-2">
                   <label className="text-gray-700 text-sm">Search:</label>
@@ -521,7 +486,7 @@ export function DTRLogFieldsSetupPage() {
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Device Type</th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Device Format</th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Flag Code</th>
-                      {(hasPermission('Edit') || hasPermission('Delete')) && ( 
+                      {(hasPermission('Edit') || hasPermission('Delete')) && (
                         <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
                       )}
                     </tr>
@@ -536,32 +501,32 @@ export function DTRLogFieldsSetupPage() {
                           <td className="px-6 py-4 text-sm text-gray-600">{item.deviceFormat}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">{item.flagCode}</td>
                           {(hasPermission('Edit') || hasPermission('Delete')) && (
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              {hasPermission('Edit') && (
-                                <button
-                                  onClick={() => handleEdit(item)}
-                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                  title="Edit"
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                {hasPermission('Edit') && (
+                                  <button
+                                    onClick={() => handleEdit(item)}
+                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                    title="Edit"
                                   >
-                                
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                              )}
-                              {hasPermission("Edit") && hasPermission("Delete") && (
-                                <span className="text-gray-300">|</span>
-                              )}
-                              {hasPermission('Delete') && (
-                                <button
-                                  onClick={() => handleDelete(item)}
-                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </td>)}
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {hasPermission("Edit") && hasPermission("Delete") && (
+                                  <span className="text-gray-300">|</span>
+                                )}
+                                {hasPermission('Delete') && (
+                                  <button
+                                    onClick={() => handleDelete(item)}
+                                    className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     ) : (
@@ -572,54 +537,52 @@ export function DTRLogFieldsSetupPage() {
                       </tr>
                     )}
                   </tbody>
-                </table> ) : (
-                  <div className="text-center py-10 text-gray-500">
-                      You do not have permission to view this list.
-                  </div>
+                </table>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+                </div>
               )}
             </div>
 
             {/* Pagination */}
             {hasPermission('View') && (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-gray-600">
-                Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="text-gray-600">
+                  Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                </span>
+                <div className="flex items-center gap-2">
                   <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded transition-colors ${
-                      currentPage === page
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-gray-300 hover:bg-gray-100'
-                    }`}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {page}
+                    Previous
                   </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
-                  disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded transition-colors ${currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                    disabled={currentPage >= totalPages || filteredData.length === 0}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>)}
+            )}
           </div>
         </div>
       </div>
 
-      {/* Create/Edit Modal - Due to length, I'll create a separate modal component */}
+      {/* Create/Edit Modal */}
       {(showCreateModal || showEditModal) && (
         <DTRLogFieldModal
           isEdit={showEditModal}
@@ -631,16 +594,23 @@ export function DTRLogFieldsSetupPage() {
           deviceTypes={deviceTypes}
           deviceFormats={deviceFormats}
           dateFormats={dateFormats}
+          // Flag modal props
+          showFlagModal={showFlagModal}
+          onOpenFlagModal={handleOpenFlagModal}
+          onCloseFlagModal={() => setShowFlagModal(false)}
+          flagSearchTerm={flagSearchTerm}
+          setFlagSearchTerm={setFlagSearchTerm}
+          dtrFlags={dtrFlags}
+          loadingFlags={loadingFlags}
         />
       )}
 
-      {/* Footer */}
       <Footer />
     </div>
   );
 }
 
-// Modal Component
+// ─── Modal Component ───────────────────────────────────────────────────────────
 interface DTRLogFieldModalProps {
   isEdit: boolean;
   formData: any;
@@ -651,6 +621,14 @@ interface DTRLogFieldModalProps {
   deviceTypes: string[];
   deviceFormats: string[];
   dateFormats: string[];
+  // Flag modal
+  showFlagModal: boolean;
+  onOpenFlagModal: () => void;
+  onCloseFlagModal: () => void;
+  flagSearchTerm: string;
+  setFlagSearchTerm: (v: string) => void;
+  dtrFlags: DTRFlag[];
+  loadingFlags: boolean;
 }
 
 function DTRLogFieldModal({
@@ -662,58 +640,84 @@ function DTRLogFieldModal({
   submitting,
   deviceTypes,
   deviceFormats,
-  dateFormats
+  dateFormats,
+  showFlagModal,
+  onOpenFlagModal,
+  onCloseFlagModal,
+  flagSearchTerm,
+  setFlagSearchTerm,
+  dtrFlags,
+  loadingFlags,
 }: DTRLogFieldModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
+
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0 z-10">
           <h2 className="text-gray-900">{isEdit ? 'Edit DTR Log Field' : 'Create New'}</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
+
         <form onSubmit={onSubmit} className="p-6">
           <h3 className="text-blue-600 mb-4">DTR Log Fields Setup</h3>
-          
+
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-6 mb-6">
-            {/* Left Column */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <label className="text-gray-700 text-sm whitespace-nowrap w-32">Code :</label>
-                <input
-                  type="text"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  required
-                />
-              </div>
+           {/* Left Column */}
+<div className="space-y-3">
+  <div className="flex items-center gap-3">
+    <label className="text-gray-700 text-sm whitespace-nowrap w-32">Code :</label>
+    <input
+      type="text"
+      value={formData.code}
+      maxLength={10}
+      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+      required
+    />
+  </div>
 
-              <div className="flex items-center gap-3">
-                <label className="text-gray-700 text-sm whitespace-nowrap w-32">Description :</label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
+  <div className="flex items-center gap-3">
+    <label className="text-gray-700 text-sm whitespace-nowrap w-32">Description :</label>
+    <input
+      type="text"
+      value={formData.description}
+      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+    />
+  </div>
 
-              <div className="flex items-center gap-3">
-                <label className="text-gray-700 text-sm whitespace-nowrap w-32">Flag Code :</label>
-                <input
-                  type="text"
-                  value={formData.flagCode}
-                  onChange={(e) => setFormData({ ...formData, flagCode: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
-            </div>
+  {/* Flag Code — label on its own row, then input+buttons below */}
+  <div className="flex flex-col gap-1">
+    <label className="text-gray-700 text-sm whitespace-nowrap">Flag Code :</label>
+    <div className="flex items-center gap-2">
+      <input
+        type="text"
+        value={formData.flagCode}
+        readOnly
+        placeholder="Select flag code..."
+        className="flex-1 min-w-0 px-3 py-1.5 border border-gray-300 rounded-lg bg-gray-50 text-sm cursor-default focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button
+        type="button"
+        onClick={onOpenFlagModal}
+        className="w-8 h-8 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center justify-center flex-shrink-0"
+      >
+        <Search className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setFormData({ ...formData, flagCode: '' })}
+        className="w-8 h-8 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center justify-center flex-shrink-0"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  </div>
+</div>
 
             {/* Right Column */}
             <div className="space-y-3">
@@ -722,11 +726,9 @@ function DTRLogFieldModal({
                 <select
                   value={formData.deviceType}
                   onChange={(e) => setFormData({ ...formData, deviceType: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
-                  {deviceTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
+                  {deviceTypes.map(type => <option key={type} value={type}>{type}</option>)}
                 </select>
               </div>
 
@@ -735,11 +737,9 @@ function DTRLogFieldModal({
                 <select
                   value={formData.deviceFormat}
                   onChange={(e) => setFormData({ ...formData, deviceFormat: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
-                  {deviceFormats.map(format => (
-                    <option key={format} value={format}>{format}</option>
-                  ))}
+                  {deviceFormats.map(format => <option key={format} value={format}>{format}</option>)}
                 </select>
               </div>
 
@@ -748,11 +748,9 @@ function DTRLogFieldModal({
                 <select
                   value={formData.dateFormat}
                   onChange={(e) => setFormData({ ...formData, dateFormat: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
-                  {dateFormats.map(format => (
-                    <option key={format} value={format}>{format}</option>
-                  ))}
+                  {dateFormats.map(format => <option key={format} value={format}>{format}</option>)}
                 </select>
               </div>
 
@@ -762,7 +760,7 @@ function DTRLogFieldModal({
                   type="text"
                   value={formData.dateSeparator}
                   onChange={(e) => setFormData({ ...formData, dateSeparator: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
 
@@ -785,248 +783,132 @@ function DTRLogFieldModal({
               {/* EmpCode */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">EmpCode Position</label>
-                <input
-                  type="number"
-                  value={formData.empCodePos}
-                  onChange={(e) => setFormData({ ...formData, empCodePos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.empCodePos} onChange={(e) => setFormData({ ...formData, empCodePos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">EmpCode Chars</label>
-                <input
-                  type="number"
-                  value={formData.empCodeNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, empCodeNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.empCodeNoOfChar} onChange={(e) => setFormData({ ...formData, empCodeNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
               {/* Date */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Date Position</label>
-                <input
-                  type="number"
-                  value={formData.datePos}
-                  onChange={(e) => setFormData({ ...formData, datePos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.datePos} onChange={(e) => setFormData({ ...formData, datePos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Date Chars</label>
-                <input
-                  type="number"
-                  value={formData.dateNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, dateNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.dateNoOfChar} onChange={(e) => setFormData({ ...formData, dateNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
               {/* Time */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Time Position</label>
-                <input
-                  type="number"
-                  value={formData.timePos}
-                  onChange={(e) => setFormData({ ...formData, timePos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.timePos} onChange={(e) => setFormData({ ...formData, timePos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Time Chars</label>
-                <input
-                  type="number"
-                  value={formData.timeNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, timeNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.timeNoOfChar} onChange={(e) => setFormData({ ...formData, timeNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
-              {/* Month/Day/Year */}
+              {/* Month */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Month Position</label>
-                <input
-                  type="number"
-                  value={formData.monthPos}
-                  onChange={(e) => setFormData({ ...formData, monthPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.monthPos} onChange={(e) => setFormData({ ...formData, monthPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Month Chars</label>
-                <input
-                  type="number"
-                  value={formData.monthNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, monthNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.monthNoOfChar} onChange={(e) => setFormData({ ...formData, monthNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
+              {/* Day */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Day Position</label>
-                <input
-                  type="number"
-                  value={formData.dayPos}
-                  onChange={(e) => setFormData({ ...formData, dayPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.dayPos} onChange={(e) => setFormData({ ...formData, dayPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Day Chars</label>
-                <input
-                  type="number"
-                  value={formData.dayNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, dayNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.dayNoOfChar} onChange={(e) => setFormData({ ...formData, dayNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
+              {/* Year */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Year Position</label>
-                <input
-                  type="number"
-                  value={formData.yearPos}
-                  onChange={(e) => setFormData({ ...formData, yearPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.yearPos} onChange={(e) => setFormData({ ...formData, yearPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Year Chars</label>
-                <input
-                  type="number"
-                  value={formData.yearNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, yearNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.yearNoOfChar} onChange={(e) => setFormData({ ...formData, yearNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
-              {/* Hour/Minutes/Period */}
+              {/* Hour */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Hour Position</label>
-                <input
-                  type="number"
-                  value={formData.hourPos}
-                  onChange={(e) => setFormData({ ...formData, hourPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.hourPos} onChange={(e) => setFormData({ ...formData, hourPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Hour Chars</label>
-                <input
-                  type="number"
-                  value={formData.hourNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, hourNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.hourNoOfChar} onChange={(e) => setFormData({ ...formData, hourNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
+              {/* Minutes */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Minutes Position</label>
-                <input
-                  type="number"
-                  value={formData.minutesPos}
-                  onChange={(e) => setFormData({ ...formData, minutesPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.minutesPos} onChange={(e) => setFormData({ ...formData, minutesPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Minutes Chars</label>
-                <input
-                  type="number"
-                  value={formData.minutesNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, minutesNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.minutesNoOfChar} onChange={(e) => setFormData({ ...formData, minutesNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
+              {/* Time Period */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Time Period Position</label>
-                <input
-                  type="number"
-                  value={formData.timePeriodPos}
-                  onChange={(e) => setFormData({ ...formData, timePeriodPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.timePeriodPos} onChange={(e) => setFormData({ ...formData, timePeriodPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Time Period Chars</label>
-                <input
-                  type="number"
-                  value={formData.timePeriodNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, timePeriodNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.timePeriodNoOfChar} onChange={(e) => setFormData({ ...formData, timePeriodNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
               {/* Flag */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Flag Position</label>
-                <input
-                  type="number"
-                  value={formData.flagPos}
-                  onChange={(e) => setFormData({ ...formData, flagPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.flagPos} onChange={(e) => setFormData({ ...formData, flagPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Flag Chars</label>
-                <input
-                  type="number"
-                  value={formData.flagNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, flagNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.flagNoOfChar} onChange={(e) => setFormData({ ...formData, flagNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
               {/* Terminal */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Terminal Position</label>
-                <input
-                  type="number"
-                  value={formData.terminalPos}
-                  onChange={(e) => setFormData({ ...formData, terminalPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.terminalPos} onChange={(e) => setFormData({ ...formData, terminalPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Terminal Chars</label>
-                <input
-                  type="number"
-                  value={formData.terminalNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, terminalNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.terminalNoOfChar} onChange={(e) => setFormData({ ...formData, terminalNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div></div>
 
               {/* Identifier */}
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Identifier Position</label>
-                <input
-                  type="number"
-                  value={formData.identifierPos}
-                  onChange={(e) => setFormData({ ...formData, identifierPos: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.identifierPos} onChange={(e) => setFormData({ ...formData, identifierPos: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
               <div>
                 <label className="text-gray-700 text-xs mb-1 block">Identifier Chars</label>
-                <input
-                  type="number"
-                  value={formData.identifierNoOfChar}
-                  onChange={(e) => setFormData({ ...formData, identifierNoOfChar: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <input type="number" value={formData.identifierNoOfChar} onChange={(e) => setFormData({ ...formData, identifierNoOfChar: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
             </div>
           </div>
@@ -1049,6 +931,104 @@ function DTRLogFieldModal({
             </button>
           </div>
         </form>
+
+        {/* ── Flag Code Search Modal (nested inside main modal) ── */}
+        {showFlagModal && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-[10] rounded-lg">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-2xl w-full max-w-2xl max-h-[95%] flex flex-col mx-4">
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+                <h2 className="text-gray-900 font-semibold">Search DTR Flag</h2>
+                <button type="button" onClick={onCloseFlagModal} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 flex flex-col flex-1 overflow-hidden">
+                {/* Search Bar */}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-blue-600 font-medium">Select a Flag Code</h3>
+                  <div className="flex items-center gap-2">
+                    <label className="text-gray-700 text-sm">Search:</label>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={flagSearchTerm}
+                      onChange={(e) => setFlagSearchTerm(e.target.value)}
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48 md:w-64"
+                    />
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1 flex flex-col">
+                  <div className="overflow-y-auto max-h-[400px]">
+                    {loadingFlags ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      </div>
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-100 border-b border-gray-200 sticky top-0 z-20">
+                          <tr>
+                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Flag Code</th>
+                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Time In</th>
+                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Time Out</th>
+                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase">Break 1</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {(() => {
+                            const filtered = dtrFlags.filter(f =>
+                              f.flagCode.toLowerCase().includes(flagSearchTerm.toLowerCase())
+                            );
+                            return filtered.length > 0 ? (
+                              filtered.map((flag) => (
+                                <tr
+                                  key={flag.id}
+                                  className="hover:bg-blue-50 cursor-pointer transition-colors group"
+                                  onClick={() => {
+                                    setFormData({ ...formData, flagCode: flag.flagCode });
+                                    onCloseFlagModal();
+                                  }}
+                                >
+                                  <td className="px-4 py-3 text-sm font-medium text-blue-600 group-hover:underline">{flag.flagCode}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-600">{flag.timeIn}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-600">{flag.timeOut}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-500">{flag.break1Out} - {flag.break1In}</td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={4} className="px-4 py-12 text-center text-gray-500">
+                                  No flag codes found{flagSearchTerm ? ` matching "${flagSearchTerm}"` : ''}
+                                </td>
+                              </tr>
+                            );
+                          })()}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onCloseFlagModal}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ── end Flag Code Search Modal ── */}
+
       </div>
     </div>
   );

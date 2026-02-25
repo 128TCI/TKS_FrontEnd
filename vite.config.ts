@@ -4,6 +4,7 @@
   import path from 'path';
 
   export default defineConfig({
+    base: '/TKS_128_TEST/',
     plugins: [react()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -53,7 +54,9 @@
     },
     build: {
       target: 'esnext',
-      outDir: 'build',
+      outDir: 'dist',
+    // Set the limit to 4000kb (4MB) so your 3.3MB file doesn't trigger it
+    chunkSizeWarningLimit: 10000, // Sets the limit to 10MB (effectively no limit for now)
     },
     server: {
       port: 3000,
