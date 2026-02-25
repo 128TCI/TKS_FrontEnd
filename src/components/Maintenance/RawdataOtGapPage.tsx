@@ -4,6 +4,7 @@ import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
 import apiClient from '../../services/apiClient';
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
+import { TimePicker } from '../Modals/TimePickerModal';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -173,10 +174,12 @@ export function RawdataOtGapPage() {
     const [otGap,         setOtGap]         = useState(false);
     const [isLateFilingProcessed, setIsLateFilingProcessed] = useState(false);
 
-    // ── Calendar states inside modal ──
+    // ── Calendar / TimePicker states inside modal ──
     const [showActualDateInCalendar, setShowActualDateInCalendar] = useState(false);
     const [showDateInCalendar,       setShowDateInCalendar]       = useState(false);
+    const [showTimeInPicker,         setShowTimeInPicker]         = useState(false);
     const [showDateOutCalendar,      setShowDateOutCalendar]      = useState(false);
+    const [showTimeOutPicker,        setShowTimeOutPicker]        = useState(false);
 
     // ── Employee modal (form) ──
     const [showEmpCodeModal, setShowEmpCodeModal]   = useState(false);
@@ -195,8 +198,6 @@ export function RawdataOtGapPage() {
     // DATA FETCHING
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Mirrors the SP: rawDateIn BETWEEN floor(from) AND floor(to)+1439min,
-     *  completeness = dateOut + timeIn + timeOut all present */
     const fetchRecords = useCallback(async () => {
         setLoading(true);
         setTableError('');
@@ -213,7 +214,6 @@ export function RawdataOtGapPage() {
             if (response.status === 200 && response.data) {
                 const list: OTGapRecord[] = Array.isArray(response.data) ? response.data : [];
 
-                // Client-side date filter on dateIn (equivalent to rawDateIn in the SP)
                 const fromMs = new Date(toISODate(dateFrom)).setUTCHours(0, 0, 0, 0);
                 const toMs   = new Date(toISODate(dateTo)).setUTCHours(23, 59, 0, 0);
 
@@ -222,7 +222,6 @@ export function RawdataOtGapPage() {
                     const dateInMs = new Date(entry.dateIn).getTime();
                     if (dateInMs < fromMs || dateInMs > toMs) return false;
 
-                    // completeness check
                     const hasDateOut = !!entry.dateOut && entry.dateOut.trim() !== '';
                     const hasTimeIn  = !!entry.timeIn;
                     const hasTimeOut = !!entry.timeOut;
@@ -242,7 +241,6 @@ export function RawdataOtGapPage() {
         }
     }, [dateFrom, dateTo, incompleteLogs, filterType, specificEmpCode]);
 
-    /** Exact pattern from provided snippet */
     const fetchEmployeeData = async () => {
         setLoadingEmployees(true);
         setEmployeeError('');
@@ -304,7 +302,7 @@ export function RawdataOtGapPage() {
             dateOut:      toISODate(dateOut || dateIn),
             timeOut:      toISODateTime(dateOut || dateIn, timeOut),
             workShiftCode: workshiftCode,
-            dayType:      '',   // server-computed
+            dayType:      '',
             otGap,
             isLateFilingProcessed,
         };
@@ -331,7 +329,6 @@ export function RawdataOtGapPage() {
         setEditingId(record.id);
         setEmpCode(record.empCode);
 
-        // look up name from loaded employees
         const found = employeeData.find(e => e.empCode === record.empCode);
         setEmpName(found?.name ?? '');
 
@@ -408,15 +405,12 @@ export function RawdataOtGapPage() {
     // EFFECTS
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Load employees on mount
     useEffect(() => { fetchEmployeeData(); }, []);
 
-    // Lazy-load workshifts when modal opens
     useEffect(() => {
         if (showWorkshiftModal && workshifts.length === 0) fetchWorkshifts();
     }, [showWorkshiftModal, workshifts.length, fetchWorkshifts]);
 
-    // ESC closes modals
     useEffect(() => {
         const onEsc = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
@@ -428,7 +422,9 @@ export function RawdataOtGapPage() {
             setShowDateToCalendar(false);
             setShowActualDateInCalendar(false);
             setShowDateInCalendar(false);
+            setShowTimeInPicker(false);
             setShowDateOutCalendar(false);
+            setShowTimeOutPicker(false);
         };
         document.addEventListener('keydown', onEsc);
         return () => document.removeEventListener('keydown', onEsc);
@@ -438,7 +434,6 @@ export function RawdataOtGapPage() {
     // JSX
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── SortIcon helper ──
     const SortIcon = ({ col }: { col: SortKey }) => {
         if (sortKey !== col) return (
             <span className="inline-flex flex-col ml-1 leading-none" style={{ fontSize: '8px', verticalAlign: 'middle' }}>
@@ -454,8 +449,6 @@ export function RawdataOtGapPage() {
         );
     };
 
-    // ── Derived sorted + filtered list ──
-    // Client-side empCode filter for 'specific' mode (guards against API returning all rows)
     const filteredByEmp = filterType === 'specific' && specificEmpCode
         ? recordList.filter(r => r.empCode === specificEmpCode)
         : recordList;
@@ -670,7 +663,7 @@ export function RawdataOtGapPage() {
                                 <thead>
                                     <tr className="bg-gray-100 border-b-2 border-gray-300">
                                         <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
-                                        {([ 
+                                        {([
                                             { key: 'empCode',      label: 'Employee Code' },
                                             { key: 'empName',      label: 'Employee Name' },
                                             { key: 'workShiftCode',label: 'Workshift Code' },
@@ -823,7 +816,7 @@ export function RawdataOtGapPage() {
                                                 </button>
                                             </div>
 
-                                            {/* ── Employee Name (read-only display) ── */}
+                                            {/* ── Employee Name ── */}
                                             <div className="flex items-center gap-2">
                                                 <label className="w-36 text-gray-700 text-sm flex-shrink-0">Employee Name :</label>
                                                 <input
@@ -913,13 +906,29 @@ export function RawdataOtGapPage() {
                                             {/* ── Time-In ── */}
                                             <div className="flex items-center gap-2">
                                                 <label className="w-36 text-gray-700 text-sm flex-shrink-0">Time-In :</label>
-                                                <input
-                                                    type="text" value={timeIn}
-                                                    onChange={e => setTimeIn(e.target.value)}
-                                                    onBlur={() => setTimeIn(validateTimeFormat(timeIn))}
-                                                    placeholder="HH:MM AM/PM"
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                                />
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={timeIn}
+                                                        onChange={e => setTimeIn(e.target.value)}
+                                                        onBlur={() => setTimeIn(validateTimeFormat(timeIn))}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowTimeInPicker(!showTimeInPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showTimeInPicker && (
+                                                        <TimePicker
+                                                            initialTime={timeIn}
+                                                            onTimeSelect={time => { setTimeIn(time); setShowTimeInPicker(false); }}
+                                                            onClose={() => setShowTimeInPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* ── Date-Out ── */}
@@ -953,13 +962,29 @@ export function RawdataOtGapPage() {
                                             {/* ── Time-Out ── */}
                                             <div className="flex items-center gap-2">
                                                 <label className="w-36 text-gray-700 text-sm flex-shrink-0">Time-Out :</label>
-                                                <input
-                                                    type="text" value={timeOut}
-                                                    onChange={e => setTimeOut(e.target.value)}
-                                                    onBlur={() => setTimeOut(validateTimeFormat(timeOut))}
-                                                    placeholder="HH:MM AM/PM"
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                                />
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={timeOut}
+                                                        onChange={e => setTimeOut(e.target.value)}
+                                                        onBlur={() => setTimeOut(validateTimeFormat(timeOut))}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowTimeOutPicker(!showTimeOutPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showTimeOutPicker && (
+                                                        <TimePicker
+                                                            initialTime={timeOut}
+                                                            onTimeSelect={time => { setTimeOut(time); setShowTimeOutPicker(false); }}
+                                                            onClose={() => setShowTimeOutPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* ── OT Gap ── */}
