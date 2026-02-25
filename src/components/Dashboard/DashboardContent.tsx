@@ -124,10 +124,17 @@ import { PayHouseSetupPage } from '../FileSetup/Employment/PayHouseSetupPage';
 import { OnlineApprovalSetupPage } from '../FileSetup/Employment/OnlineApprovalSetupPage';
 import { SectionSetupPage } from '../FileSetup/Employment/SectionSetupPage';
 import { UnitSetupPage } from '../FileSetup/Employment/UnitSetupPage';
+<<<<<<< HEAD
 import { CreateNewDatabasePage } from '../Security/CreateNewDatabasePage';
 import { EmailConfigurationPage } from '../Security/EmailConfigurationPage';
 import { AuditTrailPage } from '../Security/AuditTrailPage';
 import { SecurityManagerPage } from '../Security/SecurityManagerPage';
+=======
+import { CreateNewDatabasePage } from '../CreateNewDatabasePage';
+import { EmailConfigurationPage } from '../EmailConfigurationPage';
+import { AuditTrailPage } from '../AuditTrailPage';
+import { SecurityManagerPage } from '../SecurityManagerPage';
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
 
 //Export Sub-menu
 import { PayrollDTRAllowancePage } from '../Export/PayrollDTRAllowancePage';
@@ -138,7 +145,11 @@ import { GroupScheduleSetupPage } from '../FileSetup/Process/GroupScheduleSetupP
 import { HelpSetupPage } from '../FileSetup/Process/HelpSetupPage';
 import { LeaveTypeSetupPage } from '../FileSetup/Process/LeaveTypeSetupPage';
 import { PayrollLocationSetupPage } from '../FileSetup/Process/PayrollLocationSetupPage';
+<<<<<<< HEAD
 //import { SystemConfigurationSetupPage } from '../FileSetup/Process/SystemConfigurationSetupPage';
+=======
+import { SystemConfigurationSetupPage } from '../FileSetup/Process/SystemConfigurationSetupPage';
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
 import { UnpaidLunchDeductionBracketSetupPage } from '../FileSetup/Process/UnpaidLunchDeductionBracketSetupPage';
 import { TimeKeepGroupPage } from '../FileSetup/Process/TimeKeepGroupPage';
 
@@ -511,10 +522,17 @@ export function DashboardContent({ activeSection }: DashboardContentProps) {
     if (activeSection === 'payroll-location-setup') {
         return <PayrollLocationSetupPage />;
     }
+<<<<<<< HEAD
     
     //if (activeSection === 'system-configuration-setup') {
     //    return <SystemConfigurationSetupPage />;
     //}
+=======
+
+    if (activeSection === 'system-configuration-setup') {
+        return <SystemConfigurationSetupPage />;
+    }
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
 
     if (activeSection === 'daily-schedule-setup') {
         return <DailyScheduleSetupPage />;
