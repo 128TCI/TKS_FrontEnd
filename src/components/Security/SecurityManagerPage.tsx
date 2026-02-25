@@ -8,6 +8,7 @@ import { ApiService, showSuccessModal, showErrorModal } from '../../services/api
 import apiClient from '../../services/apiClient';
 import { securityService } from '../../services/securityService';
 import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../../types/security';
+import { ACCESS_TYPE_LABELS, ACCESS_TYPE_ORDER } from '../../types/security';
 
 export function SecurityManagerPage() {
   const [activeTab, setActiveTab] = useState<'security-manager' | 'group-member' | 'security-control'>('security-manager');
@@ -163,7 +164,10 @@ export function SecurityManagerPage() {
   const fetchAccessTypes = useCallback(async () => {
     try {
       const data = await securityService.getFormAccessTypes();
-      setAccessTypes(data);
+      const sorted = [...data].sort((a, b) =>
+        (ACCESS_TYPE_ORDER[a.accessTypeName] ?? 99) - (ACCESS_TYPE_ORDER[b.accessTypeName] ?? 99)
+      );
+      setAccessTypes(sorted);
     } catch {
       showErrorModal('Failed to load access types.');
     }
@@ -937,7 +941,7 @@ export function SecurityManagerPage() {
                                 <th className="px-4 py-3 text-left text-xs text-gray-600">Form Name</th>
                                 {accessTypes.map(at => (
                                   <th key={at.id} className="px-4 py-3 text-center text-xs text-gray-600">
-                                    {at.description ?? at.accessTypeName}
+                                    {ACCESS_TYPE_LABELS[at.accessTypeName] ?? at.description ?? at.accessTypeName}
                                   </th>
                                 ))}
                                 <th className="px-4 py-3 text-center text-xs text-gray-600">Actions</th>
