@@ -20,6 +20,7 @@ export function BracketCodeSetupPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  
 
   // Bracket Code List
   const [bracketCodeList, setBracketCodeList] = useState<

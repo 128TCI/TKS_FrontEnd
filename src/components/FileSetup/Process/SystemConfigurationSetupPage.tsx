@@ -61,22 +61,22 @@ export function SystemConfigurationSetupPage() {
 
   // Helper function for numeric-only input
   const formatNumericInput = (value: string): string => {
-    return value.replace(/[^\d]/g, '');
+    return value.replace(/[^\d]/g, "");
   };
 
   const [formData, setFormData] = useState({
-    numOfMinBeforeTheShift: '',
-    numOfMinToIgnoreMultipleOutInBreak: '',
-    numOfMinBeforeMidnightShift: '',
-    devicePolicy: 'Device11',
-    retryCount: '',
-    retryInterval: '',
-    noOfMinToConsiderBrk2In: '',
+    numOfMinBeforeTheShift: "",
+    numOfMinToIgnoreMultipleOutInBreak: "",
+    numOfMinBeforeMidnightShift: "",
+    devicePolicy: "Device11",
+    retryCount: "",
+    retryInterval: "",
+    noOfMinToConsiderBrk2In: "",
     oldOvertimeProc: false,
     oldNighDiffProc: false,
     oldTardinessProc: false,
     useHHMM: false,
-    borrowedDeviceNameOrg: '',
+    borrowedDeviceNameOrg: "",
     disableMultipleLogin: false,
     brk1Brk3NoMinutes: '',
     brk2NoMinutes: '',
@@ -136,25 +136,29 @@ export function SystemConfigurationSetupPage() {
         }
 
         if (!config) {
-          console.error('No config data found');
+          console.error("No config data found");
           return;
         }
 
         setOriginalData(config);
 
         const mappedData = {
-          numOfMinBeforeTheShift: String(config.numOfMinBeforeTheShift ?? ''),
-          numOfMinToIgnoreMultipleOutInBreak: String(config.numOfMinToIgnoreMultipleOutInBreak ?? ''),
-          numOfMinBeforeMidnightShift: String(config.numOfMinBeforeMidnightShift ?? ''),
-          devicePolicy: config.devicePolicy || 'Device11',
-          retryCount: String(config.retryCount ?? ''),
-          retryInterval: String(config.retryInterval ?? ''),
-          noOfMinToConsiderBrk2In: String(config.noOfMinToConsiderBrk2In ?? ''),
+          numOfMinBeforeTheShift: String(config.numOfMinBeforeTheShift ?? ""),
+          numOfMinToIgnoreMultipleOutInBreak: String(
+            config.numOfMinToIgnoreMultipleOutInBreak ?? "",
+          ),
+          numOfMinBeforeMidnightShift: String(
+            config.numOfMinBeforeMidnightShift ?? "",
+          ),
+          devicePolicy: config.devicePolicy || "Device11",
+          retryCount: String(config.retryCount ?? ""),
+          retryInterval: String(config.retryInterval ?? ""),
+          noOfMinToConsiderBrk2In: String(config.noOfMinToConsiderBrk2In ?? ""),
           oldOvertimeProc: Boolean(config.oldOvertimeProc),
           oldNighDiffProc: Boolean(config.oldNighDiffProc),
           oldTardinessProc: Boolean(config.oldTardinessProc),
           useHHMM: Boolean(config.useHHMM),
-          borrowedDeviceNameOrg: config.borrowedDeviceNameOrg ?? '',
+          borrowedDeviceNameOrg: config.borrowedDeviceNameOrg ?? "",
           disableMultipleLogin: Boolean(config.disableMultipleLogin),
           brk1Brk3NoMinutes: String(config.brk1Brk3NoMinutes ?? ''),
           brk2NoMinutes: String(config.brk2NoMinutes ?? ''),
@@ -175,7 +179,7 @@ export function SystemConfigurationSetupPage() {
         setFormData(mappedData);
       }
     } catch (error: any) {
-      console.error('Fetch error:', error);
+      console.error("Fetch error:", error);
       await Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -202,7 +206,8 @@ export function SystemConfigurationSetupPage() {
         devicePolicy: formData.devicePolicy,
         retryCount: parseInt(formData.retryCount) || 0,
         retryInterval: parseInt(formData.retryInterval) || 0,
-        noOfMinToConsiderBrk2In: parseInt(formData.noOfMinToConsiderBrk2In) || 0,
+        noOfMinToConsiderBrk2In:
+          parseInt(formData.noOfMinToConsiderBrk2In) || 0,
         oldOvertimeProc: formData.oldOvertimeProc,
         oldNighDiffProc: formData.oldNighDiffProc,
         oldTardinessProc: formData.oldTardinessProc,
@@ -224,9 +229,9 @@ export function SystemConfigurationSetupPage() {
         formName,
       });
       await Swal.fire({
-        icon: 'success',
-        title: 'Success',
-        text: 'System configuration saved successfully.',
+        icon: "success",
+        title: "Success",
+        text: "System configuration saved successfully.",
         timer: 2000,
         showConfirmButton: false,
       });
@@ -264,7 +269,7 @@ export function SystemConfigurationSetupPage() {
         oldNighDiffProc: originalData.oldNighDiffProc,
         oldTardinessProc: originalData.oldTardinessProc,
         useHHMM: originalData.useHHMM,
-        borrowedDeviceNameOrg: originalData.borrowedDeviceNameOrg || '',
+        borrowedDeviceNameOrg: originalData.borrowedDeviceNameOrg || "",
         disableMultipleLogin: originalData.disableMultipleLogin,
         brk1Brk3NoMinutes: String(originalData.brk1Brk3NoMinutes),
         brk2NoMinutes: String(originalData.brk2NoMinutes),
@@ -282,12 +287,12 @@ export function SystemConfigurationSetupPage() {
   // ── ESC key ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showEditMode) {
+      if (event.key === "Escape" && showEditMode) {
         handleCancel();
       }
     };
-    document.addEventListener('keydown', handleEscKey);
-    return () => document.removeEventListener('keydown', handleEscKey);
+    document.addEventListener("keydown", handleEscKey);
+    return () => document.removeEventListener("keydown", handleEscKey);
   }, [showEditMode, originalData]);
 
   return (
@@ -361,7 +366,7 @@ export function SystemConfigurationSetupPage() {
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Save className="w-4 h-4" />
-                    {saving ? 'Saving...' : 'Save'}
+                    {saving ? "Saving..." : "Save"}
                   </button>
                   <button
                     onClick={handleCancel}
@@ -394,45 +399,63 @@ export function SystemConfigurationSetupPage() {
                 {/* ── Old Process Options ─────────────────────────────────── */}
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
-                    <label className="w-64 text-gray-700">Old Overtime Process :</label>
-                    <div className="flex-1 flex items-center gap-3">
-                      <CustomCheckbox
+                    <label className="w-64 text-gray-700">
+                      Old Overtime Process :
+                    </label>
+                    <div className="flex-1">
+                      <input
+                        type="checkbox"
                         checked={formData.oldOvertimeProc}
                         onChange={(checked) =>
                           setFormData({ ...formData, oldOvertimeProc: checked })
                         }
                         disabled={!showEditMode}
+                        className={checkboxClass}
                       />
-                      <p className="text-sm text-green-600">Use Old Overtime Process</p>
+                      <p className="text-sm text-green-600 mt-1 ml-6">
+                        Use Old Overtime Process
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <label className="w-64 text-gray-700">Old Night Differential Process :</label>
-                    <div className="flex-1 flex items-center gap-3">
-                      <CustomCheckbox
+                    <label className="w-64 text-gray-700">
+                      Old Night Differential Process :
+                    </label>
+                    <div className="flex-1">
+                      <input
+                        type="checkbox"
                         checked={formData.oldNighDiffProc}
                         onChange={(checked) =>
                           setFormData({ ...formData, oldNighDiffProc: checked })
                         }
                         disabled={!showEditMode}
+                        className={checkboxClass}
                       />
-                      <p className="text-sm text-green-600">Use Old Night Differential Process</p>
+                      <p className="text-sm text-green-600 mt-1 ml-6">
+                        Use Old Night Differential Process
+                      </p>
                     </div>
                   </div>
 
                   {/* FIX: was incorrectly bound to oldOvertimeProc */}
                   <div className="flex items-start gap-3">
-                    <label className="w-64 text-gray-700">Old Tardiness Process :</label>
-                    <div className="flex-1 flex items-center gap-3">
-                      <CustomCheckbox
+                    <label className="w-64 text-gray-700">
+                      Old Tardiness Process :
+                    </label>
+                    <div className="flex-1">
+                      <input
+                        type="checkbox"
                         checked={formData.oldTardinessProc}
                         onChange={(checked) =>
                           setFormData({ ...formData, oldTardinessProc: checked })
                         }
                         disabled={!showEditMode}
+                        className={checkboxClass}
                       />
-                      <p className="text-sm text-green-600">Use Old Tardiness Process</p>
+                      <p className="text-sm text-green-600 mt-1 ml-6">
+                        Use Old Tardiness Process
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -462,14 +485,45 @@ export function SystemConfigurationSetupPage() {
                       disabled={!showEditMode}
                     />
                   </div>
-
-                  <div className="flex items-start gap-3">
-                    <label className="w-64 text-gray-700">Use HH:MM :</label>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
+                </div>
+                ) : (
+                <div className="space-y-6">
+                  {/* Old Process Options */}
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <label className="w-64 text-gray-700">
+                        Old Overtime Process :
+                      </label>
+                      <div className="flex-1 flex items-center gap-3">
                         <CustomCheckbox
-                          checked={formData.useHHMM}
-                          onChange={(checked) => setFormData({ ...formData, useHHMM: checked })}
+                          checked={formData.oldOvertimeProc}
+                          onChange={(checked) =>
+                            setFormData({
+                              ...formData,
+                              oldOvertimeProc: checked,
+                            })
+                          }
+                          disabled={!showEditMode}
+                        />
+                        <p className="text-sm text-green-600">
+                          Use Old Overtime Process
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <label className="w-64 text-gray-700">
+                        Old Night Differential Process :
+                      </label>
+                      <div className="flex-1 flex items-center gap-3">
+                        <CustomCheckbox
+                          checked={formData.oldNighDiffProc}
+                          onChange={(checked) =>
+                            setFormData({
+                              ...formData,
+                              oldNighDiffProc: checked,
+                            })
+                          }
                           disabled={!showEditMode}
                         />
                         <p className="text-sm text-green-600">
@@ -477,8 +531,6 @@ export function SystemConfigurationSetupPage() {
                         </p>
                       </div>
                     </div>
-                  </div>
-                </div>
 
                 {/* ── Time and Validation Settings ────────────────────────── */}
                 <div className="space-y-3">
@@ -518,7 +570,7 @@ export function SystemConfigurationSetupPage() {
                           })
                         }
                         disabled={!showEditMode}
-                        className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
+                        className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 disabled:bg-gray-100"
                       />
                       <p className="text-sm text-green-600 mt-1">
                         This will be triggered when your Device Policy is Device 4
@@ -528,7 +580,6 @@ export function SystemConfigurationSetupPage() {
                         difference of break is equal or less than to defined policy.
                       </p>
                     </div>
-                  </div>
 
                   <div className="flex items-start gap-3">
                     <label className="w-64 text-gray-700">
@@ -545,14 +596,11 @@ export function SystemConfigurationSetupPage() {
                           })
                         }
                         disabled={!showEditMode}
-                        className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
                       />
                       <p className="text-sm text-green-600 mt-1">
                         This will be triggered when Midnight Shift is check in workshift.
                       </p>
                     </div>
-                  </div>
-                </div>
 
                 {/* ── Retry Settings ──────────────────────────────────────── */}
                 <div className="space-y-3">
@@ -597,7 +645,6 @@ export function SystemConfigurationSetupPage() {
                       </p>
                       <p className="text-sm text-green-600">Note: that this setup is in seconds</p>
                     </div>
-                  </div>
 
                   <div className="flex items-start gap-3">
                     <label className="w-64 text-gray-700">No of Min. to Consider Break2 In :</label>
@@ -619,8 +666,6 @@ export function SystemConfigurationSetupPage() {
                         is used in Device 5.
                       </p>
                     </div>
-                  </div>
-                </div>
 
                 {/* ── Device Policy ────────────────────────────────────────── */}
                 <div className="space-y-3">
@@ -657,7 +702,6 @@ export function SystemConfigurationSetupPage() {
                       </p>
                     </div>
                   </div>
-                </div>
 
                 {/* ── Device Policy Descriptions ───────────────────────────── */}
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -748,11 +792,19 @@ export function SystemConfigurationSetupPage() {
                           }
                           disabled={!showEditMode}
                           className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
-                          placeholder="minutes"
                         />
+                        <p className="text-sm text-green-600 mt-1">
+                          This will be the count on retries when deadlock
+                          occured.
+                        </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <label className="w-24 text-sm text-gray-700">Break2 (min)</label>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <label className="w-64 text-gray-700">
+                        Retry Interval :
+                      </label>
+                      <div className="flex-1">
                         <input
                           type="text"
                           value={formData.noFlag_Break2}
@@ -764,11 +816,22 @@ export function SystemConfigurationSetupPage() {
                           }
                           disabled={!showEditMode}
                           className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
-                          placeholder="minutes"
                         />
+                        <p className="text-sm text-green-600 mt-1">
+                          This will be the interval of system before retries
+                          when deadlock occured.
+                        </p>
+                        <p className="text-sm text-green-600">
+                          Note: that this setup is in seconds
+                        </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <label className="w-24 text-sm text-gray-700">Break3 (min)</label>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <label className="w-64 text-gray-700">
+                        No of Min. to Consider Break2 In :
+                      </label>
+                      <div className="flex-1">
                         <input
                           type="text"
                           value={formData.noFlag_Break3}
@@ -780,8 +843,197 @@ export function SystemConfigurationSetupPage() {
                           }
                           disabled={!showEditMode}
                           className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
-                          placeholder="minutes"
                         />
+                        <p className="text-sm text-green-600 mt-1">
+                          This is the number of minutes to consider as the pair
+                          of Break 2 Out, this is used in Device 5.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Device Policy */}
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <label className="w-64 text-gray-700">
+                        Device Policy :
+                      </label>
+                      <div className="flex-1">
+                        <select
+                          value={formData.devicePolicy}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              devicePolicy: e.target.value,
+                            })
+                          }
+                          disabled={!showEditMode}
+                          className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 disabled:bg-gray-100"
+                        >
+                          <option value="Device11">Device 11</option>
+                          <option value="Device1">Device 1</option>
+                          <option value="Device2">Device 2</option>
+                          <option value="Device3">Device 3</option>
+                          <option value="Device4">Device 4</option>
+                          <option value="Device5">Device 5</option>
+                          <option value="Device6">Device 6</option>
+                          <option value="Device7">Device 7</option>
+                          <option value="Device8">Device 8</option>
+                          <option value="Device9">Device 9</option>
+                          <option value="Device10">Device 10</option>
+                          <option value="Device12">Device 12</option>
+                          <option value="Device13">Device 13</option>
+                          <option value="Device14">Device 14</option>
+                          <option value="Device15">Device 15</option>
+                          <option value="Device12_v810">Device 12_v810</option>
+                        </select>
+                        <p className="text-sm text-green-600 mt-1">
+                          Leave blank if you want the default pairing of logs.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Device Descriptions */}
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-gray-700 mb-3 font-semibold">
+                      Device Policy Descriptions:
+                    </h3>
+                    <ul className="space-y-2 text-sm">
+                      {[
+                        {
+                          dev: "Device 1",
+                          desc: "First in Last Out Regardless of flagging",
+                        },
+                        {
+                          dev: "Device 2",
+                          desc: "First In = Time In, Second In = Break2 In, First Out = Break2 Out, Second Out = Time Out (if no second out First Out will become Time Out)",
+                        },
+                        {
+                          dev: "Device 3",
+                          desc: "First Flag for Break1Out = Break1Out, Second Flag for Break1Out = Break3Out, First flag for Break1In = Break1In, Last flag for break1In = Break3In",
+                        },
+                        {
+                          dev: "Device 4",
+                          desc: "First Flag for BreakIn = Break1In, Second Flag for BreakIn = Break2In, Third Flag for BreakIn = Break3In, First Flag for BreakOut = Break1Out, Second Flag for BreakOut = Break2Out, Third Flag for BreakOut = Break3Out",
+                        },
+                        {
+                          dev: "Device 5",
+                          desc: "If there is First Flag of any Break before Any flag of In/Out, Flagging of In/Out will always be Out.",
+                        },
+                        { dev: "Device 6", desc: "From Windows Validation." },
+                        {
+                          dev: "Device 7",
+                          desc: "All Logs that falls on 6:00am Current Date to 5:59am the next day will be paired to Current Date",
+                        },
+                        { dev: "Device 8", desc: "24 Hours Pairing" },
+                        {
+                          dev: "Device 9",
+                          desc: "Standard pairing but First Time Out will pair",
+                        },
+                        {
+                          dev: "Device 10",
+                          desc: "First In of the current day and last out before first in of next day",
+                        },
+                        {
+                          dev: "Device 11",
+                          desc: "24 Hours Pairing With Workshift Validation",
+                        },
+                        {
+                          dev: "Device 12",
+                          desc: "24 Hours Pairing Device8 Replica",
+                        },
+                        {
+                          dev: "Device 13",
+                          desc: "24 Hours Pairing Breaks Flag are the Same",
+                        },
+                        { dev: "Device 14", desc: "Device10 Replica" },
+                        {
+                          dev: "Device 15",
+                          desc: "24 Hours Pairing Breaks IN/OUT Flags is same with IN/OUT Flags",
+                        },
+                        { dev: "Device 12_v810", desc: "Device12 of v810" },
+                      ].map(({ dev, desc }) => (
+                        <li key={dev}>
+                          <strong className="text-gray-700">{dev}</strong>
+                          <p className="text-gray-600 ml-4">- {desc}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Break Time Policy */}
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h3 className="text-blue-700 mb-3 font-semibold">
+                      Policy for Utility to Update the Time Flag Base on Set
+                      Policy of Breaks
+                    </h3>
+                    <p className="text-sm text-gray-700 mb-3">
+                      No Flags - Break Hours Policy from Time In
+                    </p>
+
+                    <div className="bg-gray-100 p-3 rounded mb-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <label className="w-24 text-sm text-gray-700">
+                            Break1 (min)
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.noFlag_Break1}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                noFlag_Break1: formatNumericInput(
+                                  e.target.value,
+                                ),
+                              })
+                            }
+                            disabled={!showEditMode}
+                            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
+                            placeholder="minutes"
+                          />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <label className="w-24 text-sm text-gray-700">
+                            Break2 (min)
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.noFlag_Break2}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                noFlag_Break2: formatNumericInput(
+                                  e.target.value,
+                                ),
+                              })
+                            }
+                            disabled={!showEditMode}
+                            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
+                            placeholder="minutes"
+                          />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <label className="w-24 text-sm text-gray-700">
+                            Break3 (min)
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.noFlag_Break3}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                noFlag_Break3: formatNumericInput(
+                                  e.target.value,
+                                ),
+                              })
+                            }
+                            disabled={!showEditMode}
+                            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 disabled:bg-gray-100"
+                            placeholder="minutes"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

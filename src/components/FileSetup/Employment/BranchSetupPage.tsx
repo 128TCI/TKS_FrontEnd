@@ -45,8 +45,12 @@ export function BranchSetupPage() {
   const [branchError, setBranchError] = useState("");
 
   // API Data states
-  const [employeeData, setEmployeeData] = useState<Array<{ empCode: string; name: string; groupCode: string }>>([]);
-  const [deviceData, setDeviceData] = useState<Array<{ id: number ;code: string; description: string }>>([]);
+  const [employeeData, setEmployeeData] = useState<
+    Array<{ empCode: string; name: string; groupCode: string }>
+  >([]);
+  const [deviceData, setDeviceData] = useState<
+    Array<{ id: number; code: string; description: string }>
+  >([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [employeeError, setEmployeeError] = useState("");
@@ -72,7 +76,7 @@ export function BranchSetupPage() {
       const parsedPayload = JSON.parse(rawPayload);
       const encryptedArray: any[] = parsedPayload.permissions || [];
       const branchEntries = encryptedArray.filter(
-        (p) => decryptData(p.formName) === "BranchSetup"
+        (p) => decryptData(p.formName) === "BranchSetup",
       );
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
@@ -92,13 +96,13 @@ export function BranchSetupPage() {
       const response = await apiClient.get("/Fs/Employment/BranchSetUp");
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((branch: any) => ({
-          id: branch.braID || branch.id || '',
-          branchId: branch.braID || branch.id || '',
-          code: branch.braCode || branch.code || '',
-          description: branch.braDesc || branch.description || '',
-          branchManager: branch.braMngr || branch.branchManager || '',
-          branchManagerCode: branch.braMngrCode || '',
-          deviceName: branch.deviceName || branch.DeviceName || '',
+          id: branch.braID || branch.id || "",
+          branchId: branch.braID || branch.id || "",
+          code: branch.braCode || branch.code || "",
+          description: branch.braDesc || branch.description || "",
+          branchManager: branch.braMngr || branch.branchManager || "",
+          branchManagerCode: branch.braMngrCode || "",
+          deviceName: branch.deviceName || branch.DeviceName || "",
         }));
         setBranchList(mappedData);
       }
@@ -117,7 +121,7 @@ export function BranchSetupPage() {
     setLoadingEmployees(true);
     setEmployeeError("");
     try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
+      const response = await apiClient.get("/Maintenance/EmployeeMasterFile");
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((emp: any) => ({
           empCode: emp.empCode || emp.code || "",
@@ -127,7 +131,7 @@ export function BranchSetupPage() {
         setEmployeeData(mappedData);
       }
     } catch (error: any) {
-      setEmployeeError('Failed to load employees');
+      setEmployeeError("Failed to load employees");
     } finally {
       setLoadingEmployees(false);
     }
@@ -137,17 +141,19 @@ export function BranchSetupPage() {
     setLoadingDevices(true);
     setDeviceError("");
     try {
-      const response = await apiClient.get('/Fs/Process/Device/BorrowedDeviceName');
+      const response = await apiClient.get(
+        "/Fs/Process/Device/BorrowedDeviceName",
+      );
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((device: any) => ({
-          id: device.id || '',
-          code: device.code || '',
-          description: device.description || ''
+          id: device.id || "",
+          code: device.code || "",
+          description: device.description || "",
         }));
         setDeviceData(mappedData);
       }
     } catch (error: any) {
-      setDeviceError('Failed to load devices');
+      setDeviceError("Failed to load devices");
     } finally {
       setLoadingDevices(false);
     }
@@ -155,20 +161,20 @@ export function BranchSetupPage() {
 
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showCreateModal) setShowCreateModal(false);
+      if (event.key === "Escape" && showCreateModal) setShowCreateModal(false);
     };
-    if (showCreateModal) document.addEventListener('keydown', handleEscKey);
-    return () => document.removeEventListener('keydown', handleEscKey);
+    if (showCreateModal) document.addEventListener("keydown", handleEscKey);
+    return () => document.removeEventListener("keydown", handleEscKey);
   }, [showCreateModal]);
 
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedBranchIndex(null);
-    setCode('');
-    setDescription('');
-    setBranchManagerCode('');
-    setBranchManager('');
-    setDeviceName('');
+    setCode("");
+    setDescription("");
+    setBranchManagerCode("");
+    setBranchManager("");
+    setDeviceName("");
     setShowCreateModal(true);
   };
 
@@ -190,8 +196,8 @@ export function BranchSetupPage() {
       title: "Confirm Delete",
       text: `Are you sure you want to delete branch ${branch.code}?`,
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      confirmButtonText: 'Delete',
+      confirmButtonColor: "#d33",
+      confirmButtonText: "Delete",
     });
     if (confirmed.isConfirmed) {
       try {
@@ -280,11 +286,16 @@ export function BranchSetupPage() {
             formName,
         });
       }
-      await Swal.fire({ icon: 'success', title: 'Success', timer: 2000, showConfirmButton: false });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        timer: 2000,
+        showConfirmButton: false,
+      });
       await fetchBranchData();
       setShowCreateModal(false);
     } catch (error: any) {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'An error occurred' });
+      Swal.fire({ icon: "error", title: "Error", text: "An error occurred" });
     } finally {
       setSubmitting(false);
     }
@@ -374,26 +385,31 @@ export function BranchSetupPage() {
               </div>
             </div>
 
-            {/* Controls Row - Stacked on mobile */}
-            <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
-              {hasPermission("Add") && (
-                <button 
-                  className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+            {/* Controls Row */}
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              {hasPermission("Add") && hasPermission("View") && (
+                <button
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                   onClick={handleCreateNew}
                 >
                   <Plus className="w-4 h-4" />
                   Create New
                 </button>
               )}
-              <div className="md:ml-auto flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
-                <label className="text-gray-700 whitespace-nowrap">Search:</label>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+
+              {hasPermission("View") && (
+                <div className="flex items-center gap-2 md:ml-auto">
+                  <label className="text-gray-700 whitespace-nowrap">
+                    Search:
+                  </label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-64 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Table Container - Scrollable on small screens */}
@@ -402,18 +418,31 @@ export function BranchSetupPage() {
                 <table className="w-full border-collapse min-w-[700px]">
                   <thead>
                     <tr className="bg-gray-100 border-b-2 border-gray-300">
-                      <th className="px-4 py-2 text-left text-gray-700">Code ▲</th>
-                      <th className="px-4 py-2 text-left text-gray-700">Description</th>
-                      <th className="px-4 py-2 text-left text-gray-700">Branch Manager</th>
-                      <th className="px-4 py-2 text-left text-gray-700">Device Name</th>
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Code ▲
+                      </th>
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Description
+                      </th>
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Branch Manager
+                      </th>
+                      <th className="px-4 py-2 text-left text-gray-700">
+                        Device Name
+                      </th>
                       {(hasPermission("Edit") || hasPermission("Delete")) && (
-                        <th className="px-4 py-2 text-left text-gray-700">Actions</th>
+                        <th className="px-4 py-2 text-left text-gray-700">
+                          Actions
+                        </th>
                       )}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredBranches.map((branch, index) => (
-                      <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                      <tr
+                        key={index}
+                        className="border-b border-gray-200 hover:bg-gray-50"
+                      >
                         <td className="px-4 py-2">{branch.code}</td>
                         <td className="px-4 py-2">{branch.description}</td>
                         <td className="px-4 py-2">{branch.branchManager}</td>
@@ -422,12 +451,18 @@ export function BranchSetupPage() {
                           <td className="px-4 py-2 whitespace-nowrap">
                             <div className="flex gap-2">
                               {hasPermission("Edit") && (
-                                <button onClick={() => handleEdit(branch, index)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
+                                <button
+                                  onClick={() => handleEdit(branch, index)}
+                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                >
                                   <Edit className="w-4 h-4" />
                                 </button>
                               )}
                               {hasPermission("Delete") && (
-                                <button onClick={() => handleDelete(branch)} className="p-1 text-red-600 hover:bg-red-100 rounded">
+                                <button
+                                  onClick={() => handleDelete(branch)}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
@@ -439,21 +474,31 @@ export function BranchSetupPage() {
                   </tbody>
                 </table>
               ) : (
-                <div className="text-center py-10 text-gray-500">Access denied.</div>
+                <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+                </div>
               )}
             </div>
 
             {/* Pagination - Column on mobile */}
-            <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-4">
-              <div className="text-gray-600 text-sm">
-                Showing {filteredBranches.length} entries
+            {hasPermission("View") && (
+              <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-4">
+                <div className="text-gray-600 text-sm">
+                  Showing {filteredBranches.length} entries
+                </div>
+                <div className="flex gap-2">
+                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">
+                    Previous
+                  </button>
+                  <button className="px-3 py-1 bg-blue-600 text-white rounded">
+                    1
+                  </button>
+                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">
+                    Next
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Previous</button>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded">1</button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Next</button>
-              </div>
-            </div>
+            )}
 
             {/* Modal - Better sizing for mobile */}
             {showCreateModal && (
@@ -461,22 +506,45 @@ export function BranchSetupPage() {
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col">
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b bg-gray-50 rounded-t-2xl">
-                    <h2 className="text-gray-800 text-lg">{isEditMode ? 'Edit Branch' : 'Create New'}</h2>
-                    <button onClick={() => setShowCreateModal(false)} className="text-gray-600"><X className="w-5 h-5" /></button>
+                    <h2 className="text-gray-800 text-lg">
+                      {isEditMode ? "Edit Branch" : "Create New"}
+                    </h2>
+                    <button
+                      onClick={() => setShowCreateModal(false)}
+                      className="text-gray-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
 
                   {/* Body */}
                   <div className="p-4 md:p-6 overflow-y-auto space-y-4">
-                    <h3 className="text-blue-600 font-semibold">Branch Setup</h3>
-                    
+                    <h3 className="text-blue-600 font-semibold">
+                      Branch Setup
+                    </h3>
+
                     {/* Responsive Form Rows */}
                     <div className="grid gap-4">
                       {[
-                        { label: 'Code', value: code, setter: setCode, max: 10 },
-                        { label: 'Description', value: description, setter: setDescription }
+                        {
+                          label: "Code",
+                          value: code,
+                          setter: setCode,
+                          max: 10,
+                        },
+                        {
+                          label: "Description",
+                          value: description,
+                          setter: setDescription,
+                        },
                       ].map((field) => (
-                        <div key={field.label} className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <label className="sm:w-40 text-gray-700 text-sm">{field.label} :</label>
+                        <div
+                          key={field.label}
+                          className="flex flex-col sm:flex-row sm:items-center gap-2"
+                        >
+                          <label className="sm:w-40 text-gray-700 text-sm">
+                            {field.label} :
+                          </label>
                           <input
                             type="text"
                             maxLength={field.max}
@@ -489,41 +557,86 @@ export function BranchSetupPage() {
 
                       {/* Manager Row */}
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <label className="sm:w-40 text-gray-700 text-sm">Manager Code :</label>
+                        <label className="sm:w-40 text-gray-700 text-sm">
+                          Manager Code :
+                        </label>
                         <div className="flex-1 flex gap-2">
-                          <input readOnly value={branchManagerCode} className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm" />
-                          <button onClick={() => setShowBranchManagerModal(true)} className="p-2 bg-green-600 text-white rounded-lg"><Search className="w-4 h-4" /></button>
-                          <button onClick={() => {setBranchManager(''); setBranchManagerCode('');}} className="p-2 bg-red-600 text-white rounded-lg"><X className="w-4 h-4" /></button>
+                          <input
+                            readOnly
+                            value={branchManagerCode}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm"
+                          />
+                          <button
+                            onClick={() => setShowBranchManagerModal(true)}
+                            className="p-2 bg-green-600 text-white rounded-lg"
+                          >
+                            <Search className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setBranchManager("");
+                              setBranchManagerCode("");
+                            }}
+                            className="p-2 bg-red-600 text-white rounded-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <label className="sm:w-40 text-gray-700 text-sm">Manager Name :</label>
-                        <input readOnly value={branchManager} className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm" />
+                        <label className="sm:w-40 text-gray-700 text-sm">
+                          Manager Name :
+                        </label>
+                        <input
+                          readOnly
+                          value={branchManager}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm"
+                        />
                       </div>
 
                       {/* Device Row */}
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <label className="sm:w-40 text-gray-700 text-sm">Device Name :</label>
+                        <label className="sm:w-40 text-gray-700 text-sm">
+                          Device Name :
+                        </label>
                         <div className="flex-1 flex gap-2">
-                          <input readOnly value={deviceName} className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm" />
-                          <button onClick={() => setShowDeviceNameModal(true)} className="p-2 bg-green-600 text-white rounded-lg"><Search className="w-4 h-4" /></button>
-                          <button onClick={() => setDeviceName('')} className="p-2 bg-red-600 text-white rounded-lg"><X className="w-4 h-4" /></button>
+                          <input
+                            readOnly
+                            value={deviceName}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm"
+                          />
+                          <button
+                            onClick={() => setShowDeviceNameModal(true)}
+                            className="p-2 bg-green-600 text-white rounded-lg"
+                          >
+                            <Search className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeviceName("")}
+                            className="p-2 bg-red-600 text-white rounded-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
 
                     {/* Footer Actions */}
                     <div className="flex flex-wrap gap-3 pt-4 border-t">
-                      <button 
-                        onClick={handleSubmit} 
-                        disabled={submitting} 
+                      <button
+                        onClick={handleSubmit}
+                        disabled={submitting}
                         className="flex-1 min-w-[120px] px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
                       >
-                        {submitting ? 'Processing...' : (isEditMode ? 'Update' : 'Submit')}
+                        {submitting
+                          ? "Processing..."
+                          : isEditMode
+                            ? "Update"
+                            : "Submit"}
                       </button>
-                      <button 
-                        onClick={() => setShowCreateModal(false)} 
+                      <button
+                        onClick={() => setShowCreateModal(false)}
                         className="flex-1 min-w-[120px] px-6 py-2.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm"
                       >
                         Back to List

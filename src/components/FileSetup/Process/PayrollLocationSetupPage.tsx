@@ -496,25 +496,31 @@ export function PayrollLocationSetupPage() {
                                                 <td className="px-4 py-2">{item.noOfDays}</td>
                                                 <td className="px-4 py-2">{item.noOfHours}</td>
                                                 <td className="px-4 py-2">{item.totalPeriod}</td>
-                                                <td className="px-4 py-2">
+                                                {(hasPermission('Edit') || hasPermission('Delete')) && ( 
+                                                    <td className="px-4 py-2">
                                                     <div className="flex items-center justify-center gap-2">
-                                                        <button
+                                                        {hasPermission('Edit') && (
+                                                            <button
                                                             onClick={() => handleEdit(item)}
                                                             className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                                             title="Edit"
                                                         >
                                                             <Edit className="w-4 h-4" />
                                                         </button>
+                                                        )}
                                                         <span className="text-gray-300">|</span>
-                                                        <button
+                                                        {hasPermission('Delete') && (
+                                                            <button
                                                             onClick={() => handleDelete(item)}
                                                             className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                                             title="Delete"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
+                                                        )}
                                                     </div>
                                                 </td>
+                                                )}
                                             </tr>
                                         ))
                                     ) : (
