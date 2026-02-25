@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Calendar, Trash2, Users, Building2, Briefcase, Award, LayoutGrid, Network, AlertTriangle, Check } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -601,23 +602,11 @@ export function DeleteRawdataPage() {
 
   const handleDelete = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
     if (!dateFrom || !dateTo) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date From and Date To.');
       return;
     } 
 
@@ -634,33 +623,41 @@ export function DeleteRawdataPage() {
 
     if (confirmed.isConfirmed) {
       try {
-        // 🔴 call delete API here if you have one
+        const formatDateForAPI = (dateString: string) => {
+          const date = new Date(dateString);
+          return date.toISOString();
+        };
 
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Records in Raw Data deleted successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          'Failed to delete employee transaction';
+        const payload = {
+          empCode: selectedEmployees.map(String), // Convert to array of strings
+          dateFrom: formatDateForAPI(dateFrom),
+          dateTo: formatDateForAPI(dateTo),
 
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: errorMsg,
-        });
-      }
+        };
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom('');
-      setDateTo('');
-            
+        const _ByAddtmpDeleteResponse = await apiClient.post("/Utilities/DeleteRawData_AddtmpDeleteRawData", payload);
+        console.log("API response:", _ByAddtmpDeleteResponse);
+        const _ByDeleteLogsResponse = await apiClient.post("/Utilities/DeleteRawData_DeleteLogs", payload);
+        console.log("API response:", _ByDeleteLogsResponse);
+
+        const isSuccessByAddtmpDelete = ApiService.isApiSuccess(_ByAddtmpDeleteResponse);
+        console.log("Is success:", isSuccessByAddtmpDelete);
+        const isSuccessByDeleteLogs = ApiService.isApiSuccess(_ByDeleteLogsResponse);
+        console.log("Is success:", isSuccessByDeleteLogs);   
+        
+        if (isSuccessByAddtmpDelete && isSuccessByDeleteLogs ) {
+          await showSuccessModal('Records in Raw Data deleted successfully.');
+          setSelectedGroups([]);
+          setSelectedEmployees([]); 
+          setDateFrom('');
+          setDateTo('');
+        }
+
+      } 
+      catch (error: any) {
+        console.error(error);
+        await showErrorModal('Failed to update records');
+      }            
     }
   };
 

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Check, Search, X, Building2, Users, Briefcase, Network, CalendarClock, Wallet, Grid, Box, RefreshCw } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { PayHouseSearchModal } from './../Modals/PayhouseSearchModal';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -417,45 +418,40 @@ export function UpdateEmployeePayHousePage() {
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
 
     if(house.length === 0){
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Pay House code should not be empty.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Pay House code should not be empty.');
       return;
     }
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Employees Pay House.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const payload = {
+        //param: selectedEmployees.join(","),
+        empCode: selectedEmployees.map(String), // Convert to array of strings
+        payHouse: payHouse,
+      }
+      //for checking of selected items
+      const tkGroupList = selectedEmployees.join(","); 
+
+      const _ByPayHouse = await apiClient.post("/Utilities/UpdateEmployeesLine", payload);
+      console.log("API response:", _ByPayHouse);
+
+      const isSuccessByPayHouse = ApiService.isApiSuccess(_ByPayHouse);
+      console.log("Is success:", isSuccessByPayHouse); 
+      await showSuccessModal('Successfully updated Employees Pay House.');
 
       setSelectedGroups([]);
       setSelectedEmployees([]);
       setHouse('');
 
     } 
-    catch (error) {
+    catch (error: any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal("Failed to update records");
     } 
     finally {
       setIsUpdating(false);

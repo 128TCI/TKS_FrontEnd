@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Clock, Calendar, Check, Search, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, RefreshCw } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -510,62 +511,60 @@ export function UpdateEmployeeOvertimeApplicationPage() {
       } else {
           setSelectedEmployees(filteredEmployees.map(e => e.id));
       }
-  };
+  }; 
 
   const handleUpdate = async () => {
-      if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+    if (!selectedEmployees.length) {
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
 
     if (!date ) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date.');
       return;
-    } 
-    {/*}
+    }
+
+
     if (!allowedOTHours ) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Approved OT Hours cannot be empty.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Approved OT Hours cannot be empty.');
       return;
-    } 
-    */}
+    }     
     
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Employees Overtime Application.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const formatDateForAPI = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toISOString();
+    };
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDate('');
-      setAllowedOTHours('');
+    const payload = {
+      EmpCode: selectedEmployees.map(String), // Convert to array of strings
+      date: formatDateForAPI(date),
+      OTHours: allowedOTHours ? parseFloat(allowedOTHours) : 0.00,
+    };
+
+      console.log("Sending payload:", payload);
+
+      const _ByDateResponse = await apiClient.post("/Utilities/UpdateStatus_byDate", payload);
+      console.log("API response:", _ByDateResponse);
+
+      const isSuccessByDate = ApiService.isApiSuccess(_ByDateResponse);
+      console.log("Is success:", isSuccessByDate);
+
+      if (isSuccessByDate) {
+        await showSuccessModal('Successfully updated Employees Overtime Application.');
+        setSelectedGroups([]);
+        setSelectedEmployees([]);
+        setDate('');
+        setAllowedOTHours('');
+      } else {
+        await showErrorModal('Failed to update Employees Overtime Application.');
+      }
 
     } 
-    catch (error) {
+    catch (error:any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal("Failed to update records");
     } 
     finally {
       setIsUpdating(false);

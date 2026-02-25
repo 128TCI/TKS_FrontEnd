@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Calendar, AlertCircle, Check, Save, RotateCcw, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -497,47 +498,48 @@ export function AdditionalHoursPerWeekPage() {
         return pages;
     };
 
+
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
     if (!dateFrom || !dateTo) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date From and Date To.'); 
       return;
     } 
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Additional Hours per Week successfully updated.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const formatDateForAPI = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toISOString();
+      };
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom('');
-      setDateTo('');
+      const payload = {
+        dateFrom: formatDateForAPI(dateFrom),
+        dateTo: formatDateForAPI(dateTo),
+        empCodes: selectedEmployees, 
+      };
 
+      const _ByUpdateesponse = await apiClient.post("/Utilities/AdditionalHoursPerWeek_byDate", payload);
+      console.log("API response:", _ByUpdateesponse);
+
+      const isSuccessByUpdate = ApiService.isApiSuccess(_ByUpdateesponse);
+      console.log("Is success:", isSuccessByUpdate);   
+      
+      if (isSuccessByUpdate) {
+        await showSuccessModal('Additional Hours per Week successfully updated.');
+
+        setSelectedGroups([]);
+        setSelectedEmployees([]);
+        setDateFrom('');
+        setDateTo('');
+      }
     } 
-    catch (error) {
+    catch (error: any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal('Failed to update records');
     } 
     finally {
       setIsUpdating(false);

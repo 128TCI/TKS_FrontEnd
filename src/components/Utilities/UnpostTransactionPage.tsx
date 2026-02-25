@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Calendar, RotateCcw, Check, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, Network, Box, RefreshCw } from 'lucide-react';
+import { Calendar, RotateCcw, Check, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, Network, Box, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -148,6 +149,7 @@ export function UnpostTransactionPage() {
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);  
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
   const [currentEmpPage, setCurrentEmpPage] = useState(1);
+  const [isInfoExpanded, setIsInfoExpanded] = useState(false);  
   const itemsPerPage = 10;
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -398,7 +400,7 @@ export function UnpostTransactionPage() {
 
     // Fetch employee data from API
     const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
-        const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
+        const response = await apiClient.get('/EmployeeMasterFile');
 
         const list = Array.isArray(response.data) ? response.data : [];
 
@@ -520,59 +522,53 @@ export function UnpostTransactionPage() {
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
     if (!dateFrom || !dateTo) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date From and Date To.');
       return;
     } 
 
     const noOptionSelected = !Object.values(options).some(Boolean);
 
     if (noOptionSelected) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please check atleast 1 transaction to unpost.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please check at least 1 transaction to unpost.');
       return;
-    }     
+    } 
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully Unpost Transactions.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const formatDateForAPI = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toISOString();
+      };
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom('');
-      setDateTo('');
-      uncheckAllOptions();
+      const payload = {
+        dateFrom: formatDateForAPI(dateFrom),
+        dateTo: formatDateForAPI(dateTo),
+        empCodes: selectedEmployees, // Array of employee codes
+        updateOptions: options, // Array of selected options
+      };
+      
+      const _ByUnpostResponse = await apiClient.post("/Utilities/UnpostTransaction_RawDataUnpost", payload);
+      console.log("API response:", _ByUnpostResponse);
 
+      const isSuccessByUnpost = ApiService.isApiSuccess(_ByUnpostResponse);
+      console.log("Is success:", isSuccessByUnpost);   
+      if (isSuccessByUnpost) {
+        await showSuccessModal('Successfully Unpost Transactions.');
+
+        setSelectedGroups([]);
+        setSelectedEmployees([]);
+        setDateFrom('');
+        setDateTo('');
+        uncheckAllOptions();
+      }
     } 
-    catch (error) {
+    catch (error: any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal('Failed to update records');
     } 
     finally {
       setIsUpdating(false);
@@ -708,28 +704,43 @@ export function UnpostTransactionPage() {
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                   <RotateCcw className="w-5 h-5 text-white" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-700 mb-3">
-                    Batch unpost processed transactions for selected employee groups. Remove posted data from the system to make corrections or adjustments efficiently.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Select groups and date range to unpost</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Choose specific transaction types</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Filter by employee status</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Update to process changes</span>
-                    </div>
+               <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-700">
+                      Batch unpost processed transactions for selected employee groups. Remove posted data from the system to make corrections or adjustments efficiently.
+                    </p>
+                    <button
+                      onClick={() => setIsInfoExpanded(!isInfoExpanded)}
+                      className="ml-3 flex-shrink-0 p-1 hover:bg-blue-100 rounded transition-colors"
+                      title={isInfoExpanded ? 'Collapse' : 'Expand'}
+                    >
+                      {isInfoExpanded ? (
+                        <ChevronUp className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-blue-600" />
+                      )}
+                    </button>
                   </div>
+                  {isInfoExpanded && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">Select groups and date range to unpost</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">Choose specific transaction types</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">Filter by employee status</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">Update to process changes</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

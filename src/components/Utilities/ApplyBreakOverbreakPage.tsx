@@ -3,6 +3,7 @@ import { Calendar, Clock, Check, Search, X, Calculator, Save } from 'lucide-reac
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { EmployeeSearchModal } from './../Modals/EmployeeSearchModal';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -292,55 +293,25 @@ export function ApplyBreakOverbreakPage() {
 
   const handleUpdate = async () => {
      if (!selectedItems.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select TK Group item/s.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select TK Group item/s.');
       return;
     }
      if (!headCode.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Employee.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Employee.');
       return;
     }    
     if (!dateToApply) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Please select Date to Apply.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
-        return;
+        await showErrorModal('Please select Date to Apply.');
+      return;
     }
     if (!dateFrom || !dateTo) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Please select Date From and Date To.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Please select Date From and Date To.');
         return;
       }
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Break1 and Breaks Overbreak.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      await showSuccessModal('Successfully updated Break1 and Breaks Overbreak.');
 
       setSelectedItems([]);
       setHead('');
@@ -350,9 +321,9 @@ export function ApplyBreakOverbreakPage() {
       setDateTo('');
       
     } 
-    catch (error) {
+    catch (error: any) {
       console.error(error);
-      alert("Failed to update records");
+      showErrorModal('Failed to update records');
     } 
     finally {
       setIsUpdating(false);

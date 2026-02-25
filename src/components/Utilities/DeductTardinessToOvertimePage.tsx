@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Calendar, Minus, Check, Save, Users, Building2, Briefcase, CalendarClock, Wallet, Grid } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -135,10 +136,10 @@ function CalendarPopup({ value, onChange, onClose, position }: CalendarPopupProp
 
 export function DeductTardinessToOvertimePage() {
   const [activeTab, setActiveTab] = useState<'TK Group' | 'Branch' | 'Department' | 'Group Schedule' | 'Pay House' | 'Section'>('TK Group');
-  const [dateFrom1, setDateFrom1] = useState('5/5/2021');
-  const [dateFrom2, setDateFrom2] = useState('05/05/2021');
+  const [dateFrom, setDateFrom] = useState('5/5/2021');
+  const [dateTo, setDateTo] = useState('05/05/2021');
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
-  const [showCalendar, setShowCalendar] = useState<'dateFrom1' | 'dateFrom2' | null>(null);
+  const [showCalendar, setShowCalendar] = useState<'dateFrom' | 'dateTo' | null>(null);
   const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
@@ -438,45 +439,45 @@ export function DeductTardinessToOvertimePage() {
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
-    if (!dateFrom1 || !dateFrom2) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+    if (!dateFrom || !dateTo) {
+      await showErrorModal('Please select Date From and Date To.');
       return;
     } 
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Tardiness to Overtime successfully updated.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const formatDateForAPI = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toISOString();
+      };
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom1('');
-      setDateFrom2('');
+      const payload = {
+          empCodes: selectedEmployees.map(String),
+          DateFrom: formatDateForAPI(dateFrom),
+          DateTo: formatDateForAPI(dateTo),
+      };         
 
+      const _ByUpdateResponse = await apiClient.post("/Utilities/DeductTardinessToOvertime_DeleteOTRegday", payload);
+      console.log("API response:", _ByUpdateResponse);
+
+      const isSuccessByUpdate = ApiService.isApiSuccess(_ByUpdateResponse);
+      console.log("Is success:", isSuccessByUpdate);   
+
+      if (isSuccessByUpdate) { 
+        await showSuccessModal('Tardiness to Overtime successfully updated.');
+
+        setSelectedGroups([]);
+        setSelectedEmployees([]);
+        setDateFrom('');
+        setDateTo('');
+      }
     } 
-    catch (error) {
+    catch (error: any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal('Failed to update records');
     } 
     finally {
       setIsUpdating(false);
@@ -512,7 +513,7 @@ export function DeductTardinessToOvertimePage() {
     }
   };
 
-  const handleCalendarClick = (field: 'dateFrom1' | 'dateFrom2', event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleCalendarClick = (field: 'dateFrom' | 'dateTo', event: React.MouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setCalendarPosition({
       top: rect.bottom + 5,
@@ -522,10 +523,10 @@ export function DeductTardinessToOvertimePage() {
   };
 
   const handleDateChange = (date: string) => {
-    if (showCalendar === 'dateFrom1') {
-      setDateFrom1(date);
-    } else if (showCalendar === 'dateFrom2') {
-      setDateFrom2(date);
+    if (showCalendar === 'dateFrom') {
+      setDateFrom(date);
+    } else if (showCalendar === 'dateTo') {
+      setDateTo(date);
     }
   };
 
@@ -868,27 +869,27 @@ export function DeductTardinessToOvertimePage() {
                       <label className="text-sm text-gray-700 w-24">Date From:</label>
                       <input
                         type="text"
-                        value={dateFrom1}
-                        onChange={(e) => setDateFrom1(e.target.value)}
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
                         className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
                       />
                       <CalendarPopover
-                          date={dateFrom1}
-                          onChange={setDateFrom1}
+                          date={dateFrom}
+                          onChange={setDateFrom}
                         />
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-24">Date From:</label>
+                      <label className="text-sm text-gray-700 w-24">Date To:</label>
                       <input
                         type="text"
-                        value={dateFrom2}
-                        onChange={(e) => setDateFrom2(e.target.value)}
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
                         className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
                       />
                       <CalendarPopover
-                          date={dateFrom2}
-                          onChange={setDateFrom2}
+                          date={dateTo}
+                          onChange={setDateTo}
                         />
                     </div>
 
@@ -910,7 +911,7 @@ export function DeductTardinessToOvertimePage() {
       {/* Calendar Popup */}
       {showCalendar && (
         <CalendarPopup
-          value={showCalendar === 'dateFrom1' ? dateFrom1 : dateFrom2}
+          value={showCalendar === 'dateFrom' ? dateFrom : dateTo}
           onChange={handleDateChange}
           onClose={() => setShowCalendar(null)}
           position={calendarPosition}

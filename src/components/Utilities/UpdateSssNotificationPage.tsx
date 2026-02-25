@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Calendar, FileText, Check, X, Save, RotateCcw, Search } from 'lucide-react';
 import { EmployeeSearchModal } from './../Modals/EmployeeSearchModal';
 import { CalendarPopover } from '../Modals/CalendarPopover';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -197,7 +198,7 @@ export function UpdateSssNotificationPage() {
         setLoadingEmployees(true);
         setEmployeeError('');
         try {
-            const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
+            const response = await apiClient.get('/EmployeeMasterFile');
             if (response.status === 200 && response.data) {
                 // Map API response to expected format
                 const mappedData = response.data.map((emp: any) => ({
@@ -265,56 +266,52 @@ export function UpdateSssNotificationPage() {
         return pages;
       };  
 
+  const formatDateForAPI = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toISOString();
+  };      
+
   const handleUpdate = async () => {
     if (!selectedItems.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select TK Group item/s.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select TK Group item/s.'); 
       return;
     }
     if (!headCode.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee to update.');
       return;
     }
     if (!dateFrom || !dateTo) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date From and Date To.');  
       return;
     } 
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated SSS Notification.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const payload = {
+          DateFrom: formatDateForAPI(dateFrom),
+          DateTo: formatDateForAPI(dateTo),
+          EmpCode: headCode, 
+          Mode: "Update",
 
-      setSelectedItems([]);
-      setDateFrom('');
-      setDateTo('');
+      };
 
+      const _ByUpdateesponse = await apiClient.post("/Utilities/UpdateSSSNotification", payload);
+      console.log("API response:", _ByUpdateesponse);
+
+      const isSuccessByUpdate = ApiService.isApiSuccess(_ByUpdateesponse);
+      console.log("Is success:", isSuccessByUpdate);   
+      
+      if (isSuccessByUpdate) {
+        await showSuccessModal('Successfully updated SSS Notification.');
+        setSelectedItems([]);
+        setDateFrom('');
+        setDateTo('');
+
+      }
     } 
     catch (error) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal("Failed to update records");
     } 
     finally {
       setIsUpdating(false);
@@ -324,46 +321,41 @@ export function UpdateSssNotificationPage() {
 
   const handleUnpost = async () => {
     if (!selectedItems.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select TK Group item/s.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select TK Group item/s.');  
       return;
     }
     if (!dateFrom || !dateTo) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date From and Date To.');  
       return;
     } 
  
-
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'warning',
-          title: 'Success',
-          text: 'Successfully Unpost No. of Hours Per Week.',
-          timer: 2000,
-          background: '#da1526',
-          showConfirmButton: false,
-      });
+    const payload = {
+          DateFrom: formatDateForAPI(dateFrom),
+          DateTo: formatDateForAPI(dateTo),
+          EmpCode: headCode, 
+          Mode: "Unpost",
 
-      setSelectedItems([]);
-      setDateFrom('');
-      setDateTo('');
+      };
 
+      const _ByUnpostResponse = await apiClient.post("/Utilities/UpdateSSSNotification", payload);
+      console.log("API response:", _ByUnpostResponse);
+
+      const isSuccessByUnpost = ApiService.isApiSuccess(_ByUnpostResponse);
+      console.log("Is success:", isSuccessByUnpost);   
+      
+      if (isSuccessByUnpost) {
+        await showSuccessModal('Successfully Unpost No. of Hours Per Week.');
+        setSelectedItems([]);
+        setDateFrom('');
+        setDateTo('');
+        
+      }
     } 
     catch (error) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal("Failed to unpost records.");
     } 
     finally {
       setIsUpdating(false);

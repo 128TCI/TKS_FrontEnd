@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Calendar, AlertCircle, Check, Save, RotateCcw, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -135,7 +136,7 @@ function CalendarPopup({ value, onChange, onClose, position }: CalendarPopupProp
 export function UpdateTardinessPenaltyPage() {
   const [activeTab, setActiveTab] = useState<'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit'>('TK Group');
   const [year, setYear] = useState('');
-  const [month, setMonth] = useState('January');
+const [month, setMonth] = useState<number>(new Date().getMonth() + 1); // Current month (1-12)
   const [noOfTardiness, setNoOfTardiness] = useState('');
   const [gracePeriod, setGracePeriod] = useState('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
@@ -502,62 +503,58 @@ export function UpdateTardinessPenaltyPage() {
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
-    if (!month || !year) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Invalid Month or Year.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+    if (month < 1 || !year) {
+      await showErrorModal('Invalid Month or Year.');
       return;
     }
     if (!noOfTardiness || isNaN(Number(noOfTardiness)) || Number(noOfTardiness) <= 0) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please fill no of Tardiness.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please fill no of Tardiness.');
       return;
     }
     if (!gracePeriod || isNaN(Number(gracePeriod)) || Number(gracePeriod) < 0) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please fill Grace Period.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please fill Grace Period.');
       return;
     }
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Tardiness Penalty.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const formatDateForAPI = (dateString: string): string => {
+          const date = new Date(dateString);
+          return date.toISOString();
+      };
 
-      setSelectedEmployees([]);
+      const payload = {
+        empCode: selectedEmployees,
+        year: year,
+        month: month,
+        gracePeriod: gracePeriod,
+        noOfTardiness: noOfTardiness,
+      };
 
+      const _ByUpdateResponse = await apiClient.post("/Utilities/UpdateTardinessPenalty_Update", payload);
+      console.log("API response:", _ByUpdateResponse);
+
+      const isSuccessByUpdate = ApiService.isApiSuccess(_ByUpdateResponse);
+      console.log("Is success:", isSuccessByUpdate);   
+
+      if (isSuccessByUpdate) {
+        await showSuccessModal('Successfully updated Tardiness Penalty.');
+        setSelectedGroups([]);
+        setSelectedEmployees([]);
+        setYear('');
+        setMonth(new Date().getMonth() + 1);
+        setNoOfTardiness('');
+        setGracePeriod('');
+
+
+      } 
     } 
-    catch (error) {
+    catch (error: any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal("Failed to update records");
     } 
     finally {
       setIsUpdating(false);
@@ -567,64 +564,38 @@ export function UpdateTardinessPenaltyPage() {
 
   const handleUnpost = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
-    if (!month.length || !year.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Invalid Month or Year.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+    if (month < 1 || !year) {
+      await showErrorModal('Invalid Month or Year.');
       return;
     }
-    if (!noOfTardiness || isNaN(Number(noOfTardiness)) || Number(noOfTardiness) <= 0) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please fill no of Tardiness.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
-      return;
-    }
-    if (!gracePeriod || isNaN(Number(gracePeriod)) || Number(gracePeriod) < 0) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please fill Grace Period.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
-      return;
-    } 
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'warning',
-          title: 'Success',
-          text: 'Successfully unposted Tardiness Penalty.',
-          timer: 2000,
-          background: '#da1526',
-          showConfirmButton: false,
-      });
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setYear('');
-      setMonth('');
-      setNoOfTardiness('');
-      setGracePeriod('');
+      const payload = {
+        empCode: selectedEmployees,
+        year: year,
+        month: month,
+      };
 
+      const _ByUnpostResponse = await apiClient.post("/Utilities/UpdateTardinessPenalty_Unpost", payload);
+      console.log("API response:", _ByUnpostResponse);
+
+      const isSuccessByUnpost = ApiService.isApiSuccess(_ByUnpostResponse);
+      console.log("Is success:", isSuccessByUnpost);      
+      
+      if(isSuccessByUnpost){
+        await showSuccessModal('Successfully unposted Tardiness Penalty.');
+        setSelectedGroups([]);
+        setSelectedEmployees([]);
+        setYear('');
+        setMonth(new Date().getMonth() + 1);
+        setNoOfTardiness('');
+        setGracePeriod('');
+      }
     } 
     catch (error) {
       console.error(error);
@@ -1031,21 +1002,21 @@ export function UpdateTardinessPenaltyPage() {
                         <label className="text-sm text-gray-700">Month</label>
                         <select
                           value={month}
-                          onChange={(e) => setMonth(e.target.value)}
+                          onChange={(e) => setMonth(parseInt(e.target.value))}
                           className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
                         >
-                          <option value="January">January</option>
-                          <option value="February">February</option>
-                          <option value="March">March</option>
-                          <option value="April">April</option>
-                          <option value="May">May</option>
-                          <option value="June">June</option>
-                          <option value="July">July</option>
-                          <option value="August">August</option>
-                          <option value="September">September</option>
-                          <option value="October">October</option>
-                          <option value="November">November</option>
-                          <option value="December">December</option>
+                          <option value="1">January</option>
+                          <option value="2">February</option>
+                          <option value="3">March</option>
+                          <option value="4">April</option>
+                          <option value="5">May</option>
+                          <option value="6">June</option>
+                          <option value="7">July</option>
+                          <option value="8">August</option>
+                          <option value="9">September</option>
+                          <option value="10">October</option>
+                          <option value="11">November</option>
+                          <option value="12">December</option>
                         </select>
                       </div>
                     </div>

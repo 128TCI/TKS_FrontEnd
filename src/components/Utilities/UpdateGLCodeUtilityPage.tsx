@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Calendar, AlertCircle, Check, Save, RotateCcw, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 import axios from "axios";
@@ -444,61 +445,44 @@ export function UpdateGLCodeUtilityPage() {
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select at least one employee to update.'); 
       return;
     }
     if (!dateFrom || !dateTo) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date From and Date To.');
       return;
     } 
 
     try {
       setIsUpdating(true);
-      const payload = {
-        dateFrom,
-        dateTo,
-        empCode: selectedEmployees, // works for selected employees   
-      };
+      const formatDateForAPI = (dateString: string): string => {
+          const date = new Date(dateString);
+          return date.toISOString();
+        };
 
-      console.log("Sending payload:", payload);
-     
-      // Update existing record via PUT
-      await apiClient.put(`/Utilities/UpdateGLCodeUtilityByDate,`, 
-        payload);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: `GL code policy settings successfully updated for employees: ${selectedEmployees.map(empCode => empCode.toString()).join(', ')}`,
-          timer: 2000,
-          showConfirmButton: false,
-      });
+        const payload = {
+            empCodes: selectedEmployees.map(String),
+            DateFrom: formatDateForAPI(dateFrom),
+            DateTo: formatDateForAPI(dateTo),
+        };         
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom('');
-      setDateTo('');
+        const _ByUpdateResponse = await apiClient.post("/Utilities/UpdateFlexiBreakByDate", payload);
+        console.log("API response:", _ByUpdateResponse);
 
+        const isSuccessByUpdate = ApiService.isApiSuccess(_ByUpdateResponse);
+        console.log("Is success:", isSuccessByUpdate);   
+
+      if (isSuccessByUpdate) {
+        await showSuccessModal('GL Code utility successfully updated.');
+        setSelectedGroups([]);
+        setSelectedEmployees([]);
+        setDateFrom('');
+        setDateTo('');
+      }
     } 
     catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({
-              icon: 'error',
-              title: 'Error',
-              text: errorMsg,
-            });
-      console.error('Error submitting form:', error);
+      console.error(error);
+      await showErrorModal("Failed to update records");
     } 
     finally {
       setIsUpdating(false);

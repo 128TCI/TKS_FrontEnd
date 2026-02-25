@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Check, Search, X, Calendar as CalendarIcon, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, RefreshCw } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -349,85 +350,46 @@ useEffect(() => {
 
   const handleUpdate = async () => {
      if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
-    }
+     }
 
     if(restDayMode == 'fixed')
     {
       if (restDay1Fixed == restDay2Fixed || restDay1Fixed == restDay3Fixed || restDay2Fixed == restDay3Fixed) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Restdays must not be equal.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Restdays must not be equal.');
         return;
       }
     }
     else if(restDayMode == 'variable')
     {
       if (!dateFrom || !dateTo) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Please select Date From and Date To.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Please select Date From and Date To.');
         return;
       }
       if (refNo.length === 0) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Variable restday must add atleast 1 item.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Variable restday must add atleast 1 item.');
         return;
       }
     }
     else if(restDayMode == 'restday-setup')
     {
       if (refNo.length === 0) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Reference number must not be empty.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Reference number must not be empty.');
         return;
       }
     }
  
-
-
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Batch Rest Day.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
-
+      await showSuccessModal('Successfully updated Batch Rest Day.');
       setSelectedGroups([]);
       setSelectedEmployees([]);
 
     } 
-    catch (error) {
+    catch (error: any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal('Failed to update records');
     } 
     finally {
       setIsUpdating(false);

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Calendar, Clock, RefreshCw } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showErrorModal, showSuccessModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -210,42 +211,50 @@ export function UpdateWorkshiftRawdataPage() {
 
   const handleUpdate = async () => {
      if (!selectedItems.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select TK Group item/s.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select TK Group item/s.');
       return;
     }
 
     if (!dateFrom || !dateTo) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Please select Date From and Date To.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Please select Date From and Date To.');
         return;
       }
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Workshift in Raw Data.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      
+      const formatDateForAPI = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toISOString();
+      };
 
-      setSelectedItems([]);
+      const payload = {
+        tkGroupList: selectedItems.map(String), // Convert to array of strings
+        dateFrom: formatDateForAPI(dateFrom),
+        dateTo: formatDateForAPI(dateTo),
+        
+      };
+      
+      const _ByAddTmpResponse = await apiClient.post("/Utilities/UpdateWorkshiftRawData_AddtmpTable", payload);
+      console.log("API response:", _ByAddTmpResponse);
+      const _ByUpdateResponse = await apiClient.post("/Utilities/UpdateWorkshiftRawData_UpdateTKGroup", payload);
+      console.log("API response:", _ByUpdateResponse);
+
+      const isSuccessByAddTmp = ApiService.isApiSuccess(_ByAddTmpResponse);
+      console.log("Is success:", isSuccessByAddTmp);
+      const isSuccessByUpdate = ApiService.isApiSuccess(_ByUpdateResponse);
+      console.log("Is success:", isSuccessByUpdate);   
+
+      if (isSuccessByAddTmp && isSuccessByUpdate) {
+        await showSuccessModal('Successfully updated Workshift in Raw Data.');
+        setSelectedItems([]);
+        setDateFrom('');
+        setDateTo('');
+      }
     } 
     catch (error) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal("Failed to update records");
     } 
     finally {
       setIsUpdating(false);

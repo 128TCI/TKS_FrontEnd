@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Trash2, Search, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box, Calendar, Check } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -418,64 +419,50 @@ export function DeleteEmployeeTransactionsPage() {
 
   const handleDelete = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');  
       return;
     }
     if (!dateFrom || !dateTo) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select Date From and Date To.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select Date From and Date To.');
       return;
     } 
 
-    const confirmed = await Swal.fire({
-      icon: 'warning',
-      title: 'Confirm Delete',
-      text: 'Are you sure you want to delete Employee Transaction?',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
-    });
+    const confirmed = await ApiService.showDeleteConfirmDialog();
 
-    if (confirmed.isConfirmed) {
+    if (confirmed) {
       try {
-        // 🔴 call delete API here if you have one
+        const formatDateForAPI = (dateString: string) => {
+          const date = new Date(dateString);
+          return date.toISOString();
+        };
 
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Employee Transaction deleted successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
+        const payload = {
+          mode: "Delete",
+          transType: transactionType,
+          dateFrom: formatDateForAPI(dateFrom),
+          dateTo: formatDateForAPI(dateTo),
+          leavecode: "",
+          empCode: selectedEmployees.map(String), // Convert to array of strings
+          
+        };
+
+        const _ByDeleteResponse = await apiClient.post("/Utilities/DeleteEmployeeTransactions", payload);
+        console.log("API response:", _ByDeleteResponse);
+
+        const isSuccessByDelete = ApiService.isApiSuccess(_ByDeleteResponse);
+        console.log("Is success:", isSuccessByDelete);   
+        
+        if (isSuccessByDelete) {
+          await showSuccessModal('Employee transactions deleted successfully.');
+          setSelectedGroups([]);
+          setSelectedEmployees([]); 
+        
+        }
+
       } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          'Failed to delete employee transaction';
-
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: errorMsg,
-        });
-      }
-
-      setSelectedGroups([]);
-      setSelectedEmployees([]);      
-
+        console.error(error);
+        await showErrorModal('Failed to delete employee transaction');
+      }  
     }
   };
 

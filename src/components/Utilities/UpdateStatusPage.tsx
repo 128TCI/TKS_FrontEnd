@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { RefreshCw, Check, Search } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 import { Calendar } from "../ui/calendar";
@@ -224,54 +225,14 @@ export function UpdateStatusPage() {
     );
   };
 
-  // Generic function to check if API response is successful
-  const isApiSuccess = (response: any): boolean => {
-    // Check HTTP status code (2xx range)
-    if (response?.status >= 200 && response?.status < 300) {
-      return true;
-    }
-
-    // Check common boolean response patterns
-    if (response?.data === true) return true;
-    if (response?.data?.success === true) return true;
-    if (response?.data?.isSuccess === true) return true;
-    if (response?.data?.status === 'success') return true;
-    if (response?.data?.result === true) return true;
-
-    return false;
-  };  
-
-  // Generic success modal handler
-  const showSuccessModal = async (message: string, timer: number = 3000) => {
-    await Swal.fire({
-      icon: 'success',
-      title: 'Success',
-      text: message,
-      timer: timer,
-      showConfirmButton: false,
-    });
-  };  
-
   const handleUpdate = async () => {
   if (!selectedItems.length) {
-    await Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Please select TK Group item/s.',
-      timer: 2000,
-      showConfirmButton: true,
-    });
+    await showErrorModal('Please select TK Group item/s.');
     return;
   }
 
   if (!dateFrom || !dateTo) {
-    await Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Please select Date From and Date To.',
-      timer: 2000,
-      showConfirmButton: true,
-    });
+    await showErrorModal('Please select Date From and Date To.');
     return;
   }
 
@@ -303,9 +264,9 @@ export function UpdateStatusPage() {
       console.log("API response:", _byTKGroupCodeResponse);
 
       // Convert response to boolean
-      const isSuccessByDate = isApiSuccess(_ByDateResponse);
+      const isSuccessByDate = ApiService.isApiSuccess(_ByDateResponse);
       console.log("Is success:", isSuccessByDate);   
-      const isSuccessByTKGroup = isApiSuccess(_byTKGroupCodeResponse);
+      const isSuccessByTKGroup = ApiService.isApiSuccess(_byTKGroupCodeResponse);
       console.log("Is success:", isSuccessByTKGroup);
       
       if (isSuccessByDate && isSuccessByTKGroup) {
@@ -320,7 +281,7 @@ export function UpdateStatusPage() {
       const _ByCDateResponse = await apiClient.post("/Utilities/UpdateStatus_byCDate", payload);
       console.log("API response:", _ByCDateResponse);
 
-      const isSuccessByCDate = isApiSuccess(_ByCDateResponse);
+      const isSuccessByCDate = ApiService.isApiSuccess(_ByCDateResponse);
       console.log("Is success:", isSuccessByCDate);   
       if (isSuccessByCDate) {
           await showSuccessModal('Successfully updated TKGroup Items.');    
@@ -333,13 +294,8 @@ export function UpdateStatusPage() {
 
     }
   } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-    await Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: errorMsg,
-    });
-    console.error('Error submitting form:', error);
+      console.error(error);
+      await showErrorModal("Failed to update records");
   } finally {
     setIsUpdating(false);
   }

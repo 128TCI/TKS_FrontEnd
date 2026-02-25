@@ -3,6 +3,7 @@ import { Check, Search, X, Tag, Calendar, Users, Building2, Briefcase, Network, 
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { EmpClassSearchModal } from './../Modals/EmpClassificationSearchModal';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -516,63 +517,81 @@ export function UpdateEmployeeClassificationPage() {
         pages.push(totalEmployeePages);
         return pages;
     };
-
+ 
+ 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
 
     if(classificationType == 'fixed'){
       if(classification.length === 0){
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Classification should not be empty.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        showErrorModal('Classification should not be empty.');
         return;
       }
     }
     else if(classificationType == 'variable'){
       if (!dateFrom || !dateTo) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Please select Date From and Date To.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        showErrorModal('Please select Date From and Date To.');
         return;
       } 
     }    
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Employee Classification.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
+      const formatDateForAPI = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toISOString();
+      };
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom('');
-      setDateTo('');
+      const payload = {
+        //param: selectedEmployees.join(","),
+        empCode: selectedEmployees.map(String), // Convert to array of strings
+        classCode: classification,
+        dateFrom: formatDateForAPI(dateFrom),
+        dateTo: formatDateForAPI(dateTo),
+        classOption: classificationType,
+      };
 
+      if(classificationType == 'fixed'){    
+        const _ByFixedResponse = await apiClient.post("/Utilities/UpdateEmployeeClassification_UpdateClassFixed", payload);
+        console.log("API response:", _ByFixedResponse);
+
+        const isSuccessByFixed = ApiService.isApiSuccess(_ByFixedResponse);
+        console.log("Is success:", isSuccessByFixed);   
+        if (isSuccessByFixed) {
+          await showSuccessModal('Successfully updated Employee Classification.');
+
+          setSelectedGroups([]);
+          setSelectedEmployees([]);
+          setDateFrom('');
+          setDateTo('');
+        }
+      }else if(classificationType == 'variable'){
+        const _ByDeleteResponse = await apiClient.post("/Utilities/UpdateEmployeeClassification_DeleteClassVariable", payload);
+        console.log("API response:", _ByDeleteResponse);
+        const _ByVariableResponse = await apiClient.post("/Utilities/UpdateEmployeeClassification_UpdateClassVariable", payload);
+        console.log("API response:", _ByVariableResponse);
+
+        const isSuccessDelete = ApiService.isApiSuccess(_ByDeleteResponse);
+        console.log("Is success:", isSuccessDelete);
+        const isSuccessByVariable = ApiService.isApiSuccess(_ByVariableResponse);
+        console.log("Is success:", isSuccessByVariable);
+
+        if (isSuccessByVariable && isSuccessDelete) {
+          await showSuccessModal('Successfully updated Employee Workshift.');
+
+          setSelectedGroups([]);
+          setSelectedEmployees([]);
+          setDateFrom('');
+          setDateTo('');
+        }
+      }
     } 
     catch (error) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal('Failed to update records');
     } 
     finally {
       setIsUpdating(false);

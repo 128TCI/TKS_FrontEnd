@@ -232,6 +232,37 @@ export function AMSDatabaseConfigurationSetupPage() {
         setShowEditModal(true);
     };
 
+<<<<<<< HEAD
+    const handleDelete = async (item: AMSDatabase) => {
+        const confirmed = await Swal.fire({
+            icon: 'warning',
+            title: 'Confirm Delete',
+            text: `Are you sure you want to delete database configuration "${item.description}"?`,
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+        });
+
+        if (confirmed.isConfirmed) {
+            try {
+                await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
+                await auditTrail.log({
+                    accessType: 'Delete',
+                    trans: `Database configuration "${item.description}" deleted.`,
+                    messages: `Database configuration "${item.description}" deleted.`,
+                    formName: formName,
+                });
+                await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration deleted successfully.', timer: 2000, showConfirmButton: false });
+                await fetchAMSDatabases();
+            } catch (error: any) {
+                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete database configuration';
+                await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+            }
+        }
+    };
+=======
   const handleDelete = async (item: AMSDatabase) => {
     const confirmed = await Swal.fire({
         icon: 'warning',
@@ -261,6 +292,7 @@ export function AMSDatabaseConfigurationSetupPage() {
         }
     }
 };
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
 
     const handleSubmitCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -399,7 +431,10 @@ export function AMSDatabaseConfigurationSetupPage() {
     const labelClass = "text-gray-700 text-sm whitespace-nowrap w-40 shrink-0";
     const inputClass = "flex-1 min-w-0 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
 
+<<<<<<< HEAD
+=======
     // Reusable date field with inline CalendarPopup
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
     const renderDateField = (
         label: string,
         fieldKey: 'lastDateUpdated' | 'lastDateUpdatedFrom' | 'lastDateUpdatedTo',
@@ -431,7 +466,10 @@ export function AMSDatabaseConfigurationSetupPage() {
 
     const renderFormFields = () => (
         <div className="space-y-3">
+<<<<<<< HEAD
+=======
             {/* Description */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Description :</label>
                 <input type="text" value={formData.description}
@@ -439,7 +477,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className={inputClass} required />
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Server & Database Name */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>Server :</label>
@@ -455,7 +496,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Username & Password */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>Username :</label>
@@ -471,7 +515,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
             {/* With Device Code & Last Date Updated */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>With Device Code :</label>
@@ -485,7 +532,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Table Name */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Table Name :</label>
                 <input type="text" value={formData.tableName}
@@ -493,7 +543,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className={inputClass} />
             </div>
 
+<<<<<<< HEAD
+=======
             {/* EmpCode Column & Time Stamp Column */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>EmpCode Column :</label>
@@ -509,7 +562,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Flag Column & Flag Code */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>Flag Column :</label>
@@ -535,7 +591,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Automatic EmpCode */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Automatic EmpCode :</label>
                 <input type="checkbox" checked={formData.automaticEmpCode}
@@ -543,7 +602,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500" />
             </div>
 
+<<<<<<< HEAD
+=======
             {/* EmpCode Table Name */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="flex items-center gap-3">
                 <label className={labelClass}>EmpCode Table Name :</label>
                 <input type="text" value={formData.empCodeTableName}
@@ -551,7 +613,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className={inputClass} />
             </div>
 
+<<<<<<< HEAD
+=======
             {/* EmpCode Column & EmpCode ID Column */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>EmpCode Column :</label>
@@ -567,7 +632,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Days to Deduct */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="flex items-center gap-3">
                 <label className="text-gray-700 text-sm whitespace-nowrap w-56 shrink-0">Days to Deduct to Convert Date :</label>
                 <input type="text" value={formData.daysToDeduct}
@@ -575,7 +643,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className={inputClass} />
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Specific Range */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Specific Range :</label>
                 <input type="checkbox" checked={formData.specificRange}
@@ -583,7 +654,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500" />
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Last Date Updated From & To */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className="text-gray-700 text-sm whitespace-nowrap w-40 shrink-0">Last Date Updated From :</label>
@@ -595,7 +669,10 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
             {/* Device Name Column */}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Device Name Column :</label>
                 <input type="text" value={formData.deviceNameColumn}
@@ -888,4 +965,8 @@ export function AMSDatabaseConfigurationSetupPage() {
             <Footer />
         </div>
     );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9

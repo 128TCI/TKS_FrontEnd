@@ -1,7 +1,8 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Clock, Calendar, Check, Search, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, X, RefreshCw } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
 
@@ -469,90 +470,100 @@ export function UpdateEmployeeWorkshiftPage() {
           setSelectedEmployees(filteredEmployees.map(e => e.id));
       }
   };
+
  
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select employee/s to update.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Please select employee/s to update.');
       return;
     }
 
     if(workshiftType == 'fixed'){
       if(dailySchedule.length === 0){
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Daily Time Schedule should not be empty.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
-        return;
+        await showErrorModal('Daily Time Schedule should not be empty.');
+        return;        
       }
     }
     if(workshiftType == 'variable'){
       if (workshift.length === 0) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Workshift should not be empty.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Workshift should not be empty.');
         return;
       } 
       if (!dateFrom || !dateTo) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Please select Date From and Date To.',
-            timer: 2000,
-            showConfirmButton: true,
-        });
+        await showErrorModal('Please select Date From and Date To.');
         return;
       } 
     }
     if(workshiftType.length == 0){      
-      await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Workshift should not be empty.',
-          timer: 2000,
-          showConfirmButton: true,
-      });
+      await showErrorModal('Workshift should not be empty.');
       return;
     }
 
     try {
       setIsUpdating(true);
-      await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Successfully updated Employee Workshift.',
-          timer: 2000,
-          showConfirmButton: false,
-      });
 
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom('');
-      setDateTo('');
+      const formatDateForAPI = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toISOString();
+      };
 
-    } 
-    catch (error) {
+      const payload = {
+        //param: selectedEmployees.join(","),
+        empCode: selectedEmployees.map(String), // Convert to array of strings
+        dailySchedule: dailySchedule,
+        workshift: workshiftType,
+        withDateRange: withDateRange,
+        dateFrom: formatDateForAPI(dateFrom),
+        dateTo: formatDateForAPI(dateTo),
+        deleteExistingWorkshift: deleteExisting,
+      };
+
+     //for checking of selected items
+     const tkGroupList = selectedEmployees.join(",");     
+
+      if(workshiftType == 'fixed'){    
+        const _ByFixedResponse = await apiClient.post("/Utilities/UpdateStatus_byCDate", payload);
+        console.log("API response:", _ByFixedResponse);
+
+        const isSuccessByFixed = ApiService.isApiSuccess(_ByFixedResponse);
+        console.log("Is success:", isSuccessByFixed);   
+        if (isSuccessByFixed) {
+
+          await showSuccessModal('Successfully updated Employee Workshift.');
+
+          setSelectedGroups([]);
+          setSelectedEmployees([]);
+          setDateFrom('');
+          setDateTo('');
+        }     
+      }else if(workshiftType === 'variable') 
+      {
+        const _ByVariableResponse = await apiClient.post("/Utilities/UpdateStatus_byCDate", payload);
+        console.log("API response:", _ByVariableResponse);
+
+        const isSuccessByVariable = ApiService.isApiSuccess(_ByVariableResponse);
+        console.log("Is success:", isSuccessByVariable);   
+        if (isSuccessByVariable) {
+
+          await showSuccessModal('Successfully updated Employee Workshift.');
+
+          setSelectedGroups([]);
+          setSelectedEmployees([]);
+          setDateFrom('');
+          setDateTo('');
+        }
+      } 
+    }
+    catch (error : any) {
       console.error(error);
-      alert("Failed to update records");
+      await showErrorModal("Failed to update records");
     } 
     finally {
       setIsUpdating(false);
     }
 
   };  
-
+ 
   const handleDateClick = (event: React.MouseEvent<HTMLInputElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setCalendarPosition({ top: rect.bottom + 5, left: rect.left });
