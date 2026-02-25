@@ -5,6 +5,8 @@ import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
 import { decryptData } from '../../../../services/encryptionService';
+import { TimePicker } from '../../../Modals/TimePickerModal';
+
 
 interface DTRFlag {
   id: number;
@@ -39,6 +41,16 @@ export function DTRFlagSetupPage() {
     break3In: ''
   });
 
+  // TimePicker visibility state
+  const [showTimeInPicker, setShowTimeInPicker] = useState(false);
+  const [showTimeOutPicker, setShowTimeOutPicker] = useState(false);
+  const [showBreak1OutPicker, setShowBreak1OutPicker] = useState(false);
+  const [showBreak1InPicker, setShowBreak1InPicker] = useState(false);
+  const [showBreak2OutPicker, setShowBreak2OutPicker] = useState(false);
+  const [showBreak2InPicker, setShowBreak2InPicker] = useState(false);
+  const [showBreak3OutPicker, setShowBreak3OutPicker] = useState(false);
+  const [showBreak3InPicker, setShowBreak3InPicker] = useState(false);
+
   // DTR Flags List states
   const [flags, setFlags] = useState<DTRFlag[]>([]);
   const [loadingFlags, setLoadingFlags] = useState(false);
@@ -47,38 +59,36 @@ export function DTRFlagSetupPage() {
   const itemsPerPage = 10;
 
   // Permissions
-    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-    const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
-    useEffect(() => {
-      getDTRFlagSetupPermissions();
-    }, []);
-  
-    const getDTRFlagSetupPermissions = () => {
-      const rawPayload = localStorage.getItem("loginPayload");
-      if (!rawPayload) return;
-  
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-        const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-        const branchEntries = encryptedArray.filter(
-          (p) => decryptData(p.formName) === "DTRFlagSetup"
-        );
-  
-        // Build a map: { Add: true, Edit: true, ... }
-        const permMap: Record<string, boolean> = {};
-        branchEntries.forEach((p) => {
-          const accessType = decryptData(p.accessTypeName);
-          if (accessType) permMap[accessType] = true;
-        });
-  
-        setPermissions(permMap);
-  
-      } catch (e) {
-        console.error("Error parsing or decrypting payload", e);
-      }
-    };
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
+
+  useEffect(() => {
+    getDTRFlagSetupPermissions();
+  }, []);
+
+  const getDTRFlagSetupPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "DTRFlagSetup"
+      );
+
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
 
   // Fetch DTR flags from API
   useEffect(() => {
@@ -101,7 +111,7 @@ export function DTRFlagSetupPage() {
       setLoadingFlags(false);
     }
   };
-  
+
   const filteredData = flags.filter(item =>
     item.flagCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.timeIn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -118,10 +128,17 @@ export function DTRFlagSetupPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
-  //Reset to page 1 when search term changes
-  // useEffect(() => {
-  //   setCurrentPage(1);
-  // }, [searchTerm]);
+  // Helper to close all time pickers
+  const closeAllPickers = () => {
+    setShowTimeInPicker(false);
+    setShowTimeOutPicker(false);
+    setShowBreak1OutPicker(false);
+    setShowBreak1InPicker(false);
+    setShowBreak2OutPicker(false);
+    setShowBreak2InPicker(false);
+    setShowBreak3OutPicker(false);
+    setShowBreak3InPicker(false);
+  };
 
   const handleCreateNew = () => {
     setFormData({
@@ -135,6 +152,7 @@ export function DTRFlagSetupPage() {
       break3Out: '',
       break3In: ''
     });
+    closeAllPickers();
     setShowCreateModal(true);
   };
 
@@ -151,6 +169,7 @@ export function DTRFlagSetupPage() {
       break3Out: item.break3Out,
       break3In: item.break3In
     });
+    closeAllPickers();
     setShowEditModal(true);
   };
 
@@ -176,7 +195,6 @@ export function DTRFlagSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the list
         await fetchDTRFlags();
       } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Failed to delete DTR flag';
@@ -192,19 +210,13 @@ export function DTRFlagSetupPage() {
 
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate flag code
+
     if (!formData.flagCode.trim()) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Flag Code is required.',
-      });
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Flag Code is required.' });
       return;
     }
 
-    // Check for duplicate flag code
-    const isDuplicate = flags.some(flag => 
+    const isDuplicate = flags.some(flag =>
       flag.flagCode.toLowerCase() === formData.flagCode.trim().toLowerCase()
     );
 
@@ -240,17 +252,12 @@ export function DTRFlagSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the list
+
       await fetchDTRFlags();
       setShowCreateModal(false);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error creating DTR flag:', error);
     } finally {
       setSubmitting(false);
@@ -259,22 +266,16 @@ export function DTRFlagSetupPage() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!editingItem) return;
 
-    // Validate flag code
     if (!formData.flagCode.trim()) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Flag Code is required.',
-      });
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Flag Code is required.' });
       return;
     }
 
-    // Check for duplicate flag code (excluding current item)
-    const isDuplicate = flags.some(flag => 
-      flag.id !== editingItem.id && 
+    const isDuplicate = flags.some(flag =>
+      flag.id !== editingItem.id &&
       flag.flagCode.toLowerCase() === formData.flagCode.trim().toLowerCase()
     );
 
@@ -310,18 +311,13 @@ export function DTRFlagSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the list
+
       await fetchDTRFlags();
       setShowEditModal(false);
       setEditingItem(null);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error updating DTR flag:', error);
     } finally {
       setSubmitting(false);
@@ -332,6 +328,7 @@ export function DTRFlagSetupPage() {
     setShowCreateModal(false);
     setShowEditModal(false);
     setEditingItem(null);
+    closeAllPickers();
   };
 
   // Handle ESC key press
@@ -340,9 +337,11 @@ export function DTRFlagSetupPage() {
       if (event.key === 'Escape') {
         if (showCreateModal) {
           setShowCreateModal(false);
+          closeAllPickers();
         } else if (showEditModal) {
           setShowEditModal(false);
           setEditingItem(null);
+          closeAllPickers();
         }
       }
     };
@@ -355,6 +354,77 @@ export function DTRFlagSetupPage() {
       document.removeEventListener('keydown', handleEscKey);
     };
   }, [showCreateModal, showEditModal]);
+
+  // ── Reusable time field renderer ──────────────────────────────────────────
+  // Renders a label + text input + clock-icon button that opens the TimePicker
+  const renderTimeField = (
+    label: string,
+    fieldKey: keyof typeof formData,
+    showPicker: boolean,
+    setShowPicker: (v: boolean) => void
+  ) => (
+    <div className="flex items-center gap-3">
+      <label className="text-gray-700 text-sm whitespace-nowrap w-28">{label} :</label>
+      <div className="relative flex-1">
+        <input
+          type="text"
+          value={formData[fieldKey]}
+          onChange={(e) => setFormData({ ...formData, [fieldKey]: e.target.value })}
+          placeholder="HH:MM AM/PM"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-10"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPicker(!showPicker)}
+          className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          title="Pick time"
+        >
+          {/* Clock icon */}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+        {showPicker && (
+          <TimePicker
+            initialTime={formData[fieldKey]}
+            onTimeSelect={(time) => {
+              setFormData({ ...formData, [fieldKey]: time });
+              setShowPicker(false);
+            }}
+            onClose={() => setShowPicker(false)}
+          />
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Shared modal form body ─────────────────────────────────────────────────
+  const renderFormFields = () => (
+    <div className="space-y-3">
+      {/* Flag Code – no TimePicker, plain text */}
+      <div className="flex items-center gap-3">
+        <label className="text-gray-700 text-sm whitespace-nowrap w-28">Flag Code :</label>
+        <input
+          type="text"
+          value={formData.flagCode}
+          maxLength={10}
+          onChange={(e) => setFormData({ ...formData, flagCode: e.target.value })}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          required
+        />
+      </div>
+
+      {renderTimeField('Time In',    'timeIn',    showTimeInPicker,    setShowTimeInPicker)}
+      {renderTimeField('Time Out',   'timeOut',   showTimeOutPicker,   setShowTimeOutPicker)}
+      {renderTimeField('Break1 Out', 'break1Out', showBreak1OutPicker, setShowBreak1OutPicker)}
+      {renderTimeField('Break1 In',  'break1In',  showBreak1InPicker,  setShowBreak1InPicker)}
+      {renderTimeField('Break2 Out', 'break2Out', showBreak2OutPicker, setShowBreak2OutPicker)}
+      {renderTimeField('Break2 In',  'break2In',  showBreak2InPicker,  setShowBreak2InPicker)}
+      {renderTimeField('Break3 Out', 'break3Out', showBreak3OutPicker, setShowBreak3OutPicker)}
+      {renderTimeField('Break3 In',  'break3In',  showBreak3InPicker,  setShowBreak3InPicker)}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -420,7 +490,7 @@ export function DTRFlagSetupPage() {
                   <input
                     type="text"
                     value={searchTerm}
-                    onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
+                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
                   />
                 </div>
@@ -453,7 +523,6 @@ export function DTRFlagSetupPage() {
                       {(hasPermission('Edit') || hasPermission('Delete')) && (
                         <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase whitespace-nowrap">Actions</th>
                       )}
-                      
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -470,31 +539,32 @@ export function DTRFlagSetupPage() {
                           <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{item.break3Out}</td>
                           <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{item.break3In}</td>
                           {(hasPermission('Edit') || hasPermission('Delete')) && (
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              {hasPermission('Edit') && (
-                                <button
-                                  onClick={() => handleEdit(item)}
-                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                  title="Edit"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                              )}
-                              {hasPermission("Edit") && hasPermission("Delete") && (
-                                <span className="text-gray-300">|</span>
-                              )}
-                              {hasPermission('Delete') && (
-                                <button
-                                  onClick={() => handleDelete(item)}
-                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </td>)}
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                {hasPermission('Edit') && (
+                                  <button
+                                    onClick={() => handleEdit(item)}
+                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {hasPermission("Edit") && hasPermission("Delete") && (
+                                  <span className="text-gray-300">|</span>
+                                )}
+                                {hasPermission('Delete') && (
+                                  <button
+                                    onClick={() => handleDelete(item)}
+                                    className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     ) : (
@@ -505,190 +575,68 @@ export function DTRFlagSetupPage() {
                       </tr>
                     )}
                   </tbody>
-                </table> ) : (
-                  <div className="text-center py-10 text-gray-500">
-                      You do not have permission to view this list.
-                  </div>
+                </table>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+                </div>
               )}
             </div>
 
             {/* Pagination */}
             {hasPermission('View') && (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-gray-600">
-                Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="text-gray-600">
+                  Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                </span>
+                <div className="flex items-center gap-2">
                   <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded transition-colors ${
-                      currentPage === page
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-gray-300 hover:bg-gray-100'
-                    }`}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {page}
+                    Previous
                   </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
-                  disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded transition-colors ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                    disabled={currentPage >= totalPages || filteredData.length === 0}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>)}
+            )}
           </div>
         </div>
       </div>
 
-      {/* Create New Modal */}
+      {/* ── Create New Modal ─────────────────────────────────────────────────── */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
               <h2 className="text-gray-900">Create New</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSubmitCreate} className="p-6">
               <h3 className="text-blue-600 mb-4">DTR Flag Setup</h3>
-              
-              <div className="space-y-3">
-                {/* Flag Code */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Flag Code :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.flagCode}
-                    maxLength={10}
-                    onChange={(e) => setFormData({ ...formData, flagCode: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Time In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Time In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.timeIn}
-                    onChange={(e) => setFormData({ ...formData, timeIn: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Time Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Time Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.timeOut}
-                    onChange={(e) => setFormData({ ...formData, timeOut: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break1 Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break1 Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break1Out}
-                    onChange={(e) => setFormData({ ...formData, break1Out: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break1 In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break1 In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break1In}
-                    onChange={(e) => setFormData({ ...formData, break1In: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break2 Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break2 Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break2Out}
-                    onChange={(e) => setFormData({ ...formData, break2Out: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break2 In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break2 In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break2In}
-                    onChange={(e) => setFormData({ ...formData, break2In: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break3 Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break3 Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break3Out}
-                    onChange={(e) => setFormData({ ...formData, break3Out: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break3 In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break3 In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break3In}
-                    onChange={(e) => setFormData({ ...formData, break3In: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-              </div>
-
+              {renderFormFields()}
               <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
                 <button
                   type="submit"
@@ -711,143 +659,19 @@ export function DTRFlagSetupPage() {
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* ── Edit Modal ───────────────────────────────────────────────────────── */}
       {showEditModal && editingItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
               <h2 className="text-gray-900">Edit DTR Flag</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSubmitEdit} className="p-6">
               <h3 className="text-blue-600 mb-4">DTR Flag Setup</h3>
-              
-              <div className="space-y-3">
-                {/* Flag Code */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Flag Code :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.flagCode}
-                    maxLength={10}
-                    onChange={(e) => setFormData({ ...formData, flagCode: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Time In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Time In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.timeIn}
-                    onChange={(e) => setFormData({ ...formData, timeIn: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Time Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Time Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.timeOut}
-                    onChange={(e) => setFormData({ ...formData, timeOut: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break1 Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break1 Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break1Out}
-                    onChange={(e) => setFormData({ ...formData, break1Out: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break1 In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break1 In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break1In}
-                    onChange={(e) => setFormData({ ...formData, break1In: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break2 Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break2 Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break2Out}
-                    onChange={(e) => setFormData({ ...formData, break2Out: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break2 In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break2 In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break2In}
-                    onChange={(e) => setFormData({ ...formData, break2In: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break3 Out */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break3 Out :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break3Out}
-                    onChange={(e) => setFormData({ ...formData, break3Out: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-
-                {/* Break3 In */}
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Break3 In :
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.break3In}
-                    onChange={(e) => setFormData({ ...formData, break3In: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-              </div>
-
+              {renderFormFields()}
               <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
                 <button
                   type="submit"

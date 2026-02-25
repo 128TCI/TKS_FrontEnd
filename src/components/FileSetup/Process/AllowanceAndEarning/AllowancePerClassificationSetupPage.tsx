@@ -95,7 +95,6 @@ export function AllowancePerClassificationSetupPage() {
     const [workshiftCodes, setWorkshiftCodes] = useState<WorkshiftCode[]>([]);
     const [classificationCodes, setClassificationCodes] = useState<ClassificationCode[]>([]);
 
-    // Fetch all data on component mount
     useEffect(() => {
         fetchAllowancePerClassification();
         fetchEarningCodes();
@@ -103,7 +102,6 @@ export function AllowancePerClassificationSetupPage() {
         fetchClassificationCodes();
     }, []);
 
-    // Fetch Allowance Per Classification data
     const fetchAllowancePerClassification = async () => {
         try {
             setLoading(true);
@@ -120,7 +118,6 @@ export function AllowancePerClassificationSetupPage() {
         }
     };
 
-    // Fetch Earning Codes
     const fetchEarningCodes = async () => {
         try {
             const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/EarningsSetUp');
@@ -139,7 +136,6 @@ export function AllowancePerClassificationSetupPage() {
         }
     };
 
-    // Fetch Workshift Codes
     const fetchWorkshiftCodes = async () => {
         try {
             const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/WorkshiftSetUp');
@@ -155,7 +151,6 @@ export function AllowancePerClassificationSetupPage() {
         }
     };
 
-    // Fetch Classification Codes
     const fetchClassificationCodes = async () => {
         try {
             const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp');
@@ -333,7 +328,6 @@ export function AllowancePerClassificationSetupPage() {
         setDetailsItem(null);
     };
 
-    // Handle ESC key press with hierarchy
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -366,60 +360,52 @@ export function AllowancePerClassificationSetupPage() {
     }, [showCreateModal, showEditModal, showDetailsModal,
         showAllowanceCodeModal, showWorkshiftCodeModal, showClassificationCodeModal]);
 
-    // Permissions
     const [permissions, setPermissions] = useState<Record<string, boolean>>({});
     const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
+
     useEffect(() => {
-      getAllowancePerClassificationSetUpPermissions();
+        getAllowancePerClassificationSetUpPermissions();
     }, []);
-  
+
     const getAllowancePerClassificationSetUpPermissions = () => {
-      const rawPayload = localStorage.getItem("loginPayload");
-      if (!rawPayload) return;
-  
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-        const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-        const branchEntries = encryptedArray.filter(
-          (p) => decryptData(p.formName) === "AllowancePerClassificationSetUp"
-        );
-  
-        // Build a map: { Add: true, Edit: true, ... }
-        const permMap: Record<string, boolean> = {};
-        branchEntries.forEach((p) => {
-          const accessType = decryptData(p.accessTypeName);
-          if (accessType) permMap[accessType] = true;
-        });
-  
-        setPermissions(permMap);
-  
-      } catch (e) {
-        console.error("Error parsing or decrypting payload", e);
-      }
+        const rawPayload = localStorage.getItem("loginPayload");
+        if (!rawPayload) return;
+
+        try {
+            const parsedPayload = JSON.parse(rawPayload);
+            const encryptedArray: any[] = parsedPayload.permissions || [];
+
+            const branchEntries = encryptedArray.filter(
+                (p) => decryptData(p.formName) === "AllowancePerClassificationSetUp"
+            );
+
+            const permMap: Record<string, boolean> = {};
+            branchEntries.forEach((p) => {
+                const accessType = decryptData(p.accessTypeName);
+                if (accessType) permMap[accessType] = true;
+            });
+
+            setPermissions(permMap);
+        } catch (e) {
+            console.error("Error parsing or decrypting payload", e);
+        }
     };
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Main Content */}
             <div className="flex-1 p-6">
                 <div className="max-w-7xl mx-auto">
-                    {/* Page Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
                         <h1 className="text-white text-2xl font-bold">Allowance Per Classification Setup</h1>
                     </div>
 
-                    {/* Content Container */}
                     <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-                        {/* Error Message */}
                         {error && (
                             <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded">
                                 <p className="text-red-700">{error}</p>
                             </div>
                         )}
 
-                        {/* Information Frame */}
                         <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
                             <div className="flex items-start gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -453,7 +439,6 @@ export function AllowancePerClassificationSetupPage() {
                             </div>
                         </div>
 
-                        {/* Top Controls */}
                         <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
                             {(hasPermission('Add') && hasPermission('View')) && (
                                 <button
@@ -479,122 +464,121 @@ export function AllowancePerClassificationSetupPage() {
                             )}
                         </div>
 
-                        {/* Table */}
                         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                            { hasPermission('View') ? (
-                            <table className="w-full">
-                                <thead className="bg-gray-100 border-b border-gray-200">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Reference Code</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Allowance Code</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Workshift Code</th>
-                                        <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Classification Code</th>
-                                        { (hasPermission('Edit') || hasPermission('Delete')) && (
-                                            <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">
-                                                Actions
-                                            </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {loading ? (
+                            {hasPermission('View') ? (
+                                <table className="w-full">
+                                    <thead className="bg-gray-100 border-b border-gray-200">
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-16 text-center">
-                                                <div className="text-gray-500">Loading...</div>
-                                            </td>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Reference Code</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Allowance Code</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Workshift Code</th>
+                                            <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase">Classification Code</th>
+                                            {(hasPermission('Edit') || hasPermission('Delete')) && (
+                                                <th className="px-6 py-3 text-center text-xs text-gray-600 uppercase">Actions</th>
+                                            )}
                                         </tr>
-                                    ) : paginatedData.length > 0 ? (
-                                        paginatedData.map((item) => (
-                                            <tr key={item.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 text-sm text-gray-900">{item.refNo}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.allowanceCode}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.workShiftCode}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{item.classificationCode || '-'}</td>
-                                                {(hasPermission('Edit') || hasPermission('Delete') ) && (
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={() => handleDetails(item)}
-                                                            className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
-                                                        >
-                                                            <Info className="w-4 h-4" />
-                                                        </button>
-                                                        {hasPermission('Edit') && (
-                                                        <span className="text-gray-300">|</span>)}
-                                                        {hasPermission('Edit') && (   
-                                                            <button
-                                                                onClick={() => handleEdit(item)}
-                                                                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                                                title="Edit"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                        { hasPermission('Delete') && (
-                                                        <span className="text-gray-300">|</span>)}
-                                                        {hasPermission('Delete') && (
-                                                        <button
-                                                            onClick={() => handleDelete(item.id)}
-                                                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                                            title="Delete"
-                                                            disabled={loading}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                        )}
-                                                    </div>
-                                                </td>)}
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {loading ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-16 text-center">
+                                                    <div className="text-gray-500">Loading...</div>
+                                                </td>
                                             </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-16 text-center">
-                                                <div className="text-gray-500">No data available in table</div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table> ) : (
+                                        ) : paginatedData.length > 0 ? (
+                                            paginatedData.map((item) => (
+                                                <tr key={item.id} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 text-sm text-gray-900">{item.refNo}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{item.allowanceCode}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{item.workShiftCode}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{item.classificationCode || '-'}</td>
+                                                    {(hasPermission('Edit') || hasPermission('Delete')) && (
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <button
+                                                                    onClick={() => handleDetails(item)}
+                                                                    className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                                                                >
+                                                                    <Info className="w-4 h-4" />
+                                                                </button>
+                                                                {hasPermission('Edit') && (
+                                                                    <span className="text-gray-300">|</span>
+                                                                )}
+                                                                {hasPermission('Edit') && (
+                                                                    <button
+                                                                        onClick={() => handleEdit(item)}
+                                                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                                                        title="Edit"
+                                                                    >
+                                                                        <Edit className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                                {hasPermission('Delete') && (
+                                                                    <span className="text-gray-300">|</span>
+                                                                )}
+                                                                {hasPermission('Delete') && (
+                                                                    <button
+                                                                        onClick={() => handleDelete(item.id)}
+                                                                        className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                                                        title="Delete"
+                                                                        disabled={loading}
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-16 text-center">
+                                                    <div className="text-gray-500">No data available in table</div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            ) : (
                                 <div className="text-center py-10 text-gray-500">
                                     You do not have permission to view this list.
                                 </div>
                             )}
                         </div>
 
-                        {/* Pagination */}
                         {hasPermission('View') && (
-                        <div className="mt-4 flex items-center justify-between text-sm">
-                            <span className="text-gray-600">
-                                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
-                            </span>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                    disabled={currentPage === 1}
-                                    className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                                >
-                                    Previous
-                                </button>
-                                <button className="px-3 py-1 bg-blue-500 text-white rounded">
-                                    {currentPage}
-                                </button>
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
-                                    disabled={currentPage >= totalPages || filteredData.length === 0}
-                                    className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                                >
-                                    Next
-                                </button>
+                            <div className="mt-4 flex items-center justify-between text-sm">
+                                <span className="text-gray-600">
+                                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                    >
+                                        Previous
+                                    </button>
+                                    <button className="px-3 py-1 bg-blue-500 text-white rounded">
+                                        {currentPage}
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                                        disabled={currentPage >= totalPages || filteredData.length === 0}
+                                        className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
                             </div>
-                        </div>)}
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Create New Modal */}
             {showCreateModal && (
                 <FormModal
-                
                     title="Create New"
                     formData={formData}
                     setFormData={setFormData}
@@ -608,7 +592,6 @@ export function AllowancePerClassificationSetupPage() {
                 />
             )}
 
-            {/* Edit Modal */}
             {showEditModal && editingItem && (
                 <FormModal
                     title="Edit"
@@ -624,22 +607,17 @@ export function AllowancePerClassificationSetupPage() {
                 />
             )}
 
-            {/* Details Modal */}
             {showDetailsModal && detailsItem && (
-                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[50vh] overflow-y-auto">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0 z-10">
                             <h2 className="text-gray-900 font-semibold">Details</h2>
-                            <button
-                                onClick={handleCloseModal}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
+                            <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                         <div className="p-6">
                             <h3 className="text-blue-600 mb-4 font-semibold">Allowance Per Classification Details</h3>
-
                             <div className="space-y-3 text-sm">
                                 <div><span className="text-gray-700 font-medium">Reference Code : </span><span className="text-gray-900">{detailsItem.refNo}</span></div>
                                 <div><span className="text-gray-700 font-medium">Allowance Code : </span><span className="text-gray-900">{detailsItem.allowanceCode}</span></div>
@@ -651,15 +629,14 @@ export function AllowancePerClassificationSetupPage() {
                                 <div><span className="text-gray-700 font-medium">Max. Hours for Rest Day : </span><span className="text-gray-900">{detailsItem.maxHrsRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmtRestDay}</span></div>
                                 <div><span className="text-gray-700 font-medium">Min. Hours for Holiday : </span><span className="text-gray-900">{detailsItem.minHrsHoliday}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.minAmtHoliday}</span></div>
                                 <div><span className="text-gray-700 font-medium">Max. Hours for Holiday : </span><span className="text-gray-900">{detailsItem.maxHrsHoliday}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmtHoliday}</span></div>
-                                <div><span className="text-gray-700 font-medium">Min. Hours for Holiday and Restday : </span><span className="text-gray-900">{detailsItem.minHrsHolidayRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.minAmountHolidayRestDay}</span></div>
-                                <div><span className="text-gray-700 font-medium">Max. Hours for Holiday and Restday : </span><span className="text-gray-900">{detailsItem.maxHrsHolidayRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmountHolidayRestDay}</span></div>
+                                <div><span className="text-gray-700 font-medium">Min. Hours for Holiday and Rest Day : </span><span className="text-gray-900">{detailsItem.minHrsHolidayRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.minAmountHolidayRestDay}</span></div>
+                                <div><span className="text-gray-700 font-medium">Max. Hours for Holiday and Rest Day : </span><span className="text-gray-900">{detailsItem.maxHrsHolidayRestDay}</span> <span className="text-gray-700 font-medium">Amount: </span><span className="text-gray-900">{detailsItem.maxAmountHolidayRestDay}</span></div>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Allowance Code Search Modal */}
             {showAllowanceCodeModal && (
                 <SearchModal
                     title="Earnings Code"
@@ -675,7 +652,6 @@ export function AllowancePerClassificationSetupPage() {
                 />
             )}
 
-            {/* Workshift Code Search Modal */}
             {showWorkshiftCodeModal && (
                 <SearchModal
                     title="Workshift Code"
@@ -691,7 +667,6 @@ export function AllowancePerClassificationSetupPage() {
                 />
             )}
 
-            {/* Classification Code Search Modal */}
             {showClassificationCodeModal && (
                 <SearchModal
                     title="Classification Code"
@@ -738,31 +713,27 @@ function FormModal({
     setShowClassificationCodeModal,
     submitButtonText
 }: FormModalProps) {
+
+    const numVal = (val: number) => val === 0 ? '' : val;
+    const parseNum = (val: string) => val === '' ? 0 : parseFloat(val) || 0;
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[75vh] overflow-hidden flex flex-col">
-                {/* Sticky Header - No scroll */}
                 <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex-shrink-0">
                     <h2 className="text-gray-800 font-semibold">{title}</h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
-                
-                {/* Scrollable Content */}
+
                 <div className="overflow-y-auto flex-1">
                     <form onSubmit={onSubmit} className="p-6">
                         <h3 className="text-blue-600 mb-4 font-semibold">Allowance Per Classification</h3>
 
                         <div className="space-y-3">
-                            {/* All form fields with reduced spacing */}
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Reference Code :
-                                </label>
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Reference Code :</label>
                                 <input
                                     type="text"
                                     value={formData.refNo}
@@ -773,9 +744,7 @@ function FormModal({
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Allowance Code :
-                                </label>
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Allowance Code :</label>
                                 <input
                                     type="text"
                                     value={formData.allowanceCode}
@@ -783,26 +752,18 @@ function FormModal({
                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                     required
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAllowanceCodeModal(true)}
-                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                >
+                                <button type="button" onClick={() => setShowAllowanceCodeModal(true)}
+                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                                     <Search className="w-4 h-4" />
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, allowanceCode: '' })}
-                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                >
+                                <button type="button" onClick={() => setFormData({ ...formData, allowanceCode: '' })}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Workshift Code :
-                                </label>
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Workshift Code :</label>
                                 <input
                                     type="text"
                                     value={formData.workShiftCode}
@@ -810,234 +771,166 @@ function FormModal({
                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                     required
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowWorkshiftCodeModal(true)}
-                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                >
+                                <button type="button" onClick={() => setShowWorkshiftCodeModal(true)}
+                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                                     <Search className="w-4 h-4" />
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, workShiftCode: '' })}
-                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                >
+                                <button type="button" onClick={() => setFormData({ ...formData, workShiftCode: '' })}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Classification :
-                                </label>
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Classification :</label>
                                 <input
                                     type="text"
                                     value={formData.classificationCode}
                                     onChange={(e) => setFormData({ ...formData, classificationCode: e.target.value })}
                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowClassificationCodeModal(true)}
-                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                >
+                                <button type="button" onClick={() => setShowClassificationCodeModal(true)}
+                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                                     <Search className="w-4 h-4" />
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, classificationCode: '' })}
-                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                >
+                                <button type="button" onClick={() => setFormData({ ...formData, classificationCode: '' })}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
 
-                            {/* Regular Day Fields */}
+                            {/* Regular Day */}
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Min. Hours for Regular Day :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minHrsRegDay}
-                                    onChange={(e) => setFormData({ ...formData, minHrsRegDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Min. Hours for Regular Day :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minHrsRegDay)}
+                                    onChange={(e) => setFormData({ ...formData, minHrsRegDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minAmtRegDay}
-                                    onChange={(e) => setFormData({ ...formData, minAmtRegDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minAmtRegDay)}
+                                    onChange={(e) => setFormData({ ...formData, minAmtRegDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Max. Hours for Regular Day :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxHrsRegDay}
-                                    onChange={(e) => setFormData({ ...formData, maxHrsRegDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Max. Hours for Regular Day :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxHrsRegDay)}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsRegDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxAmtRegDay}
-                                    onChange={(e) => setFormData({ ...formData, maxAmtRegDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxAmtRegDay)}
+                                    onChange={(e) => setFormData({ ...formData, maxAmtRegDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
 
-                            {/* Rest Day Fields */}
+                            {/* Rest Day */}
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Min. Hours for Rest Day :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minHrsRestDay}
-                                    onChange={(e) => setFormData({ ...formData, minHrsRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Min. Hours for Rest Day :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minHrsRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, minHrsRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minAmtRestDay}
-                                    onChange={(e) => setFormData({ ...formData, minAmtRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minAmtRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, minAmtRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Max. Hours for Rest Day :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxHrsRestDay}
-                                    onChange={(e) => setFormData({ ...formData, maxHrsRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Max. Hours for Rest Day :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxHrsRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxAmtRestDay}
-                                    onChange={(e) => setFormData({ ...formData, maxAmtRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxAmtRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, maxAmtRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
 
-                            {/* Holiday Fields */}
+                            {/* Holiday */}
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Min. Hours for Holiday :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minHrsHoliday}
-                                    onChange={(e) => setFormData({ ...formData, minHrsHoliday: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Min. Hours for Holiday :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minHrsHoliday)}
+                                    onChange={(e) => setFormData({ ...formData, minHrsHoliday: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minAmtHoliday}
-                                    onChange={(e) => setFormData({ ...formData, minAmtHoliday: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minAmtHoliday)}
+                                    onChange={(e) => setFormData({ ...formData, minAmtHoliday: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Max. Hours for Holiday :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxHrsHoliday}
-                                    onChange={(e) => setFormData({ ...formData, maxHrsHoliday: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Max. Hours for Holiday :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxHrsHoliday)}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsHoliday: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxAmtHoliday}
-                                    onChange={(e) => setFormData({ ...formData, maxAmtHoliday: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxAmtHoliday)}
+                                    onChange={(e) => setFormData({ ...formData, maxAmtHoliday: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
 
-                            {/* Holiday and Restday Fields */}
+                            {/* Holiday and Rest Day */}
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Min. Hours for Holiday and Restday :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minHrsHolidayRestDay}
-                                    onChange={(e) => setFormData({ ...formData, minHrsHolidayRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Min. Hours for Holiday and Rest Day :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minHrsHolidayRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, minHrsHolidayRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.minAmountHolidayRestDay}
-                                    onChange={(e) => setFormData({ ...formData, minAmountHolidayRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.minAmountHolidayRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, minAmountHolidayRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <label className="text-gray-700 text-sm whitespace-nowrap w-48">
-                                    Max. Hours for Holiday and Restday :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxHrsHolidayRestDay}
-                                    onChange={(e) => setFormData({ ...formData, maxHrsHolidayRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <label className="text-gray-700 text-sm whitespace-nowrap w-56">Max. Hours for Holiday and Rest Day :</label>
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxHrsHolidayRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, maxHrsHolidayRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 <label className="text-gray-700 text-sm whitespace-nowrap">Amount :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.maxAmountHolidayRestDay}
-                                    onChange={(e) => setFormData({ ...formData, maxAmountHolidayRestDay: parseFloat(e.target.value) || 0 })}
-                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+                                <input type="number" step="0.01"
+                                    value={numVal(formData.maxAmountHolidayRestDay)}
+                                    onChange={(e) => setFormData({ ...formData, maxAmountHolidayRestDay: parseNum(e.target.value) })}
+                                    placeholder="0"
+                                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                             </div>
                         </div>
 
                         <div className="flex gap-3 mt-6">
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm disabled:opacity-50"
-                            >
+                            <button type="submit" disabled={loading}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm disabled:opacity-50">
                                 {submitButtonText}
                             </button>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
-                            >
+                            <button type="button" onClick={onClose}
+                                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm">
                                 Back to List
                             </button>
                         </div>
@@ -1061,11 +954,10 @@ interface SearchModalProps {
 function SearchModal({ title, searchTerm, setSearchTerm, data, onSelect, onClose, style }: SearchModalProps) {
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div 
+            <div
                 style={style}
                 className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto"
             >
-                {/* Modal Header - Sticky at the top */}
                 <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                     <h2 className="text-gray-800 text-sm font-semibold">Search</h2>
                     <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
@@ -1073,11 +965,9 @@ function SearchModal({ title, searchTerm, setSearchTerm, data, onSelect, onClose
                     </button>
                 </div>
 
-                {/* Modal Content */}
                 <div className="p-3">
                     <h3 className="text-blue-600 mb-2 text-sm font-semibold">{title}</h3>
 
-                    {/* Search Input Area */}
                     <div className="flex items-center gap-2 mb-3">
                         <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
                         <input
@@ -1089,11 +979,7 @@ function SearchModal({ title, searchTerm, setSearchTerm, data, onSelect, onClose
                         />
                     </div>
 
-                    {/* TABLE CONTAINER: Fixed height and scrollable */}
-                    <div 
-                        className="border border-gray-200 rounded overflow-hidden" 
-                        style={{ maxHeight: '400px', overflowY: 'auto' }}
-                    >
+                    <div className="border border-gray-200 rounded overflow-hidden" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                         <table className="w-full border-collapse text-sm">
                             <thead className="sticky top-0 bg-white z-10">
                                 <tr className="bg-gray-100 border-b-2 border-gray-300">

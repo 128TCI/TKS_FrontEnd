@@ -4,6 +4,7 @@ import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
 import apiClient from '../../services/apiClient';
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
+import { TimePicker } from '../Modals/TimePickerModal';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ interface EmployeeData {
 
 const RAW_DATA_BASE_URL = '/Maintenance/EmployeeRawData';
 const DEVICE_BASE_URL = '/Fs/Process/Device/BorrowedDeviceName';
-const WORKSHIFT_BASE_URL = '/Maintenance/WorkShift'; // adjust as needed
+const WORKSHIFT_BASE_URL = '/Maintenance/WorkShift';
 const EMPLOYEE_MASTER_URL = '/Maintenance/EmployeeMasterFile';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,7 +89,6 @@ const EMPLOYEE_MASTER_URL = '/Maintenance/EmployeeMasterFile';
 const toISOSafe = (dateStr: string, timeStr: string = ''): string => {
     if (!dateStr) return new Date().toISOString();
     try {
-        // Support MM/DD/YYYY or YYYY-MM-DD
         let base = dateStr;
         if (dateStr.includes('/')) {
             const [m, d, y] = dateStr.split('/');
@@ -217,8 +217,20 @@ export function RawDataPage() {
     const [isLateFiling, setIsLateFiling] = useState(false);
     const [remarks, setRemarks] = useState('');
     const [borrowedDeviceName, setBorrowedDeviceName] = useState('');
+
+    // ── Calendar / TimePicker visibility ──
     const [showDateInCalendar, setShowDateInCalendar] = useState(false);
+    const [showTimeInPicker, setShowTimeInPicker] = useState(false);
+    const [showActualDateInCalendar, setShowActualDateInCalendar] = useState(false);
+    const [showActualTimeInPicker, setShowActualTimeInPicker] = useState(false);
+    const [showBreak1OutPicker, setShowBreak1OutPicker] = useState(false);
+    const [showBreak1InPicker, setShowBreak1InPicker] = useState(false);
+    const [showBreak2OutPicker, setShowBreak2OutPicker] = useState(false);
+    const [showBreak2InPicker, setShowBreak2InPicker] = useState(false);
+    const [showBreak3OutPicker, setShowBreak3OutPicker] = useState(false);
+    const [showBreak3InPicker, setShowBreak3InPicker] = useState(false);
     const [showDateOutCalendar, setShowDateOutCalendar] = useState(false);
+    const [showTimeOutPicker, setShowTimeOutPicker] = useState(false);
 
     // ── Employee search modal ──
     const [showEmpCodeModal, setShowEmpCodeModal] = useState(false);
@@ -265,35 +277,19 @@ export function RawDataPage() {
             if (response.status === 200 && response.data) {
                 const list: RawDataEntry[] = Array.isArray(response.data) ? response.data : [];
 
-                // ── Mirror the stored proc WHERE clause client-side ──────────────────
-                // SP: A.RawDateIn BETWEEN @RawDateInFrom AND @RawDateInTo
-                //     @RawDateInFrom = floor(dateFrom)         → 00:00 of dateFrom
-                //     @RawDateInTo   = floor(dateTo) + 1439min → 23:59 of dateTo
-                //
-                // SP also requires:
-                //   ISNULL(A.RawDateOut,'') <> ''   →  rawDateOut must be present
-                //   A.RawTimeIn  IS NOT NULL
-                //   A.RawTimeOut IS NOT NULL
-                //
-                // incompleteLogs toggle inverts the completeness check (show missing logs)
-
                 const fromMs = new Date(toISOSafe(dateFrom)).setUTCHours(0, 0, 0, 0);
                 const toMs   = new Date(toISOSafe(dateTo)).setUTCHours(23, 59, 0, 0);
 
                 const filtered = list.filter(entry => {
-                    // 1. rawDateIn must fall within [00:00 dateFrom .. 23:59 dateTo]
                     if (!entry.rawDateIn) return false;
                     const rawDateInMs = new Date(entry.rawDateIn).getTime();
                     if (rawDateInMs < fromMs || rawDateInMs > toMs) return false;
 
-                    // 2. completeness check (mirrors SP ISNULL/IS NOT NULL conditions)
                     const hasDateOut = !!entry.rawDateOut && entry.rawDateOut.trim() !== '';
                     const hasTimeIn  = !!entry.rawTimeIn;
                     const hasTimeOut = !!entry.rawTimeOut;
                     const isComplete = hasDateOut && hasTimeIn && hasTimeOut;
 
-                    // incompleteLogs ON  → show only incomplete records
-                    // incompleteLogs OFF → show only complete records (SP default)
                     return incompleteLogs ? !isComplete : isComplete;
                 });
 
@@ -558,12 +554,10 @@ export function RawDataPage() {
     // EFFECTS
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Load employees on mount (matches provided pattern)
     useEffect(() => {
         fetchEmployeeData();
     }, []);
 
-    // ESC to close modals
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
@@ -575,18 +569,26 @@ export function RawDataPage() {
             setShowDateFromCalendar(false);
             setShowDateToCalendar(false);
             setShowDateInCalendar(false);
+            setShowTimeInPicker(false);
+            setShowActualDateInCalendar(false);
+            setShowActualTimeInPicker(false);
+            setShowBreak1OutPicker(false);
+            setShowBreak1InPicker(false);
+            setShowBreak2OutPicker(false);
+            setShowBreak2InPicker(false);
+            setShowBreak3OutPicker(false);
+            setShowBreak3InPicker(false);
             setShowDateOutCalendar(false);
+            setShowTimeOutPicker(false);
         };
         document.addEventListener('keydown', handleEsc);
         return () => document.removeEventListener('keydown', handleEsc);
     }, [showEmpCodeModal, showSpecificEmpModal, showWorkshiftModal, showDeviceModal, showCreateModal]);
 
-    // Load workshifts when workshift modal opens (lazy)
     useEffect(() => {
         if (showWorkshiftModal && workshifts.length === 0) fetchWorkshifts();
     }, [showWorkshiftModal, workshifts.length, fetchWorkshifts]);
 
-    // Reload devices when device modal opens
     useEffect(() => {
         if (showDeviceModal) fetchDevices();
     }, [showDeviceModal, fetchDevices]);
@@ -618,7 +620,6 @@ export function RawDataPage() {
     };
 
     // ── Derived sorted + filtered list ──
-    // Client-side empCode filter for 'specific' mode (guards against API returning all rows)
     const filteredByEmp = displayMode === 'specific' && specificEmpCode
         ? rawDataList.filter(e => e.empCode === specificEmpCode)
         : rawDataList;
@@ -646,25 +647,6 @@ export function RawDataPage() {
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER HELPERS
     // ─────────────────────────────────────────────────────────────────────────
-
-    const renderTimeField = (
-        label: string,
-        val: string,
-        setter: (v: string) => void,
-        extraClass = 'flex-1'
-    ) => (
-        <>
-            <label className="text-gray-700 text-sm whitespace-nowrap">{label} :</label>
-            <input
-                type="text"
-                value={val}
-                onChange={timeChangeHandler(setter)}
-                onBlur={timeBlurHandler(val, setter)}
-                placeholder="HH:MM AM/PM"
-                className={`${extraClass} px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
-            />
-        </>
-    );
 
     const renderDateWithCalendar = (
         label: string,
@@ -780,7 +762,7 @@ export function RawDataPage() {
                             </div>
                         </div>
 
-                        {/* Specific Employee Picker – only shown when displayMode === 'specific' */}
+                        {/* Specific Employee Picker */}
                         {displayMode === 'specific' && (
                             <div className="flex flex-wrap items-center gap-3 mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
                                 <span className="text-sm font-medium text-blue-700 whitespace-nowrap">Employee:</span>
@@ -1097,57 +1079,226 @@ export function RawDataPage() {
                                                         />
                                                     )}
                                                 </div>
-                                                {renderTimeField('Time In', timeIn, setTimeIn)}
+                                                <label className="text-gray-700 text-sm whitespace-nowrap">Time In :</label>
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={timeIn}
+                                                        onChange={timeChangeHandler(setTimeIn)}
+                                                        onBlur={timeBlurHandler(timeIn, setTimeIn)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowTimeInPicker(!showTimeInPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showTimeInPicker && (
+                                                        <TimePicker
+                                                            initialTime={timeIn}
+                                                            onTimeSelect={time => { setTimeIn(time); setShowTimeInPicker(false); }}
+                                                            onClose={() => setShowTimeInPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            {/* ── Actual Date In ── */}
+                                            {/* ── Actual Date In / Actual Time In ── */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Actual Date In :</label>
-                                                <input
-                                                    type="text" value={actualDateIn} onChange={e => setActualDateIn(e.target.value)}
-                                                    placeholder="MM/DD/YYYY"
-                                                    className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm"
-                                                />
-                                                {renderTimeField('Actual Time In', actualTimeIn, setActualTimeIn)}
+                                                <div className="relative">
+                                                    <input
+                                                        type="text" value={actualDateIn} onChange={e => setActualDateIn(e.target.value)}
+                                                        placeholder="MM/DD/YYYY"
+                                                        className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowActualDateInCalendar(!showActualDateInCalendar)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showActualDateInCalendar && (
+                                                        <CalendarPopup
+                                                            onDateSelect={d => { setActualDateIn(d); setShowActualDateInCalendar(false); }}
+                                                            onClose={() => setShowActualDateInCalendar(false)}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <label className="text-gray-700 text-sm whitespace-nowrap">Actual Time In :</label>
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={actualTimeIn}
+                                                        onChange={timeChangeHandler(setActualTimeIn)}
+                                                        onBlur={timeBlurHandler(actualTimeIn, setActualTimeIn)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowActualTimeInPicker(!showActualTimeInPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showActualTimeInPicker && (
+                                                        <TimePicker
+                                                            initialTime={actualTimeIn}
+                                                            onTimeSelect={time => { setActualTimeIn(time); setShowActualTimeInPicker(false); }}
+                                                            onClose={() => setShowActualTimeInPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* ── Break 1 ── */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Break 1 Out :</label>
-                                                <input
-                                                    type="text" value={break1Out}
-                                                    onChange={timeChangeHandler(setBreak1Out)}
-                                                    onBlur={timeBlurHandler(break1Out, setBreak1Out)}
-                                                    placeholder="HH:MM AM/PM"
-                                                    className="w-32 px-3 py-1.5 border border-gray-300 rounded text-sm"
-                                                />
-                                                {renderTimeField('Break 1 In', break1In, setBreak1In)}
+                                                <div className="relative w-32">
+                                                    <input
+                                                        type="text" value={break1Out}
+                                                        onChange={timeChangeHandler(setBreak1Out)}
+                                                        onBlur={timeBlurHandler(break1Out, setBreak1Out)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowBreak1OutPicker(!showBreak1OutPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showBreak1OutPicker && (
+                                                        <TimePicker
+                                                            initialTime={break1Out}
+                                                            onTimeSelect={time => { setBreak1Out(time); setShowBreak1OutPicker(false); }}
+                                                            onClose={() => setShowBreak1OutPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <label className="text-gray-700 text-sm whitespace-nowrap">Break 1 In :</label>
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={break1In}
+                                                        onChange={timeChangeHandler(setBreak1In)}
+                                                        onBlur={timeBlurHandler(break1In, setBreak1In)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowBreak1InPicker(!showBreak1InPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showBreak1InPicker && (
+                                                        <TimePicker
+                                                            initialTime={break1In}
+                                                            onTimeSelect={time => { setBreak1In(time); setShowBreak1InPicker(false); }}
+                                                            onClose={() => setShowBreak1InPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* ── Break 2 ── */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Break 2 Out :</label>
-                                                <input
-                                                    type="text" value={break2Out}
-                                                    onChange={timeChangeHandler(setBreak2Out)}
-                                                    onBlur={timeBlurHandler(break2Out, setBreak2Out)}
-                                                    placeholder="HH:MM AM/PM"
-                                                    className="w-32 px-3 py-1.5 border border-gray-300 rounded text-sm"
-                                                />
-                                                {renderTimeField('Break 2 In', break2In, setBreak2In)}
+                                                <div className="relative w-32">
+                                                    <input
+                                                        type="text" value={break2Out}
+                                                        onChange={timeChangeHandler(setBreak2Out)}
+                                                        onBlur={timeBlurHandler(break2Out, setBreak2Out)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowBreak2OutPicker(!showBreak2OutPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showBreak2OutPicker && (
+                                                        <TimePicker
+                                                            initialTime={break2Out}
+                                                            onTimeSelect={time => { setBreak2Out(time); setShowBreak2OutPicker(false); }}
+                                                            onClose={() => setShowBreak2OutPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <label className="text-gray-700 text-sm whitespace-nowrap">Break 2 In :</label>
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={break2In}
+                                                        onChange={timeChangeHandler(setBreak2In)}
+                                                        onBlur={timeBlurHandler(break2In, setBreak2In)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowBreak2InPicker(!showBreak2InPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showBreak2InPicker && (
+                                                        <TimePicker
+                                                            initialTime={break2In}
+                                                            onTimeSelect={time => { setBreak2In(time); setShowBreak2InPicker(false); }}
+                                                            onClose={() => setShowBreak2InPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* ── Break 3 ── */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Break 3 Out :</label>
-                                                <input
-                                                    type="text" value={break3Out}
-                                                    onChange={timeChangeHandler(setBreak3Out)}
-                                                    onBlur={timeBlurHandler(break3Out, setBreak3Out)}
-                                                    placeholder="HH:MM AM/PM"
-                                                    className="w-32 px-3 py-1.5 border border-gray-300 rounded text-sm"
-                                                />
-                                                {renderTimeField('Break 3 In', break3In, setBreak3In)}
+                                                <div className="relative w-32">
+                                                    <input
+                                                        type="text" value={break3Out}
+                                                        onChange={timeChangeHandler(setBreak3Out)}
+                                                        onBlur={timeBlurHandler(break3Out, setBreak3Out)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowBreak3OutPicker(!showBreak3OutPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showBreak3OutPicker && (
+                                                        <TimePicker
+                                                            initialTime={break3Out}
+                                                            onTimeSelect={time => { setBreak3Out(time); setShowBreak3OutPicker(false); }}
+                                                            onClose={() => setShowBreak3OutPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <label className="text-gray-700 text-sm whitespace-nowrap">Break 3 In :</label>
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={break3In}
+                                                        onChange={timeChangeHandler(setBreak3In)}
+                                                        onBlur={timeBlurHandler(break3In, setBreak3In)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowBreak3InPicker(!showBreak3InPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showBreak3InPicker && (
+                                                        <TimePicker
+                                                            initialTime={break3In}
+                                                            onTimeSelect={time => { setBreak3In(time); setShowBreak3InPicker(false); }}
+                                                            onClose={() => setShowBreak3InPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* ── Date Out / Time Out ── */}
@@ -1172,7 +1323,29 @@ export function RawDataPage() {
                                                         />
                                                     )}
                                                 </div>
-                                                {renderTimeField('Time Out', timeOut, setTimeOut)}
+                                                <label className="text-gray-700 text-sm whitespace-nowrap">Time Out :</label>
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text" value={timeOut}
+                                                        onChange={timeChangeHandler(setTimeOut)}
+                                                        onBlur={timeBlurHandler(timeOut, setTimeOut)}
+                                                        placeholder="HH:MM AM/PM"
+                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button" onClick={() => setShowTimeOutPicker(!showTimeOutPicker)}
+                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {showTimeOutPicker && (
+                                                        <TimePicker
+                                                            initialTime={timeOut}
+                                                            onTimeSelect={time => { setTimeOut(time); setShowTimeOutPicker(false); }}
+                                                            onClose={() => setShowTimeOutPicker(false)}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* ── OT Approved ── */}
