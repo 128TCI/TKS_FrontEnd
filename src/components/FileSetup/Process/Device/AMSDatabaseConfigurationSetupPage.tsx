@@ -232,7 +232,7 @@ export function AMSDatabaseConfigurationSetupPage() {
         setShowEditModal(true);
     };
 
-    const handleDelete = async (item: AMSDatabase) => {
+  const handleDelete = async (item: AMSDatabase) => {
     const confirmed = await Swal.fire({
         icon: 'warning',
         title: 'Confirm Delete',
@@ -246,27 +246,21 @@ export function AMSDatabaseConfigurationSetupPage() {
 
     if (confirmed.isConfirmed) {
         try {
-        await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
-
-        // Audit trail
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Database configuration "${item.description}" deleted.`,
-            messages: `Database configuration "${item.description}" deleted.`,
-            formName: formName,
-        });
-        if (confirmed.isConfirmed) {
-            try {
-                await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
-                await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration deleted successfully.', timer: 2000, showConfirmButton: false });
-                await fetchAMSDatabases();
-            } catch (error: any) {
-                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete database configuration';
-                await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-            }
+            await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Database configuration "${item.description}" deleted.`,
+                messages: `Database configuration "${item.description}" deleted.`,
+                formName: formName,
+            });
+            await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration deleted successfully.', timer: 2000, showConfirmButton: false });
+            await fetchAMSDatabases();
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to delete database configuration';
+            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
         }
     }
-    };
+};
 
     const handleSubmitCreate = async (e: React.FormEvent) => {
         e.preventDefault();
