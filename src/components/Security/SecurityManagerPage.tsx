@@ -309,6 +309,24 @@ export function SecurityManagerPage() {
 
   const handleAccessPageChange = (page: number) => setCurrentAccessPage(page);
 
+   const getFormAccessPageNumbers = (): (number | string)[] => {
+    const pages: (number | string)[] = [];
+    if (totalFormAccessPages <= 7) {
+      for (let i = 1; i <= totalFormAccessPages; i++) pages.push(i);
+    } else if (currentAccessPage <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...'); pages.push(totalFormAccessPages);
+    } else if (currentAccessPage >= totalFormAccessPages - 3) {
+      pages.push(1); pages.push('...');
+      for (let i = totalFormAccessPages - 4; i <= totalFormAccessPages; i++) pages.push(i);
+    } else {
+      pages.push(1); pages.push('...');
+      for (let i = currentAccessPage - 1; i <= currentAccessPage + 1; i++) pages.push(i);
+      pages.push('...'); pages.push(totalFormAccessPages);
+    }
+    return pages;
+  }; 
+
   const renderAccessPageNumbers = () => {
     const pages = [];
     for (let i = 1; i <= totalFormAccessPages; i++) {
@@ -774,7 +792,7 @@ export function SecurityManagerPage() {
                     onChange={e => { setSelectedUserGroup(e.target.value); fetchMembers(e.target.value); }}
                     className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
-                    {userGroupsList.map(g => <option key={g.id} value={g.groupName}>{g.groupName}</option>)}
+                    {userGroupsList.map(g => <option key={g.id} value={g.description}>{g.description}</option>)}
                   </select>
                 </div>
 
@@ -984,7 +1002,7 @@ export function SecurityManagerPage() {
                                           </button>
                                           <button
                                             onClick={() => { setEditingRowId(null); setEditedRowData(null); }}
-                                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50 flex items-center gap-1"
+                                            className="px-3 py-1 text-xs bg-red-600 text-white rounded flex items-center gap-1 hover:bg-red-700 border border-red-600"
                                           >
                                             <X className="w-3 h-3" /> Cancel
                                           </button>
@@ -1003,14 +1021,26 @@ export function SecurityManagerPage() {
                           </table>
                         </div>
                         {/* Pagination */}
-                        <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-2">
-                          <button onClick={() => currentAccessPage > 1 && handleAccessPageChange(currentAccessPage - 1)}
-                            disabled={currentAccessPage === 1}
-                            className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs disabled:opacity-50">Previous</button>
-                          {renderAccessPageNumbers()}
-                          <button onClick={() => currentAccessPage < totalFormAccessPages && handleAccessPageChange(currentAccessPage + 1)}
-                            disabled={currentAccessPage === totalFormAccessPages}
-                            className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs disabled:opacity-50">Next</button>
+                        <div className="flex items-center justify-between mt-3 px-2 pb-2">
+                          <div className="text-gray-600 text-xs">
+                            Showing {filteredFormAccess.length === 0 ? 0 : (currentAccessPage - 1) * itemsPerPage + 1} to {Math.min(currentAccessPage * itemsPerPage, filteredFormAccess.length)} of {filteredFormAccess.length} entries
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => handleAccessPageChange(Math.max(1, currentAccessPage - 1))} disabled={currentAccessPage === 1}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                            {getFormAccessPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs self-center">...</span>
+                              ) : (
+                                <button key={page} onClick={() => handleAccessPageChange(page as number)}
+                                  className={`px-2 py-1 rounded text-xs ${currentAccessPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                                  {page}
+                                </button>
+                              )
+                            ))}
+                            <button onClick={() => handleAccessPageChange(Math.min(totalFormAccessPages, currentAccessPage + 1))} disabled={currentAccessPage === totalFormAccessPages || totalFormAccessPages === 0}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                          </div>
                         </div>
                       </div>
                     </div>

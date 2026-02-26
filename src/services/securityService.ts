@@ -18,14 +18,19 @@ import type {
 } from '../types/security';
 
 const BASE = '/Security';
+//get token
+const authToken = localStorage.getItem("authToken");
 
 export const securityService = {
 
   // ── Users ──────────────────────────────────────────────────────────────────
 
   async getUsers(page = 1, pageSize = 10): Promise<PagedResult<User>> {
-    const res = await apiClient.get('/User', { params: { page, pageSize } });
-
+    const res = await apiClient.get('/User', { 
+      params: { page, pageSize },
+      headers: { Authorization: `Bearer ${authToken}` } 
+    });
+    
     // API returns a flat array or paged object
     const raw: any[] = Array.isArray(res.data) ? res.data : (res.data.data ?? []);
     const total: number = res.data.totalCount ?? raw.length;
@@ -68,7 +73,9 @@ export const securityService = {
       Suspended:             data.suspended,
       IsWindowsAuthenticate: data.isWindowsAuthenticate,
       WindowsLoginName:      data.windowsLoginName,
-    });
+    }, { 
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data;
   },
 
@@ -79,65 +86,86 @@ export const securityService = {
       Suspended:             data.suspended,
       IsWindowsAuthenticate: data.isWindowsAuthenticate,
       WindowsLoginName:      data.windowsLoginName,
-    });
+    }, { 
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res);
     return res.data;
   },
 
   async changePassword(username: string, data: ChangePasswordRequest): Promise<ApiResult> {
     const res = await apiClient.put(
       `${BASE}/SecurityManager/users/${username}/change-password`,
-      { OldPassword: data.oldPassword, NewPassword: data.newPassword }
+      { OldPassword: data.oldPassword, NewPassword: data.newPassword },
+      { headers: { Authorization: `Bearer ${authToken}` } }
     );
+    console.log('API response:', res); 
     return res.data;
   },
 
   async resetPassword(username: string, p0: { newPassword: string; }): Promise<ApiResult> {
     const res = await apiClient.put(
-      `${BASE}/SecurityManager/users/${username}/reset-password`, {}
+      `${BASE}/SecurityManager/users/${username}/reset-password`, {
+        NewPassword: p0.newPassword,
+      },
+      { headers: { Authorization: `Bearer ${authToken}` } }
     );
+    console.log('API response:', res); 
     return res.data;
   },
 
   async removeUser(username: string): Promise<ApiResult> {
-    const res = await apiClient.delete(`${BASE}/SecurityManager/users/${username}`);
+    const res = await apiClient.delete(`${BASE}/SecurityManager/users/${username}`, {
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data;
   },
 
   // ── User Groups ────────────────────────────────────────────────────────────
 
   async getUserGroups(): Promise<UserGroup[]> {
-    const res = await apiClient.get(`${BASE}/SecurityManager/groups`);
+    const res = await apiClient.get(`${BASE}/SecurityManager/groups`, { 
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data;
   },
 
   async createUserGroup(groupName: string, description?: string): Promise<UserGroup> {
     const res = await apiClient.post(`${BASE}/SecurityManager/groups`, {
       GroupName: groupName, Description: description,
-    });
+    }, { headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data;
   },
 
   async removeUserGroup(groupName: string): Promise<ApiResult> {
-    const res = await apiClient.delete(`${BASE}/SecurityManager/groups/${groupName}`);
+    const res = await apiClient.delete(`${BASE}/SecurityManager/groups/${groupName}`, {
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data;
   },
 
   // ── Group Members ──────────────────────────────────────────────────────────
 
   async getMembers(groupName: string): Promise<string[]> {
-    const res = await apiClient.get(`${BASE}/GroupMember/members/${groupName}`);
+    const res = await apiClient.get(`${BASE}/GroupMember/members/${groupName}`,
+      { headers: { Authorization: `Bearer ${authToken}` } });
+      console.log('API response:', res); 
     return res.data;
   },
 
   async getNonMembers(groupName: string): Promise<string[]> {
-    const res = await apiClient.get(`${BASE}/GroupMember/non-members/${groupName}`);
+
+    const res = await apiClient.get(`${BASE}/GroupMember/non-members/${groupName}`,
+      { headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res);  
     return res.data;
   },
 
   async updateMembers(groupName: string, usernames: string[]): Promise<ApiResult> {
-    const res = await apiClient.post(`${BASE}/GroupMember/update`, {
-      GroupName: groupName, Usernames: usernames,
-    });
+    const res = await apiClient.post(`${BASE}/GroupMember/update`, 
+      { GroupName: groupName, Usernames: usernames,}, 
+      { headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data;
   },
 
@@ -148,7 +176,9 @@ export const securityService = {
    * Call once on mount to build dynamic column headers.
    */
   async getFormAccessTypes(): Promise<FormAccessType[]> {
-    const res = await apiClient.get(`${BASE}/SecurityControl/access-types`);
+    const res = await apiClient.get(`${BASE}/SecurityControl/access-types`, { 
+      headers: { Authorization: `Bearer ${authToken}` } });
+      console.log('API response:', res); 
     return res.data.map((a: any) => ({
       id:             a.id,
       accessTypeName: a.accessTypeName,
@@ -161,7 +191,9 @@ export const securityService = {
 
   /** Returns all form definitions from tk_Forms. */
   async getForms(): Promise<Form[]> {
-    const res = await apiClient.get(`${BASE}/SecurityControl/forms`);
+    const res = await apiClient.get(`${BASE}/SecurityControl/forms`,{ 
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data.map((f: any) => ({
       id:              f.id,
       formName:        f.formName,
@@ -176,7 +208,9 @@ export const securityService = {
    * Each row's accessFlags dict is keyed by AccessTypeName → boolean.
    */
   async getGroupAccess(groupName: string): Promise<FormAccess[]> {
-    const res = await apiClient.get(`${BASE}/SecurityControl/group-access/${groupName}`);
+    const res = await apiClient.get(`${BASE}/SecurityControl/group-access/${groupName}`, {
+      headers: { Authorization: `Bearer ${authToken}` }});
+    console.log('API response:', res);
     return res.data.map((a: any) => ({
       id:          a.id,
       formName:    a.formName,
@@ -188,15 +222,18 @@ export const securityService = {
     const res = await apiClient.post(`${BASE}/SecurityControl/group-access`, {
       GroupName:   data.groupName,
       FormName:    data.formName,
-      AccessFlags: data.accessFlags,      // { CanView: bool, CanAdd: bool, ... }
-    });
+      AccessFlags: data.accessFlags,},
+    { headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res); 
     return res.data;
   },
 
   // ── Security Control — TKS Group ───────────────────────────────────────────
 
   async getTksGroups(): Promise<TKSGroup[]> {
-    const res = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+    const res = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp', {
+      headers: { Authorization: `Bearer ${authToken}` } } );
+    console.log('API response:', res);   
     return res.data.map((item: any) => ({
       id:          item.ID   || item.id,
       code:        item.groupCode        || item.code,
@@ -205,7 +242,9 @@ export const securityService = {
   },
 
   async getTksGroupAccess(groupName: string): Promise<TKSGroupAccess[]> {
-    const res = await apiClient.get(`${BASE}/SecurityControl/tks-group-access/${groupName}`);
+    const res = await apiClient.get(`${BASE}/SecurityControl/tks-group-access/${groupName}`, {
+      headers: { Authorization: `Bearer ${authToken}` }});
+    console.log('API response:', res);
     return res.data.map((a: any) => ({
       id:           a.id,
       tksGroupName: a.tksGroupName,
@@ -216,13 +255,16 @@ export const securityService = {
 
   async saveTksGroupAccess(tksGroupName: string, groupName: string): Promise<ApiResult> {
     const res = await apiClient.post(`${BASE}/SecurityControl/tks-group-access`, {
-      TksGroupName: tksGroupName, GroupName: groupName,
-    });
+      TksGroupName: tksGroupName, GroupName: groupName,}, { 
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res);
     return res.data;
   },
 
   async removeTksGroupAccess(id: number): Promise<ApiResult> {
-    const res = await apiClient.delete(`${BASE}/SecurityControl/tks-group-access/${id}`);
+    const res = await apiClient.delete(`${BASE}/SecurityControl/tks-group-access/${id}`, {
+      headers: { Authorization: `Bearer ${authToken}` } });
+    console.log('API response:', res);
     return res.data;
   },
 };
