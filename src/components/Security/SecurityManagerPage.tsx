@@ -485,9 +485,7 @@ export function SecurityManagerPage() {
     if (!passwordForm.newPassword.trim()) { showErrorModal('Please enter a new password.'); return; }
     if (passwordForm.newPassword !== passwordForm.confirmNewPassword) { showErrorModal('Passwords do not match.'); return; }
     try {
-      const res = await securityService.resetPassword(selectedUser!.username, {
-        newPassword: passwordForm.newPassword,
-      });
+      const res = await securityService.resetPassword(selectedUser!.username);
       if (res.success) { showSuccessModal(res.message); setShowResetPasswordModal(false); }
       else showErrorModal(res.message);
     } catch {
