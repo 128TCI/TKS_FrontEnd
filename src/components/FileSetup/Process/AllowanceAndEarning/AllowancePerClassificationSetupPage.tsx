@@ -138,20 +138,22 @@ export function AllowancePerClassificationSetupPage() {
         }
     };
 
-    const fetchWorkshiftCodes = async () => {
-        try {
-            const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/WorkshiftSetUp');
-            if (response.status === 200 && response.data) {
-                const mappedData = response.data.map((workshift: any) => ({
-                    code: workshift.workShiftCode || workshift.code || '',
-                    description: workshift.workShiftDesc || workshift.description || '',
-                }));
-                setWorkshiftCodes(mappedData);
-            }
-        } catch (err) {
-            console.error('Error fetching workshift codes:', err);
+   const fetchWorkshiftCodes = async () => {
+    try {
+        const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
+        if (response.status === 200 && response.data) {
+            console.log(response.data);
+            const workshifts = response.data.data;
+            const mappedData = workshifts.map((workshift: any) => ({
+                code: workshift.code || '',
+                description: workshift.description || '',
+            }));
+            setWorkshiftCodes(mappedData);
         }
-    };
+    } catch (err) {
+        console.error('Error fetching workshift codes:', err);
+    }
+};
 
     const fetchClassificationCodes = async () => {
         try {

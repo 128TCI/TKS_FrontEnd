@@ -25,7 +25,7 @@ export function DailyScheduleSearchModal({
   isOpen,
   onClose,
   onSelect,
-  dailySchedules,
+  dailySchedules = [],
   loading
 }: DailyScheduleSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,7 +38,7 @@ export function DailyScheduleSearchModal({
 
   if (!isOpen) return null;
 
-  const filteredSchedules = dailySchedules.filter(schedule =>
+  const filteredSchedules = (Array.isArray(dailySchedules) ? dailySchedules : []).filter(schedule =>
     (schedule.referenceNo?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
@@ -92,7 +92,7 @@ export function DailyScheduleSearchModal({
                       </tr>
                     ) : (
                       filteredSchedules.map((schedule) => (
-                        <tr 
+                        <tr
                           key={schedule.dailyScheduleID}
                           className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
                           onClick={() => {
