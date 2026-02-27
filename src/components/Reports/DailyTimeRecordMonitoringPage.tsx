@@ -28,6 +28,8 @@ interface ReportFilter {
   company: string | null
   address: string | null
   userName: string
+  mode: string
+  activeInActiveAll: string
 }
 
 interface LeaveAbsencesFilter {
@@ -78,8 +80,8 @@ interface EmployeeReport {
 }
 
 export function DailyTimeRecordMonitoringPage() {
-  const [dateFrom, setDateFrom] = useState('05/01/2021');
-  const [dateTo, setDateTo] = useState('05/15/2021');
+  const [dateFrom, setDateFrom] = useState('05/24/2021');
+  const [dateTo, setDateTo] = useState('05/24/2021');
   const [empCode, setEmpCode] = useState('');
   const [empName, setEmpName] = useState('');
   const [searchModalTerm, setSearchModalTerm] = useState('');
@@ -109,9 +111,12 @@ export function DailyTimeRecordMonitoringPage() {
   const [includeLeaveAdj, setIncludeLeaveAdj] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<'1' | '0' | ''>('1');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [empStatus, setEmpStatus] = useState<'Active' |'InActive'| 'All'>('Active');
   const [status, setStatus] = useState<'Active' |'InActive'| 'All'>('All');
   const [mode, setMode] = useState<'Absences' |'Leave'| 'All'>('All');
+  const [hrsOptions, setHrsOptions] = useState<'Per Employee' | 'Summary'>('Per Employee');
+  const [dataMode, setDataMode] = useState('CompleteLogs');
   const [withOrWOutPay, setWithOrWOutPay] = useState<'WithPay' |'WithOutPay'| 'All'>('All');
   const itemsPerPage = 10;
   const [selectedLeaveType, setSelectedLeaveType] = useState('');
@@ -362,7 +367,9 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
     company: "",
     address: "",
-    userName: "128TCI"
+    userName: "128TCI",
+    mode: dataMode,
+    activeInActiveAll: empStatus
   };
 
   const leaveAbsenceFilter: LeaveAbsencesFilter = {
@@ -407,6 +414,16 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     if(reportType === "Attendance Summary"){
       try{      
         const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
         const response = await apiClient.get(`/AttendanceSummary/PrintAttendanceSummary?${query}`, {
           responseType: 'blob'
         });
@@ -429,6 +446,16 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     else if(reportType === "Daily Time"){
       try{      
         const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
         const response = await apiClient.get(`/DailyTimeReport/PrintDailyTimeReport?${query}`, {
           responseType: 'blob'
         });
@@ -451,6 +478,16 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     else if(reportType === "Employees Raw In And Out (From Update Rawdata)"){
       try{      
         const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
         const response = await apiClient.get(`/EmployeeRawInAndOut/PrintEmployeeRawInAndOut?${query}`, {
           responseType: 'blob'
         });
@@ -552,6 +589,166 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         });
         console.log(response.headers);
         const fileName = "LeaveReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Device Code Report"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/DeviceCodeReport/PrintDeviceCodeReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "DeviceCodeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Employees Raw Data Report"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/EmployeeRawDataReport/PrintEmployeeRawDataReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "EmployeeRawDataReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "In And Out By Position"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/InOutByPositionReport/PrintInOutByPositionReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "EmployeesInAndOutReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Man Hours" && hrsOptions === "Per Employee"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ManHoursReport/PrintManHoursPerEmployee?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "ManHoursPerEmployeeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Man Hours" && hrsOptions === "Summary"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ManHoursReport/PrintManHoursSummary?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "ManHoursSummaryReport.xlsx";
         const mimeType = response.headers['content-type']
         const blob = new Blob([response.data], { type: mimeType });
         fileLinkCreate(blob, fileName)
@@ -1248,9 +1445,9 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             <input
                               type="radio"
                               name="status"
-                              value="1"
-                              checked={filterStatus === '1'}
-                              onChange={(e) => setFilterStatus(e.target.value as '1' | '0' | '')}
+                              value="Active"
+                              checked={empStatus === 'Active'}
+                              onChange={(e) => setEmpStatus(e.target.value as 'Active' | 'InActive' | 'All')}
                               className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-gray-700">Active</span>
@@ -1259,9 +1456,9 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             <input
                               type="radio"
                               name="status"
-                              value="0"
-                              checked={filterStatus === '0'}
-                              onChange={(e) => setFilterStatus(e.target.value as '1' | '0' | '')}
+                              value="InActive"
+                              checked={empStatus === 'InActive'}
+                              onChange={(e) => setEmpStatus(e.target.value as 'Active' | 'InActive' | 'All')}
                               className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-gray-700">In Active</span>
@@ -1270,9 +1467,9 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             <input
                               type="radio"
                               name="status"
-                              value=""
-                              checked={filterStatus === ''}
-                              onChange={(e) => setFilterStatus(e.target.value as '1' | '0' | '')}
+                              value="All"
+                              checked={empStatus === 'All'}
+                              onChange={(e) => setEmpStatus(e.target.value as 'Active' | 'InActive' | 'All')}
                               className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-gray-700">All</span>
@@ -1476,7 +1673,10 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           />
                           <span className="text-gray-700">To Excel File</span>
                         </label>)} */}
-                        <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                        {["Leave And Absences", "Daily Time", "Attendance Summary", "Adjustment", "Assumed Days", "Overtime",
+                          "Tardiness", "Unauthorized Absences", "Undertime"
+                        ].includes(reportType) 
+                        &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
                           <input
                             type="checkbox"
                             checked={convertToHHMM}
@@ -1484,7 +1684,47 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                           />
                           <span className="text-gray-700">Convert To HH:MM</span>
-                        </label>
+                        </label>)}
+                        {/*Man Hours Options*/}
+                        {reportType == "Man Hours" &&(<div>
+                        <span>Options</span>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="hrsOption"
+                                value="Per Employee"
+                                checked={hrsOptions === 'Per Employee'}
+                                onChange={(e) => setHrsOptions(e.target.value as 'Per Employee' | 'Summary')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Per Employee</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="hrsOption"
+                                value="Summary"
+                                checked={hrsOptions === 'Summary'}
+                                onChange={(e) => setHrsOptions(e.target.value as 'Per Employee' | 'Summary')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Summary</span>
+                            </label>
+                          </div>
+                        </div>)}
+                        {reportType == "Employees Raw Data Report" &&(<div>
+                          <label className="block text-gray-700 text-sm mb-2">Raw Data Type:</label>
+                          <select
+                          value={dataMode}
+                          onChange={(e) => setDataMode(e.target.value)}
+                          className="mb-4 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          
+                          <option value="CompleteLogs">Complete Logs</option>
+                          <option value="IncompleteLogs">Incomplete Logs</option>
+                        </select>
+                        </div>)}
                         {reportType == "Leave And Absences" &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
                           <input
                             type="checkbox"
