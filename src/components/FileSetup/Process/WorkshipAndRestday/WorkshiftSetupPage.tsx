@@ -10,8 +10,87 @@ import { WorkshiftFormModal, normalizeWorkshiftForForm } from '../../../Modals/W
 import { WorkshiftDetailsModal } from '../../../Modals/WorkshiftSetupModals/WorkshiftSetupDetailsModal';
 
 const formName = 'Workshift SetUp';
+const ITEMS_PER_PAGE = 10;
 
-const ITEMS_PER_PAGE = 25;
+// ── Pagination ─────────────────────────────────────────────────────────────
+function Pagination({
+    currentPage,
+    totalCount,
+    pageSize,
+    onPageChange,
+}: {
+    currentPage:  number;
+    totalCount:   number;
+    pageSize:     number;
+    onPageChange: (page: number) => void;
+}) {
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex   = Math.min(startIndex + pageSize, totalCount);
+
+    const getPageNumbers = () => {
+        const pages: (number | string)[] = [];
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else if (currentPage <= 4) {
+            for (let i = 1; i <= 5; i++) pages.push(i);
+            pages.push('...');
+            pages.push(totalPages);
+        } else if (currentPage >= totalPages - 3) {
+            pages.push(1);
+            pages.push('...');
+            for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            pages.push('...');
+            for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+            pages.push('...');
+            pages.push(totalPages);
+        }
+        return pages;
+    };
+
+    return (
+        <div className="flex items-center justify-between mt-3 px-2 pb-2">
+            <div className="text-gray-600 text-sm">
+                Showing {totalCount === 0 ? 0 : startIndex + 1} to {endIndex} of {totalCount}
+            </div>
+            <div className="flex gap-1">
+                <button
+                    onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50"
+                >
+                    Previous
+                </button>
+                {getPageNumbers().map((page, idx) =>
+                    page === '...' ? (
+                        <span key={idx} className="px-2 text-sm">...</span>
+                    ) : (
+                        <button
+                            key={page}
+                            onClick={() => onPageChange(page as number)}
+                            className={`px-3 py-1 text-sm rounded ${
+                                currentPage === page
+                                    ? 'bg-blue-600 text-white'
+                                    : 'border hover:bg-gray-100'
+                            }`}
+                        >
+                            {page}
+                        </button>
+                    )
+                )}
+                <button
+                    onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50"
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    );
+}
 
 export function WorkshiftSetupPage() {
   // ── State ────────────────────────────────────────────────────────────────
@@ -279,30 +358,12 @@ export function WorkshiftSetupPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between mt-4 text-sm">
-              <span className="text-gray-500">
-                Showing {filteredData.length === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filteredData.length)} of {filteredData.length} entries
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded">
-                  {currentPage}
-                </button>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <Pagination
+                currentPage={currentPage}
+                totalCount={filteredData.length}
+                pageSize={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+            />
 
           </div>
         </div>
