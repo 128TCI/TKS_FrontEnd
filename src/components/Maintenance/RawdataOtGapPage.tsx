@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Plus, Check, Calendar, Edit, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
@@ -36,9 +37,8 @@ interface WorkShift {
 
 // ─── API Endpoints ────────────────────────────────────────────────────────────
 
-const OT_GAP_BASE_URL    = '/Maintenance/EmployeeRawDataOTGap';
+const OT_GAP_BASE_URL     = '/Maintenance/EmployeeRawDataOTGap';
 const EMPLOYEE_MASTER_URL = '/Maintenance/EmployeeMasterFile';
-const WORKSHIFT_BASE_URL  = '/Maintenance/WorkShift';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -144,8 +144,8 @@ export function RawdataOtGapPage() {
 
     // ── Sorting ──
     type SortKey = 'empCode' | 'empName' | 'workShiftCode' | 'actualDateIn' | 'dateIn' | 'timeIn' | 'dateOut' | 'timeOut' | 'dayType' | 'otGap';
-    const [sortKey, setSortKey]         = useState<SortKey>('empCode');
-    const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('asc');
+    const [sortKey, setSortKey] = useState<SortKey>('empCode');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -182,10 +182,10 @@ export function RawdataOtGapPage() {
     const [showTimeOutPicker,        setShowTimeOutPicker]        = useState(false);
 
     // ── Employee modal (form) ──
-    const [showEmpCodeModal, setShowEmpCodeModal]   = useState(false);
-    const [employeeData,     setEmployeeData]       = useState<EmployeeData[]>([]);
-    const [loadingEmployees, setLoadingEmployees]   = useState(false);
-    const [employeeError,    setEmployeeError]      = useState('');
+    const [showEmpCodeModal, setShowEmpCodeModal] = useState(false);
+    const [employeeData,     setEmployeeData]     = useState<EmployeeData[]>([]);
+    const [loadingEmployees, setLoadingEmployees] = useState(false);
+    const [employeeError,    setEmployeeError]    = useState('');
 
     // ── Workshift modal ──
     const [showWorkshiftModal,  setShowWorkshiftModal]  = useState(false);
@@ -267,18 +267,19 @@ export function RawdataOtGapPage() {
         setLoadingWorkshifts(true);
         setWorkshiftError('');
         try {
-            const response = await apiClient.get(WORKSHIFT_BASE_URL);
+            const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
             if (response.status === 200 && response.data) {
-                const data = Array.isArray(response.data) ? response.data : [];
-                setWorkshifts(data.map((w: any) => ({
-                    code:        w.code || w.workShiftCode || w.workshiftCode || '',
-                    description: w.description || w.workShiftDescription || '',
-                })));
+                const workshifts = response.data.data || [];
+                const mappedData = workshifts.map((w: any) => ({
+                    code: w.code || '',
+                    description: w.description || '',
+                }));
+                setWorkshifts(mappedData);
             }
         } catch (error: any) {
             const msg = error.response?.data?.message || error.message || 'Failed to load workshifts';
             setWorkshiftError(msg);
-            console.error('Error fetching workshifts:', error);
+            console.error('Error fetching workshift codes:', error);
         } finally {
             setLoadingWorkshifts(false);
         }
@@ -334,11 +335,11 @@ export function RawdataOtGapPage() {
 
         setWorkshiftCode(record.workShiftCode);
 
-        const adi  = fromISO(record.actualDateIn);
-        const di   = fromISO(record.dateIn);
-        const ti   = fromISO(record.timeIn);
-        const doD  = fromISO(record.dateOut);
-        const tot  = fromISO(record.timeOut);
+        const adi = fromISO(record.actualDateIn);
+        const di  = fromISO(record.dateIn);
+        const ti  = fromISO(record.timeIn);
+        const doD = fromISO(record.dateOut);
+        const tot = fromISO(record.timeOut);
 
         setActualDateIn(adi.date);
         setDateIn(di.date);
@@ -394,6 +395,7 @@ export function RawdataOtGapPage() {
     const handleWorkshiftSelect = (code: string) => {
         setWorkshiftCode(code);
         setShowWorkshiftModal(false);
+        setWorkshiftSearchTerm('');
     };
 
     const filteredWorkshifts = workshifts.filter(ws =>
@@ -416,7 +418,7 @@ export function RawdataOtGapPage() {
             if (e.key !== 'Escape') return;
             if (showEmpCodeModal)      { setShowEmpCodeModal(false);      return; }
             if (showSpecificEmpModal)  { setShowSpecificEmpModal(false);  return; }
-            if (showWorkshiftModal)    { setShowWorkshiftModal(false);    return; }
+            if (showWorkshiftModal)    { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); return; }
             if (showCreateModal)       { setShowCreateModal(false);       return; }
             setShowDateFromCalendar(false);
             setShowDateToCalendar(false);
@@ -431,7 +433,7 @@ export function RawdataOtGapPage() {
     }, [showEmpCodeModal, showSpecificEmpModal, showWorkshiftModal, showCreateModal]);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // JSX
+    // JSX HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
     const SortIcon = ({ col }: { col: SortKey }) => {
@@ -475,6 +477,10 @@ export function RawdataOtGapPage() {
         if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
         return 0;
     });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────────────────────────────────
 
     return (
         <div className="min-h-screen bg-white flex flex-col">
@@ -826,22 +832,23 @@ export function RawdataOtGapPage() {
                                             </div>
 
                                             {/* ── Workshift Code ── */}
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-3">
                                                 <label className="w-36 text-gray-700 text-sm flex-shrink-0">Workshift Code :</label>
                                                 <input
                                                     type="text" value={workshiftCode} readOnly
                                                     placeholder="Select workshift..."
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-gray-50"
+                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-gray-50 cursor-pointer"
+                                                    onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }}
                                                 />
                                                 <button
                                                     onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }}
-                                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex-shrink-0"
+                                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"
                                                 >
                                                     <Search className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => setWorkshiftCode('')}
-                                                    className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex-shrink-0"
+                                                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
                                                 >
                                                     <X className="w-4 h-4" />
                                                 </button>
@@ -1054,78 +1061,95 @@ export function RawdataOtGapPage() {
                             error={employeeError}
                         />
 
-                        {/* ══════════════════════════════════════════════════════════
-                            WORKSHIFT SEARCH MODAL
-                        ══════════════════════════════════════════════════════════ */}
-                        {showWorkshiftModal && (
-                            <>
-                                <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowWorkshiftModal(false)} />
-                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-                                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-                                        <div className="bg-gray-100 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between rounded-t-lg">
-                                            <h2 className="text-gray-800 font-medium text-sm">Search – Workshift Code</h2>
-                                            <button onClick={() => setShowWorkshiftModal(false)} className="text-gray-500 hover:text-gray-700">
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="p-4 flex flex-col flex-1 overflow-hidden">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <Search className="w-4 h-4 text-gray-400" />
-                                                <input
-                                                    type="text" value={workshiftSearchTerm} autoFocus
-                                                    onChange={e => setWorkshiftSearchTerm(e.target.value)}
-                                                    placeholder="Search workshifts..."
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                                />
-                                            </div>
-                                            {workshiftError && (
-                                                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
-                                                    <AlertCircle className="w-4 h-4" /> {workshiftError}
-                                                </div>
-                                            )}
-                                            <div className="flex-1 overflow-y-auto border border-gray-200 rounded">
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead className="sticky top-0 bg-white">
-                                                        <tr className="bg-gray-50 border-b-2 border-gray-200">
-                                                            <th className="px-3 py-2 text-left text-gray-700">Code ▲</th>
-                                                            <th className="px-3 py-2 text-left text-gray-700">Description</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {loadingWorkshifts ? (
-                                                            <tr>
-                                                                <td colSpan={2} className="px-4 py-6 text-center text-gray-500">
-                                                                    <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
-                                                                </td>
-                                                            </tr>
-                                                        ) : filteredWorkshifts.length === 0 ? (
-                                                            <tr>
-                                                                <td colSpan={2} className="px-4 py-6 text-center text-gray-500">No workshifts found</td>
-                                                            </tr>
-                                                        ) : (
-                                                            filteredWorkshifts.map(ws => (
-                                                                <tr
-                                                                    key={ws.code}
-                                                                    className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"
-                                                                    onClick={() => handleWorkshiftSelect(ws.code)}
-                                                                >
-                                                                    <td className="px-3 py-2 font-mono font-medium">{ws.code}</td>
-                                                                    <td className="px-3 py-2">{ws.description}</td>
-                                                                </tr>
-                                                            ))
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
                     </div>{/* /Content Container */}
                 </div>
             </div>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                WORKSHIFT SEARCH MODAL — portaled to document.body
+                Fully escapes the main modal's stacking context so it always
+                renders on top regardless of parent z-index / transform.
+            ══════════════════════════════════════════════════════════════════ */}
+            {showWorkshiftModal && createPortal(
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/40"
+                        style={{ zIndex: 99998 }}
+                        onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }}
+                    />
+                    <div
+                        className="fixed inset-0 flex items-center justify-center p-4"
+                        style={{ zIndex: 99999 }}
+                    >
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+                            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+                                <h2 className="text-gray-800 text-sm font-semibold">Search</h2>
+                                <button
+                                    onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }}
+                                    className="text-gray-600 hover:text-gray-800"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm font-semibold">Workshift Code</h3>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={workshiftSearchTerm}
+                                        onChange={e => setWorkshiftSearchTerm(e.target.value)}
+                                        autoFocus
+                                        placeholder="Type to filter..."
+                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    />
+                                </div>
+                                {workshiftError && (
+                                    <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" /> {workshiftError}
+                                    </div>
+                                )}
+                                <div className="border border-gray-200 rounded overflow-hidden" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    <table className="w-full border-collapse text-sm">
+                                        <thead className="sticky top-0 bg-white z-10">
+                                            <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                                <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Code</th>
+                                                <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {loadingWorkshifts ? (
+                                                <tr>
+                                                    <td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic">
+                                                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
+                                                    </td>
+                                                </tr>
+                                            ) : filteredWorkshifts.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td>
+                                                </tr>
+                                            ) : (
+                                                filteredWorkshifts.map(ws => (
+                                                    <tr
+                                                        key={ws.code}
+                                                        className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                                        onClick={() => handleWorkshiftSelect(ws.code)}
+                                                    >
+                                                        <td className="px-3 py-1.5 text-gray-900 font-medium">{ws.code}</td>
+                                                        <td className="px-3 py-1.5 text-gray-600">{ws.description}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>,
+                document.body
+            )}
+
             <Footer />
         </div>
     );

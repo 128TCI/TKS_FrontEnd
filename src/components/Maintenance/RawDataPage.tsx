@@ -6,6 +6,7 @@ import { Footer } from '../Footer/Footer';
 import apiClient from '../../services/apiClient';
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
 import { TimePicker } from '../Modals/TimePickerModal';
+import Swal from 'sweetalert2';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -375,70 +376,115 @@ export function RawDataPage() {
     // CRUD
     // ─────────────────────────────────────────────────────────────────────────
 
-    const handleSubmit = async () => {
-        if (!empCode.trim()) {
-            setFormError('Please select an Employee Code.');
-            return;
-        }
-        if (!dateIn.trim()) {
-            setFormError('Date In is required.');
-            return;
-        }
-        setFormError('');
-        setSubmitLoading(true);
+const handleSubmit = async () => {
+    if (!empCode.trim()) {
+        setFormError('Please select an Employee Code.');
+        return;
+    }
+    if (!dateIn.trim()) {
+        setFormError('Date In is required.');
+        return;
+    }
+    setFormError('');
+    setSubmitLoading(true);
 
-        const payload: Omit<RawDataEntry, 'id'> & { id?: number } = {
-            empCode,
-            workShiftCode: workshiftCode,
-            dayType: 'Regular',
-            rawDateIn: toISOSafe(dateIn),
-            rawTimeIn: toISOSafe(dateIn, timeIn),
-            actualDateIn: toISOSafe(actualDateIn || dateIn),
-            actualTimeIn2: toISOSafe(actualDateIn || dateIn, actualTimeIn),
-            rawBreak1Out: toISOSafe(dateIn, break1Out),
-            rawBreak1In: toISOSafe(dateIn, break1In),
-            rawBreak2Out: toISOSafe(dateIn, break2Out),
-            rawBreak2In: toISOSafe(dateIn, break2In),
-            rawBreak3Out: toISOSafe(dateIn, break3Out),
-            rawBreak3In: toISOSafe(dateIn, break3In),
-            rawDateOut: toISOSafe(dateOut || dateIn),
-            rawTimeOut: toISOSafe(dateOut || dateIn, timeOut),
-            rawotApproved: otApproved,
-            rawRemarks: remarks,
-            isLateFiling,
-            bDeviceName: borrowedDeviceName,
-            rawTardiness: false, rawUndertime: false, rawOT: false,
-            rawNightDiff: false, rawOtherEarnings: false, rawUnproductive: false,
-            rawDisplDateFrom: toISOSafe(dateFrom),
-            rawDisplDateTo: toISOSafe(dateTo),
-            isSuspended: false, rawNoofDays: false,
-            dayType2: '', actualDateIn2: '', entryFlag: '',
-            terminalID: '', dayTypeDOLE: '',
-            aprOTTime: '', deviceNameIn: '', deviceNameOut: '',
-            isLateFilingProcessed: false,
-            post_Tardy: false, post_UT: false, post_OT: false,
-            post_Earn: false, post_ND: false, post_NoOfDays: false,
-            otAppApprovalFlag: false, sdWorkShiftCodeFlag: false, flexiBreakFlag: false,
-        };
-
-        try {
-            if (editingId !== null) {
-                await apiClient.put(`${RAW_DATA_BASE_URL}/${editingId}`, { ...payload, id: editingId });
-            } else {
-                await apiClient.post(RAW_DATA_BASE_URL, payload);
-            }
-            setShowCreateModal(false);
-            setEditingId(null);
-            await fetchRawData();
-        } catch (error: any) {
-            const msg = error.response?.data?.message || error.message || 'Failed to save entry';
-            setFormError(msg);
-            console.error('Error saving raw data:', error);
-        } finally {
-            setSubmitLoading(false);
-        }
+    const dtoPayload = {
+        id: editingId ?? 0,
+        empCode,
+        workShiftCode: workshiftCode,
+        dayType: 'Regular',
+        rawDateIn: toISOSafe(dateIn),
+        rawTimeIn: toISOSafe(dateIn, timeIn),
+        actualDateIn: toISOSafe(actualDateIn || dateIn),
+        actualDateIn2: toISOSafe(dateIn),
+        actualTimeIn2: toISOSafe(actualDateIn || dateIn, actualTimeIn),
+        rawBreak1Out: toISOSafe(dateIn, break1Out),
+        rawBreak1In: toISOSafe(dateIn, break1In),
+        rawBreak2Out: toISOSafe(dateIn, break2Out),
+        rawBreak2In: toISOSafe(dateIn, break2In),
+        rawBreak3Out: toISOSafe(dateIn, break3Out),
+        rawBreak3In: toISOSafe(dateIn, break3In),
+        rawDateOut: toISOSafe(dateOut || dateIn),
+        rawTimeOut: toISOSafe(dateOut || dateIn, timeOut),
+        rAWOTApproved: otApproved,
+        rawRemarks: remarks,
+        isLateFiling,
+        bDeviceName: borrowedDeviceName,
+        rawTardiness: false,
+        rawUndertime: false,
+        rawOT: false,
+        rawNightDiff: false,
+        rawOtherEarnings: false,
+        rawUnproductive: false,
+        rawDisplDateFrom: toISOSafe(dateFrom),
+        rawDisplDateTo: toISOSafe(dateTo),
+        isSuspended: false,
+        rawNoofDays: false,
+        dayType2: '',
+        entryFlag: '',
+        terminalID: '',
+        dayTypeDOLE: '',
+        aprOTTime: toISOSafe(dateIn),
+        deviceNameIn: '',
+        deviceNameOut: '',
+        isLateFilingProcessed: false,
+        post_Tardy: false,
+        post_UT: false,
+        post_OT: false,
+        post_Earn: false,
+        post_ND: false,
+        post_NoOfDays: false,
+        oTAppApprovalFlag: false,
+        sDWorkShiftCodeFlag: false,
+        flexiBreakFlag: false,
     };
 
+    try {
+        if (editingId !== null) {
+            // UPDATE — no wrapper, flat payload
+            await apiClient.put(`${RAW_DATA_BASE_URL}/${editingId}`, {
+                ...dtoPayload,
+                id: editingId,
+            });
+        } else {
+            // CREATE — no wrapper, flat payload
+            await apiClient.post(RAW_DATA_BASE_URL, dtoPayload);
+        }
+
+        await Swal.fire({
+            icon: 'success',
+            title: editingId !== null ? 'Updated Successfully' : 'Created Successfully',
+            text: editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
+            timer: 2000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+        });
+
+        setShowCreateModal(false);
+        setEditingId(null);
+        await fetchRawData();
+
+    } catch (error: any) {
+        const backendMsg =
+            error.response?.data?.message ||
+            error.response?.data?.title ||
+            error.message ||
+            'Something went wrong. Please try again.';
+
+        await Swal.fire({
+            icon: 'error',
+            title: editingId !== null ? 'Update Failed' : 'Create Failed',
+            text: backendMsg,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Close',
+        });
+
+        setFormError(backendMsg);
+        console.error('Error saving raw data:', error);
+    } finally {
+        setSubmitLoading(false);
+    }
+};
     const handleEdit = (entry: RawDataEntry) => {
         setEditingId(entry.id);
         setEmpCode(entry.empCode);
@@ -477,17 +523,43 @@ export function RawDataPage() {
         setShowCreateModal(true);
     };
 
-    const handleDelete = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this entry?')) return;
-        try {
-            await apiClient.delete(`${RAW_DATA_BASE_URL}/${id}`);
-            setRawDataList(prev => prev.filter(e => e.id !== id));
-        } catch (error: any) {
-            const msg = error.response?.data?.message || error.message || 'Failed to delete entry';
-            alert(msg);
-            console.error('Error deleting raw data:', error);
-        }
-    };
+const handleDelete = async (id: number) => {
+    const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Are you sure?',
+        text: 'This entry will be permanently deleted.',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it',
+        cancelButtonText: 'Cancel',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        await apiClient.delete(`${RAW_DATA_BASE_URL}/${id}`);
+        setRawDataList(prev => prev.filter(e => e.id !== id));
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Deleted',
+            text: 'The entry has been deleted.',
+            timer: 1500,
+            timerProgressBar: true,
+            showConfirmButton: false,
+        });
+    } catch (error: any) {
+        const msg = error.response?.data?.message || error.message || 'Failed to delete entry';
+        await Swal.fire({
+            icon: 'error',
+            title: 'Delete Failed',
+            text: msg,
+            confirmButtonColor: '#d33',
+        });
+        console.error('Error deleting raw data:', error);
+    }
+};
 
     const handleCreateNew = () => {
         setEditingId(null);

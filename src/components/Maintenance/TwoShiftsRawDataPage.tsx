@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Search, X, Check, Calendar, Edit, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { CalendarPopup } from '../CalendarPopup';
 
@@ -78,7 +79,7 @@ interface EmployeeData {
 
 const TWO_SHIFTS_BASE_URL = '/Maintenance/Employee2ShiftsInADayRawData';
 const DEVICE_BASE_URL = '/Fs/Process/Device/BorrowedDeviceName';
-const WORKSHIFT_BASE_URL = '/Maintenance/WorkShift';
+const WORKSHIFT_BASE_URL = '/Fs/Process/WorkshiftSetUp';
 const EMPLOYEE_MASTER_URL = '/Maintenance/EmployeeMasterFile';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -302,16 +303,17 @@ export function TwoShiftsRawDataPage() {
         }
     }, []);
 
+    // ── Updated to match RawDataPage: uses /Fs/Process/WorkshiftSetUp and response.data.data ──
     const fetchWorkshifts = useCallback(async () => {
         setLoadingWorkshifts(true);
         setWorkshiftError('');
         try {
             const response = await apiClient.get(WORKSHIFT_BASE_URL);
             if (response.status === 200 && response.data) {
-                const data = Array.isArray(response.data) ? response.data : [];
+                const data = response.data.data || [];
                 setWorkshifts(data.map((w: any) => ({
-                    code: w.code || w.workShiftCode || w.workshiftCode || '',
-                    description: w.description || w.workShiftDescription || '',
+                    code: w.code || '',
+                    description: w.description || '',
                 })));
             }
         } catch (error: any) {
@@ -509,11 +511,13 @@ export function TwoShiftsRawDataPage() {
     const handleWorkshiftSelect = (code: string) => {
         setWorkshiftCode(code);
         setShowWorkshiftModal(false);
+        setWorkshiftSearchTerm('');
     };
 
     const handleDeviceSelect = (desc: string) => {
         setBorrowedDeviceName(desc);
         setShowDeviceModal(false);
+        setDeviceSearchTerm('');
     };
 
     const filteredWorkshifts = workshifts.filter(ws =>
@@ -557,8 +561,8 @@ export function TwoShiftsRawDataPage() {
             if (e.key !== 'Escape') return;
             if (showEmpCodeModal) { setShowEmpCodeModal(false); return; }
             if (showSpecificEmpModal) { setShowSpecificEmpModal(false); return; }
-            if (showWorkshiftModal) { setShowWorkshiftModal(false); return; }
-            if (showDeviceModal) { setShowDeviceModal(false); return; }
+            if (showWorkshiftModal) { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); return; }
+            if (showDeviceModal) { setShowDeviceModal(false); setDeviceSearchTerm(''); return; }
             if (showCreateModal) { setShowCreateModal(false); return; }
             setShowDateFromCalendar(false);
             setShowDateToCalendar(false);
@@ -1005,21 +1009,30 @@ export function TwoShiftsRawDataPage() {
                                                     </button>
                                                 </div>
 
-                                                {/* Workshift Code */}
+                                                {/* Workshift Code — updated to match RawDataPage */}
                                                 <div className="flex items-center gap-3">
                                                     <label className="w-40 text-gray-700 text-sm">Workshift Code :</label>
                                                     <input
                                                         type="text"
                                                         value={workshiftCode}
                                                         readOnly
-                                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50"
+                                                        placeholder="Select workshift..."
+                                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50 cursor-pointer"
+                                                        onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }}
                                                     />
                                                     <button
-                                                        onClick={() => setShowWorkshiftModal(true)}
+                                                        onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }}
                                                         className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                                         title="Search Workshift"
                                                     >
                                                         <Search className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setWorkshiftCode('')}
+                                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                                        title="Clear Workshift"
+                                                    >
+                                                        <X className="w-4 h-4" />
                                                     </button>
                                                     <button className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm">
                                                         Get Shift
@@ -1383,10 +1396,12 @@ export function TwoShiftsRawDataPage() {
                                                         type="text"
                                                         value={borrowedDeviceName}
                                                         readOnly
-                                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50"
+                                                        placeholder="Select device..."
+                                                        onClick={() => { setDeviceSearchTerm(''); setShowDeviceModal(true); }}
+                                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50 cursor-pointer"
                                                     />
                                                     <button
-                                                        onClick={() => setShowDeviceModal(true)}
+                                                        onClick={() => { setDeviceSearchTerm(''); setShowDeviceModal(true); }}
                                                         className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                                         title="Search Device"
                                                     >
@@ -1438,146 +1453,6 @@ export function TwoShiftsRawDataPage() {
                             error={employeeError}
                         />
 
-                        {/* ══════════════════════════════════════════════════════════
-                            WORKSHIFT SEARCH MODAL
-                        ══════════════════════════════════════════════════════════ */}
-                        {showWorkshiftModal && (
-                            <>
-                                <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowWorkshiftModal(false)} />
-                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-                                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                                        <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                                            <h2 className="text-gray-800 text-sm">Search</h2>
-                                            <button onClick={() => setShowWorkshiftModal(false)} className="text-gray-600 hover:text-gray-800">
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="p-3">
-                                            <h3 className="text-blue-600 mb-2 text-sm">Workshift Code</h3>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <label className="text-gray-700 text-sm">Search:</label>
-                                                <input
-                                                    type="text"
-                                                    value={workshiftSearchTerm}
-                                                    onChange={(e) => setWorkshiftSearchTerm(e.target.value)}
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                />
-                                            </div>
-                                            {workshiftError && (
-                                                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
-                                                    <AlertCircle className="w-4 h-4" /> {workshiftError}
-                                                </div>
-                                            )}
-                                            <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead className="sticky top-0 bg-white">
-                                                        <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                                            <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Code ▲</th>
-                                                            <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Description</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {loadingWorkshifts ? (
-                                                            <tr>
-                                                                <td colSpan={2} className="px-4 py-6 text-center text-gray-500">
-                                                                    <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
-                                                                </td>
-                                                            </tr>
-                                                        ) : filteredWorkshifts.length === 0 ? (
-                                                            <tr>
-                                                                <td colSpan={2} className="px-4 py-6 text-center text-gray-500">No workshifts found</td>
-                                                            </tr>
-                                                        ) : (
-                                                            filteredWorkshifts.map((ws, index) => (
-                                                                <tr
-                                                                    key={ws.code}
-                                                                    className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                                                    onClick={() => handleWorkshiftSelect(ws.code)}
-                                                                >
-                                                                    <td className="px-3 py-1.5">{ws.code}</td>
-                                                                    <td className="px-3 py-1.5">{ws.description}</td>
-                                                                </tr>
-                                                            ))
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        {/* ══════════════════════════════════════════════════════════
-                            DEVICE SEARCH MODAL
-                        ══════════════════════════════════════════════════════════ */}
-                        {showDeviceModal && (
-                            <>
-                                <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowDeviceModal(false)} />
-                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-                                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                                        <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                                            <h2 className="text-gray-800 text-sm">Search</h2>
-                                            <button onClick={() => setShowDeviceModal(false)} className="text-gray-600 hover:text-gray-800">
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="p-3">
-                                            <h3 className="text-blue-600 mb-2 text-sm">Device Name</h3>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <label className="text-gray-700 text-sm">Search:</label>
-                                                <input
-                                                    type="text"
-                                                    value={deviceSearchTerm}
-                                                    onChange={(e) => setDeviceSearchTerm(e.target.value)}
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                />
-                                            </div>
-                                            {deviceError && (
-                                                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
-                                                    <AlertCircle className="w-4 h-4" /> {deviceError}
-                                                </div>
-                                            )}
-                                            <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead className="sticky top-0 bg-white">
-                                                        <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                                            <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Device Code ▲</th>
-                                                            <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Device Name</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {loadingDevices ? (
-                                                            <tr>
-                                                                <td colSpan={2} className="px-4 py-6 text-center text-gray-500">
-                                                                    <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
-                                                                </td>
-                                                            </tr>
-                                                        ) : filteredDevices.length === 0 ? (
-                                                            <tr>
-                                                                <td colSpan={2} className="px-4 py-6 text-center text-gray-500">No devices found</td>
-                                                            </tr>
-                                                        ) : (
-                                                            filteredDevices.map((device, index) => (
-                                                                <tr
-                                                                    key={device.id}
-                                                                    className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                                                    onClick={() => handleDeviceSelect(device.description)}
-                                                                >
-                                                                    <td className="px-3 py-1.5">{device.code}</td>
-                                                                    <td className="px-3 py-1.5">{device.description}</td>
-                                                                </tr>
-                                                            ))
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
                         {/* ── Employee Search Modal (Specific filter) ── */}
                         <EmployeeSearchModal
                             isOpen={showSpecificEmpModal}
@@ -1594,6 +1469,175 @@ export function TwoShiftsRawDataPage() {
                     </div>
                 </div>
             </div>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                WORKSHIFT SEARCH MODAL — portaled to document.body
+                Fully escapes the main modal's stacking context so it always
+                renders on top regardless of parent z-index / transform.
+            ══════════════════════════════════════════════════════════════════ */}
+            {showWorkshiftModal && createPortal(
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/40"
+                        style={{ zIndex: 99998 }}
+                        onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }}
+                    />
+                    <div
+                        className="fixed inset-0 flex items-center justify-center p-4"
+                        style={{ zIndex: 99999 }}
+                    >
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+                            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+                                <h2 className="text-gray-800 text-sm font-semibold">Search</h2>
+                                <button
+                                    onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }}
+                                    className="text-gray-600 hover:text-gray-800"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm font-semibold">Workshift Code</h3>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={workshiftSearchTerm}
+                                        onChange={e => setWorkshiftSearchTerm(e.target.value)}
+                                        autoFocus
+                                        placeholder="Type to filter..."
+                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    />
+                                </div>
+                                {workshiftError && (
+                                    <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" /> {workshiftError}
+                                    </div>
+                                )}
+                                <div className="border border-gray-200 rounded overflow-hidden" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    <table className="w-full border-collapse text-sm">
+                                        <thead className="sticky top-0 bg-white z-10">
+                                            <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                                <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Code</th>
+                                                <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {loadingWorkshifts ? (
+                                                <tr>
+                                                    <td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic">
+                                                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
+                                                    </td>
+                                                </tr>
+                                            ) : filteredWorkshifts.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td>
+                                                </tr>
+                                            ) : (
+                                                filteredWorkshifts.map(ws => (
+                                                    <tr
+                                                        key={ws.code}
+                                                        className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                                        onClick={() => handleWorkshiftSelect(ws.code)}
+                                                    >
+                                                        <td className="px-3 py-1.5 text-gray-900 font-medium">{ws.code}</td>
+                                                        <td className="px-3 py-1.5 text-gray-600">{ws.description}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>,
+                document.body
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════════
+                BORROWED DEVICE SEARCH MODAL — also portaled to document.body
+            ══════════════════════════════════════════════════════════════════ */}
+            {showDeviceModal && createPortal(
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/40"
+                        style={{ zIndex: 99998 }}
+                        onClick={() => { setShowDeviceModal(false); setDeviceSearchTerm(''); }}
+                    />
+                    <div
+                        className="fixed inset-0 flex items-center justify-center p-4"
+                        style={{ zIndex: 99999 }}
+                    >
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+                            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+                                <h2 className="text-gray-800 text-sm font-semibold">Search</h2>
+                                <button
+                                    onClick={() => { setShowDeviceModal(false); setDeviceSearchTerm(''); }}
+                                    className="text-gray-600 hover:text-gray-800"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm font-semibold">Borrowed Device Name</h3>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
+                                    <input
+                                        type="text"
+                                        value={deviceSearchTerm}
+                                        onChange={e => setDeviceSearchTerm(e.target.value)}
+                                        autoFocus
+                                        placeholder="Type to filter..."
+                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    />
+                                </div>
+                                {deviceError && (
+                                    <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" /> {deviceError}
+                                    </div>
+                                )}
+                                <div className="border border-gray-200 rounded overflow-hidden" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    <table className="w-full border-collapse text-sm">
+                                        <thead className="sticky top-0 bg-white z-10">
+                                            <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                                <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Code</th>
+                                                <th className="px-3 py-1.5 text-left text-gray-700 text-sm font-semibold">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {loadingDevices ? (
+                                                <tr>
+                                                    <td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic">
+                                                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
+                                                    </td>
+                                                </tr>
+                                            ) : filteredDevices.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td>
+                                                </tr>
+                                            ) : (
+                                                filteredDevices.map(d => (
+                                                    <tr
+                                                        key={d.id}
+                                                        className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                                        onClick={() => handleDeviceSelect(d.description)}
+                                                    >
+                                                        <td className="px-3 py-1.5 text-gray-900 font-medium">{d.code}</td>
+                                                        <td className="px-3 py-1.5 text-gray-600">{d.description}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>,
+                document.body
+            )}
+
             <Footer />
         </div>
     );
