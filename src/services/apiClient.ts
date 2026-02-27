@@ -10,6 +10,7 @@ import axios, {
   type InternalAxiosRequestConfig,
   type AxiosResponse,
 } from 'axios';
+import { decryptData } from './encryptionService';
 
 
 const BASE_URL = 'https://localhost:7264/api';
@@ -131,15 +132,16 @@ function redirectToLogin() {
 // ── Username helper — reads from userData in localStorage ─────────────────────
 export function getLoggedInUsername(): string {
   try {
-    const raw = localStorage.getItem('userData');
+    const raw = localStorage.getItem('userData') || '';
     if (!raw) return 'Guest';
     // Handles both plain string and JSON object
     if (raw.startsWith('{')) {
       const parsed = JSON.parse(raw);
-      return parsed?.username ?? parsed?.userName ?? parsed?.name ?? 'Guest';
+      return decryptData(parsed?.username ?? parsed?.userName ?? parsed?.name ?? 'Guest');
     }
     return raw;
-  } catch {
+  } catch (error) {
+    console.error('Error decrypting username:', error);
     return 'Guest';
   }
 }
