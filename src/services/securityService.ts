@@ -25,7 +25,7 @@ export const securityService = {
 
   async getUsers(page = 1, pageSize = 10): Promise<PagedResult<User>> {
     const res = await apiClient.get('/User', { params: { page, pageSize } });
-
+    console.log('API response:', res);
     // API returns a flat array or paged object
     const raw: any[] = Array.isArray(res.data) ? res.data : (res.data.data ?? []);
     const total: number = res.data.totalCount ?? raw.length;
@@ -69,6 +69,7 @@ export const securityService = {
       IsWindowsAuthenticate: data.isWindowsAuthenticate,
       WindowsLoginName:      data.windowsLoginName,
     });
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -80,6 +81,7 @@ export const securityService = {
       IsWindowsAuthenticate: data.isWindowsAuthenticate,
       WindowsLoginName:      data.windowsLoginName,
     });
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -88,18 +90,21 @@ export const securityService = {
       `${BASE}/SecurityManager/users/${username}/change-password`,
       { OldPassword: data.oldPassword, NewPassword: data.newPassword }
     );
+    console.log('API response:', res);
     return res.data;
   },
 
-  async resetPassword(username: string, p0: { newPassword: string; }): Promise<ApiResult> {
+  async resetPassword(username: string): Promise<ApiResult> {
     const res = await apiClient.put(
       `${BASE}/SecurityManager/users/${username}/reset-password`, {}
     );
+    console.log('API response:', res);
     return res.data;
   },
 
   async removeUser(username: string): Promise<ApiResult> {
     const res = await apiClient.delete(`${BASE}/SecurityManager/users/${username}`);
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -107,6 +112,7 @@ export const securityService = {
 
   async getUserGroups(): Promise<UserGroup[]> {
     const res = await apiClient.get(`${BASE}/SecurityManager/groups`);
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -114,11 +120,13 @@ export const securityService = {
     const res = await apiClient.post(`${BASE}/SecurityManager/groups`, {
       GroupName: groupName, Description: description,
     });
+    console.log('API response:', res);
     return res.data;
   },
 
   async removeUserGroup(groupName: string): Promise<ApiResult> {
     const res = await apiClient.delete(`${BASE}/SecurityManager/groups/${groupName}`);
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -126,11 +134,13 @@ export const securityService = {
 
   async getMembers(groupName: string): Promise<string[]> {
     const res = await apiClient.get(`${BASE}/GroupMember/members/${groupName}`);
+    console.log('API response:', res);
     return res.data;
   },
 
   async getNonMembers(groupName: string): Promise<string[]> {
     const res = await apiClient.get(`${BASE}/GroupMember/non-members/${groupName}`);
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -138,6 +148,7 @@ export const securityService = {
     const res = await apiClient.post(`${BASE}/GroupMember/update`, {
       GroupName: groupName, Usernames: usernames,
     });
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -149,6 +160,7 @@ export const securityService = {
    */
   async getFormAccessTypes(): Promise<FormAccessType[]> {
     const res = await apiClient.get(`${BASE}/SecurityControl/access-types`);
+    console.log('API response:', res);
     return res.data.map((a: any) => ({
       id:             a.id,
       accessTypeName: a.accessTypeName,
@@ -162,6 +174,7 @@ export const securityService = {
   /** Returns all form definitions from tk_Forms. */
   async getForms(): Promise<Form[]> {
     const res = await apiClient.get(`${BASE}/SecurityControl/forms`);
+    console.log('API response:', res);
     return res.data.map((f: any) => ({
       id:              f.id,
       formName:        f.formName,
@@ -177,6 +190,7 @@ export const securityService = {
    */
   async getGroupAccess(groupName: string): Promise<FormAccess[]> {
     const res = await apiClient.get(`${BASE}/SecurityControl/group-access/${groupName}`);
+    console.log('API response:', res);
     return res.data.map((a: any) => ({
       id:          a.id,
       formName:    a.formName,
@@ -190,6 +204,7 @@ export const securityService = {
       FormName:    data.formName,
       AccessFlags: data.accessFlags,      // { CanView: bool, CanAdd: bool, ... }
     });
+    console.log('API response:', res);
     return res.data;
   },
 
@@ -197,6 +212,7 @@ export const securityService = {
 
   async getTksGroups(): Promise<TKSGroup[]> {
     const res = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+    console.log('API response:', res);
     return res.data.map((item: any) => ({
       id:          item.ID   || item.id,
       code:        item.groupCode        || item.code,
@@ -206,6 +222,7 @@ export const securityService = {
 
   async getTksGroupAccess(groupName: string): Promise<TKSGroupAccess[]> {
     const res = await apiClient.get(`${BASE}/SecurityControl/tks-group-access/${groupName}`);
+    console.log('API response:', res);
     return res.data.map((a: any) => ({
       id:           a.id,
       tksGroupName: a.tksGroupName,
@@ -218,11 +235,13 @@ export const securityService = {
     const res = await apiClient.post(`${BASE}/SecurityControl/tks-group-access`, {
       TksGroupName: tksGroupName, GroupName: groupName,
     });
+    console.log('API response:', res);
     return res.data;
   },
 
   async removeTksGroupAccess(id: number): Promise<ApiResult> {
     const res = await apiClient.delete(`${BASE}/SecurityControl/tks-group-access/${id}`);
+    console.log('API response:', res);
     return res.data;
   },
 };

@@ -6,7 +6,7 @@ import { TimePicker } from '../Modals/TimePickerModal';
 interface LeaveTypeSearchModalProps {
   show: boolean;
   onClose: () => void;
-  onSelect: (code: string, description: string) => void;
+  onSelect: (code: string, description: string) => void; 
   searchTerm: string;
   setSearchTerm: (value: string) => void;
 }
