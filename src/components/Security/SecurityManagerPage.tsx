@@ -7,7 +7,8 @@ import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import { securityService } from '../../services/securityService';
-import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../../types/security';
+import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../Types/security';
+import { ACCESS_TYPE_LABELS, ACCESS_TYPE_ORDER } from '../Types/security';
 
 export function SecurityManagerPage() {
   const [activeTab, setActiveTab] = useState<'security-manager' | 'group-member' | 'security-control'>('security-manager');
@@ -107,7 +108,7 @@ export function SecurityManagerPage() {
 
   const fetchUserGroups = useCallback(async () => {
     setLoadingGroups(true);
-    try {
+    try { 
       const data = await securityService.getUserGroups();
       setUserGroupsList(data);
       if (data.length > 0 && !selectedUserGroup) {
@@ -142,7 +143,8 @@ export function SecurityManagerPage() {
     setLoadingAccess(true);
     try {
       const data = await securityService.getGroupAccess(groupName);
-      setFormAccessData(data);
+      const sorted = [...data].sort((a, b) => a.formName.localeCompare(b.formName));
+      setFormAccessData(sorted);
       setCurrentAccessPage(1);
     } catch {
       showErrorModal('Failed to load group access.');
@@ -160,20 +162,24 @@ export function SecurityManagerPage() {
     }
   }, []);
 
+
   const fetchAccessTypes = useCallback(async () => {
     try {
       const data = await securityService.getFormAccessTypes();
-      setAccessTypes(data);
+      const sorted = [...data].sort((a, b) =>
+        (ACCESS_TYPE_ORDER[a.accessTypeName] ?? 99) - (ACCESS_TYPE_ORDER[b.accessTypeName] ?? 99)
+      );
+      setAccessTypes(sorted);
     } catch {
       showErrorModal('Failed to load access types.');
     }
   }, []);
 
-  // Matches original pattern: fetches from /Fs/Process/TimeKeepGroupSetUp via securityService
-  const fetchTKSGroupData = useCallback(async () => {
+
+  const fetchTKSGroupData = useCallback(async (groupName : string) => {
     setLoadingTKSGroup(true);
     try {
-      const data = await securityService.getTksGroups();
+      const data = await securityService.getAvailableTksGroups(groupName);
       setTKSGroupItems(data);
     } catch {
       showErrorModal('Failed to load TKS groups.');
@@ -197,7 +203,7 @@ export function SecurityManagerPage() {
   useEffect(() => {
     fetchUsers(1);
     fetchUserGroups();
-    fetchTKSGroupData();
+    fetchTKSGroupData(selectedUserGroup);
     fetchForms();
     fetchAccessTypes();
   }, []);
@@ -872,7 +878,17 @@ export function SecurityManagerPage() {
                   <label className="block text-gray-700 mb-2">User Group</label>
                   <select
                     value={selectedUserGroup}
-                    onChange={e => { setSelectedUserGroup(e.target.value); setSearchGroupAccessTerm(''); setCurrentAccessPage(1); }}
+                   onChange={e => {
+                      const g = e.target.value;
+                      setSelectedUserGroup(g);
+                      setSearchGroupAccessTerm('');
+                      setCurrentAccessPage(1);
+                      setCurrentTKSPage(1);
+                      setCurrentTKSAccessPage(1);
+                      fetchTksGroupAccess(g);
+                      fetchGroupAccess(g);
+                      fetchTKSGroupData(g);
+                    }}
                     className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     {userGroupsList.map(g => <option key={g.id} value={g.description}>{g.description}</option>)}
@@ -913,7 +929,7 @@ export function SecurityManagerPage() {
                                 <input type="checkbox" checked={selectedAccessTypes.includes(type.accessTypeName)}
                                   onChange={e => setSelectedAccessTypes(p => e.target.checked ? [...p, type.accessTypeName] : p.filter(t => t !== type.accessTypeName))}
                                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                                <span className="text-sm text-gray-700">{type.description ?? type.accessTypeName}</span>
+                                <span className="text-sm text-gray-700">{ACCESS_TYPE_LABELS[type.accessTypeName] ?? type.description ?? type.accessTypeName}</span>
                               </label>
                             ))}
                           </div>
@@ -953,7 +969,7 @@ export function SecurityManagerPage() {
                                 <th className="px-4 py-3 text-left text-xs text-gray-600">Form Name</th>
                                 {accessTypes.map(at => (
                                   <th key={at.id} className="px-4 py-3 text-center text-xs text-gray-600">
-                                    {at.description ?? at.accessTypeName}
+                                    {ACCESS_TYPE_LABELS[at.accessTypeName] ?? at.description ?? at.accessTypeName}
                                   </th>
                                 ))}
                                 <th className="px-4 py-3 text-center text-xs text-gray-600">Actions</th>
@@ -994,7 +1010,7 @@ export function SecurityManagerPage() {
                                               setEditingRowId(null); setEditedRowData(null);
                                             }}
                                             disabled={savingAccess}
-                                            className="px-3 py-1 text-xs text-blue-600 hover:text-blue-700 border border-blue-600 rounded hover:bg-blue-50 flex items-center gap-1 disabled:opacity-50"
+                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded flex items-center gap-1 hover:bg-green-700 border border-green-600"
                                           >
                                             <Save className="w-3 h-3" /> Save
                                           </button>

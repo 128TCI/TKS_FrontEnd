@@ -9,6 +9,8 @@ import {
     TrendingUp,
     ArrowRight
 } from 'lucide-react';
+import { decryptData } from '../../services/encryptionService';
+import apiClient, { getLoggedInUsername}  from '../../services/apiClient';
 // import { WorkshiftVariablePage } from '../WorkshiftVariablePage';
 import { WorkshiftVariablePage } from '../Import/WorkshiftVariablePage';
 import { ImportAdjustmentPage } from '../Import/ImportAdjustmentPage';
@@ -154,7 +156,6 @@ import { EmployeeMasterFilePage } from '../Maintenance/EmployeeMasterFilePage';
 import { EmployeeTimekeepConfigPage } from '../Maintenance/EmployeeTimekeepConfigPage';
 import { RawDataPage } from '../Maintenance/RawDataPage';
 import { Process2ShiftsPayrollPage } from '../Process/Process2ShiftsPayrollPage';
-
 
 interface DashboardContentProps {
     activeSection: string;
@@ -670,7 +671,7 @@ export function DashboardContent({ activeSection }: DashboardContentProps) {
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8 flex-1">
             {/* Welcome Section */}
             <div className="mb-8">
-                <h1 className="text-gray-900 mb-2">Welcome back, Admin</h1>
+                <h1 className="text-gray-900 mb-2">Welcome back, {getLoggedInUsername()}</h1>
                 <p className="text-gray-600">Here's what's happening with your timekeeping today</p>
             </div>
 
