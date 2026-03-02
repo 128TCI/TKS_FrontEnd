@@ -30,6 +30,8 @@ interface ReportFilter {
   userName: string
   mode: string
   activeInActiveAll: string
+  include: boolean
+  option: number
 }
 
 interface LeaveAbsencesFilter {
@@ -116,6 +118,8 @@ export function DailyTimeRecordMonitoringPage() {
   const [status, setStatus] = useState<'Active' |'InActive'| 'All'>('All');
   const [mode, setMode] = useState<'Absences' |'Leave'| 'All'>('All');
   const [hrsOptions, setHrsOptions] = useState<'Per Employee' | 'Summary'>('Per Employee');
+  const [noShiftOptions, setNoShiftOptions] = useState<number>(1);
+  const [include, setInclude] = useState(false);
   const [dataMode, setDataMode] = useState('CompleteLogs');
   const [withOrWOutPay, setWithOrWOutPay] = useState<'WithPay' |'WithOutPay'| 'All'>('All');
   const itemsPerPage = 10;
@@ -369,7 +373,9 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     address: "",
     userName: "128TCI",
     mode: dataMode,
-    activeInActiveAll: empStatus
+    activeInActiveAll: empStatus,
+    include: include,
+    option: noShiftOptions
   };
 
   const leaveAbsenceFilter: LeaveAbsencesFilter = {
@@ -749,6 +755,38 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         });
         console.log(response.headers);
         const fileName = "ManHoursSummaryReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Employees With No Workshift"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/EmployeeNoWorkShiftReport/PrintEmployeeNoWorkShift?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "EmployeeNoWorkShiftReport.xlsx";
         const mimeType = response.headers['content-type']
         const blob = new Blob([response.data], { type: mimeType });
         fileLinkCreate(blob, fileName)
@@ -1685,6 +1723,43 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           />
                           <span className="text-gray-700">Convert To HH:MM</span>
                         </label>)}
+                        {/*Employee No Workshift Options*/}
+                        {reportType == "Employees With No Workshift" &&(<div>
+                        <span>Options</span>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="noShiftOption"
+                                value={1}
+                                checked={noShiftOptions === 1}
+                                onChange={(e) => setNoShiftOptions(Number(e.target.value))}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Employee Workshift</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="noShiftOption"
+                                value={2}
+                                checked={noShiftOptions === 2}
+                                onChange={(e) => setNoShiftOptions(Number(e.target.value))}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Raw Data</span>
+                            </label>
+                          </div>
+                          <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={include}
+                              onChange={(e) => setInclude(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">Include Transaction with Shift</span>
+                          </label>
+                        </div>)}
                         {/*Man Hours Options*/}
                         {reportType == "Man Hours" &&(<div>
                         <span>Options</span>
