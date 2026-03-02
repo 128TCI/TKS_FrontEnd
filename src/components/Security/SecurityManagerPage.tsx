@@ -5,10 +5,11 @@ import {
 } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername} from '../../services/apiClient';
 import { securityService } from '../../services/securityService';
 import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../Types/security';
 import { ACCESS_TYPE_LABELS, ACCESS_TYPE_ORDER } from '../Types/security';
+import { get } from 'http';
 
 export function SecurityManagerPage() {
   const [activeTab, setActiveTab] = useState<'security-manager' | 'group-member' | 'security-control'>('security-manager');
@@ -560,15 +561,55 @@ export function SecurityManagerPage() {
   };
 
   // ── TKS Group Access remove ────────────────────────────────────────────────
+  // ── TKS Group Add handler ──────────────────────────────────────────────────
+  const handleAddTksGroupAccess = async () => {
+    if (!selectedItems.length) {
+      showErrorModal('Please select at least one TKS Group to add.');
+      return;
+    }
+    // Collect the GroupCode (stored in item.code) of each selected row
+    const selectedCodes = tksGroup
+      .filter(item => selectedItems.includes(item.id))
+      .map(item => item.code);
 
-  const handleRemoveTksGroupAccess = async () => {
-    if (!selectedTKSGroupAccess.length) return;
+    console.log('Logs:', selectedCodes);  
+
     try {
-      await Promise.all(selectedTKSGroupAccess.map(id => securityService.removeTksGroupAccess(id)));
-      showSuccessModal('Removed successfully.');
-      setSelectedTKSGroupAccess([]);
-      fetchTksGroupAccess(selectedUserGroup);
+      const res = await securityService.saveTksGroupAccess(
+        selectedUserGroup,
+        selectedCodes,
+        getLoggedInUsername()
+      );
+      if (res.success) {
+        showSuccessModal(`Added ${selectedCodes.length} TKS group(s) successfully.`);
+        setSelectedItems([]);                       // clear selection in left panel
+        fetchTksGroupAccess(selectedUserGroup);     // refresh right panel
+        fetchTKSGroupData(selectedUserGroup);       // refresh left panel (now fewer available)
+      } else {
+        showErrorModal(res.message);
+      }
     } catch {
+      showErrorModal('Failed to add TKS group access.');
+    }
+  };
+
+  // ── TKS Group Remove handler ────────────────────────────────────────────────
+  const handleRemoveTksGroupAccess = async () => {
+    if (!selectedTKSGroupAccess.length) {
+      showErrorModal('Please select at least one record to remove.');
+      return;
+    }
+    try {
+      const res = await securityService.removeTksGroupAccessBulk(selectedTKSGroupAccess);
+      if (res.success) {
+        showSuccessModal(res.message);
+        setSelectedTKSGroupAccess([]);
+        fetchTksGroupAccess(selectedUserGroup);
+        fetchTKSGroupData(selectedUserGroup);   // refresh available TKS groups (removed ones reappear)
+      } else {
+        showErrorModal(res.message);
+      }
+    } catch (error) {
       showErrorModal('Failed to remove TKS group access.');
     }
   };
@@ -1067,7 +1108,11 @@ export function SecurityManagerPage() {
                       <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-gray-900">TKS Group</h3>
-                          <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2">
+                          <button
+                            onClick={handleAddTksGroupAccess}
+                            disabled={selectedItems.length === 0}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
                             <Plus className="w-4 h-4" /> Add
                           </button>
                         </div>

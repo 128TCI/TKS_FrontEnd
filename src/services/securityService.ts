@@ -227,10 +227,11 @@ export const securityService = {
     }));
   },
 
-  async saveTksGroupAccess(tksGroupName: string, groupName: string): Promise<ApiResult> {
+  async saveTksGroupAccess(tksGroupName: string, groupName: string[], createdBy: string): Promise<ApiResult> {
     const res = await apiClient.post(`${BASE}/SecurityControl/tks-group-access`, {
-      TksGroupName: tksGroupName, GroupName: groupName,
+      TksGroupName: tksGroupName, GroupName: groupName, CreatedBy: createdBy
     });
+    console.log('API response: ', res);
     return res.data;
   },
 
@@ -238,4 +239,14 @@ export const securityService = {
     const res = await apiClient.delete(`${BASE}/SecurityControl/tks-group-access/${id}`);
     return res.data;
   },
+
+
+  // Remove multiple rows from tk_UserGroupTKSGroupAccess by IDs (bulk)
+  async removeTksGroupAccessBulk(ids: number[]): Promise<ApiResult> {
+    const res = await apiClient.delete(`${BASE}/SecurityControl/tks-group-access/bulk`, {
+      data: ids,
+    });
+    return { success: res.data?.success ?? true, message: res.data?.message ?? 'Removed.' };
+  },
+
 };
