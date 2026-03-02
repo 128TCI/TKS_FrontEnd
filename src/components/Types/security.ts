@@ -76,6 +76,28 @@ export interface ApiResult {
   message: string;
 }
 
+// ── Access type display helpers ──────────────────────────────────────────────
+
+export const ACCESS_TYPE_LABELS: Record<string, string> = {
+  View:             'View',
+  Add:              'Add',
+  Edit:             'Edit',
+  Delete:           'Delete',
+  Print:            'Print',
+  ImportLogs:       'Import Logs',
+  EnableEditPosted: 'EnableEditPosted',
+};
+
+export const ACCESS_TYPE_ORDER: Record<string, number> = {
+  View:             1,
+  Add:              2,
+  Edit:             3,
+  Delete:           4,
+  Print:            5,
+  ImportLogs:       6,
+  EnableEditPosted: 7,
+};
+
 // ── Request payloads ──────────────────────────────────────────────────────────
 
 export interface CreateUserRequest {

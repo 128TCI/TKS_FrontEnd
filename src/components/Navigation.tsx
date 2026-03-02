@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import apiClient, { getLoggedInUsername}  from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
 import Swal from 'sweetalert2';
@@ -53,6 +53,23 @@ export function Navigation({ onLogout, activeSection, setActiveSection }: Naviga
   // Permissions
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) => permissions[accessType] === true;
+
+  //Extract Username from the local memory
+  const getUserName = (): string | null => {
+    try {
+      const raw = localStorage.getItem('userData');
+      if (!raw) return null;
+
+      const user = JSON.parse(raw);
+      return user?.userName ?? user?.username ?? null;
+    } catch (err) {
+      console.error('Invalid userData in localStorage:', err);
+      return null;
+    }
+  };
+
+  // Cache value once per render lifecycle
+  const userName = useMemo(() => getUserName(), []);
 
 // Auto logout functionality
 useEffect(() => {

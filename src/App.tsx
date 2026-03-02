@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HomePage } from './components/HomePage';
-import { LoginPage } from './components/Login/LoginPage';
+import { LoginPage } from './components/LoginPage';
 import { ForgotPasswordPage } from './components/ForgotPasswordPage';
 
 export default function App() {
