@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { decryptData } from '../../services/encryptionService';
 import apiClient, { getLoggedInUsername}  from '../../services/apiClient';
+import { useMemo } from 'react';
 // import { WorkshiftVariablePage } from '../WorkshiftVariablePage';
 import { WorkshiftVariablePage } from '../Import/WorkshiftVariablePage';
 import { ImportAdjustmentPage } from '../Import/ImportAdjustmentPage';
