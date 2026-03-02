@@ -15,7 +15,7 @@ import type {
   UpdateUserRequest,
   ChangePasswordRequest,
   SaveGroupAccessRequest,
-} from '../types/security';
+} from '../components/Types/security';
 
 const BASE = '/Security';
 
@@ -91,7 +91,7 @@ export const securityService = {
     return res.data;
   },
 
-  async resetPassword(username: string, p0: { newPassword: string; }): Promise<ApiResult> {
+  async resetPassword(username: string): Promise<ApiResult> {
     const res = await apiClient.put(
       `${BASE}/SecurityManager/users/${username}/reset-password`, {}
     );
@@ -195,22 +195,35 @@ export const securityService = {
 
   // ── Security Control — TKS Group ───────────────────────────────────────────
 
+  // All TKS groups (for the TKS Group table)
   async getTksGroups(): Promise<TKSGroup[]> {
     const res = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
     return res.data.map((item: any) => ({
-      id:          item.ID   || item.id,
-      code:        item.groupCode        || item.code,
-      description: item.groupDescription || item.description,
+      id:          item.ID          ?? item.id   ?? 0,
+      code:        item.groupCode   ?? item.code ?? '',
+      description: item.groupDescription ?? item.description ?? '',
+    }));
+  },
+
+  async getAvailableTksGroups(groupName: string): Promise<TKSGroup[]> {
+    const res = await apiClient.get(`${BASE}/SecurityControl/tks-groups/${groupName}`);
+    console.log('API response:', res);
+    return res.data.map((item: any) => ({
+      id:          0,
+      code:        item.tksGroupName ?? item.groupCode ?? item.code ?? '',
+      description: item.description  ?? item.groupDescription       ?? '',
     }));
   },
 
   async getTksGroupAccess(groupName: string): Promise<TKSGroupAccess[]> {
     const res = await apiClient.get(`${BASE}/SecurityControl/tks-group-access/${groupName}`);
+    console.log('API response:', res);
     return res.data.map((a: any) => ({
       id:           a.id,
-      tksGroupName: a.tksGroupName,
-      description:  a.description ?? '',
-      userGroup:    a.groupName,
+      tksGroupCode: a.tksGroupCode ?? '',
+      tksGroupName: a.tksGroupName ?? '',
+      description:  a.description  ?? '',
+      userGroup:    a.groupName    ?? '',
     }));
   },
 

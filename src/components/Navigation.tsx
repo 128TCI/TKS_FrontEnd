@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import apiClient from '../services/apiClient';
+import { useState, useEffect, useRef } from 'react';
+import apiClient, { getLoggedInUsername}  from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
 import Swal from 'sweetalert2';
 import { 
@@ -9,7 +9,6 @@ import {
   ExternalLink, ChevronDown, ChevronRight,
   Clock, LogOut, User, X, Menu
 } from 'lucide-react';
-import lifeBankLogo from '../assets/Lifebank.png';
 import { decryptData } from '../services/encryptionService';
 
 interface NavigationProps {
@@ -50,9 +49,10 @@ export function Navigation({ onLogout, activeSection, setActiveSection }: Naviga
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
-    // Permissions
-const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-const hasPermission = (accessType: string) => permissions[accessType] === true;
+  const token = localStorage.getItem("token");
+  // Permissions
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
 
   //Extract Username from the local memory
   const getUserName = (): string | null => {
@@ -198,7 +198,9 @@ useEffect(() => {
       const username = loginPayload.username || loginPayload.userName || 'Unknown';
       const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-      await apiClient.post('UserLogin/logout', { userId });
+      await apiClient.post('UserLogin/logout', { userId }, { headers: { Authorization: `Bearer ${token}` } });
+
+      // Audit trail for manual logout
       try {
         await auditTrail.log({
           trans: `Employee ${username} logged out.`,
@@ -895,7 +897,7 @@ useEffect(() => {
             onMouseLeave={() => {
               closeTimeoutRef.current = window.setTimeout(() => {
                 setExpandedMenu(null);
-              }, 200);
+              }, 200) as unknown as NodeJS.Timeout;
             }}
           >
             {subItem.label}
@@ -1239,9 +1241,7 @@ useEffect(() => {
                 onMouseLeave={() => setShowVersionTooltip(false)}
               >
                 <User className="w-4 h-4 text-slate-200" />
-                <span className="text-slate-200 text-sm">
-                  {userName ?? 'Admin'}
-                </span>
+                  <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>
                 
                 {/* Version Tooltip */}
                 {showVersionTooltip && (

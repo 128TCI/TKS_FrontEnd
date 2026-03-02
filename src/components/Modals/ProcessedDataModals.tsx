@@ -3,6 +3,178 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarPopup } from '../CalendarPopup';
 import { TimePicker } from '../Modals/TimePickerModal';
+interface LeaveTypeSearchModalProps {
+  show: boolean;
+  onClose: () => void;
+  onSelect: (code: string, description: string) => void; 
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+}
+
+export function LeaveTypeSearchModal({
+  show,
+  onClose,
+  onSelect,
+  searchTerm,
+  setSearchTerm
+}: LeaveTypeSearchModalProps) {
+  if (!show) return null;
+
+  // Sample leave type data
+  const leaveTypeData = [
+    { code: 'BL', description: 'Birthday Leave' },
+    { code: 'HL', description: 'Home Leave' },
+    { code: 'PL', description: 'Paternity Leave' },
+    { code: 'SL', description: 'Sick Leave' },
+    { code: 'SPL', description: 'Solo Parent Leave' },
+    { code: 'VL', description: 'Vacation Leave' },
+    { code: 'WN', description: 'Leave with notice' },
+  ];
+
+  const filteredLeaveTypes = leaveTypeData.filter(lt =>
+    lt.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lt.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <>
+      {/* Modal Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/30 z-30"
+        onClick={onClose}
+      ></div>
+
+      {/* Modal Dialog */}
+      <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[110vh] overflow-y-auto">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
+            <h2 className="text-gray-800 text-sm">Search</h2>
+            <button 
+              onClick={onClose}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Modal Content */}
+          <div className="p-3">
+            <h3 className="text-blue-600 mb-2 text-sm">Leave Type</h3>
+
+            {/* Search Input */}
+            <div className="flex items-center justify-end gap-2 mb-3">
+              <label className="text-gray-700 text-sm">Search:</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+
+            {/* Leave Type Table */}
+            <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="w-full border-collapse text-sm">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="bg-gray-100 border-b-2 border-gray-300">
+                    <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Code ▲</th>
+                    <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Description ▲</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLeaveTypes.map((lt) => (
+                    <tr 
+                      key={lt.code}
+                      className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                      onClick={() => {
+                        onSelect(lt.code, lt.description);
+                        onClose();
+                      }}
+                    >
+                      <td className="px-3 py-1.5">{lt.code}</td>
+                      <td className="px-3 py-1.5">{lt.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3">
+              <div className="text-gray-600 text-xs">
+                Showing 1 to 7 of 7 entries
+              </div>
+              <div className="flex gap-1">
+                <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
+                  Previous
+                </button>
+                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">1</button>
+                <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs">
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Workshift Search Modal Component
+interface WorkshiftSearchModalProps {
+  show: boolean;
+  onClose: () => void;
+  onSelect: (code: string, description: string) => void;
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+}
+
+export function WorkshiftSearchModal({
+  show,
+  onClose,
+  onSelect,
+  searchTerm,
+  setSearchTerm
+}: WorkshiftSearchModalProps) {
+  if (!show) return null;
+
+  // Sample workshift data
+  const workshiftData = [
+    { code: 'WS001', description: 'Regular Shift' },
+    { code: 'WS002', description: 'Night Shift' },
+    { code: 'WS003', description: 'Swing Shift' },
+    { code: 'WS004', description: 'Morning Shift' },
+    { code: 'WS005', description: 'Evening Shift' },
+  ];
+
+  const filteredWorkshifts = workshiftData.filter(ws =>
+    ws.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    ws.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <>
+      {/* Modal Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/30 z-30"
+        onClick={onClose}
+      ></div>
+
+      {/* Modal Dialog */}
+      <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[110vh] overflow-y-auto">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
+            <h2 className="text-gray-800 text-sm">Search</h2>
+            <button 
+              onClick={onClose}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
 // ─── No of Hours Modal Component ───────────────────────────────────────────────
 interface NoOfHoursModalProps {
