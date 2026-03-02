@@ -3,27 +3,19 @@ import apiClient from '../../services/apiClient';
 import { Check, Plus, Clock, AlertCircle, TrendingDown, CalendarX,
          Zap, DollarSign, Settings, Layers, Search, X, Calendar, Edit, Trash2,} from 'lucide-react';
 import { AdvancedModal, AdjustmentModal, OtherEarningsModal, UndertimeModal, OvertimeModal, 
-        TardinessModal, LeaveAbsencesModal, NoOfHoursModal, WorkshiftSearchModal, 
-    OTCodeSearchModal, LeaveTypeSearchModal,} from '../Modals/ProcessedDataModals';
+        TardinessModal, LeaveAbsencesModal, NoOfHoursModal } from '../Modals/ProcessedDataModals';
+import { WorkshiftCodeSearchModal } from '../Modals/WorkshiftSetupModals/WorkshiftCodeSearchModal'
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
+import { AllowanceCodeSearchModal } from '../Modals/AllowanceCodeSearchModal';
+import { BorrowedDeviceSearchModal } from '../Modals/BorrowedDeviceSearchModal';
+import { OTCodeSearchModal } from '../Modals/OTCodeSearchModal';
+import { LeaveTypeSearchModal } from '../Modals/LeaveTypeSearchModal';
 import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
 import Swal from 'sweetalert2';
 import auditTrail from '../../services/auditTrail'
 
-// ─── Shared Types ─────────────────────────────────────────────────────────────
-interface NoOfHoursRecord {
-    id: number;
-    empCode: string;
-    workshiftCode: string;
-    dateIn: string;
-    dateOut: string;
-    noOfHours: string;
-    groupCode?: string;
-    glCode?: string;
-}
 
-// ─── Shared Utility ───────────────────────────────────────────────────────────
 const parseToISO = (raw: string): string | null => {
     if (!raw) return null;
 
@@ -175,8 +167,8 @@ export function ProcessedDataPage() {
     const [employeeName, setEmployeeName]   = useState('');
     const [employeeGroupCode, setEmployeeGroupCode] = useState('');
 
-    const [dateFrom,     setDateFrom]       = useState('01/01/2019');
-    const [dateTo,       setDateTo]         = useState('12/31/2019');
+    const [dateFrom,     setDateFrom]       = useState('01/01/2015');
+    const [dateTo,       setDateTo]         = useState('12/31/2025');
     const [subTab,       setSubTab]         = useState('No Of Hrs Per Day');
 
     // ── Calendar popup state ──────────────────────────────────────────────────
@@ -193,45 +185,41 @@ export function ProcessedDataPage() {
     const [isEditMode,    setIsEditMode]    = useState(false);
     const [editingIndex,  setEditingIndex]  = useState<number | null>(null);
 
-    // ── Workshift / OT Code / Leave Type Search Modals ────────────────────────
+    // ── Workshift / OT Code / Leave Type / Allowance / Borrowed Device Search Modals ────────────────────────
     const [showWorkshiftSearchModal,  setShowWorkshiftSearchModal]  = useState(false);
     const [showOTCodeSearchModal,     setShowOTCodeSearchModal]     = useState(false);
     const [showLeaveTypeSearchModal,  setShowLeaveTypeSearchModal]  = useState(false);
+    const [showAllowanceSearchModal, setShowAllowanceSearchModal] = useState(false);
+    const [showBorrowedDeviceSearchModal, setShowBorrowedDeviceSearchModal] = useState(false);
     const [workshiftSearchTerm,       setWorkshiftSearchTerm]       = useState('');
     const [otCodeSearchTerm,          setOtCodeSearchTerm]          = useState('');
     const [leaveTypeSearchTerm,       setLeaveTypeSearchTerm]       = useState('');
-    
+    const [allowanceSearchTerm, setAllowanceSearchTerm] = useState('');
+    const [borrowedDeviceSearchTerm,  setBorrowedDeviceSearchTerm] = useState('');
+
+    const formName = `Processed Data - ${subTab}`;
+
     // ── Pagination state for each sub tab ─────────────────────────────────────────
+    const PAGE_SIZE = 10;
+
     const [noOfHoursPage,            setNoOfHoursPage]            = useState(1);
     const [noOfHoursTotalCount,      setNoOfHoursTotalCount]      = useState(0);
-
     const [tardinessPage,            setTardinessPage]            = useState(1);
     const [tardinessTotalCount,      setTardinessTotalCount]      = useState(0);
-
     const [undertimePage,            setUndertimePage]            = useState(1);
     const [undertimeTotalCount,      setUndertimeTotalCount]      = useState(0);
-
-    const [leaveAbsencesPage,        setLeaveAbsencesPage]        = useState(1);
-    const [leaveAbsencesTotalCount,  setLeaveAbsencesTotalCount]  = useState(0);
-
-    const [overtimePage,             setOvertimePage]             = useState(1);
-    const [overtimeTotalCount,       setOvertimeTotalCount]       = useState(0);
-
-    const [otherEarningsPage,        setOtherEarningsPage]        = useState(1);
-    const [otherEarningsTotalCount,  setOtherEarningsTotalCount]  = useState(0);
-
-    const [adjustmentPage,           setAdjustmentPage]           = useState(1);
-    const [adjustmentTotalCount,     setAdjustmentTotalCount]     = useState(0);
-
-    const [advancedPage,             setAdvancedPage]             = useState(1);
-    const [advancedTotalCount,       setAdvancedTotalCount]       = useState(0);
-
-    const PAGE_SIZE = 10;
-    
-    // =========================================================================
-    // ── § EMPLOYEE SEARCH ─────────────────────────────────────────────────────
-    // =========================================================================
-
+    const [leaveAbsencesPage,       setLeaveAbsencesPage]       = useState(1);
+    const [leaveAbsencesTotalCount, setLeaveAbsencesTotalCount] = useState(0);
+    const [overtimePage,       setOvertimePage]       = useState(1);
+    const [overtimeTotalCount, setOvertimeTotalCount] = useState(0);
+    const [otherEarningsPage,       setOtherEarningsPage]       = useState(1);
+    const [otherEarningsTotalCount, setOtherEarningsTotalCount] = useState(0);
+    const [adjustmentPage,       setAdjustmentPage]       = useState(1);
+    const [adjustmentTotalCount, setAdjustmentTotalCount] = useState(0);
+    const [advancedPage,       setAdvancedPage]       = useState(1);
+    const [advancedTotalCount, setAdvancedTotalCount] = useState(0);
+   
+    // ──  EMPLOYEE SEARCH ─────────────────────────────────────────────────────
     const fetchEmployees = async () => {
         setLoadingEmployees(true);
         setEmployeeError('');
@@ -266,11 +254,17 @@ export function ProcessedDataPage() {
         setNoOfHoursError('');
     };
 
-    // =========================================================================
-    // ── § NO OF HRS PER DAY ───────────────────────────────────────────────────
-    // =========================================================================
-
-    // ── State ─────────────────────────────────────────────────────────────────
+    // ──  NO OF HRS PER DAY ───────────────────────────────────────────────────
+    interface NoOfHoursRecord {
+    id: number;
+    empCode: string;
+    workshiftCode: string;
+    dateIn: string;
+    dateOut: string;
+    noOfHours: string;
+    groupCode?: string;
+    glCode?: string;
+}
     const [noOfHoursData,    setNoOfHoursData]    = useState<NoOfHoursRecord[]>([]);
     const [noOfHoursLoading, setNoOfHoursLoading] = useState(false);
     const [noOfHoursError,   setNoOfHoursError]   = useState<string>('');
@@ -283,13 +277,12 @@ export function ProcessedDataPage() {
     const [noOfHoursDateOut,      setNoOfHoursDateOut]      = useState('');
     const [noOfHoursNoOfHours,    setNoOfHoursNoOfHours]    = useState('');
     const [noOfHoursGroupCode,     setNoOfHoursGroupCode]     = useState('');
+
     // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchNoOfHours = useCallback(async () => {
         if (!employeeCode) return;
         setNoOfHoursLoading(true);
         setNoOfHoursError('');
-
-
 
         const parsedFrom = parseDate(dateFrom);
         const parsedTo   = parseDate(dateTo);
@@ -299,8 +292,6 @@ export function ProcessedDataPage() {
             setNoOfHoursLoading(false);
             return;
         }
-
-
 
         try {
             const response = await apiClient.get(
@@ -335,12 +326,6 @@ export function ProcessedDataPage() {
             setNoOfHoursLoading(false);
         }
     }, [employeeCode, dateFrom, dateTo, noOfHoursPage]); 
-
-    // ── Auto-fetch when tab switches ──────────────────────────────────────────
-    useEffect(() => {
-        if (!employeeCode) return;
-        if (subTab === 'No Of Hrs Per Day') fetchNoOfHours();
-    }, [subTab, fetchNoOfHours]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateNoOfHours = () => {
@@ -421,6 +406,12 @@ export function ProcessedDataPage() {
                     `/Maintenance/ProcessedData/PDNumberHoursPerDay/${id}`,
                     payload
                 );
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Updated successfully',
@@ -434,6 +425,12 @@ export function ProcessedDataPage() {
                     '/Maintenance/ProcessedData/PDNumberHoursPerDay',
                     payload
                 );
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
                 await Swal.fire({
                     icon: 'success',
                     title: 'Created successfully',
@@ -479,6 +476,12 @@ export function ProcessedDataPage() {
             await apiClient.delete(
                 `/Maintenance/ProcessedData/PDNumberHoursPerDay/${record.id}`
             );
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
             await fetchNoOfHours();
             await Swal.fire({
                 icon: 'success',
@@ -497,11 +500,7 @@ export function ProcessedDataPage() {
         }
     };
 
- // =========================================================================
-    // ── § TARDINESS ───────────────────────────────────────────────────────────
-    // =========================================================================
-
-    // ── Types ─────────────────────────────────────────────────────────────────
+    // ──  TARDINESS ───────────────────────────────────────────────────────────
     interface TardinessRecord {
         id:                             number;
         empCode:                        string;
@@ -522,8 +521,6 @@ export function ProcessedDataPage() {
         exemptionRpt:                   string;
         glCode:                         string;
     }
-
-    // ── State ─────────────────────────────────────────────────────────────────
     const [tardinessData,    setTardinessData]    = useState<TardinessRecord[]>([]);
     const [tardinessLoading, setTardinessLoading] = useState(false);
     const [tardinessError,   setTardinessError]   = useState<string>('');
@@ -547,8 +544,6 @@ export function ProcessedDataPage() {
     const [tardinessOffSetOTFlag,                   setTardinessOffSetOTFlag]                   = useState(false);
     const [tardinessExemptionRpt,                   setTardinessExemptionRpt]                   = useState('');
     const [tardinessGLCode,                         setTardinessGLCode]                         = useState('');
-
-
 
     // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchTardiness = useCallback(async () => {
@@ -585,13 +580,10 @@ export function ProcessedDataPage() {
                 const records: TardinessRecord[] = rows.map((r: any) => ({
                     id:                             r.id                             ?? 0,
                     empCode:                        r.empCode                        ?? '',
-                    // ── Date-only ─────────────────────────────────────────────
                     dateFrom:                       formatDateOnly(r.dateFrom),
                     dateTo:                         formatDateOnly(r.dateTo),
-                    // ── Time-only (strip the 1900-01-01 carrier date) ─────────
                     timeIn:                         formatTimeOnly(r.timeIn),
                     timeOut:                        formatTimeOnly(r.timeOut),
-                    // ── Rest ──────────────────────────────────────────────────
                     workShiftCode:                  r.workShiftCode                  ?? '',
                     tardiness:                      r.tardiness                      ?? '',
                     tardinessHHMM:                  r.tardinessHHMM                  ?? '',
@@ -616,12 +608,6 @@ export function ProcessedDataPage() {
             setTardinessLoading(false);
         }
     }, [employeeCode, dateFrom, dateTo, tardinessPage]);
-
-    // ── Auto-fetch when tab switches ──────────────────────────────────────────
-    useEffect(() => {
-        if (!employeeCode) return;
-        if (subTab === 'Tardiness') fetchTardiness();
-    }, [subTab, fetchTardiness]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateTardiness = () => {
@@ -653,13 +639,8 @@ export function ProcessedDataPage() {
         setIsEditMode(true);
         setEditingIndex(index);
         setTardinessEmpCode(r.empCode);
-        // dateFrom / dateTo are already formatted as "Nov. 1, 2025" by fetch.
-        // parseDate() in the submit will re-parse this back to "YYYY-MM-DD"
-        // via the Date constructor which handles "Nov. 1, 2025" fine.
         setTardinessDateFrom(r.dateFrom);
         setTardinessDateTo(r.dateTo);
-        // timeIn / timeOut are already formatted as "8:30 AM" by fetch.
-        // parseTimeOnly() in the submit accepts "HH:MM AM/PM" directly.
         setTardinessTimeIn(r.timeIn);
         setTardinessTimeOut(r.timeOut);
         setTardinessWorkShiftCode(r.workShiftCode);
@@ -708,16 +689,12 @@ export function ProcessedDataPage() {
 
             if (period === 'PM' && hours !== 12) hours += 12;
             if (period === 'AM' && hours === 12)  hours  = 0;
-
-            // Use a fixed carrier date (1900-01-01) — same trick SQL SP
-            // implicitly uses when storing time-only values as datetime.
             return `1900-01-01T${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:00`;
         };
 
         const parsedTimeIn  = tardinessTimeIn.trim()  ? parseTimeOnly(tardinessTimeIn)  : null;
         const parsedTimeOut = tardinessTimeOut.trim()  ? parseTimeOnly(tardinessTimeOut) : null;
 
-        // timeIn / timeOut are optional — only validate if the user typed something
         if (tardinessTimeIn.trim() && !parsedTimeIn) {
             await Swal.fire({
                 icon:  'error',
@@ -736,10 +713,7 @@ export function ProcessedDataPage() {
             return;
         }
 
-        // ── Decimal helper ────────────────────────────────────────────────────
         const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
-
-        // ── Build payload ─────────────────────────────────────────────────────
         const payload = {
             empCode:                        tardinessEmpCode,
             dateFrom:                       parsedDateFrom,
@@ -779,14 +753,18 @@ export function ProcessedDataPage() {
 
                 const id = tardinessData[editingIndex].id;
 
-                // UpdateRow excludes empCode and glCode — strip before sending
                 const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
 
                 await apiClient.put(
                     `/Maintenance/ProcessedData/PDTardiness/${id}`,
                     updatePayload
                 );
-
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
                 await Swal.fire({
                     icon:              'success',
                     title:             'Updated successfully',
@@ -801,7 +779,12 @@ export function ProcessedDataPage() {
                     '/Maintenance/ProcessedData/PDTardiness',
                     payload
                 );
-
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
                 await Swal.fire({
                     icon:              'success',
                     title:             'Created successfully',
@@ -849,6 +832,12 @@ export function ProcessedDataPage() {
             await apiClient.delete(
                 `/Maintenance/ProcessedData/PDTardiness/${record.id}`
             );
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
             await fetchTardiness();
             await Swal.fire({
                 icon:              'success',
@@ -866,134 +855,677 @@ export function ProcessedDataPage() {
         }
     };
 
-    // =========================================================================
-    // ── § UNDERTIME ───────────────────────────────────────────────────────────
-    // =========================================================================
+    // ──  UNDERTIME ───────────────────────────────────────────────────────────
+    // ── Types ─────────────────────────────────────────────────────────────────
+    interface UndertimeRecord {
+        id:                              number;
+        empCode:                         string;
+        workShiftCode:                       string;
+        dateFrom:                        string;
+        dateTo:                          string;
+        timeIn:                          string;
+        timeOut:                         string;
+        undertime:                       string;
+        undertimeHHMM:                   string;
+        undertimeWithinGracePeriod:      string;
+        undertimeWithinGracePeriodHHMM:  string;
+        actualUndertime:                 string;
+        actualUndertimeHHMM:             string;
+        remarks:                         string;
+        groupCode:                       string;
+        glCode:                          string;
+    }
 
     // ── State ─────────────────────────────────────────────────────────────────
-    const [undertimeData,      setUndertimeData]      = useState<any[]>([]);
+    const [undertimeData,    setUndertimeData]    = useState<UndertimeRecord[]>([]);
+    const [undertimeLoading, setUndertimeLoading] = useState(false);
+    const [undertimeError,   setUndertimeError]   = useState<string>('');
     const [showUndertimeModal, setShowUndertimeModal] = useState(false);
-    const [undertimeEmpCode,               setUndertimeEmpCode]               = useState('');
-    const [undertimeDateFrom,              setUndertimeDateFrom]              = useState('');
-    const [undertimeDateTo,                setUndertimeDateTo]                = useState('');
-    const [undertimeTimeIn,                setUndertimeTimeIn]                = useState('');
-    const [undertimeTimeOut,               setUndertimeTimeOut]               = useState('');
-    const [undertimeWorkshiftCode,         setUndertimeWorkshiftCode]         = useState('');
-    const [undertimeUndertime,             setUndertimeUndertime]             = useState('');
-    const [undertimeWithinGracePeriod,     setUndertimeWithinGracePeriod]     = useState('');
-    const [undertimeActualUndertime,       setUndertimeActualUndertime]       = useState('');
-    const [undertimeRemarks,               setUndertimeRemarks]               = useState('');
+
+    // Modal form fields
+    const [undertimeEmpCode,                       setUndertimeEmpCode]                       = useState('');
+    const [undertimeDateFrom,                      setUndertimeDateFrom]                      = useState('');
+    const [undertimeDateTo,                        setUndertimeDateTo]                        = useState('');
+    const [undertimeTimeIn,                        setUndertimeTimeIn]                        = useState('');
+    const [undertimeTimeOut,                       setUndertimeTimeOut]                       = useState('');
+    const [undertimeWorkshiftCode,                 setUndertimeWorkshiftCode]                 = useState('');
+    const [undertimeUndertime,                     setUndertimeUndertime]                     = useState('');
+    const [undertimeUndertimeHHMM,                 setUndertimeUndertimeHHMM]                 = useState('');
+    const [undertimeWithinGracePeriod,             setUndertimeWithinGracePeriod]             = useState('');
+    const [undertimeWithinGracePeriodHHMM,         setUndertimeWithinGracePeriodHHMM]         = useState('');
+    const [undertimeActualUndertime,               setUndertimeActualUndertime]               = useState('');
+    const [undertimeActualUndertimeHHMM,           setUndertimeActualUndertimeHHMM]           = useState('');
+    const [undertimeRemarks,                       setUndertimeRemarks]                       = useState('');
+    const [undertimeGroupCode,                     setUndertimeGroupCode]                     = useState('');
+    const [undertimeGLCode,                        setUndertimeGLCode]                        = useState('');
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
+    const fetchUndertime = useCallback(async () => {
+        if (!employeeCode) return;
+        setUndertimeLoading(true);
+        setUndertimeError('');
+
+        const parsedFrom = parseDate(dateFrom);
+        const parsedTo   = parseDate(dateTo);
+
+        if (!parsedFrom || !parsedTo) {
+            setUndertimeError('Invalid date range. Please check Date From and Date To.');
+            setUndertimeLoading(false);
+            return;
+        }
+
+        try {
+            const response = await apiClient.get(
+                '/Maintenance/ProcessedData/PDUndertime',
+                { params: {
+                    empCode:  employeeCode,
+                    dateFrom: parsedFrom,
+                    dateTo:   parsedTo,
+                    start:    (undertimePage - 1) * PAGE_SIZE,
+                    length:   PAGE_SIZE,
+                }}
+            );
+
+            if (response.status === 200 && response.data) {
+                const rows  = response.data.data       ?? response.data;
+                const total = response.data.totalCount ?? 0;
+                setUndertimeTotalCount(total);
+
+                const records: UndertimeRecord[] = rows.map((r: any) => ({
+                    id:                             r.id                             ?? 0,
+                    empCode:                        r.empCode                        ?? '',
+                    workShiftCode:                  r.workShift ?? '',
+                    dateFrom:                       formatDateOnly(r.dateFrom),
+                    dateTo:                         formatDateOnly(r.dateTo),
+                    timeIn:                         formatTimeOnly(r.timeIn),
+                    timeOut:                        formatTimeOnly(r.timeOut),
+                    undertime:                      r.undertime                      ?? '',
+                    undertimeHHMM:                  r.undertimeHHMM                  ?? '',
+                    undertimeWithinGracePeriod:     r.undertimeWithinGracePeriod     ?? '',
+                    undertimeWithinGracePeriodHHMM: r.undertimeWithinGracePeriodHHMM ?? '',
+                    actualUndertime:                r.actualUndertime                ?? '',
+                    actualUndertimeHHMM:            r.actualUndertimeHHMM            ?? '',
+                    remarks:                        r.remarks                        ?? '',
+                    groupCode:                      r.groupCode                      ?? '',
+                    glCode:                         r.glCode                         ?? '',
+                }));
+
+                setUndertimeData(records);
+            }
+        } catch (error: any) {
+            setUndertimeError(
+                error.response?.data?.message || error.message || 'Failed to load Undertime data'
+            );
+        } finally {
+            setUndertimeLoading(false);
+        }
+    }, [employeeCode, dateFrom, dateTo, undertimePage]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateUndertime = () => {
-        setIsEditMode(false); setEditingIndex(null);
-        setUndertimeEmpCode(''); setUndertimeDateFrom(''); setUndertimeDateTo('');
-        setUndertimeTimeIn(''); setUndertimeTimeOut(''); setUndertimeWorkshiftCode('');
-        setUndertimeUndertime(''); setUndertimeWithinGracePeriod('');
-        setUndertimeActualUndertime(''); setUndertimeRemarks('');
+        setIsEditMode(false);
+        setEditingIndex(null);
+        setUndertimeEmpCode(employeeCode);
+        setUndertimeDateFrom('');
+        setUndertimeDateTo('');
+        setUndertimeTimeIn('');
+        setUndertimeTimeOut('');
+        setUndertimeWorkshiftCode('');
+        setUndertimeUndertime('');
+        setUndertimeUndertimeHHMM('');
+        setUndertimeWithinGracePeriod('');
+        setUndertimeWithinGracePeriodHHMM('');
+        setUndertimeActualUndertime('');
+        setUndertimeActualUndertimeHHMM('');
+        setUndertimeRemarks('');
+        setUndertimeGroupCode(employeeGroupCode);
+        setUndertimeGLCode('');
         setShowUndertimeModal(true);
     };
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     const handleEditUndertime = (index: number) => {
         const r = undertimeData[index];
-        setIsEditMode(true); setEditingIndex(index);
-        setUndertimeEmpCode(r.empCode); setUndertimeDateFrom(r.dateFrom);
-        setUndertimeDateTo(r.dateTo); setUndertimeTimeIn(r.timeIn);
-        setUndertimeTimeOut(r.timeOut); setUndertimeWorkshiftCode(r.workshiftCode);
-        setUndertimeUndertime(r.undertime);
-        setUndertimeWithinGracePeriod(r.undertimeWithinGracePeriod);
-        setUndertimeActualUndertime(r.actualUndertime); setUndertimeRemarks(r.remarks);
+        setIsEditMode(true);
+        setEditingIndex(index);
+        setUndertimeEmpCode(r.empCode);
+        setUndertimeDateFrom(r.dateFrom);
+        setUndertimeDateTo(r.dateTo);
+        setUndertimeTimeIn(r.timeIn);
+        setUndertimeTimeOut(r.timeOut);
+        setUndertimeWorkshiftCode(r.workShiftCode);               // API field: workShift
+        setUndertimeUndertime(String(r.undertime));
+        setUndertimeUndertimeHHMM(String(r.undertimeHHMM));
+        setUndertimeWithinGracePeriod(String(r.undertimeWithinGracePeriod));
+        setUndertimeWithinGracePeriodHHMM(String(r.undertimeWithinGracePeriodHHMM));
+        setUndertimeActualUndertime(String(r.actualUndertime));
+        setUndertimeActualUndertimeHHMM(String(r.actualUndertimeHHMM));
+        setUndertimeRemarks(r.remarks);
+        setUndertimeGroupCode(r.groupCode);
+        setUndertimeGLCode(r.glCode);
         setShowUndertimeModal(true);
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
-    const handleUndertimeSubmit = () => {
-        const newRecord = {
-            empCode: undertimeEmpCode, dateFrom: undertimeDateFrom, dateTo: undertimeDateTo,
-            timeIn: undertimeTimeIn, timeOut: undertimeTimeOut, workshiftCode: undertimeWorkshiftCode,
-            undertime: undertimeUndertime, undertimeWithinGracePeriod,
-            actualUndertime: undertimeActualUndertime, remarks: undertimeRemarks,
-        };
-        if (isEditMode && editingIndex !== null) {
-            const updated = [...undertimeData]; updated[editingIndex] = newRecord; setUndertimeData(updated);
-        } else {
-            setUndertimeData([...undertimeData, newRecord]);
+    // ── Submit (create / update) ──────────────────────────────────────────────
+    const handleUndertimeSubmit = async () => {
+        const parsedDateFrom = parseDate(undertimeDateFrom)
+            ? `${parseDate(undertimeDateFrom)}T00:00:00`
+            : null;
+
+        const parsedDateTo = parseDate(undertimeDateTo)
+            ? `${parseDate(undertimeDateTo)}T00:00:00`
+            : null;
+
+        if (!parsedDateFrom || !parsedDateTo) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Date',
+                text:  'Invalid Date From or Date To. Please use MM/DD/YYYY format.',
+            });
+            return;
         }
-        setShowUndertimeModal(false); setIsEditMode(false); setEditingIndex(null);
+
+        // ── Time-only fields (timeIn / timeOut) ───────────────────────────────
+        const parseTimeOnly = (raw: string): string | null => {
+            if (!raw?.trim()) return null;
+
+            const match = raw.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+            if (!match) return null;
+
+            let hours    = parseInt(match[1]);
+            const mins   = parseInt(match[2]);
+            const period = match[3]?.toUpperCase();
+
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12)  hours  = 0;
+            return `1900-01-01T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
+        };
+
+        const parsedTimeIn  = undertimeTimeIn.trim()  ? parseTimeOnly(undertimeTimeIn)  : null;
+        const parsedTimeOut = undertimeTimeOut.trim()  ? parseTimeOnly(undertimeTimeOut) : null;
+
+        if (undertimeTimeIn.trim() && !parsedTimeIn) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Time',
+                text:  'Invalid Time In. Please use HH:MM AM/PM format (e.g. 8:30 AM).',
+            });
+            return;
+        }
+
+        if (undertimeTimeOut.trim() && !parsedTimeOut) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Time',
+                text:  'Invalid Time Out. Please use HH:MM AM/PM format (e.g. 5:00 PM).',
+            });
+            return;
+        }
+
+        const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
+
+        const payload = {
+            empCode:                        undertimeEmpCode,
+            workShift:                      undertimeWorkshiftCode          || null,  // modal prop: workshiftCode → DTO: workShift
+            dateFrom:                       parsedDateFrom,
+            dateTo:                         parsedDateTo,
+            timeIn:                         parsedTimeIn,
+            timeOut:                        parsedTimeOut,
+            undertime:                      toDecimal(undertimeUndertime),
+            undertimeHHMM:                  toDecimal(undertimeUndertimeHHMM),
+            undertimeWithinGracePeriod:     toDecimal(undertimeWithinGracePeriod),
+            undertimeWithinGracePeriodHHMM: toDecimal(undertimeWithinGracePeriodHHMM),
+            actualUndertime:                toDecimal(undertimeActualUndertime),
+            actualUndertimeHHMM:            toDecimal(undertimeActualUndertimeHHMM),
+            remarks:                        undertimeRemarks                || null,
+            groupCode:                      undertimeGroupCode              || null,
+            glCode:                         undertimeGLCode                 || null,
+        };
+
+        const recordLabel = `${undertimeDateFrom} → ${undertimeDateTo}`;
+
+        try {
+            if (isEditMode && editingIndex !== null) {
+
+                const confirm = await Swal.fire({
+                    icon:               'question',
+                    title:              'Confirm Update',
+                    text:               `Are you sure you want to update the record for ${recordLabel}?`,
+                    showCancelButton:   true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor:  '#6b7280',
+                    confirmButtonText:  'Yes',
+                    cancelButtonText:   'Cancel',
+                });
+                if (!confirm.isConfirmed) return;
+
+                const id = undertimeData[editingIndex].id;
+                const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
+
+                await apiClient.put(
+                    `/Maintenance/ProcessedData/PDUndertime/${id}`,
+                    updatePayload
+                );
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Updated successfully',
+                    text:              `Record for ${recordLabel} updated.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+
+            } else {
+
+                await apiClient.post(
+                    '/Maintenance/ProcessedData/PDUndertime',
+                    payload
+                );
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Created successfully',
+                    text:              `Record for ${recordLabel} created.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+            }
+
+            await fetchUndertime();
+
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to save record',
+            });
+        } finally {
+            setShowUndertimeModal(false);
+            setIsEditMode(false);
+            setEditingIndex(null);
+        }
     };
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteUndertime = (index: number) => {
-        if (window.confirm('Delete?')) setUndertimeData(undertimeData.filter((_, i) => i !== index));
+    const handleDeleteUndertime = async (index: number) => {
+
+        const record      = undertimeData[index];
+        const recordLabel = `${record.dateFrom} → ${record.dateTo}`;
+
+        const confirm = await Swal.fire({
+            icon:               'warning',
+            title:              'Confirm Delete',
+            text:               `Are you sure you want to delete the record for ${recordLabel}?`,
+            showCancelButton:   true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor:  '#6b7280',
+            confirmButtonText:  'Delete',
+            cancelButtonText:   'Cancel',
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        try {
+            await apiClient.delete(
+                `/Maintenance/ProcessedData/PDUndertime/${record.id}`
+            );
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
+            await fetchUndertime();
+            await Swal.fire({
+                icon:              'success',
+                title:             'Deleted successfully',
+                text:              `Record for ${recordLabel} deleted.`,
+                timer:             1500,
+                showConfirmButton: false,
+            });
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to delete record',
+            });
+        }
     };
 
-    // =========================================================================
-    // ── § LEAVE AND ABSENCES ──────────────────────────────────────────────────
-    // =========================================================================
+   // ──  LEAVE AND ABSENCES ──────────────────────────────────────────────────
+    interface LeaveAbsencesRecord {
+        id:                   number;
+        empCode:              string;
+        date:                 string;
+        hoursLeaveAbsent:     string;
+        hoursLeaveAbsentHHMM: string;
+        leaveCode:            string;
+        leaveDescription:     string;   // UI-only, no backing DTO field (always '')
+        reason:               string;
+        remarks:              string;
+        groupCode:            string;
+        withPay:              boolean;
+        exemptAllowFlag:      boolean;  // DTO field name
+        balanceID:            string;
+        glCode:               string;
+    }
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    const [leaveData,             setLeaveData]             = useState<any[]>([]);
+    const [leaveData,             setLeaveData]             = useState<LeaveAbsencesRecord[]>([]);
+    const [leaveLoading,          setLeaveLoading]          = useState(false);
+    const [leaveError,            setLeaveError]            = useState<string>('');
     const [showLeaveAbsencesModal, setShowLeaveAbsencesModal] = useState(false);
-    const [leaveEmpCode,                    setLeaveEmpCode]                    = useState('');
-    const [leaveDate,                       setLeaveDate]                       = useState('');
-    const [leaveHoursLeaveAbsent,           setLeaveHoursLeaveAbsent]           = useState('');
-    const [leaveLeaveCode,                  setLeaveLeaveCode]                  = useState('');
-    const [leaveLeaveDescription,           setLeaveLeaveDescription]           = useState('');
-    const [leaveReason,                     setLeaveReason]                     = useState('');
-    const [leaveRemarks,                    setLeaveRemarks]                    = useState('');
-    const [leaveWithPay,                    setLeaveWithPay]                    = useState(false);
-    const [leaveExemptForAllowanceDeduction, setLeaveExemptForAllowanceDeduction] = useState(false);
+
+    // Modal form fields
+    const [leaveEmpCode,                     setLeaveEmpCode]                     = useState('');
+    const [leaveDate,                        setLeaveDate]                        = useState('');
+    const [leaveHoursLeaveAbsent,            setLeaveHoursLeaveAbsent]            = useState('');
+    const [leaveLeaveCode,                   setLeaveLeaveCode]                   = useState('');
+    const [leaveLeaveDescription,            setLeaveLeaveDescription]            = useState('');   
+    const [leaveReason,                      setLeaveReason]                      = useState('');
+    const [leaveRemarks,                     setLeaveRemarks]                     = useState('');
+    const [leaveGroupCode,                   setLeaveGroupCode]                   = useState('');
+    const [leaveWithPay,                     setLeaveWithPay]                     = useState(false);
+    const [leaveExemptForAllowanceDeduction, setLeaveExemptForAllowanceDeduction] = useState(false); 
+    const [leaveGLCode,                      setLeaveGLCode]                      = useState('');
+
+    const [leaveTypesMap, setLeaveTypesMap] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        apiClient.get('/Fs/Process/LeaveTypeSetUp')
+            .then(res => {
+                const map: Record<string, string> = {};
+                (res.data as any[]).forEach(lt => {
+                    if (lt.leaveCode) map[lt.leaveCode] = lt.leaveDesc ?? '';
+                });
+                setLeaveTypesMap(map);
+            })
+            .catch(() => {}); 
+    }, []);
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
+    const fetchLeaveAbsences = useCallback(async () => {
+        if (!employeeCode) return;
+        setLeaveLoading(true);
+        setLeaveError('');
+
+        const parsedFrom = parseDate(dateFrom);
+        const parsedTo   = parseDate(dateTo);
+
+        if (!parsedFrom || !parsedTo) {
+            setLeaveError('Invalid date range. Please check Date From and Date To.');
+            setLeaveLoading(false);
+            return;
+        }
+
+        try {
+            const response = await apiClient.get(
+                '/Maintenance/ProcessedData/PDLeaveAbsences',
+                { params: {
+                    empCode:  employeeCode,
+                    dateFrom: parsedFrom,
+                    dateTo:   parsedTo,
+                    start:    (leaveAbsencesPage - 1) * PAGE_SIZE,
+                    length:   PAGE_SIZE,
+                }}
+            );
+
+            if (response.status === 200 && response.data) {
+                const rows  = response.data.data       ?? response.data;
+                const total = response.data.totalCount ?? 0;
+                setLeaveAbsencesTotalCount(total);
+
+                const records: LeaveAbsencesRecord[] = rows.map((r: any) => ({
+                    id:                   r.id                   ?? 0,
+                    empCode:              r.empCode              ?? '',
+                    date:                 formatDateOnly(r.date),
+                    hoursLeaveAbsent:     r.hoursLeaveAbsent     ?? '',
+                    hoursLeaveAbsentHHMM: r.hoursLeaveAbsentHHMM ?? '',
+                    leaveCode:            r.leaveCode            ?? '',
+                    leaveDescription:     leaveTypesMap[r.leaveCode] ?? '',  // ← resolved from lookup
+                    reason:               r.reason               ?? '',
+                    remarks:              r.remarks              ?? '',
+                    groupCode:            r.groupCode            ?? '',
+                    withPay:              r.withPay              ?? false,
+                    exemptAllowFlag:      r.exemptAllowFlag      ?? false,
+                    balanceID:            r.balanceID            ?? '',
+                    glCode:               r.glCode               ?? '',
+                }));
+
+                setLeaveData(records);
+            }
+        } catch (error: any) {
+            setLeaveError(
+                error.response?.data?.message || error.message || 'Failed to load Leave and Absences data'
+            );
+        } finally {
+            setLeaveLoading(false);
+        }
+    }, [employeeCode, dateFrom, dateTo, leaveAbsencesPage, leaveTypesMap]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateLeave = () => {
-        setIsEditMode(false); setEditingIndex(null);
-        setLeaveEmpCode(''); setLeaveDate(''); setLeaveHoursLeaveAbsent('');
-        setLeaveLeaveCode(''); setLeaveLeaveDescription(''); setLeaveReason('');
-        setLeaveRemarks(''); setLeaveWithPay(false); setLeaveExemptForAllowanceDeduction(false);
+        setIsEditMode(false);
+        setEditingIndex(null);
+        setLeaveEmpCode(employeeCode);
+        setLeaveDate('');
+        setLeaveHoursLeaveAbsent('');
+        setLeaveLeaveCode('');
+        setLeaveLeaveDescription('');
+        setLeaveReason('');
+        setLeaveRemarks('');
+        setLeaveGroupCode(employeeGroupCode);
+        setLeaveWithPay(false);
+        setLeaveExemptForAllowanceDeduction(false);
+        setLeaveGLCode('');
         setShowLeaveAbsencesModal(true);
     };
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     const handleEditLeave = (index: number) => {
         const r = leaveData[index];
-        setIsEditMode(true); setEditingIndex(index);
-        setLeaveEmpCode(r.empCode); setLeaveDate(r.date);
-        setLeaveHoursLeaveAbsent(r.hoursLeaveAbsent); setLeaveLeaveCode(r.leaveCode);
-        setLeaveLeaveDescription(r.leaveDescription); setLeaveReason(r.reason);
-        setLeaveRemarks(r.remarks); setLeaveWithPay(r.withPay);
-        setLeaveExemptForAllowanceDeduction(r.exemptForAllowanceDeduction);
+        setIsEditMode(true);
+        setEditingIndex(index);
+        setLeaveEmpCode(r.empCode);
+        setLeaveDate(r.date);
+        setLeaveHoursLeaveAbsent(String(r.hoursLeaveAbsent));
+        setLeaveLeaveCode(r.leaveCode);
+        setLeaveLeaveDescription(leaveTypesMap[r.leaveCode] ?? '');  // ← resolved here
+        setLeaveReason(r.reason);
+        setLeaveRemarks(r.remarks);
+        setLeaveGroupCode(r.groupCode);
+        setLeaveWithPay(r.withPay);
+        setLeaveExemptForAllowanceDeduction(r.exemptAllowFlag);
+        setLeaveGLCode(r.glCode);
         setShowLeaveAbsencesModal(true);
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
-    const handleLeaveAbsencesSubmit = () => {
-        const newRecord = {
-            empCode: leaveEmpCode, date: leaveDate, hoursLeaveAbsent: leaveHoursLeaveAbsent,
-            leaveCode: leaveLeaveCode, leaveDescription: leaveLeaveDescription,
-            reason: leaveReason, remarks: leaveRemarks,
-            withPay: leaveWithPay, exemptForAllowanceDeduction: leaveExemptForAllowanceDeduction,
-        };
-        if (isEditMode && editingIndex !== null) {
-            const updated = [...leaveData]; updated[editingIndex] = newRecord; setLeaveData(updated);
-        } else {
-            setLeaveData([...leaveData, newRecord]);
+    // ── Submit (create / update) ──────────────────────────────────────────────
+    const handleLeaveAbsencesSubmit = async () => {
+        const parsedDate = parseDate(leaveDate)
+            ? `${parseDate(leaveDate)}T00:00:00`
+            : null;
+
+        if (!parsedDate) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Date',
+                text:  'Invalid Date. Please use MM/DD/YYYY format.',
+            });
+            return;
         }
-        setShowLeaveAbsencesModal(false); setIsEditMode(false); setEditingIndex(null);
+
+        const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
+
+        const payload = {
+            empCode:              leaveEmpCode,
+            date:                 parsedDate,
+            hoursLeaveAbsent:     toDecimal(leaveHoursLeaveAbsent),
+            hoursLeaveAbsentHHMM: null,                              // not exposed in modal
+            leaveCode:            leaveLeaveCode                || null,
+            reason:               leaveReason                  || null,
+            remarks:              leaveRemarks                 || null,
+            groupCode:            leaveGroupCode               || null,
+            withPay:              leaveWithPay,
+            exemptAllowFlag:      leaveExemptForAllowanceDeduction,  // translate UI state → DTO
+            glCode:               leaveGLCode                  || null,
+        };
+
+        const recordLabel = leaveDate;
+
+        try {
+            if (isEditMode && editingIndex !== null) {
+
+                const confirm = await Swal.fire({
+                    icon:               'question',
+                    title:              'Confirm Update',
+                    text:               `Are you sure you want to update the record for ${recordLabel}?`,
+                    showCancelButton:   true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor:  '#6b7280',
+                    confirmButtonText:  'Yes',
+                    cancelButtonText:   'Cancel',
+                });
+                if (!confirm.isConfirmed) return;
+
+                const id = leaveData[editingIndex].id;
+
+                // Strip empCode and glCode — not accepted by PDLeaveAbsencesUpdateRow
+                const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
+
+                await apiClient.put(
+                    `/Maintenance/ProcessedData/PDLeaveAbsences/${id}`,
+                    updatePayload
+                );
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Updated successfully',
+                    text:              `Record for ${recordLabel} updated.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+
+            } else {
+
+                await apiClient.post(
+                    '/Maintenance/ProcessedData/PDLeaveAbsences',
+                    payload
+                );
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Created successfully',
+                    text:              `Record for ${recordLabel} created.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+            }
+
+            await fetchLeaveAbsences();
+
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to save record',
+            });
+        } finally {
+            setShowLeaveAbsencesModal(false);
+            setIsEditMode(false);
+            setEditingIndex(null);
+        }
     };
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteLeave = (index: number) => {
-        if (window.confirm('Delete?')) setLeaveData(leaveData.filter((_, i) => i !== index));
+    const handleDeleteLeave = async (index: number) => {
+
+        const record      = leaveData[index];
+        const recordLabel = record.date;
+
+        const confirm = await Swal.fire({
+            icon:               'warning',
+            title:              'Confirm Delete',
+            text:               `Are you sure you want to delete the record for ${recordLabel}?`,
+            showCancelButton:   true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor:  '#6b7280',
+            confirmButtonText:  'Delete',
+            cancelButtonText:   'Cancel',
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        try {
+            await apiClient.delete(
+                `/Maintenance/ProcessedData/PDLeaveAbsences/${record.id}`
+            );
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
+            await fetchLeaveAbsences();
+            await Swal.fire({
+                icon:              'success',
+                title:             'Deleted successfully',
+                text:              `Record for ${recordLabel} deleted.`,
+                timer:             1500,
+                showConfirmButton: false,
+            });
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to delete record',
+            });
+        }
     };
 
-    // =========================================================================
-    // ── § OVERTIME ────────────────────────────────────────────────────────────
-    // =========================================================================
+    // ──  OVERTIME ────────────────────────────────────────────────────────────
+    interface OvertimeRecord {
+        id:            number;
+        empCode:       string;
+        dateFrom:      string;
+        dateTo:        string;
+        timeIn:        string;
+        timeOut:       string;
+        workShiftCode: string;
+        overtime:      string;
+        overtimeHHMM:  string;
+        otCode:        string;
+        remarks:       string;
+        reason:        string;
+        groupCode:     string;
+        glCode:        string;
+    }
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    const [overtimeData,      setOvertimeData]      = useState<any[]>([]);
+    const [overtimeData,    setOvertimeData]    = useState<OvertimeRecord[]>([]);
+    const [overtimeLoading, setOvertimeLoading] = useState(false);
+    const [overtimeError,   setOvertimeError]   = useState<string>('');
     const [showOvertimeModal, setShowOvertimeModal] = useState(false);
+
+    // Modal form fields
     const [overtimeEmpCode,       setOvertimeEmpCode]       = useState('');
     const [overtimeDateFrom,      setOvertimeDateFrom]      = useState('');
     const [overtimeDateTo,        setOvertimeDateTo]        = useState('');
@@ -1001,227 +1533,1158 @@ export function ProcessedDataPage() {
     const [overtimeTimeOut,       setOvertimeTimeOut]       = useState('');
     const [overtimeWorkshiftCode, setOvertimeWorkshiftCode] = useState('');
     const [overtimeOvertime,      setOvertimeOvertime]      = useState('');
+    const [overtimeOvertimeHHMM,  setOvertimeOvertimeHHMM]  = useState('');
     const [overtimeOTCode,        setOvertimeOTCode]        = useState('');
-    const [overtimeReason,        setOvertimeReason]        = useState('');
     const [overtimeRemarks,       setOvertimeRemarks]       = useState('');
+    const [overtimeReason,        setOvertimeReason]        = useState('');
+    const [overtimeGroupCode,     setOvertimeGroupCode]     = useState('');
+    const [overtimeGLCode,        setOvertimeGLCode]        = useState('');
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
+    const fetchOvertime = useCallback(async () => {
+        if (!employeeCode) return;
+        setOvertimeLoading(true);
+        setOvertimeError('');
+
+        const parsedFrom = parseDate(dateFrom);
+        const parsedTo   = parseDate(dateTo);
+
+        if (!parsedFrom || !parsedTo) {
+            setOvertimeError('Invalid date range. Please check Date From and Date To.');
+            setOvertimeLoading(false);
+            return;
+        }
+
+        try {
+            const response = await apiClient.get(
+                '/Maintenance/ProcessedData/PDOvertime',
+                { params: {
+                    empCode:  employeeCode,
+                    dateFrom: parsedFrom,
+                    dateTo:   parsedTo,
+                    start:    (overtimePage - 1) * PAGE_SIZE,
+                    length:   PAGE_SIZE,
+                }}
+            );
+
+            if (response.status === 200 && response.data) {
+                const rows  = response.data.data       ?? response.data;
+                const total = response.data.totalCount ?? 0;
+                setOvertimeTotalCount(total);
+
+                const records: OvertimeRecord[] = rows.map((r: any) => ({
+                    id:            r.id            ?? 0,
+                    empCode:       r.empCode       ?? '',
+                    dateFrom:      formatDateOnly(r.dateFrom),
+                    dateTo:        formatDateOnly(r.dateTo),
+                    timeIn:        formatTimeOnly(r.timeIn),
+                    timeOut:       formatTimeOnly(r.timeOut),
+                    workShiftCode: r.workShiftCode ?? '',
+                    overtime:      r.overtime      ?? '',
+                    overtimeHHMM:  r.overtimeHHMM  ?? '',
+                    otCode:        r.otCode        ?? '',
+                    remarks:       r.remarks       ?? '',
+                    reason:        r.reason        ?? '',
+                    groupCode:     r.groupCode     ?? '',
+                    glCode:        r.glCode        ?? '',
+                }));
+
+                setOvertimeData(records);
+            }
+        } catch (error: any) {
+            setOvertimeError(
+                error.response?.data?.message || error.message || 'Failed to load Overtime data'
+            );
+        } finally {
+            setOvertimeLoading(false);
+        }
+    }, [employeeCode, dateFrom, dateTo, overtimePage]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateOvertime = () => {
-        setIsEditMode(false); setEditingIndex(null);
-        setOvertimeEmpCode(''); setOvertimeDateFrom(''); setOvertimeDateTo('');
-        setOvertimeTimeIn(''); setOvertimeTimeOut(''); setOvertimeWorkshiftCode('');
-        setOvertimeOvertime(''); setOvertimeOTCode(''); setOvertimeReason(''); setOvertimeRemarks('');
+        setIsEditMode(false);
+        setEditingIndex(null);
+        setOvertimeEmpCode(employeeCode);
+        setOvertimeDateFrom('');
+        setOvertimeDateTo('');
+        setOvertimeTimeIn('');
+        setOvertimeTimeOut('');
+        setOvertimeWorkshiftCode('');
+        setOvertimeOvertime('');
+        setOvertimeOvertimeHHMM('');
+        setOvertimeOTCode('');
+        setOvertimeRemarks('');
+        setOvertimeReason('');
+        setOvertimeGroupCode(employeeGroupCode);
+        setOvertimeGLCode('');
         setShowOvertimeModal(true);
     };
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     const handleEditOvertime = (index: number) => {
         const r = overtimeData[index];
-        setIsEditMode(true); setEditingIndex(index);
-        setOvertimeEmpCode(r.empCode); setOvertimeDateFrom(r.dateFrom);
-        setOvertimeDateTo(r.dateTo); setOvertimeTimeIn(r.timeIn);
-        setOvertimeTimeOut(r.timeOut); setOvertimeWorkshiftCode(r.workshiftCode);
-        setOvertimeOvertime(r.overtime); setOvertimeOTCode(r.otCode);
-        setOvertimeReason(r.reason); setOvertimeRemarks(r.remarks);
+        setIsEditMode(true);
+        setEditingIndex(index);
+        setOvertimeEmpCode(r.empCode);
+        setOvertimeDateFrom(r.dateFrom);
+        setOvertimeDateTo(r.dateTo);
+        setOvertimeTimeIn(r.timeIn);
+        setOvertimeTimeOut(r.timeOut);
+        setOvertimeWorkshiftCode(r.workShiftCode);
+        setOvertimeOvertime(String(r.overtime));
+        setOvertimeOvertimeHHMM(String(r.overtimeHHMM));
+        setOvertimeOTCode(r.otCode);
+        setOvertimeRemarks(r.remarks);
+        setOvertimeReason(r.reason);
+        setOvertimeGroupCode(r.groupCode);
+        setOvertimeGLCode(r.glCode);
         setShowOvertimeModal(true);
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
-    const handleOvertimeSubmit = () => {
-        const newRecord = {
-            empCode: overtimeEmpCode, dateFrom: overtimeDateFrom, dateTo: overtimeDateTo,
-            timeIn: overtimeTimeIn, timeOut: overtimeTimeOut, workshiftCode: overtimeWorkshiftCode,
-            overtime: overtimeOvertime, otCode: overtimeOTCode,
-            reason: overtimeReason, remarks: overtimeRemarks,
-        };
-        if (isEditMode && editingIndex !== null) {
-            const updated = [...overtimeData]; updated[editingIndex] = newRecord; setOvertimeData(updated);
-        } else {
-            setOvertimeData([...overtimeData, newRecord]);
+    // ── Submit (create / update) ──────────────────────────────────────────────
+    const handleOvertimeSubmit = async () => {
+        const parsedDateFrom = parseDate(overtimeDateFrom)
+            ? `${parseDate(overtimeDateFrom)}T00:00:00`
+            : null;
+
+        const parsedDateTo = parseDate(overtimeDateTo)
+            ? `${parseDate(overtimeDateTo)}T00:00:00`
+            : null;
+
+        if (!parsedDateFrom || !parsedDateTo) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Date',
+                text:  'Invalid Date From or Date To. Please use MM/DD/YYYY format.',
+            });
+            return;
         }
-        setShowOvertimeModal(false); setIsEditMode(false); setEditingIndex(null);
+
+        // ── Time-only fields (timeIn / timeOut) ───────────────────────────────
+        const parseTimeOnly = (raw: string): string | null => {
+            if (!raw?.trim()) return null;
+            const match = raw.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+            if (!match) return null;
+            let hours    = parseInt(match[1]);
+            const mins   = parseInt(match[2]);
+            const period = match[3]?.toUpperCase();
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12)  hours  = 0;
+            return `1900-01-01T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
+        };
+
+        const parsedTimeIn  = overtimeTimeIn.trim()  ? parseTimeOnly(overtimeTimeIn)  : null;
+        const parsedTimeOut = overtimeTimeOut.trim()  ? parseTimeOnly(overtimeTimeOut) : null;
+
+        if (overtimeTimeIn.trim() && !parsedTimeIn) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Time',
+                text:  'Invalid Time In. Please use HH:MM AM/PM format (e.g. 8:30 AM).',
+            });
+            return;
+        }
+
+        if (overtimeTimeOut.trim() && !parsedTimeOut) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Time',
+                text:  'Invalid Time Out. Please use HH:MM AM/PM format (e.g. 5:00 PM).',
+            });
+            return;
+        }
+
+        const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
+
+        const payload = {
+            empCode:       overtimeEmpCode,
+            dateFrom:      parsedDateFrom,
+            dateTo:        parsedDateTo,
+            timeIn:        parsedTimeIn,
+            timeOut:       parsedTimeOut,
+            workShiftCode: overtimeWorkshiftCode  || null,
+            overtime:      toDecimal(overtimeOvertime),
+            overtimeHHMM:  toDecimal(overtimeOvertimeHHMM),
+            otCode:        overtimeOTCode         || null,
+            remarks:       overtimeRemarks        || null,
+            reason:        overtimeReason         || null,
+            groupCode:     overtimeGroupCode      || null,
+            glCode:        overtimeGLCode         || null,
+        };
+
+        const recordLabel = `${overtimeDateFrom} → ${overtimeDateTo}`;
+
+        try {
+            if (isEditMode && editingIndex !== null) {
+
+                const confirm = await Swal.fire({
+                    icon:               'question',
+                    title:              'Confirm Update',
+                    text:               `Are you sure you want to update the record for ${recordLabel}?`,
+                    showCancelButton:   true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor:  '#6b7280',
+                    confirmButtonText:  'Yes',
+                    cancelButtonText:   'Cancel',
+                });
+                if (!confirm.isConfirmed) return;
+
+                const id = overtimeData[editingIndex].id;
+
+                // Strip empCode and glCode — not accepted by PDOvertimeUpdateRow
+                const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
+
+                await apiClient.put(
+                    `/Maintenance/ProcessedData/PDOvertime/${id}`,
+                    updatePayload
+                );
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Updated successfully',
+                    text:              `Record for ${recordLabel} updated.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+
+            } else {
+
+                await apiClient.post(
+                    '/Maintenance/ProcessedData/PDOvertime',
+                    payload
+                );
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Created successfully',
+                    text:              `Record for ${recordLabel} created.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+            }
+
+            await fetchOvertime();
+
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to save record',
+            });
+        } finally {
+            setShowOvertimeModal(false);
+            setIsEditMode(false);
+            setEditingIndex(null);
+        }
     };
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteOvertime = (index: number) => {
-        if (window.confirm('Delete?')) setOvertimeData(overtimeData.filter((_, i) => i !== index));
+    const handleDeleteOvertime = async (index: number) => {
+
+        const record      = overtimeData[index];
+        const recordLabel = `${record.dateFrom} → ${record.dateTo}`;
+
+        const confirm = await Swal.fire({
+            icon:               'warning',
+            title:              'Confirm Delete',
+            text:               `Are you sure you want to delete the record for ${recordLabel}?`,
+            showCancelButton:   true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor:  '#6b7280',
+            confirmButtonText:  'Delete',
+            cancelButtonText:   'Cancel',
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        try {
+            await apiClient.delete(
+                `/Maintenance/ProcessedData/PDOvertime/${record.id}`
+            );
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
+            await fetchOvertime();
+            await Swal.fire({
+                icon:              'success',
+                title:             'Deleted successfully',
+                text:              `Record for ${recordLabel} deleted.`,
+                timer:             1500,
+                showConfirmButton: false,
+            });
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to delete record',
+            });
+        }
     };
 
-    // =========================================================================
-    // ── § OTHER EARNINGS AND ALLOWANCES ──────────────────────────────────────
-    // =========================================================================
+    // ──  OTHER EARNINGS AND ALLOWANCES ──────────────────────────────────────
+    interface OtherEarningsRecord {
+        id:                 number;
+        empCode:            string;
+        allowanceCode:      string;
+        date:               string;
+        description:        string;
+        amount:             string;
+        remarks:            string;
+        groupCode:          string;
+        doubleShiftsInADay: boolean;
+        glCode:             string;
+    }
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    const [otherEarningsData,      setOtherEarningsData]      = useState<any[]>([]);
+    const [otherEarningsData,    setOtherEarningsData]    = useState<OtherEarningsRecord[]>([]);
+    const [otherEarningsLoading, setOtherEarningsLoading] = useState(false);
+    const [otherEarningsError,   setOtherEarningsError]   = useState<string>('');
     const [showOtherEarningsModal, setShowOtherEarningsModal] = useState(false);
-    const [otherEarningsEmpCode,       setOtherEarningsEmpCode]       = useState('');
-    const [otherEarningsDate,          setOtherEarningsDate]          = useState('');
-    const [otherEarningsAllowanceCode, setOtherEarningsAllowanceCode] = useState('');
-    const [otherEarningsDescription,   setOtherEarningsDescription]   = useState('');
-    const [otherEarningsAmount,        setOtherEarningsAmount]        = useState('');
-    const [otherEarningsRemarks,       setOtherEarningsRemarks]       = useState('');
+
+    // Modal form fields
+    const [otherEarningsEmpCode,           setOtherEarningsEmpCode]           = useState('');
+    const [otherEarningsAllowanceCode,     setOtherEarningsAllowanceCode]     = useState('');
+    const [otherEarningsDate,              setOtherEarningsDate]              = useState('');
+    const [otherEarningsDescription,       setOtherEarningsDescription]       = useState('');
+    const [otherEarningsAmount,            setOtherEarningsAmount]            = useState('');
+    const [otherEarningsRemarks,           setOtherEarningsRemarks]           = useState('');
+    const [otherEarningsGroupCode,         setOtherEarningsGroupCode]         = useState('');
+    const [otherEarningsDoubleShiftsInADay, setOtherEarningsDoubleShiftsInADay] = useState(false);
+    const [otherEarningsGLCode,            setOtherEarningsGLCode]            = useState('');
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
+    const fetchOtherEarnings = useCallback(async () => {
+        if (!employeeCode) return;
+        setOtherEarningsLoading(true);
+        setOtherEarningsError('');
+
+        const parsedFrom = parseDate(dateFrom);
+        const parsedTo   = parseDate(dateTo);
+
+        if (!parsedFrom || !parsedTo) {
+            setOtherEarningsError('Invalid date range. Please check Date From and Date To.');
+            setOtherEarningsLoading(false);
+            return;
+        }
+
+        try {
+            const response = await apiClient.get(
+                '/Maintenance/ProcessedData/PDOtherEarnings',
+                { params: {
+                    empCode:  employeeCode,
+                    dateFrom: parsedFrom,
+                    dateTo:   parsedTo,
+                    start:    (otherEarningsPage - 1) * PAGE_SIZE,
+                    length:   PAGE_SIZE,
+                }}
+            );
+
+            if (response.status === 200 && response.data) {
+                const rows  = response.data.data       ?? response.data;
+                const total = response.data.totalCount ?? 0;
+                setOtherEarningsTotalCount(total);
+
+                const records: OtherEarningsRecord[] = rows.map((r: any) => ({
+                    id:                 r.id                 ?? 0,
+                    empCode:            r.empCode            ?? '',
+                    allowanceCode:      r.allowanceCode      ?? '',
+                    date:               formatDateOnly(r.date),
+                    description:        r.description        ?? '',
+                    amount:             r.amount             ?? '',
+                    remarks:            r.remarks            ?? '',
+                    groupCode:          r.groupCode          ?? '',
+                    doubleShiftsInADay: r.doubleShiftsInADay ?? false,
+                    glCode:             r.glCode             ?? '',
+                }));
+
+                setOtherEarningsData(records);
+            }
+        } catch (error: any) {
+            setOtherEarningsError(
+                error.response?.data?.message || error.message || 'Failed to load Other Earnings data'
+            );
+        } finally {
+            setOtherEarningsLoading(false);
+        }
+    }, [employeeCode, dateFrom, dateTo, otherEarningsPage]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateOtherEarnings = () => {
-        setIsEditMode(false); setEditingIndex(null);
-        setOtherEarningsEmpCode(''); setOtherEarningsDate(''); setOtherEarningsAllowanceCode('');
-        setOtherEarningsDescription(''); setOtherEarningsAmount(''); setOtherEarningsRemarks('');
+        setIsEditMode(false);
+        setEditingIndex(null);
+        setOtherEarningsEmpCode(employeeCode);
+        setOtherEarningsAllowanceCode('');
+        setOtherEarningsDate('');
+        setOtherEarningsDescription('');
+        setOtherEarningsAmount('');
+        setOtherEarningsRemarks('');
+        setOtherEarningsGroupCode(employeeGroupCode);
+        setOtherEarningsDoubleShiftsInADay(false);
+        setOtherEarningsGLCode('');
         setShowOtherEarningsModal(true);
     };
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     const handleEditOtherEarnings = (index: number) => {
         const r = otherEarningsData[index];
-        setIsEditMode(true); setEditingIndex(index);
-        setOtherEarningsEmpCode(r.empCode); setOtherEarningsDate(r.date);
-        setOtherEarningsAllowanceCode(r.allowanceCode); setOtherEarningsDescription(r.description);
-        setOtherEarningsAmount(r.amount); setOtherEarningsRemarks(r.remarks);
+        setIsEditMode(true);
+        setEditingIndex(index);
+        setOtherEarningsEmpCode(r.empCode);
+        setOtherEarningsAllowanceCode(r.allowanceCode);
+        setOtherEarningsDate(r.date);
+        setOtherEarningsDescription(r.description);
+        setOtherEarningsAmount(String(r.amount));
+        setOtherEarningsRemarks(r.remarks);
+        setOtherEarningsGroupCode(r.groupCode);
+        setOtherEarningsDoubleShiftsInADay(r.doubleShiftsInADay);
+        setOtherEarningsGLCode(r.glCode);
         setShowOtherEarningsModal(true);
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
-    const handleOtherEarningsSubmit = () => {
-        const newRecord = {
-            empCode: otherEarningsEmpCode, date: otherEarningsDate,
-            allowanceCode: otherEarningsAllowanceCode, description: otherEarningsDescription,
-            amount: otherEarningsAmount, remarks: otherEarningsRemarks,
-            groupCode: '', glCode: '',
-        };
-        if (isEditMode && editingIndex !== null) {
-            const updated = [...otherEarningsData]; updated[editingIndex] = newRecord; setOtherEarningsData(updated);
-        } else {
-            setOtherEarningsData([...otherEarningsData, newRecord]);
+    // ── Submit (create / update) ──────────────────────────────────────────────
+    const handleOtherEarningsSubmit = async () => {
+        const parsedDate = parseDate(otherEarningsDate)
+            ? `${parseDate(otherEarningsDate)}T00:00:00`
+            : null;
+
+        if (!parsedDate) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Date',
+                text:  'Invalid Date. Please use MM/DD/YYYY format.',
+            });
+            return;
         }
-        setShowOtherEarningsModal(false); setIsEditMode(false); setEditingIndex(null);
+
+        const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
+
+        const payload = {
+            empCode:            otherEarningsEmpCode,
+            allowanceCode:      otherEarningsAllowanceCode  || null,
+            date:               parsedDate,
+            description:        otherEarningsDescription    || null,
+            amount:             toDecimal(otherEarningsAmount),
+            remarks:            otherEarningsRemarks        || null,
+            groupCode:          otherEarningsGroupCode      || null,
+            doubleShiftsInADay: otherEarningsDoubleShiftsInADay,
+            glCode:             otherEarningsGLCode         || null,
+        };
+
+        const recordLabel = otherEarningsDate;
+
+        try {
+            if (isEditMode && editingIndex !== null) {
+
+                const confirm = await Swal.fire({
+                    icon:               'question',
+                    title:              'Confirm Update',
+                    text:               `Are you sure you want to update the record for ${recordLabel}?`,
+                    showCancelButton:   true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor:  '#6b7280',
+                    confirmButtonText:  'Yes',
+                    cancelButtonText:   'Cancel',
+                });
+                if (!confirm.isConfirmed) return;
+
+                const id = otherEarningsData[editingIndex].id;
+
+                // Strip empCode — not accepted by PDOtherEarningsUpdateRow
+                const { empCode: _emp, ...updatePayload } = payload;
+
+                await apiClient.put(
+                    `/Maintenance/ProcessedData/PDOtherEarnings/${id}`,
+                    updatePayload
+                );
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Updated successfully',
+                    text:              `Record for ${recordLabel} updated.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+
+            } else {
+
+                await apiClient.post(
+                    '/Maintenance/ProcessedData/PDOtherEarnings',
+                    payload
+                );
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Created successfully',
+                    text:              `Record for ${recordLabel} created.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+            }
+
+            await fetchOtherEarnings();
+
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to save record',
+            });
+        } finally {
+            setShowOtherEarningsModal(false);
+            setIsEditMode(false);
+            setEditingIndex(null);
+        }
     };
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteOtherEarnings = (index: number) => {
-        if (window.confirm('Delete?')) setOtherEarningsData(otherEarningsData.filter((_, i) => i !== index));
+    const handleDeleteOtherEarnings = async (index: number) => {
+
+        const record      = otherEarningsData[index];
+        const recordLabel = record.date;
+
+        const confirm = await Swal.fire({
+            icon:               'warning',
+            title:              'Confirm Delete',
+            text:               `Are you sure you want to delete the record for ${recordLabel}?`,
+            showCancelButton:   true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor:  '#6b7280',
+            confirmButtonText:  'Delete',
+            cancelButtonText:   'Cancel',
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        try {
+            await apiClient.delete(
+                `/Maintenance/ProcessedData/PDOtherEarnings/${record.id}`
+            );
+            await fetchOtherEarnings();
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
+            await Swal.fire({
+                icon:              'success',
+                title:             'Deleted successfully',
+                text:              `Record for ${recordLabel} deleted.`,
+                timer:             1500,
+                showConfirmButton: false,
+            });
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to delete record',
+            });
+        }
     };
 
-    // =========================================================================
-    // ── § ADJUSTMENT ──────────────────────────────────────────────────────────
-    // =========================================================================
+    // ──  ADJUSTMENT ──────────────────────────────────────────────────────────
+    interface AdjustmentRecord {
+        id:                     number;
+        empCode:                string;
+        transactionDate:        string;
+        transactionType:        string;
+        leaveType:              string;
+        overTimeCode:           string;
+        noOfHours:              string;
+        noOfHoursHHMM:          string;
+        remarks:                string;
+        adjustType:             string;
+        groupCode:              string;
+        isLateFiling:           boolean;
+        isLateFilingActualDate: string;
+        bDeviceName:            string;
+        glCode:                 string;
+    }
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    const [adjustmentData,      setAdjustmentData]      = useState<any[]>([]);
+    const [adjustmentData,    setAdjustmentData]    = useState<AdjustmentRecord[]>([]);
+    const [adjustmentLoading, setAdjustmentLoading] = useState(false);
+    const [adjustmentError,   setAdjustmentError]   = useState<string>('');
     const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+
+    // Modal form fields
     const [adjustmentEmpCode,                setAdjustmentEmpCode]                = useState('');
     const [adjustmentTransactionDate,        setAdjustmentTransactionDate]        = useState('');
     const [adjustmentTransactionType,        setAdjustmentTransactionType]        = useState('');
     const [adjustmentLeaveType,              setAdjustmentLeaveType]              = useState('');
     const [adjustmentOvertimeCode,           setAdjustmentOvertimeCode]           = useState('');
     const [adjustmentNoOfHours,              setAdjustmentNoOfHours]              = useState('');
-    const [adjustmentAdjustType,             setAdjustmentAdjustType]             = useState('');
+    const [adjustmentNoOfHoursHHMM,          setAdjustmentNoOfHoursHHMM]          = useState('');
     const [adjustmentRemarks,                setAdjustmentRemarks]                = useState('');
+    const [adjustmentAdjustType,             setAdjustmentAdjustType]             = useState('');
+    const [adjustmentGroupCode,              setAdjustmentGroupCode]              = useState('');
     const [adjustmentIsLateFiling,           setAdjustmentIsLateFiling]           = useState(false);
     const [adjustmentIsLateFilingActualDate, setAdjustmentIsLateFilingActualDate] = useState('');
     const [adjustmentBorrowedDeviceName,     setAdjustmentBorrowedDeviceName]     = useState('');
+    const [adjustmentGLCode,                 setAdjustmentGLCode]                 = useState('');
+
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
+    const fetchAdjustment = useCallback(async () => {
+        if (!employeeCode) return;
+        setAdjustmentLoading(true);
+        setAdjustmentError('');
+
+        const parsedFrom = parseDate(dateFrom);
+        const parsedTo   = parseDate(dateTo);
+
+        if (!parsedFrom || !parsedTo) {
+            setAdjustmentError('Invalid date range. Please check Date From and Date To.');
+            setAdjustmentLoading(false);
+            return;
+        }
+
+        try {
+            const response = await apiClient.get(
+                '/Maintenance/ProcessedData/PDAdjustment',
+                { params: {
+                    empCode:  employeeCode,
+                    dateFrom: parsedFrom,
+                    dateTo:   parsedTo,
+                    start:    (adjustmentPage - 1) * PAGE_SIZE,
+                    length:   PAGE_SIZE,
+                }}
+            );
+
+            if (response.status === 200 && response.data) {
+                const rows  = response.data.data       ?? response.data;
+                const total = response.data.totalCount ?? 0;
+                setAdjustmentTotalCount(total);
+
+                const records: AdjustmentRecord[] = rows.map((r: any) => ({
+                    id:                     r.id                                  ?? 0,
+                    empCode:                r.empCode                             ?? '',
+                    transactionDate:        formatDateOnly(r.transactionDate),
+                    transactionType:        r.transactionType                     ?? '',
+                    leaveType:              r.leaveType                           ?? '',
+                    overTimeCode:           r.overTimeCode                        ?? '',
+                    noOfHours:              r.noOfHours                           ?? '',
+                    noOfHoursHHMM:          r.noOfHoursHHMM                       ?? '',
+                    remarks:                r.remarks                             ?? '',
+                    adjustType:             r.adjustType                          ?? '',
+                    groupCode:              r.groupCode                           ?? '',
+                    isLateFiling:           r.isLateFiling                        ?? false,
+                    isLateFilingActualDate: formatDateOnly(r.isLateFilingActualDate),
+                    bDeviceName:            r.bDeviceName                         ?? '',
+                    glCode:                 r.glCode                              ?? '',
+                }));
+
+                setAdjustmentData(records);
+            }
+        } catch (error: any) {
+            setAdjustmentError(
+                error.response?.data?.message || error.message || 'Failed to load Adjustment data'
+            );
+        } finally {
+            setAdjustmentLoading(false);
+        }
+    }, [employeeCode, dateFrom, dateTo, adjustmentPage]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateAdjustment = () => {
-        setIsEditMode(false); setEditingIndex(null);
-        setAdjustmentEmpCode(''); setAdjustmentTransactionDate(''); setAdjustmentTransactionType('');
-        setAdjustmentLeaveType(''); setAdjustmentOvertimeCode(''); setAdjustmentNoOfHours('');
-        setAdjustmentAdjustType(''); setAdjustmentRemarks('');
-        setAdjustmentIsLateFiling(false); setAdjustmentIsLateFilingActualDate('');
+        setIsEditMode(false);
+        setEditingIndex(null);
+        setAdjustmentEmpCode(employeeCode);
+        setAdjustmentTransactionDate('');
+        setAdjustmentTransactionType('');
+        setAdjustmentLeaveType('');
+        setAdjustmentOvertimeCode('');
+        setAdjustmentNoOfHours('');
+        setAdjustmentNoOfHoursHHMM('');
+        setAdjustmentRemarks('');
+        setAdjustmentAdjustType('');
+        setAdjustmentGroupCode(employeeGroupCode);
+        setAdjustmentIsLateFiling(false);
+        setAdjustmentIsLateFilingActualDate('');
         setAdjustmentBorrowedDeviceName('');
+        setAdjustmentGLCode('');
         setShowAdjustmentModal(true);
     };
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     const handleEditAdjustment = (index: number) => {
         const r = adjustmentData[index];
-        setIsEditMode(true); setEditingIndex(index);
-        setAdjustmentEmpCode(r.empCode); setAdjustmentTransactionDate(r.transactionDate);
-        setAdjustmentTransactionType(r.transactionType); setAdjustmentLeaveType(r.leaveType);
-        setAdjustmentOvertimeCode(r.overtimeCode); setAdjustmentNoOfHours(r.noOfHours);
-        setAdjustmentAdjustType(r.adjustType); setAdjustmentRemarks(r.remarks);
+        setIsEditMode(true);
+        setEditingIndex(index);
+        setAdjustmentEmpCode(r.empCode);
+        setAdjustmentTransactionDate(r.transactionDate);
+        setAdjustmentTransactionType(r.transactionType);
+        setAdjustmentLeaveType(r.leaveType);
+        setAdjustmentOvertimeCode(r.overTimeCode);
+        setAdjustmentNoOfHours(String(r.noOfHours));
+        setAdjustmentNoOfHoursHHMM(String(r.noOfHoursHHMM));
+        setAdjustmentRemarks(r.remarks);
+        setAdjustmentAdjustType(r.adjustType);
+        setAdjustmentGroupCode(r.groupCode);
         setAdjustmentIsLateFiling(r.isLateFiling);
         setAdjustmentIsLateFilingActualDate(r.isLateFilingActualDate);
-        setAdjustmentBorrowedDeviceName(r.borrowedDeviceName);
+        setAdjustmentBorrowedDeviceName(r.bDeviceName);
+        setAdjustmentGLCode(r.glCode);
         setShowAdjustmentModal(true);
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
-    const handleAdjustmentSubmit = () => {
-        const newRecord = {
-            empCode: adjustmentEmpCode, transactionDate: adjustmentTransactionDate,
-            transactionType: adjustmentTransactionType, leaveType: adjustmentLeaveType,
-            overtimeCode: adjustmentOvertimeCode, noOfHours: adjustmentNoOfHours,
-            adjustType: adjustmentAdjustType, remarks: adjustmentRemarks,
-            isLateFiling: adjustmentIsLateFiling,
-            isLateFilingActualDate: adjustmentIsLateFilingActualDate,
-            borrowedDeviceName: adjustmentBorrowedDeviceName,
-            groupCode: '', glCode: '',
-        };
-        if (isEditMode && editingIndex !== null) {
-            const updated = [...adjustmentData]; updated[editingIndex] = newRecord; setAdjustmentData(updated);
-        } else {
-            setAdjustmentData([...adjustmentData, newRecord]);
+    // ── Submit (create / update) ──────────────────────────────────────────────
+    const handleAdjustmentSubmit = async () => {
+        const parsedTransactionDate = parseDate(adjustmentTransactionDate)
+            ? `${parseDate(adjustmentTransactionDate)}T00:00:00`
+            : null;
+
+        if (!parsedTransactionDate) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Date',
+                text:  'Invalid Transaction Date. Please use MM/DD/YYYY format.',
+            });
+            return;
         }
-        setShowAdjustmentModal(false); setIsEditMode(false); setEditingIndex(null);
+
+        const parsedIsLateFilingActualDate = adjustmentIsLateFilingActualDate.trim()
+            ? parseDate(adjustmentIsLateFilingActualDate)
+                ? `${parseDate(adjustmentIsLateFilingActualDate)}T00:00:00`
+                : null
+            : null;
+
+        if (adjustmentIsLateFilingActualDate.trim() && !parsedIsLateFilingActualDate) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Date',
+                text:  'Invalid Late Filing Actual Date. Please use MM/DD/YYYY format.',
+            });
+            return;
+        }
+
+        const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
+
+        const payload = {
+            empCode:                adjustmentEmpCode,
+            transactionDate:        parsedTransactionDate,
+            transactionType:        adjustmentTransactionType        || null,
+            leaveType:              adjustmentLeaveType              || null,
+            overtimeCode:           adjustmentOvertimeCode           || null,
+            noOfHours:              toDecimal(adjustmentNoOfHours),
+            noOfHoursHHMM:          toDecimal(adjustmentNoOfHoursHHMM),
+            remarks:                adjustmentRemarks                || null,
+            adjustType:             adjustmentAdjustType             || null,
+            groupCode:              adjustmentGroupCode              || null,
+            isLateFiling:           adjustmentIsLateFiling,
+            isLateFilingActualDate: parsedIsLateFilingActualDate,
+            bDeviceName:            adjustmentBorrowedDeviceName     || null,
+            glCode:                 adjustmentGLCode                 || null,
+        };
+
+        const recordLabel = adjustmentTransactionDate;
+
+        try {
+            if (isEditMode && editingIndex !== null) {
+
+                const confirm = await Swal.fire({
+                    icon:               'question',
+                    title:              'Confirm Update',
+                    text:               `Are you sure you want to update the record for ${recordLabel}?`,
+                    showCancelButton:   true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor:  '#6b7280',
+                    confirmButtonText:  'Yes',
+                    cancelButtonText:   'Cancel',
+                });
+                if (!confirm.isConfirmed) return;
+
+                const id = adjustmentData[editingIndex].id;
+
+                // Strip empCode and glCode — not accepted by PDAdjustmentUpdateRow
+                const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
+
+                await apiClient.put(
+                    `/Maintenance/ProcessedData/PDAdjustment/${id}`,
+                    updatePayload
+                );
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Updated successfully',
+                    text:              `Record for ${recordLabel} updated.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+
+            } else {
+
+                await apiClient.post(
+                    '/Maintenance/ProcessedData/PDAdjustment',
+                    payload
+                );
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Created successfully',
+                    text:              `Record for ${recordLabel} created.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+            }
+
+            await fetchAdjustment();
+
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to save record',
+            });
+        } finally {
+            setShowAdjustmentModal(false);
+            setIsEditMode(false);
+            setEditingIndex(null);
+        }
     };
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteAdjustment = (index: number) => {
-        if (window.confirm('Delete?')) setAdjustmentData(adjustmentData.filter((_, i) => i !== index));
+    const handleDeleteAdjustment = async (index: number) => {
+
+        const record      = adjustmentData[index];
+        const recordLabel = record.transactionDate;
+
+        const confirm = await Swal.fire({
+            icon:               'warning',
+            title:              'Confirm Delete',
+            text:               `Are you sure you want to delete the record for ${recordLabel}?`,
+            showCancelButton:   true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor:  '#6b7280',
+            confirmButtonText:  'Delete',
+            cancelButtonText:   'Cancel',
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        try {
+            await apiClient.delete(
+                `/Maintenance/ProcessedData/PDAdjustment/${record.id}`
+            );
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
+            await fetchAdjustment();
+            await Swal.fire({
+                icon:              'success',
+                title:             'Deleted successfully',
+                text:              `Record for ${recordLabel} deleted.`,
+                timer:             1500,
+                showConfirmButton: false,
+            });
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to delete record',
+            });
+        }
     };
 
-    // ── § ADVANCED ────────────────────────────────────────────────────────────
+    // ──  ADVANCED ────────────────────────────────────────────────────────────
+    interface AdvancedRecord {
+        id:              number;
+        empCode:         string;
+        transactionDate: string;
+        transactionType: string;
+        otCode:          string;
+        noOfHrs:         string;
+        noOfHrsHHMM:     string;
+        groupCode:       string;
+        glCode:          string;
+    }
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    const [advancedData,      setAdvancedData]      = useState<any[]>([]);
+    const [advancedData,    setAdvancedData]    = useState<AdvancedRecord[]>([]);
+    const [advancedLoading, setAdvancedLoading] = useState(false);
+    const [advancedError,   setAdvancedError]   = useState<string>('');
     const [showAdvancedModal, setShowAdvancedModal] = useState(false);
-    const [advancedEmpCode,          setAdvancedEmpCode]          = useState('');
-    const [advancedTransactionDate,  setAdvancedTransactionDate]  = useState('');
-    const [advancedTransactionType,  setAdvancedTransactionType]  = useState('');
-    const [advancedNoOfHours,        setAdvancedNoOfHours]        = useState('');
-    const [advancedOvertimeCode,     setAdvancedOvertimeCode]     = useState('');
+
+    // Modal form fields
+    const [advancedEmpCode,         setAdvancedEmpCode]         = useState('');
+    const [advancedTransactionDate, setAdvancedTransactionDate] = useState('');
+    const [advancedTransactionType, setAdvancedTransactionType] = useState('');
+    const [advancedOTCode,          setAdvancedOTCode]          = useState('');
+    const [advancedNoOfHrs,         setAdvancedNoOfHrs]         = useState('');
+    const [advancedNoOfHrsHHMM,     setAdvancedNoOfHrsHHMM]     = useState('');
+    const [advancedGroupCode,       setAdvancedGroupCode]       = useState('');
+    const [advancedGLCode,          setAdvancedGLCode]          = useState('');
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
+    const fetchAdvanced = useCallback(async () => {
+        if (!employeeCode) return;
+        setAdvancedLoading(true);
+        setAdvancedError('');
+
+        const parsedFrom = parseDate(dateFrom);
+        const parsedTo   = parseDate(dateTo);
+
+        if (!parsedFrom || !parsedTo) {
+            setAdvancedError('Invalid date range. Please check Date From and Date To.');
+            setAdvancedLoading(false);
+            return;
+        }
+
+        try {
+            const response = await apiClient.get(
+                '/Maintenance/ProcessedData/PDAdvanced',
+                { params: {
+                    empCode:  employeeCode,
+                    dateFrom: parsedFrom,
+                    dateTo:   parsedTo,
+                    start:    (advancedPage - 1) * PAGE_SIZE,
+                    length:   PAGE_SIZE,
+                }}
+            );
+
+            if (response.status === 200 && response.data) {
+                const rows  = response.data.data       ?? response.data;
+                const total = response.data.totalCount ?? 0;
+                setAdvancedTotalCount(total);
+
+                const records: AdvancedRecord[] = rows.map((r: any) => ({
+                    id:              r.id              ?? 0,
+                    empCode:         r.empCode         ?? '',
+                    transactionDate: formatDateOnly(r.transactionDate),
+                    transactionType: r.transactionType ?? '',
+                    otCode:          r.otCode          ?? '',
+                    noOfHrs:         r.noOfHrs         ?? '',
+                    noOfHrsHHMM:     r.noOfHrsHHMM     ?? '',
+                    groupCode:       r.groupCode       ?? '',
+                    glCode:          r.glCode          ?? '',
+                }));
+
+                setAdvancedData(records);
+            }
+        } catch (error: any) {
+            setAdvancedError(
+                error.response?.data?.message || error.message || 'Failed to load Advanced data'
+            );
+        } finally {
+            setAdvancedLoading(false);
+        }
+    }, [employeeCode, dateFrom, dateTo, advancedPage]);
 
     // ── Create ────────────────────────────────────────────────────────────────
     const handleOpenCreateAdvanced = () => {
-        setIsEditMode(false); setEditingIndex(null);
-        setAdvancedEmpCode(''); setAdvancedTransactionDate(''); setAdvancedTransactionType('');
-        setAdvancedNoOfHours(''); setAdvancedOvertimeCode('');
+        setIsEditMode(false);
+        setEditingIndex(null);
+        setAdvancedEmpCode(employeeCode);
+        setAdvancedTransactionDate('');
+        setAdvancedTransactionType('');
+        setAdvancedOTCode('');
+        setAdvancedNoOfHrs('');
+        setAdvancedNoOfHrsHHMM('');
+        setAdvancedGroupCode(employeeGroupCode);
+        setAdvancedGLCode('');
         setShowAdvancedModal(true);
     };
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     const handleEditAdvanced = (index: number) => {
         const r = advancedData[index];
-        setIsEditMode(true); setEditingIndex(index);
-        setAdvancedEmpCode(r.empCode); setAdvancedTransactionDate(r.transactionDate);
-        setAdvancedTransactionType(r.transactionType); setAdvancedNoOfHours(r.noOfHours);
-        setAdvancedOvertimeCode(r.overtimeCode);
+        setIsEditMode(true);
+        setEditingIndex(index);
+        setAdvancedEmpCode(r.empCode);
+        setAdvancedTransactionDate(r.transactionDate);
+        setAdvancedTransactionType(r.transactionType);
+        setAdvancedOTCode(r.otCode);
+        setAdvancedNoOfHrs(String(r.noOfHrs));
+        setAdvancedNoOfHrsHHMM(String(r.noOfHrsHHMM));
+        setAdvancedGroupCode(r.groupCode);
+        setAdvancedGLCode(r.glCode);
         setShowAdvancedModal(true);
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
-    const handleAdvancedSubmit = () => {
-        const newRecord = {
-            empCode: advancedEmpCode, transactionDate: advancedTransactionDate,
-            transactionType: advancedTransactionType, noOfHours: advancedNoOfHours,
-            overtimeCode: advancedOvertimeCode, groupCode: '', glCode: '',
-        };
-        if (isEditMode && editingIndex !== null) {
-            const updated = [...advancedData]; updated[editingIndex] = newRecord; setAdvancedData(updated);
-        } else {
-            setAdvancedData([...advancedData, newRecord]);
+    // ── Submit (create / update) ──────────────────────────────────────────────
+    const handleAdvancedSubmit = async () => {
+        const parsedTransactionDate = parseDate(advancedTransactionDate)
+            ? `${parseDate(advancedTransactionDate)}T00:00:00`
+            : null;
+
+        if (!parsedTransactionDate) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Invalid Date',
+                text:  'Invalid Transaction Date. Please use MM/DD/YYYY format.',
+            });
+            return;
         }
-        setShowAdvancedModal(false); setIsEditMode(false); setEditingIndex(null);
+
+        const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
+
+        const payload = {
+            empCode:         advancedEmpCode,
+            transactionDate: parsedTransactionDate,
+            transactionType: advancedTransactionType || null,
+            otCode:          advancedOTCode          || null,
+            noOfHrs:         toDecimal(advancedNoOfHrs),
+            noOfHrsHHMM:     toDecimal(advancedNoOfHrsHHMM),
+            groupCode:       advancedGroupCode       || null,
+            glCode:          advancedGLCode          || null,
+        };
+
+        const recordLabel = advancedTransactionDate;
+
+        try {
+            if (isEditMode && editingIndex !== null) {
+
+                const confirm = await Swal.fire({
+                    icon:               'question',
+                    title:              'Confirm Update',
+                    text:               `Are you sure you want to update the record for ${recordLabel}?`,
+                    showCancelButton:   true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor:  '#6b7280',
+                    confirmButtonText:  'Yes',
+                    cancelButtonText:   'Cancel',
+                });
+                if (!confirm.isConfirmed) return;
+
+                const id = advancedData[editingIndex].id;
+
+                // Strip empCode and glCode — not accepted by PDAdvancedUpdateRow
+                const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
+
+                await apiClient.put(
+                    `/Maintenance/ProcessedData/PDAdvanced/${id}`,
+                    updatePayload
+                );
+                await auditTrail.log({
+                    accessType: 'Edit',
+                    trans: `Updated record for ${recordLabel}`,
+                    messages: `${formName} update record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Updated successfully',
+                    text:              `Record for ${recordLabel} updated.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+
+            } else {
+
+                await apiClient.post(
+                    '/Maintenance/ProcessedData/PDAdvanced',
+                    payload
+                );
+                await auditTrail.log({
+                    accessType: 'Add',
+                    trans: `Created new record for ${recordLabel}`,
+                    messages: `${formName} new record: ${recordLabel}`,
+                    formName: formName,
+                });
+                await Swal.fire({
+                    icon:              'success',
+                    title:             'Created successfully',
+                    text:              `Record for ${recordLabel} created.`,
+                    timer:             1500,
+                    showConfirmButton: false,
+                });
+            }
+
+            await fetchAdvanced();
+
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to save record',
+            });
+        } finally {
+            setShowAdvancedModal(false);
+            setIsEditMode(false);
+            setEditingIndex(null);
+        }
     };
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteAdvanced = (index: number) => {
-        if (window.confirm('Delete?')) setAdvancedData(advancedData.filter((_, i) => i !== index));
+    const handleDeleteAdvanced = async (index: number) => {
+
+        const record      = advancedData[index];
+        const recordLabel = record.transactionDate;
+
+        const confirm = await Swal.fire({
+            icon:               'warning',
+            title:              'Confirm Delete',
+            text:               `Are you sure you want to delete the record for ${recordLabel}?`,
+            showCancelButton:   true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor:  '#6b7280',
+            confirmButtonText:  'Delete',
+            cancelButtonText:   'Cancel',
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        try {
+            await apiClient.delete(
+                `/Maintenance/ProcessedData/PDAdvanced/${record.id}`
+            );
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted record for ${recordLabel}`,
+                messages: `${formName} deleted: ${recordLabel}`,
+                formName: formName,
+            });
+            await fetchAdvanced();
+            await Swal.fire({
+                icon:              'success',
+                title:             'Deleted successfully',
+                text:              `Record for ${recordLabel} deleted.`,
+                timer:             1500,
+                showConfirmButton: false,
+            });
+        } catch (err: any) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  err.response?.data?.message || err.message || 'Failed to delete record',
+            });
+        }
     };
 
-    // =========================================================================
-    // ── § SHARED SEARCH MODAL SELECTORS ──────────────────────────────────────
-    // =========================================================================
-
+    // ──  SHARED SEARCH MODAL SELECTORS ──────────────────────────────────────
     const handleWorkshiftSelect = (code: string) => {
         if (showUndertimeModal)   setUndertimeWorkshiftCode(code);
         else if (showOvertimeModal)  setOvertimeWorkshiftCode(code);
@@ -1231,29 +2694,65 @@ export function ProcessedDataPage() {
     };
 
     const handleOTCodeSelect = (code: string) => {
-        setOvertimeOTCode(code);
+        if (showAdjustmentModal)   setAdjustmentOvertimeCode(code);
+        else if (showAdvancedModal) setAdvancedOTCode(code);
+        else if (showOvertimeModal) setOvertimeOTCode(code);
         setShowOTCodeSearchModal(false);
+        setOtCodeSearchTerm('');
     };
 
     const handleLeaveTypeSelect = (code: string, description: string) => {
-        setLeaveLeaveCode(code);
-        setLeaveLeaveDescription(description);
+        if (showAdjustmentModal) {
+            setAdjustmentLeaveType(code);
+        } else if (showLeaveAbsencesModal) {
+            setLeaveLeaveCode(code);
+            setLeaveLeaveDescription(description);
+        }
         setShowLeaveTypeSearchModal(false);
+        setLeaveTypeSearchTerm('');
     };
 
-    // =========================================================================
-    // ── § GLOBAL SEARCH BUTTON ────────────────────────────────────────────────
-    // =========================================================================
+    const handleAllowanceSelect = (code: string, description: string) => {
+        setOtherEarningsAllowanceCode(code);
+        setOtherEarningsDescription(description);
+        setShowAllowanceSearchModal(false);
+        setAllowanceSearchTerm('');
+    };
+
+    const handleBorrowedDeviceSelect = (code: string, description: string) => {
+        setAdjustmentBorrowedDeviceName(code);
+        setShowBorrowedDeviceSearchModal(false);
+        setBorrowedDeviceSearchTerm('');
+    };
 
     const handleSearch = () => {
         if (subTab === 'No Of Hrs Per Day') fetchNoOfHours();
-        // add other tab fetches here as APIs become available
+        if (subTab === 'Tardiness')           fetchTardiness();
+        if (subTab === 'Undertime')           fetchUndertime();
+        if (subTab === 'Leave and Absences')  fetchLeaveAbsences();    
+        if (subTab === 'Overtime')            fetchOvertime();
+        if (subTab === 'Other Earnings and Allowances') fetchOtherEarnings();
+        if (subTab === 'Adjustment')          fetchAdjustment();
+        if (subTab === 'Advanced')            fetchAdvanced();
+
+
     };
 
-    // =========================================================================
-    // ── § ESC KEY HANDLER ─────────────────────────────────────────────────────
-    // =========================================================================
+    useEffect(() => {
+        if (!employeeCode) return;
+        if (subTab === 'No Of Hrs Per Day')   fetchNoOfHours();
+        if (subTab === 'Tardiness')           fetchTardiness();
+        if (subTab === 'Undertime')           fetchUndertime();
+        if (subTab === 'Leave and Absences')  fetchLeaveAbsences();
+        if (subTab === 'Overtime')            fetchOvertime();
+        if (subTab === 'Other Earnings and Allowances') fetchOtherEarnings();
+        if (subTab === 'Adjustment')          fetchAdjustment();
+        if (subTab === 'Advanced')            fetchAdvanced();
+    }, 
+    [subTab, fetchNoOfHours, fetchTardiness, fetchUndertime, fetchLeaveAbsences, 
+    fetchOvertime, fetchOtherEarnings, fetchAdjustment, fetchAdvanced]);
 
+    // ──  ESC KEY HANDLER ─────────────────────────────────────────────────────
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent) => {
             if (event.key !== 'Escape') return;
@@ -1269,15 +2768,15 @@ export function ProcessedDataPage() {
             setShowWorkshiftSearchModal(false);
             setShowOTCodeSearchModal(false);
             setShowLeaveTypeSearchModal(false);
+            setShowAllowanceSearchModal(false);
+            setShowOTCodeSearchModal(false);
+            setShowBorrowedDeviceSearchModal(false);
         };
         document.addEventListener('keydown', handleEscKey);
         return () => document.removeEventListener('keydown', handleEscKey);
     }, []);
 
-    // =========================================================================
-    // ── § CREATE NEW DISPATCHER ───────────────────────────────────────────────
-    // =========================================================================
-
+    // ──  CREATE NEW DISPATCHER ───────────────────────────────────────────────
     const handleCreateNew = () => {
         switch (subTab) {
             case 'No Of Hrs Per Day':              return handleOpenCreateNoOfHours();
@@ -1291,10 +2790,7 @@ export function ProcessedDataPage() {
         }
     };
 
-    // =========================================================================
-    // ── § HEADER TITLE ────────────────────────────────────────────────────────
-    // =========================================================================
-
+    // ──  HEADER TITLE ────────────────────────────────────────────────────────
     const getHeaderTitle = () => {
         switch (subTab) {
             case 'No Of Hrs Per Day':             return 'Process No. Hours Per Day';
@@ -1319,10 +2815,6 @@ export function ProcessedDataPage() {
         { name: 'Adjustment',                    icon: Settings    },
         { name: 'Advanced',                      icon: Layers      },
     ];
-
-    // =========================================================================
-    // ── § RENDER ──────────────────────────────────────────────────────────────
-    // =========================================================================
 
     return (
         <div className="min-h-screen bg-white flex flex-col">
@@ -1466,7 +2958,7 @@ export function ProcessedDataPage() {
                             Create New
                         </button>
                         </div>
-                        {/* ── § NO OF HRS PER DAY TABLE ── */}
+                        {/* ──  NO OF HRS PER DAY TABLE ── */}
                         {subTab === 'No Of Hrs Per Day' && (
                             <div className="overflow-x-auto">
                                 {noOfHoursLoading && (
@@ -1489,36 +2981,36 @@ export function ProcessedDataPage() {
                                     <table className="w-full border-collapse">
                                         <thead>
                                             <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Date In ▲</th>
-                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Date Out ▲</th>
-                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code ▲</th>
-                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">No Of Hours [hh.mm] ▲</th>
-                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code ▲</th>
-                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code ▲</th>
                                                 <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
+                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Date In</th>
+                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Date Out</th>
+                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code</th>
+                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">No Of Hours [hh.mm]</th>
+                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                                <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {noOfHoursData.length === 0 ? (
                                                 <tr>
                                                     <td colSpan={7} className="px-4 py-8 text-center text-gray-500 text-sm">
-                                                        {employeeCode ? 'No data available. Click Search to load records.' : 'Select an employee and click Search to load records.'}
+                                                        {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
                                                     </td>
                                                 </tr>
                                             ) : noOfHoursData.map((record, index) => (
                                                 <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.dateIn}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.dateOut}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.workshiftCode}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.noOfHours}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.groupCode}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.glCode}</td>
                                                     <td className="px-4 py-2 whitespace-nowrap">
                                                         <div className="flex gap-2">
                                                             <button onClick={() => handleEditNoOfHours(index)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit"><Edit className="w-4 h-4" /></button>
                                                             <button onClick={() => handleDeleteNoOfHours(index)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                                                         </div>
                                                     </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.dateIn}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.dateOut}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.workshiftCode}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.noOfHours}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.groupCode}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{record.glCode}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -1534,30 +3026,33 @@ export function ProcessedDataPage() {
                                 onPageChange={setNoOfHoursPage}
                             />
                         )}
-                        {/* ── § TARDINESS TABLE ── */}
+                        {/* ──  TARDINESS TABLE ── */}
                         {subTab === 'Tardiness' && (
                             <div className="overflow-x-auto">
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date From ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date To ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time In ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time Out ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Tardiness [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Tardi Within Grace Period [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Actual Tardiness [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Offset OT Flag ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group… ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date From</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date To</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time In</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time Out</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Tardiness [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Tardi Within Grace Period [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Actual Tardiness [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Offset OT Flag</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group…</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {tardinessData.length === 0 ? (
-                                            <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-500 text-sm">No data available in table</td></tr>
-                                        ) : tardinessData.map((record, index) => (
+                                            <tr>
+                                                <td colSpan={12} className="px-4 py-8 text-center text-gray-500 text-sm">
+                                                    {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
+                                                </td>
+                                            </tr>                                        ) : tardinessData.map((record, index) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1575,7 +3070,7 @@ export function ProcessedDataPage() {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.actualTardiness}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.remarks}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.offSetOTFlag ? 'Yes' : 'No'}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.groupCode}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1590,30 +3085,33 @@ export function ProcessedDataPage() {
                                 onPageChange={setTardinessPage}
                             />
                         )}
-                        {/* ── § UNDERTIME TABLE ── */}
+                        {/* ──  UNDERTIME TABLE ── */}
                         {subTab === 'Undertime' && (
                             <div className="overflow-x-auto">
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date From ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date To ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time In ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time Out ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Undertime [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Undertime Within Grace [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Actual Undertime [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date From</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date To</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time In</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time Out</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Undertime [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Undertime Within Grace [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Actual Undertime [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {undertimeData.length === 0 ? (
-                                            <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-500 text-sm">No data available in table</td></tr>
-                                        ) : undertimeData.map((record, index) => (
+                                            <tr>
+                                                <td colSpan={12} className="px-4 py-8 text-center text-gray-500 text-sm">
+                                                    {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
+                                                </td>
+                                            </tr>                                        ) : undertimeData.map((record, index) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1625,13 +3123,13 @@ export function ProcessedDataPage() {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.dateTo}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.timeIn}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.timeOut}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.workshiftCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.workShiftCode}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.undertime}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.undertimeWithinGracePeriod}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.actualUndertime}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.remarks}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.groupCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.glCode}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1646,29 +3144,32 @@ export function ProcessedDataPage() {
                                 onPageChange={setUndertimePage}
                             />
                         )}
-                        {/* ── § LEAVE AND ABSENCES TABLE ── */}
+                        {/* ──  LEAVE AND ABSENCES TABLE ── */}
                         {subTab === 'Leave and Absences' && (
                             <div className="overflow-x-auto">
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Hours Leave Absent ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Leave Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Leave Description ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Reason ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">With Pay ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Exempt for Allowance Deduction ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Hours Leave Absent</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Leave Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Leave Description</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Reason</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">With Pay</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Exempt for Allowance Deduction</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {leaveData.length === 0 ? (
-                                            <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-sm">No data available in table</td></tr>
-                                        ) : leaveData.map((record, index) => (
+                                            <tr>
+                                                <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-sm">
+                                                    {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
+                                                </td>
+                                            </tr>                                        ) : leaveData.map((record, index) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1682,10 +3183,10 @@ export function ProcessedDataPage() {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.leaveDescription}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.reason}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.remarks}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.groupCode}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.withPay ? 'Yes' : 'No'}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.exemptForAllowanceDeduction ? 'Yes' : 'No'}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.exemptAllowFlag ? 'Yes' : 'No'}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.glCode}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1700,30 +3201,33 @@ export function ProcessedDataPage() {
                                 onPageChange={setLeaveAbsencesPage}
                             />
                         )}
-                        {/* ── § OVERTIME TABLE ── */}
+                        {/* ──  OVERTIME TABLE ── */}
                         {subTab === 'Overtime' && (
                             <div className="overflow-x-auto">
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date From ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date To ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time In ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time Out ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Overtime [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">OT Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Reason ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date From</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date To</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time In</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Time Out</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Workshift Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Overtime [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">OT Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Reason</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {overtimeData.length === 0 ? (
-                                            <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-500 text-sm">No data available in table</td></tr>
-                                        ) : overtimeData.map((record, index) => (
+                                            <tr>
+                                                <td colSpan={12} className="px-4 py-8 text-center text-gray-500 text-sm">
+                                                    {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
+                                                </td>
+                                            </tr>                                        ) : overtimeData.map((record, index) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1735,13 +3239,13 @@ export function ProcessedDataPage() {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.dateTo}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.timeIn}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.timeOut}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.workshiftCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.workShiftCode}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.overtime}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.otCode}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.reason}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.remarks}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.groupCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.glCode}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1756,26 +3260,29 @@ export function ProcessedDataPage() {
                                 onPageChange={setOvertimePage}
                             />
                         )}
-                        {/* ── § OTHER EARNINGS TABLE ── */}
+                        {/* ──  OTHER EARNINGS TABLE ── */}
                         {subTab === 'Other Earnings and Allowances' && (
                             <div className="overflow-x-auto">
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Allowance Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Allowance Description ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Amount ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Date</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Allowance Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Allowance Description</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Amount</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {otherEarningsData.length === 0 ? (
-                                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500 text-sm">No data available in table</td></tr>
-                                        ) : otherEarningsData.map((data, index) => (
+                                            <tr>
+                                                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 text-sm">
+                                                {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
+                                                </td>
+                                            </tr>                                        ) : otherEarningsData.map((data, index) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1788,8 +3295,8 @@ export function ProcessedDataPage() {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.description}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.amount}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.remarks}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.groupCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.glCode}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1804,31 +3311,34 @@ export function ProcessedDataPage() {
                                 onPageChange={setOtherEarningsPage}
                             />
                         )}
-                        {/* ── § ADJUSTMENT TABLE ── */}
+                        {/* ──  ADJUSTMENT TABLE ── */}
                         {subTab === 'Adjustment' && (
                             <div className="overflow-x-auto">
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Date ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Type ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Leave Type ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Overtime Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">No Of Hours [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Adjust Type ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Is Late Filing ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Is Late Filing Actual Date ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Device Name ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Date</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Type</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Leave Type</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Overtime Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">No Of Hours [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Adjust Type</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Is Late Filing</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Is Late Filing Actual Date</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Device Name</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {adjustmentData.length === 0 ? (
-                                            <tr><td colSpan={13} className="px-4 py-8 text-center text-gray-500 text-sm">No data available in table</td></tr>
-                                        ) : adjustmentData.map((data, index) => (
+                                            <tr>
+                                                <td colSpan={13} className="px-4 py-8 text-center text-gray-500 text-sm">
+                                                {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
+                                                </td>
+                                            </tr>                                        ) : adjustmentData.map((data, index) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1839,15 +3349,15 @@ export function ProcessedDataPage() {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.transactionDate}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.transactionType}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.leaveType}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.overtimeCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.overTimeCode}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.noOfHours}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.adjustType}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.remarks}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.groupCode}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.isLateFiling ? 'Yes' : 'No'}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.isLateFilingActualDate}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.borrowedDeviceName}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.bDeviceName}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.glCode}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1862,25 +3372,28 @@ export function ProcessedDataPage() {
                                 onPageChange={setAdjustmentPage}
                             />
                         )}
-                        {/* ── § ADVANCED TABLE ── */}
+                        {/* ──  ADVANCED TABLE ── */}
                         {subTab === 'Advanced' && (
                             <div className="overflow-x-auto">
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actions</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Date ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Type ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">No of Hours [hh.mm] ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Overtime Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code ▲</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code ▲</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Date</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Transaction Type</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">No of Hours [hh.mm]</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Overtime Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">GL Code</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {advancedData.length === 0 ? (
-                                            <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500 text-sm">No data available in table</td></tr>
-                                        ) : advancedData.map((data, index) => (
+                                            <tr>
+                                                <td colSpan={7} className="px-4 py-8 text-center text-gray-500 text-sm">
+                                                {employeeCode ? 'No data available in table.' : 'Select an employee and click Search to load records.'}
+                                                </td>
+                                            </tr>                                        ) : advancedData.map((data, index) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-2 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1890,10 +3403,10 @@ export function ProcessedDataPage() {
                                                 </td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.transactionDate}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{data.transactionType}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.noOfHours}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.overtimeCode}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm"></td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.noOfHrs}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.otCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.groupCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{data.glCode}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1908,7 +3421,7 @@ export function ProcessedDataPage() {
                                 onPageChange={setAdvancedPage}
                             />
                         )}
-                        {/* ── § MODALS ── */}
+                        {/* ──  MODALS ── */}
 
                         <EmployeeSearchModal
                             isOpen={showEmpSearchModal}
@@ -2005,7 +3518,6 @@ export function ProcessedDataPage() {
                             onSubmit={handleLeaveAbsencesSubmit}
                             onLeaveCodeSearch={() => setShowLeaveTypeSearchModal(true)}
                         />
-
                         {/* Overtime Modal */}
                         <OvertimeModal
                             show={showOvertimeModal}
@@ -2029,15 +3541,22 @@ export function ProcessedDataPage() {
                         {/* Other Earnings Modal */}
                         <OtherEarningsModal
                             show={showOtherEarningsModal}
-                            onClose={() => { setShowOtherEarningsModal(false); setIsEditMode(false); setEditingIndex(null); }}
+                            onClose={() => setShowOtherEarningsModal(false)}
                             isEditMode={isEditMode}
-                            empCode={otherEarningsEmpCode}             setEmpCode={setOtherEarningsEmpCode}
-                            date={otherEarningsDate}                   setDate={setOtherEarningsDate}
-                            allowanceCode={otherEarningsAllowanceCode} setAllowanceCode={setOtherEarningsAllowanceCode}
-                            description={otherEarningsDescription}     setDescription={setOtherEarningsDescription}
-                            amount={otherEarningsAmount}               setAmount={setOtherEarningsAmount}
-                            remarks={otherEarningsRemarks}             setRemarks={setOtherEarningsRemarks}
+                            empCode={otherEarningsEmpCode}
+                            setEmpCode={setOtherEarningsEmpCode}
+                            date={otherEarningsDate}
+                            setDate={setOtherEarningsDate}
+                            allowanceCode={otherEarningsAllowanceCode}
+                            setAllowanceCode={setOtherEarningsAllowanceCode}
+                            description={otherEarningsDescription}
+                            setDescription={setOtherEarningsDescription}
+                            amount={otherEarningsAmount}
+                            setAmount={setOtherEarningsAmount}
+                            remarks={otherEarningsRemarks}
+                            setRemarks={setOtherEarningsRemarks}
                             onSubmit={handleOtherEarningsSubmit}
+                            onOpenAllowanceSearch={() => setShowAllowanceSearchModal(true)}
                         />
 
                         {/* Adjustment Modal */}
@@ -2045,18 +3564,21 @@ export function ProcessedDataPage() {
                             show={showAdjustmentModal}
                             onClose={() => { setShowAdjustmentModal(false); setIsEditMode(false); setEditingIndex(null); }}
                             isEditMode={isEditMode}
-                            empCode={adjustmentEmpCode}                           setEmpCode={setAdjustmentEmpCode}
-                            transactionDate={adjustmentTransactionDate}           setTransactionDate={setAdjustmentTransactionDate}
-                            transactionType={adjustmentTransactionType}           setTransactionType={setAdjustmentTransactionType}
-                            leaveType={adjustmentLeaveType}                       setLeaveType={setAdjustmentLeaveType}
-                            overtimeCode={adjustmentOvertimeCode}                 setOvertimeCode={setAdjustmentOvertimeCode}
-                            noOfHours={adjustmentNoOfHours}                       setNoOfHours={setAdjustmentNoOfHours}
-                            adjustType={adjustmentAdjustType}                     setAdjustType={setAdjustmentAdjustType}
-                            remarks={adjustmentRemarks}                           setRemarks={setAdjustmentRemarks}
-                            isLateFiling={adjustmentIsLateFiling}                 setIsLateFiling={setAdjustmentIsLateFiling}
+                            empCode={adjustmentEmpCode}                               setEmpCode={setAdjustmentEmpCode}
+                            transactionDate={adjustmentTransactionDate}               setTransactionDate={setAdjustmentTransactionDate}
+                            transactionType={adjustmentTransactionType}               setTransactionType={setAdjustmentTransactionType}
+                            leaveType={adjustmentLeaveType}                           setLeaveType={setAdjustmentLeaveType}
+                            overtimeCode={adjustmentOvertimeCode}                     setOvertimeCode={setAdjustmentOvertimeCode}
+                            noOfHours={adjustmentNoOfHours}                           setNoOfHours={setAdjustmentNoOfHours}
+                            adjustType={adjustmentAdjustType}                         setAdjustType={setAdjustmentAdjustType}
+                            remarks={adjustmentRemarks}                               setRemarks={setAdjustmentRemarks}
+                            isLateFiling={adjustmentIsLateFiling}                     setIsLateFiling={setAdjustmentIsLateFiling}
                             isLateFilingActualDate={adjustmentIsLateFilingActualDate} setIsLateFilingActualDate={setAdjustmentIsLateFilingActualDate}
-                            borrowedDeviceName={adjustmentBorrowedDeviceName}     setBorrowedDeviceName={setAdjustmentBorrowedDeviceName}
+                            borrowedDeviceName={adjustmentBorrowedDeviceName}         setBorrowedDeviceName={setAdjustmentBorrowedDeviceName}
                             onSubmit={handleAdjustmentSubmit}
+                            onOTCodeSearch={() => setShowOTCodeSearchModal(true)}
+                            onLeaveTypeSearch={() => setShowLeaveTypeSearchModal(true)}
+                            onBorrowedDeviceSearch={() => setShowBorrowedDeviceSearchModal(true)}
                         />
 
                         {/* Advanced Modal */}
@@ -2067,13 +3589,15 @@ export function ProcessedDataPage() {
                             empCode={advancedEmpCode}                 setEmpCode={setAdvancedEmpCode}
                             transactionDate={advancedTransactionDate} setTransactionDate={setAdvancedTransactionDate}
                             transactionType={advancedTransactionType} setTransactionType={setAdvancedTransactionType}
-                            noOfHours={advancedNoOfHours}             setNoOfHours={setAdvancedNoOfHours}
-                            overtimeCode={advancedOvertimeCode}       setOvertimeCode={setAdvancedOvertimeCode}
+                            noOfHours={advancedNoOfHrs}             setNoOfHours={setAdvancedNoOfHrs}
+                            overtimeCode={advancedOTCode}       setOvertimeCode={setAdvancedOTCode}
                             onSubmit={handleAdvancedSubmit}
+                            onOTCodeSearch={() => setShowOTCodeSearchModal(true)}
+
                         />
 
                         {/* Shared Search Modals */}
-                        <WorkshiftSearchModal
+                        <WorkshiftCodeSearchModal
                             show={showWorkshiftSearchModal}
                             onClose={() => setShowWorkshiftSearchModal(false)}
                             onSelect={handleWorkshiftSelect}
@@ -2089,10 +3613,24 @@ export function ProcessedDataPage() {
                         />
                         <LeaveTypeSearchModal
                             show={showLeaveTypeSearchModal}
-                            onClose={() => setShowLeaveTypeSearchModal(false)}
+                            onClose={() => { setShowLeaveTypeSearchModal(false); setLeaveTypeSearchTerm(''); }}
                             onSelect={handleLeaveTypeSelect}
                             searchTerm={leaveTypeSearchTerm}
                             setSearchTerm={setLeaveTypeSearchTerm}
+                        />
+                        <AllowanceCodeSearchModal
+                            show={showAllowanceSearchModal}
+                            onClose={() => setShowAllowanceSearchModal(false)}
+                            onSelect={handleAllowanceSelect}
+                            searchTerm={allowanceSearchTerm}
+                            setSearchTerm={setAllowanceSearchTerm}
+                        />
+                        <BorrowedDeviceSearchModal
+                            show={showBorrowedDeviceSearchModal}
+                            onClose={() => setShowBorrowedDeviceSearchModal(false)}
+                            onSelect={handleBorrowedDeviceSelect}
+                            searchTerm={borrowedDeviceSearchTerm}
+                            setSearchTerm={setBorrowedDeviceSearchTerm}
                         />
                     </div>
                 </div>

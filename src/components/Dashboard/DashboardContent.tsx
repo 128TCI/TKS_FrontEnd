@@ -666,7 +666,22 @@ export function DashboardContent({ activeSection }: DashboardContentProps) {
             </div>
         );
     }
+    //Extract Username from the local memory
+    const getUserName = (): string | null => {
+        try {
+        const raw = localStorage.getItem('userData');
+        if (!raw) return null;
 
+        const user = JSON.parse(raw);
+        return user?.userName ?? user?.username ?? null;
+        } catch (err) {
+        console.error('Invalid userData in localStorage:', err);
+        return null;
+        }
+    };
+
+    // Cache value once per render lifecycle
+    const userName = useMemo(() => getUserName(), []);
     return (
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8 flex-1">
             {/* Welcome Section */}

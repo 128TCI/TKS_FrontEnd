@@ -31,21 +31,21 @@ interface GroupItem {
   id: number;
   tksGroupCode: string;
   description: string;
-  //payrollGroup: string;
+  payrollGroup: string;
   cutOffDateFrom: string;
   cutOffDateTo: string;
   cutOffDateMonth: string;
   cutOffDatePeriod: string;
-  //integrationPayroll: string | null;
-  //integrationHRIS: string | null;
-  //preparedBy: string | null;
-  //preparedByPosition: string | null;
-  //checkedBy: string | null;
-  //checkedByPosition: string | null;
-  //notedBy: string | null;
-  //notedByPosition: string | null;
-  //approvedBy: string | null;
-  //approvedByPosition: string | null;
+  integrationPayroll: string | null;
+  integrationHRIS: string | null;
+  preparedBy: string | null;
+  preparedByPosition: string | null;
+  checkedBy: string | null;
+  checkedByPosition: string | null;
+  notedBy: string | null;
+  notedByPosition: string | null;
+  approvedBy: string | null;
+  approvedByPosition: string | null;
   terminalID: string | null; //
   autoPairLogsDateFrom: string;
   autoPairLogsDateTo: string;
@@ -55,6 +55,77 @@ interface PayrollLocationItem {
   id: number;
   locationCode: string;
   locationName: string;
+}
+
+interface OverTimeRatesItem {
+  id: number;
+  groupCode: string;
+  regDayOT?: string;
+  restDayOT?: string;
+  legalHolidayOT?: string;
+  specHolidayOT?: string;
+  minHoursToComputeOT?: number;
+  roundOfftHourMin?: string;
+  offsetLate?: boolean;
+  useOTAuthorization?: boolean;
+  holidayPayLegal?: boolean;
+  holidayPaySpecial?: boolean;
+  noPayIfAbsentBeforeHoliday?: boolean;
+  noPayIfAbsentAfterHoliday?: boolean;
+  considerTardinessDayBeforeHoliday?: boolean;
+  considerUndertimeDayBeforeHoliday?: boolean;
+  computeUnprodHourIfInc?: boolean;
+  computeUnprodHourIfIncLegal?: boolean;
+  computeUnprodHourIfIncSpecial?: boolean;
+  computeUnprodHourIfLeave?: boolean;
+  minHoursToPriorToHoliday?: number;
+  computeBasedDateIn?: boolean;
+  holidayWithWorkShift?: boolean;
+  deductMealBreakOTComputation?: boolean;
+  compHolidayWithPaidLeave?: boolean;
+  compUnprodWithPaidLeave?: boolean;
+  compHolidayWithPaidLeaveMinHr?: number;
+  compUnprodWithPaidLeaveMinHR?: number;
+  useOTPremiumBreakdown?: boolean;
+  useDayType2?: boolean;
+  minHoursOTBreak?: number;
+  hoursOTBreakDeduction?: number;
+  spRDDay?: string;
+  spRDDayOT?: string;
+  computeBrk2OI?: boolean;
+  useDOLEOT?: boolean;
+  doubleLegalHolidayOT?: string;
+  specialHoliday2?: string;
+  birthDayPayOT?: string;
+  compHolPayMonth?: boolean;
+  nonWrkHolidayOT?: string;
+  minimumNoOfHrsRequiredToCompHol?: string;
+  compHolPayIfWorkBeforeHolidayRestDay?: boolean;
+  compHolPayIfWorkBeforeHolidaySpecialHoliday?: boolean;
+  compHolPayIfWorkBeforeHolidayLegalHoliday?: boolean;
+  minHrsToCompOTRegDay?: string;
+  minHrsToCompOTRestDay?: string;
+  minHrsToCompOTLegal?: string;
+  minHrsToCompOTSpecial?: string;
+  minHrsToCompOTSpecial2?: string;
+  minHrsToCompOTDoubleLegal?: string;
+  minHrsToCompOTNWH?: string;
+  regDayOTAdj?: string;
+  restDayOTAdj?: string;
+  legalHolidayOTAdj?: string;
+  specHolidayOTAdj?: string;
+  doubleLegalHolidayOTAdj?: string;
+  specialHoliday2Adj?: string;
+  nonWrkHolidayOTAdj?: string;
+  compFirstRestdayHoliday?: boolean;
+  otCutOffFlag?: boolean;
+  otCutOffOTCode?: string;
+  otCutOffHours?: string;
+  enable24HrOTFlag?: boolean;
+  roundOffNDBasicHourMin?: string;
+  includeUnWorkHolInRegDay?: boolean;
+  sundayWrkOTIfWrkSaturday?: boolean;
+  otCode2ShiftsInADay?: string;
 }
 
 interface LoginPolicyItem {
@@ -113,6 +184,23 @@ interface LoginPolicyItem {
   supGroupCode?: string;
 }
 
+interface OTBreakItem {
+  id: number;
+  regDay: boolean;
+  restDay: boolean;
+  legalHoliday: boolean;
+  specialHoliday: boolean;
+  legalHolidayRest: boolean;
+  specialHolidayRest: boolean;
+  groupCode: string;
+  doubleHoliday: boolean;
+  doubleHolidayRest: boolean;
+  specialHoliday2: boolean;
+  specialHoliday2Rest: boolean;
+  nonWorkingHoliday: boolean;
+  nonWorkingHolidayRest: boolean;
+}
+
 interface OvertimeFileSetupItem {
   oTFileSetupID: number;
   oTFileSetupCode: string;
@@ -133,6 +221,27 @@ interface EquivDayItem {
   friday: number;
   saturday: number;
   sunday: number;
+}
+
+interface OTAllowancesItem {
+  id: number;
+  groupCode: string;
+  minimumOTHours: string;
+  accumOTHrsToEarnMealAllow: string;
+  dayType: string;
+  earningCode: string;
+  amount: string;
+}
+
+interface SystemConfigItem {
+  id: number;
+  groupCode: string;
+  numOfMinBeforeTheShift: string;
+  numOfMinToIgnoreMultipleOutInBreak: string;
+  numOfMinBeforeMidnightShift: string;
+  devicePolicy: string;
+  noOfMinToConsiderBrk2In: string;
+  useTKSystemConfig: boolean;
 }
 
 export function TimeKeepGroupPage() {
@@ -171,6 +280,9 @@ export function TimeKeepGroupPage() {
   const [supervisoryGroupSearchTerm, setSupervisoryGroupSearchTerm] = useState("");
   const [showOtCodeModal, setShowOtCodeModal] = useState(false);
   const [otCodeSearchTerm, setOtCodeSearchTerm] = useState("");
+  const [isEditOTRates, setIsEditOTRates] = useState(false);
+  const [isEditOTRatesFor2Shifts, setIsEditOTRatesFor2Shifts] = useState(false);
+  const [isEditBirthDayPay, setIsEditBirthDayPay] = useState(false);
 
   
 
@@ -222,36 +334,89 @@ export function TimeKeepGroupPage() {
   const [forNoBreak2In, setForNoBreak2In] = useState("");
 
   // Overtime Rates State
-  const [regularDayOT, setRegularDayOT] = useState("ROT");
-  const [restDayOT, setRestDayOT] = useState("RDOT");
-  const [legalHolidayOT, setLegalHolidayOT] = useState("LEGAL");
-  const [specialHolidayOT, setSpecialHolidayOT] = useState("SPECIAL");
-  const [doubleLegalHolidayOT, setDoubleLegalHolidayOT] = useState("DOUBLE LEGAL");
-  const [specialHolidayOT2, setSpecialHolidayOT2] = useState("SPECIAL2")
-  const [nonWorkingHolidayOT, setNonWorkingHolidayOT] = useState("NON WORKING");
-  // Late Filing
-  const [regularDayOTLateFiling, setRegularDayOTLateFiling] = useState("ROT");
-  const [restDayOTLateFiling, setRestDayOTLateFiling] = useState("RDOT");
-  const [legalHolidayOTLateFiling, setLegalHolidayOTLateFiling] = useState("LEGAL");
-  const [specialHolidayOTLateFiling, setSpecialHolidayOTLateFiling] = useState("SPECIAL");
-  const [doubleLegalHolidayOTLateFiling, setDoubleLegalHolidayOTLateFiling] = useState("DOUBLE LEGAL");
-  const [specialHoliday2OTLateFiling, setSpecialHoliday2OTLateFiling] = useState("SPECIAL2")
-  const [nonWorkingHolidayOTLateFiling, setNonWorkingHolidayOTLateFiling] = useState("NON WORKING");
+  const [regularDayOT, setRegularDayOT] = useState("");
+  const [restDayOT, setRestDayOT] = useState("");
+  const [legalHolidayOT, setLegalHolidayOT] = useState("");
+  const [specialHolidayOT, setSpecialHolidayOT] = useState("");
+  const [doubleLegalHolidayOT, setDoubleLegalHolidayOT] = useState("");
+  const [specialHolidayOT2, setSpecialHolidayOT2] = useState("")
+  const [nonWorkingHolidayOT, setNonWorkingHolidayOT] = useState("");
 
+  // Late Filing
+  const [regularDayOTLateFiling, setRegularDayOTLateFiling] = useState("");
+  const [restDayOTLateFiling, setRestDayOTLateFiling] = useState("");
+  const [legalHolidayOTLateFiling, setLegalHolidayOTLateFiling] = useState("");
+  const [specialHolidayOTLateFiling, setSpecialHolidayOTLateFiling] = useState("");
+  const [doubleLegalHolidayOTLateFiling, setDoubleLegalHolidayOTLateFiling] = useState("");
+  const [specialHoliday2OTLateFiling, setSpecialHoliday2OTLateFiling] = useState("")
+  const [nonWorkingHolidayOTLateFiling, setNonWorkingHolidayOTLateFiling] = useState("");
+
+  // 
   const [useOTPremium, setUseOTPremium] = useState(false);
   const [useActualDayType, setUseActualDayType] = useState(false);
   const [holidayWithWorkshift, setHolidayWithWorkshift] = useState(false);
+  const [deductMealBreakFromOT, setDeductMealBreakFromOT] = useState(false);
+  const [computeOTForBreak2, setComputeOTForBreak2] = useState(false);
+  const [enable24HourOT, setEnable24HourOT] = useState(false);
+  const [includeUnworkedHolidayInRegular, setIncludeUnworkedHolidayInRegular] = useState(false);
+  const [sundayOTIfWorkedSaturday, setSundayOTIfWorkedSaturday] = useState(false);
 
   // OT Break
-  const [otBreakMinHours, setOtBreakMinHours] = useState("0.00");
-  const [regDayMinHrsToCompOT, setRegDayMinHrsToCompOT] = useState("0.00");
-  const [restDayMinHrsToCompOT, setRestDayMinHrsToCompOT] = useState("0.00");
-  const [legalHolidayMinHrsToCompOT, setLegalHolidayMinHrsToCompOT] = useState("0.00");
-  const [specialHolidayMinHrsToCompOT, setSpecialHolidayMinHrsToCompOT] = useState("0.00");
-  const [specialHoliday2MinHrsToCompOT, setSpecialHoliday2MinHrsToCompOT] = useState("0.00");
-  const [doubleLegalHolidayMinHrsToCompOT, setDoubleLegalHolidayMinHrsToCompOT] = useState("0.00");
-  const [nonWorkingHolidayMinHrsToCompOT, setNonWorkingHolidayMinHrsToCompOT] = useState("0.00");
+  const [otBreakMinHours, setOtBreakMinHours] = useState(0);
+  const [oTBreakNoOfHrsDed, setOTBreakNoOfHrsDed] = useState(0);
+  const [oTBreakAppliesToRegDay, setOTBreakAppliesToRegDay] = useState(false);
+  const [oTBreakAppliesToLegHol, setOTBreakAppliesToLegHol] = useState(false);
+  const [oTBreakAppliesToSHol, setOTBreakAppliesToSHol] = useState(false);
+  const [oTBreakAppliesToDoubleLegHol, setOTBreakAppliesToDoubleLegHol] = useState(false);
+  const [oTBreakAppliesToS2Hol, setOTBreakAppliesToS2Hol] = useState(false);
+  const [oTBreakAppliesToNonWorkHol, setOTBreakAppliesToNonWorkHol] = useState(false);
+  const [oTBreakAppliesToRestDay, setOTBreakAppliesToRestDay] = useState(false);
+  const [oTBreakAppliesToLegHolRest, setOTBreakAppliesToLegHolRest] = useState(false);
+  const [oTBreakAppliesToSHolRest, setOTBreakAppliesToSHolRest] = useState(false);
+  const [oTBreakAppliesToDoubleLegHolRest, setOTBreakAppliesToDoubleLegHolRest] = useState(false);
+  const [oTBreakAppliesToS2HolRest, setOTBreakAppliesToS2HolRest] = useState(false);
+  const [oTBreakAppliesToNonWorkRest, setOTBreakAppliesToNonWorkRest] = useState(false);
 
+  // Minimum Hrs To Compute OT
+  const [regDayMinHrsToCompOT, setRegDayMinHrsToCompOT] = useState("");
+  const [restDayMinHrsToCompOT, setRestDayMinHrsToCompOT] = useState("");
+  const [legalHolidayMinHrsToCompOT, setLegalHolidayMinHrsToCompOT] = useState("");
+  const [specialHolidayMinHrsToCompOT, setSpecialHolidayMinHrsToCompOT] = useState("");
+  const [specialHoliday2MinHrsToCompOT, setSpecialHoliday2MinHrsToCompOT] = useState("");
+  const [doubleLegalHolidayMinHrsToCompOT, setDoubleLegalHolidayMinHrsToCompOT] = useState("");
+  const [nonWorkingHolidayMinHrsToCompOT, setNonWorkingHolidayMinHrsToCompOT] = useState("");
+
+  const [restDayToBeComputedAsOtherRate, setRestDayToBeComputedAsOtherRate] = useState("");
+  const [restDayOtherRate, setRestDayOtherRate] = useState("");
+  const [isOverTimeCutOffFlag, setIsOverTimeCutoffFlag] = useState(false);
+  const [overTimeCode, setOverTimeCode] = useState(""); 
+  const [requiredHours, setRequiredHours] = useState("");
+  const [overTimeCodeFor2ShiftsDay, setOverTimeCodeFor2ShiftsDay] = useState("");
+  const [oTRoundingToTheNearestHourMin, setOTRoundingToTheNearestHourMin] = useState("");
+  const [birthdayPay, setBirthdayPay] = useState("");
+  const [nDBasicRoundingToTheNearestHourMin, setNDBasicRoundingToTheNearestHourMin] = useState("");
+  const [useOverTimeAuthorization, setUseOverTimeAuthorization] = useState(false);
+  const [isSpecialOTCompFlag, setIsSpecialOTCompFlag] = useState(false);
+  const [isHolPayLegalFlag, setIsHolPayLegalFlag] = useState(false);
+  const [isHolPaySpecialFlag, setIsHolPaySpecialFlag] = useState(false)
+  const [compHolPayForMonth, setCompHolPayForMonth] = useState(false);
+  const [compHolPayIfWorkBeforeHolidayRestDay, setCompHolPayIfWorkBeforeHolidayRestDay] = useState(false);
+  const [compHolPayIfWorkBeforeHolidayLegalHoliday, setCompHolPayIfWorkBeforeHolidayLegalHoliday] = useState(false);
+  const [compHolPayIfWorkBeforeHolidaySpecialHoliday, setCompHolPayIfWorkBeforeHolidaySpecialHoliday] = useState(false);
+  const [noPayIfAbsentBeforeHoliday, setNoPayIfAbsentBeforeHoliday] = useState(false);
+  const [noPayIfAbsentAfterHoliday, setNoPayIfAbsentAfterHoliday] = useState(false);
+  const [compHolidayWithPaidLeave, setCompHolidayWithPaidLeave ] = useState(false);
+  const [minimumNoOfHrsRequiredToCompHol, setMinimumNoOfHrsRequiredToCompHol] = useState('');
+  const [compFirstRestdayHoliday, setCompFirstRestdayHoliday] = useState(false);
+
+  // OT Allowances States
+  const [oTAllowanceseID, setOTAllowancesID] = useState(0)
+  const [oTAllowancesGroupCode, setOTAllowancesGroupCode] = useState('');
+  const [minOTHrs, setMinOTHrs] = useState('');
+  const [accumOTHrsToEarnMealAllow, setAccumOTHrsToEarnMealAllow] = useState('');
+  const [dayType, setDayType] = useState('')
+  const [amount, setAmount] = useState('');
+  const [earningCode, setEarningCode] = useState('');
 
   // Other Policies State
   const [useDefaultRestday, setUseDefaultRestday] = useState(false);
@@ -280,11 +445,23 @@ export function TimeKeepGroupPage() {
   const [tksGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
 
-  // Payroll Location List states
+  // Payroll Location List 
   const [payrollLocationList, setPayrollLocationList] = useState<PayrollLocationItem[]>([]);
 
-  // Group Login Policy States
+  // Group Login Policy List
   const [groupLoginPolicyItems, setGroupLoginPolicyItems] = useState<LoginPolicyItem[]>([]);
+
+  // Overtime Rates List
+  const [overTimeRates, setOverTimeRates] = useState<OverTimeRatesItem[]>([]);
+
+  // Overtime Break List
+  const [oTBreakList, setOTBreakList] = useState<OTBreakItem[]>([]);
+
+  //  GroupSetup Overtime Allowancs List 
+  const [oTAllowancesList, setOTAllowancesList] = useState<OTAllowancesItem[]>([]);
+
+  // System Config List
+  const [systemConfigList, setSystemConfigList] = useState<SystemConfigItem[]>([])
 
   // Cutoff Group States
   const [cutOffTableSearchTerm, setCutOffTableSearchTerm] = useState("");
@@ -702,12 +879,58 @@ export function TimeKeepGroupPage() {
     }));
   };
 
+ // Fetch Group System Config data from API
+  const fetchGroupSystemConfig = async (): Promise<SystemConfigItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig",
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      groupCode: item.groupCode,
+      numOfMinBeforeTheShift: item.numOfMinBeforeTheShift?.toString() ?? "0",
+      numOfMinToIgnoreMultipleOutInBreak: item.numOfMinToIgnoreMultipleOutInBreak?.toString() ?? "0",
+      numOfMinBeforeMidnightShift: item.numOfMinBeforeMidnightShift?.toString() ?? "0",
+      devicePolicy: item.devicePolicy ?? "",
+      noOfMinToConsiderBrk2In: item.noOfMinToConsiderBrk2In?.toString() ?? "0",
+      useTKSystemConfig: item.useTKSystemConfig ?? false,
+    }));
+  };
+
+  // Fetch 
+  const fetchOTAllowancesData = async (): Promise<OTAllowancesItem[]> => {
+    const response = await apiClient.get(
+      `Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/ByGroupCode/${tksGroupCode}`,
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      groupCode: item.groupCode,
+      minimumOTHours: item.minimumOTHrs,
+      accumOTHrsToEarnMealAllow: item.accumOTHrsToEarnMealAllow,
+      dayType: item.dayType,
+      earningCode: item.earningCode,
+      amount: item.amount
+    }));
+  };
+
   useEffect(() => {
     const loadOvertimeFileSetup = async () => {
       const items = await fetchOvertimeFileSetup();
       setOtCodePerWeekList(items);
     };
+    const loadAllowancesData =  async () => {
+      const items = await fetchOTAllowancesData();
+      setOTAllowancesList(items);
+    };
+    const loadSystemConfig = async () =>  {
+      const items = await fetchGroupSystemConfig();
+      setSystemConfigList(items);
+      populateSystemConfigStates(items[0]);
+    }
     loadOvertimeFileSetup();
+    loadAllowancesData();
+    loadSystemConfig();
   }, []);
 
   const fetchPayrollLocationData = async (): Promise<PayrollLocationItem[]> => {
@@ -727,6 +950,207 @@ export function TimeKeepGroupPage() {
     };
 
     loadPayrollLocation();
+  }, []);
+
+
+  // Fetch Over Time Rates
+  const fetchOverTimeRates = async (): Promise<OverTimeRatesItem[]> => {
+    const response = await apiClient.get("/Fs/Process/TimeKeepGroup/GroupSetUpOTRates");
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      groupCode: item.groupCode,
+      regDayOT: item.regDayOT,
+      restDayOT: item.restDayOT,
+      legalHolidayOT: item.legalHolidayOT,
+      specHolidayOT: item.specHolidayOT,
+      minHoursToComputeOT: item.minHoursToComputeOT,
+      roundOfftHourMin: item.roundOfftHourMin,
+      offsetLate: item.offsetLate,
+      useOTAuthorization: item.useOTAuthorization,
+      holidayPayLegal: item.holidayPayLegal,
+      holidayPaySpecial: item.holidayPaySpecial,
+      noPayIfAbsentBeforeHoliday: item.noPayIfAbsentBeforeHoliday,
+      noPayIfAbsentAfterHoliday: item.noPayIfAbsentAfterHoliday,
+      considerTardinessDayBeforeHoliday: item.considerTardinessDayBeforeHoliday,
+      considerUndertimeDayBeforeHoliday: item.considerUndertimeDayBeforeHoliday,
+      computeUnprodHourIfInc: item.computeUnprodHourIfInc,
+      computeUnprodHourIfIncLegal: item.computeUnprodHourIfIncLegal,
+      computeUnprodHourIfIncSpecial: item.computeUnprodHourIfIncSpecial,
+      computeUnprodHourIfLeave: item.computeUnprodHourIfLeave,
+      minHoursToPriorToHoliday: item.minHoursToPriorToHoliday,
+      computeBasedDateIn: item.computeBasedDateIn,
+      holidayWithWorkShift: item.holidayWithWorkShift,
+      deductMealBreakOTComputation: item.deductMealBreakOTComputation,
+      compHolidayWithPaidLeave: item.compHolidayWithPaidLeave,
+      compUnprodWithPaidLeave: item.compUnprodWithPaidLeave,
+      compHolidayWithPaidLeaveMinHr: item.compHolidayWithPaidLeaveMinHr,
+      compUnprodWithPaidLeaveMinHR: item.compUnprodWithPaidLeaveMinHR,
+      useOTPremiumBreakdown: item.useOTPremiumBreakdown,
+      useDayType2: item.useDayType2,
+      minHoursOTBreak: item.minHoursOTBreak,
+      hoursOTBreakDeduction: item.hoursOTBreakDeduction,
+      spRDDay: item.spRDDay,
+      spRDDayOT: item.spRDDayOT,
+      computeBrk2OI: item.computeBrk2OI,
+      useDOLEOT: item.useDOLEOT,
+      doubleLegalHolidayOT: item.doubleLegalHolidayOT,
+      specialHoliday2: item.specialHoliday2,
+      birthDayPayOT: item.birthDayPayOT,
+      compHolPayMonth: item.compHolPayMonth,
+      nonWrkHolidayOT: item.nonWrkHolidayOT,
+      minimumNoOfHrsRequiredToCompHol: item.minimumNoOfHrsRequiredToCompHol,
+      compHolPayIfWorkBeforeHolidayRestDay: item.compHolPayIfWorkBeforeHolidayRestDay,
+      compHolPayIfWorkBeforeHolidaySpecialHoliday: item.compHolPayIfWorkBeforeHolidaySpecialHoliday,
+      compHolPayIfWorkBeforeHolidayLegalHoliday: item.compHolPayIfWorkBeforeHolidayLegalHoliday,
+      minHrsToCompOTRegDay: item.minHrsToCompOTRegDay,
+      minHrsToCompOTRestDay: item.minHrsToCompOTRestDay,
+      minHrsToCompOTLegal: item.minHrsToCompOTLegal,
+      minHrsToCompOTSpecial: item.minHrsToCompOTSpecial,
+      minHrsToCompOTSpecial2: item.minHrsToCompOTSpecial2,
+      minHrsToCompOTDoubleLegal: item.minHrsToCompOTDoubleLegal,
+      minHrsToCompOTNWH: item.minHrsToCompOTNWH,
+      regDayOTAdj: item.regDayOTAdj,
+      restDayOTAdj: item.restDayOTAdj,
+      legalHolidayOTAdj: item.legalHolidayOTAdj,
+      specHolidayOTAdj: item.specHolidayOTAdj,
+      doubleLegalHolidayOTAdj: item.doubleLegalHolidayOTAdj,
+      specialHoliday2Adj: item.specialHoliday2Adj,
+      nonWrkHolidayOTAdj: item.nonWrkHolidayOTAdj,
+      compFirstRestdayHoliday: item.compFirstRestdayHoliday,
+      otCutOffFlag: item.otCutOffFlag,
+      otCutOffOTCode: item.otCutOffOTCode,
+      otCutOffHours: item.otCutOffHours,
+      enable24HrOTFlag: item.enable24HrOTFlag,
+      roundOffNDBasicHourMin: item.roundOffNDBasicHourMin,
+      includeUnWorkHolInRegDay: item.includeUnWorkHolInRegDay,
+      sundayWrkOTIfWrkSaturday: item.sundayWrkOTIfWrkSaturday,
+      otCode2ShiftsInADay: item.otCode2ShiftsInADay
+    }));
+  };
+
+  const populateFromOTBreak = (item: OTBreakItem) => {
+    setOTBreakAppliesToRegDay(item.regDay ?? false);
+    setOTBreakAppliesToLegHol(item.doubleHoliday ?? false);
+    setOTBreakAppliesToSHol(item.specialHoliday ?? false);
+    setOTBreakAppliesToDoubleLegHol(item.doubleHoliday ?? false);
+    setOTBreakAppliesToS2Hol(item.specialHoliday2 ?? false);
+    setOTBreakAppliesToNonWorkHol(item.nonWorkingHoliday ?? false);
+    setOTBreakAppliesToRestDay(item.restDay ?? false);
+    setOTBreakAppliesToLegHolRest(item.legalHolidayRest ?? false);
+    setOTBreakAppliesToSHolRest(item.specialHolidayRest ?? false)
+    setOTBreakAppliesToDoubleLegHolRest(item.doubleHolidayRest ?? false);
+    setOTBreakAppliesToS2HolRest(item.specialHoliday2Rest ?? false);
+    setOTBreakAppliesToNonWorkRest(item.nonWorkingHolidayRest ?? false);
+  };
+
+  const populateSystemConfigStates = (item: SystemConfigItem) => {
+    setUseTimekeepingSystemConfig(item.useTKSystemConfig);
+    setMinBeforeShift(item.numOfMinBeforeTheShift);
+    setMinIgnoreMultipleBreak(item.numOfMinToIgnoreMultipleOutInBreak);
+    setMinBeforeMidnightShift(item.numOfMinBeforeMidnightShift);
+    setMinConsiderBreak2In(item.noOfMinToConsiderBrk2In);
+    setDevicePolicy(item.devicePolicy);
+  };
+
+  const populateFromOTRates = (item: OverTimeRatesItem) => {
+    setRegularDayOT(item.regDayOT ?? '');
+    setRestDayOT(item.restDayOT ?? '');
+    setLegalHolidayOT(item.legalHolidayOT ?? '');
+    setSpecialHolidayOT(item.specHolidayOT ?? '');
+    setDoubleLegalHolidayOT(item.doubleLegalHolidayOT ?? '')
+    setSpecialHolidayOT2(item.specialHoliday2 ?? '');
+    setNonWorkingHolidayOT(item.nonWrkHolidayOT ?? '');
+
+    setRegularDayOTLateFiling(item.regDayOTAdj ?? '');
+    setRestDayOTLateFiling(item.restDayOTAdj ?? '');
+    setLegalHolidayOTLateFiling(item.legalHolidayOTAdj ?? '');
+    setSpecialHolidayOTLateFiling(item.legalHolidayOTAdj ?? '');
+    setDoubleLegalHolidayOTLateFiling(item.doubleLegalHolidayOTAdj ?? '');
+    setSpecialHoliday2OTLateFiling(item.specialHoliday2Adj ?? '');
+    setNonWorkingHolidayOTLateFiling(item.nonWrkHolidayOTAdj ?? '');
+    
+    setOtBreakMinHours(item.minHoursOTBreak ?? 0)
+    setOTBreakNoOfHrsDed(item.hoursOTBreakDeduction ?? 0)
+    setUseOTPremium(item.useOTPremiumBreakdown ?? false);
+    setUseActualDayType(item.useDayType2 ?? false);
+    setHolidayWithWorkshift(item.holidayWithWorkShift ?? false)
+    setDeductMealBreakFromOT(item.deductMealBreakOTComputation ?? false); 
+    setComputeOTForBreak2(item.computeBrk2OI ?? false);
+    setEnable24HourOT(item.enable24HrOTFlag ?? false);
+    setIncludeUnworkedHolidayInRegular(item.includeUnWorkHolInRegDay ?? false);
+    setSundayOTIfWorkedSaturday(item.sundayWrkOTIfWrkSaturday ?? false);
+
+    setRegDayMinHrsToCompOT(item.minHrsToCompOTRegDay ?? '');
+    setRestDayMinHrsToCompOT(item.minHrsToCompOTRestDay ?? '');
+    setLegalHolidayMinHrsToCompOT(item.minHrsToCompOTLegal ?? '');
+    setSpecialHolidayMinHrsToCompOT(item.minHrsToCompOTSpecial ?? '');
+    setSpecialHoliday2MinHrsToCompOT(item.minHrsToCompOTSpecial2 ?? '');
+    setDoubleLegalHolidayMinHrsToCompOT(item.minHrsToCompOTDoubleLegal ?? '');
+    setNonWorkingHolidayMinHrsToCompOT(item.minHrsToCompOTNWH ?? '');
+
+    setRestDayToBeComputedAsOtherRate(item.spRDDay ?? '');
+    setRestDayOtherRate(item.spRDDayOT ?? '');
+    setIsOverTimeCutoffFlag(item.otCutOffFlag ?? false)
+    setOverTimeCode(item.otCutOffOTCode ?? '');
+    setRequiredHours(item.otCutOffHours ?? '');
+    setOverTimeCodeFor2ShiftsDay(item.otCode2ShiftsInADay?? '');
+    setOTRoundingToTheNearestHourMin(item.roundOfftHourMin ?? '')
+    setBirthdayPay(item.birthDayPayOT ?? '');
+    setNDBasicRoundingToTheNearestHourMin(item.roundOffNDBasicHourMin ?? '');
+    setUseOverTimeAuthorization(item.useOTAuthorization ?? false);
+    setIsSpecialOTCompFlag(item.useDayType2 ?? false);
+    setIsHolPayLegalFlag(item.holidayPayLegal ?? false);
+    setIsHolPaySpecialFlag(item.holidayPaySpecial ?? false);
+    setCompHolPayForMonth(item.compHolPayMonth ?? false);
+    setCompHolPayIfWorkBeforeHolidayRestDay(item.compHolPayIfWorkBeforeHolidayRestDay ?? false);
+    setCompHolPayIfWorkBeforeHolidayLegalHoliday(item.compHolPayIfWorkBeforeHolidayLegalHoliday ?? false);
+    setCompHolPayIfWorkBeforeHolidaySpecialHoliday(item.compHolPayIfWorkBeforeHolidaySpecialHoliday ?? false);
+    setNoPayIfAbsentBeforeHoliday(item.noPayIfAbsentBeforeHoliday ?? false);
+    setNoPayIfAbsentAfterHoliday(item.noPayIfAbsentAfterHoliday ?? false);
+    setCompHolidayWithPaidLeave(item.compHolidayWithPaidLeave ?? false );
+    setMinimumNoOfHrsRequiredToCompHol(item.minimumNoOfHrsRequiredToCompHol ?? '')
+    setCompFirstRestdayHoliday(item.compFirstRestdayHoliday ?? false);
+  };
+  
+
+
+  const fetchOTBreakData = async (): Promise<OTBreakItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/TimeKeepGroup/GroupOTBreak"
+    );
+
+    return response.data.map((item: any): OTBreakItem => ({
+      id: item.id,
+      regDay: item.regDay,
+      restDay: item.restDay,
+      legalHoliday: item.lHoliday,
+      specialHoliday: item.sHoliday,
+      legalHolidayRest: item.lHolidayRest,
+      specialHolidayRest: item.sHolidayRest,
+      groupCode: item.groupCode,
+      doubleHoliday: item.doubleHoliday,
+      doubleHolidayRest: item.doubleHolidayRest,
+      specialHoliday2: item.s2Holiday,
+      specialHoliday2Rest: item.s2HolidayRest,
+      nonWorkingHoliday: item.nonWorkHoliday,
+      nonWorkingHolidayRest: item.nonWorkHolidayRest,
+    }));
+  };
+
+  useEffect(() => {
+    const loadOverTimeRates = async () => {
+      const items = await fetchOverTimeRates();
+      setOverTimeRates(items);
+      populateFromOTRates(items[0]);
+    };
+    const loadOTBreakData = async () => {
+      const items = await fetchOTBreakData();
+      setOTBreakList(items);
+      populateFromOTBreak(items[0]);
+    };
+    loadOverTimeRates();
+    loadOTBreakData();
   }, []);
 
   // Generic fetch function
@@ -867,7 +1291,7 @@ export function TimeKeepGroupPage() {
     groupCode?: string,
   ): Promise<LoginPolicyItem[] | LoginPolicyItem | null> => {
     try {
-      const url = "/Fs/Process/GroupSetupLoginPolicy";
+      const url = "/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy";
 
       const response = await apiClient.get(url);
 
@@ -1056,7 +1480,7 @@ export function TimeKeepGroupPage() {
     setUseOTPremium(false);
     setUseActualDayType(false);
     setHolidayWithWorkshift(false);
-    setOtBreakMinHours("");
+    setOtBreakMinHours(0);
 
     // Other Policies
     setUseDefaultRestday(false);
@@ -1461,6 +1885,7 @@ export function TimeKeepGroupPage() {
                                               selectedCutOffRows.includes(
                                                 item.id.toString(),
                                               ),
+                                              
                                           )
                                         }
                                         onChange={(e) => {
@@ -2645,6 +3070,15 @@ export function TimeKeepGroupPage() {
                 tksGroupCode={tksGroupCode}
                 tksGroupDescription={tksGroupDescription}
                 isEditMode={isEditMode}
+                isEditOTRates={isEditOTRates}
+                setIsEditOTRates={setIsEditOTRates}
+                showOtCodeModal={showOtCodeModal}
+                setShowOtCodeModal={setShowOtCodeModal}
+                isEditOTRatesFor2Shifts={isEditOTRatesFor2Shifts}
+                setIsEditOTRatesFor2Shifts={setIsEditOTRatesFor2Shifts}
+                isEditBirthDayPay={isEditBirthDayPay}
+                setIsEditBirthDayPay={setIsEditBirthDayPay}
+
                 regularDayOT={regularDayOT}
                 setRegularDayOT={setRegularDayOT}
                 restDayOT={restDayOT}
@@ -2659,6 +3093,7 @@ export function TimeKeepGroupPage() {
                 setSpecialHolidayOT2={setSpecialHolidayOT2}
                 nonWorkingHolidayOT={nonWorkingHolidayOT}
                 setNonWorkingHolidayOT={setNonWorkingHolidayOT}
+
                 regularDayOTLateFiling={regularDayOTLateFiling}
                 setRegularDayOTLateFiling={setRegularDayOTLateFiling}
                 restDayOTLateFiling={restDayOTLateFiling}
@@ -2673,8 +3108,130 @@ export function TimeKeepGroupPage() {
                 setSpecialHoliday2OTLateFiling={setSpecialHoliday2OTLateFiling}
                 nonWorkingHolidayOTLateFiling={nonWorkingHolidayOTLateFiling}
                 setNonWorkingHolidayOTLateFiling={setNonWorkingHolidayOTLateFiling}
+
+                regDayMinHrsToCompOT={regDayMinHrsToCompOT}
+                setRegDayMinHrsToCompOT={setRegDayMinHrsToCompOT}
+                restDayMinHrsToCompOT={restDayMinHrsToCompOT}
+                setRestDayMinHrsToCompOT={setRestDayMinHrsToCompOT}
+                legalHolidayMinHrsToCompOT={legalHolidayMinHrsToCompOT}
+                setLegalHolidayMinHrsToCompOT={setLegalHolidayMinHrsToCompOT}
+                specialHolidayMinHrsToCompOT={specialHolidayMinHrsToCompOT}
+                setSpecialHolidayMinHrsToCompOT={setSpecialHolidayMinHrsToCompOT}
+                specialHoliday2MinHrsToCompOT={specialHoliday2MinHrsToCompOT}
+                setSpecialHoliday2MinHrsToCompOT={setSpecialHoliday2MinHrsToCompOT}
+                doubleLegalHolidayMinHrsToCompOT={doubleLegalHolidayMinHrsToCompOT}
+                setDoubleLegalHolidayMinHrsToCompOT={setDoubleLegalHolidayMinHrsToCompOT}
+                nonWorkingHolidayMinHrsToCompOT={nonWorkingHolidayMinHrsToCompOT}
+                setNonWorkingHolidayMinHrsToCompOT={setNonWorkingHolidayMinHrsToCompOT}
+
                 otBreakMinHours={otBreakMinHours}
                 setOtBreakMinHours={setOtBreakMinHours}
+                oTBreakNoOfHrsDed={oTBreakNoOfHrsDed}
+                setOTBreakNoOfHrsDed={setOTBreakNoOfHrsDed}
+
+                oTBreakAppliesToRegDay={oTBreakAppliesToRegDay}
+                setOTBreakAppliesToRegDay={setOTBreakAppliesToRegDay}
+                oTBreakAppliesToLegHol={oTBreakAppliesToLegHol}
+                setOTBreakAppliesToLegHol={setOTBreakAppliesToLegHol}
+                oTBreakAppliesToSHol={oTBreakAppliesToSHol}
+                setOTBreakAppliesToSHol={setOTBreakAppliesToSHol}
+                oTBreakAppliesToDoubleLegHol={oTBreakAppliesToDoubleLegHol}
+                setOTBreakAppliesToDoubleLegHol={setOTBreakAppliesToDoubleLegHol}
+                oTBreakAppliesToS2Hol={oTBreakAppliesToS2Hol}
+                setOTBreakAppliesToS2Hol={setOTBreakAppliesToS2Hol}
+                oTBreakAppliesToNonWorkHol={oTBreakAppliesToNonWorkHol}
+                setOTBreakAppliesToNonWorkHol={setOTBreakAppliesToNonWorkHol}
+                oTBreakAppliesToRestDay={oTBreakAppliesToRestDay}
+                setOTBreakAppliesToRestDay={setOTBreakAppliesToRestDay}
+                oTBreakAppliesToLegHolRest={oTBreakAppliesToLegHolRest}
+                setOTBreakAppliesToLegHolRest={setOTBreakAppliesToLegHolRest}
+                oTBreakAppliesToSHolRest={oTBreakAppliesToSHolRest}
+                setOTBreakAppliesToSHolRest={setOTBreakAppliesToSHolRest}
+                oTBreakAppliesToDoubleLegHolRest={oTBreakAppliesToDoubleLegHolRest}
+                setOTBreakAppliesToDoubleLegHolRest={setOTBreakAppliesToDoubleLegHolRest}
+                oTBreakAppliesToS2HolRest={oTBreakAppliesToS2HolRest}
+                setOTBreakAppliesToS2HolRest={setOTBreakAppliesToS2HolRest}
+                oTBreakAppliesToNonWorkRest={oTBreakAppliesToNonWorkRest}
+                setOTBreakAppliesToNonWorkRest={setOTBreakAppliesToNonWorkRest}
+
+                useOTPremiumBreakDwn={useOTPremium}
+                setOTPremiumBreakDwn={setUseOTPremium}
+                useActualDayType={useActualDayType}
+                setUseActualDayType={setUseActualDayType}
+                holidayWithWorkShift={holidayWithWorkshift}
+                setHolidayWithWorkShift={setHolidayWithWorkshift}
+                deductMealBreakFromOT={deductMealBreakFromOT}
+                setDeductMealBreakFromOT={setDeductMealBreakFromOT}
+                computeOTForBreak2={computeOTForBreak2}
+                setComputeOTForBreak2={setComputeOTForBreak2}
+                enable24HourOT={enable24HourOT}
+                setEnable24HourOT={setEnable24HourOT}
+                includeUnworkedHolidayInRegular={includeUnworkedHolidayInRegular}
+                setIncludeUnworkedHolidayInRegular={setIncludeUnworkedHolidayInRegular}
+                sundayOTIfWorkedSaturday={sundayOTIfWorkedSaturday}
+                setSundayOTIfWorkedSaturday={setSundayOTIfWorkedSaturday}
+
+                restDayToBeComputedAsOtherRate={restDayToBeComputedAsOtherRate}
+                setRestDayToBeComputedAsOtherRate={setRestDayToBeComputedAsOtherRate}
+                restDayOtherRate={restDayOtherRate}
+                setRestDayOtherRate={setRestDayOtherRate}
+                isOverTimeCutOffFlag={isOverTimeCutOffFlag}
+                setIsOverTimeCutoffFlag={setIsOverTimeCutoffFlag}
+                overTimeCode={overTimeCode}
+                setOverTimeCode={setOverTimeCode}
+                requiredHours={requiredHours}
+                setRequiredHours={setRequiredHours}
+                overTimeCodeFor2ShiftsDay={overTimeCodeFor2ShiftsDay}
+                setOverTimeCodeFor2ShiftsDay={setOverTimeCodeFor2ShiftsDay}
+                oTRoundingToTheNearestHourMin={oTRoundingToTheNearestHourMin}
+                setOTRoundingToTheNearestHourMin={setOTRoundingToTheNearestHourMin}
+                birthdayPay={birthdayPay}
+                setBirthdayPay={setBirthdayPay}
+                nDBasicRoundingToTheNearestHourMin={nDBasicRoundingToTheNearestHourMin}
+                setNDBasicRoundingToTheNearestHourMin={setNDBasicRoundingToTheNearestHourMin}
+                useOverTimeAuthorization={useOverTimeAuthorization}
+                setUseOverTimeAuthorization={setUseOverTimeAuthorization}
+                isSpecialOTCompFlag={isSpecialOTCompFlag}
+                setIsSpecialOTCompFlag={setIsSpecialOTCompFlag}
+                isHolPayLegalFlag={isHolPayLegalFlag}
+                setIsHolPayLegalFlag={setIsHolPayLegalFlag}
+                isHolPaySpecialFlag={isHolPaySpecialFlag}
+                setIsHolPaySpecialFlag={setIsHolPaySpecialFlag}
+                compHolPayForMonth={compHolPayForMonth}
+                setCompHolPayForMonth={setCompHolPayForMonth}
+                compHolPayIfWorkBeforeHolidayRestDay={compHolPayIfWorkBeforeHolidayRestDay}
+                setCompHolPayIfWorkBeforeHolidayRestDay={setCompHolPayIfWorkBeforeHolidayRestDay}
+                compHolPayIfWorkBeforeHolidayLegalHoliday={compHolPayIfWorkBeforeHolidayLegalHoliday}
+                setCompHolPayIfWorkBeforeHolidayLegalHoliday={setCompHolPayIfWorkBeforeHolidayLegalHoliday}
+                compHolPayIfWorkBeforeHolidaySpecialHoliday={compHolPayIfWorkBeforeHolidaySpecialHoliday}
+                setCompHolPayIfWorkBeforeHolidaySpecialHoliday={setCompHolPayIfWorkBeforeHolidaySpecialHoliday}
+                noPayIfAbsentBeforeHoliday={noPayIfAbsentBeforeHoliday}
+                setNoPayIfAbsentBeforeHoliday={setNoPayIfAbsentBeforeHoliday}
+                noPayIfAbsentAfterHoliday={noPayIfAbsentAfterHoliday}
+                setNoPayIfAbsentAfterHoliday={setNoPayIfAbsentAfterHoliday}
+                compHolidayWithPaidLeave={compHolidayWithPaidLeave}
+                setCompHolidayWithPaidLeave={setCompHolidayWithPaidLeave}
+                minimumNoOfHrsRequiredToCompHol={minimumNoOfHrsRequiredToCompHol}
+                setMinimumNoOfHrsRequiredToCompHol={setMinimumNoOfHrsRequiredToCompHol}
+                compFirstRestdayHoliday={compFirstRestdayHoliday}
+                setCompFirstRestdayHoliday={setCompFirstRestdayHoliday}
+
+                minimumOTHours={minOTHrs}
+                setMinimumOTHours={setMinOTHrs}
+                accumOTHrsToEarnMealAllow={accumOTHrsToEarnMealAllow}
+                setAccumOTHrsToEarnMealAllow={setAccumOTHrsToEarnMealAllow}
+                dayType={dayType}
+                setDayType={setDayType}
+                amount={amount}
+                setAmount={setAmount}
+                earningCode={earningCode}
+                setEarningCode={setEarningCode}
+                oTAllowancesList={oTAllowancesList}
+                setOTAllowancesList={setOTAllowancesList}
+                id={oTAllowanceseID}
+                setID={setOTAllowancesID}
+                groupCode={oTAllowancesGroupCode}
+                setGroupCode={setOTAllowancesGroupCode}
               />
             )}
 
@@ -2701,7 +3258,7 @@ export function TimeKeepGroupPage() {
                       setUseTimekeepingSystemConfig(e.target.checked)
                     }
                     disabled={!isEditMode}
-                    className={checkboxClass}
+                    className="w-4 h-4 mt-1"
                   />
                 </div>
 
@@ -2712,8 +3269,9 @@ export function TimeKeepGroupPage() {
                       No. of Min. Before the Shift :
                     </label>
                     <input
-                      type="text"
-                      defaultValue="0"
+                      type="number"
+                      value={minBeforeShift}
+                      onChange={(e) => setMinBeforeShift(e.target.value)}
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -2732,8 +3290,9 @@ export function TimeKeepGroupPage() {
                       No. of Min. to Ignore Multiple Break Out/In :
                     </label>
                     <input
-                      type="text"
-                      defaultValue="0"
+                      type="number"
+                      value={minIgnoreMultipleBreak}
+                      onChange={(e) => setMinIgnoreMultipleBreak(e.target.value)}
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -2759,7 +3318,8 @@ export function TimeKeepGroupPage() {
                     </label>
                     <input
                       type="text"
-                      defaultValue="0"
+                      value={minBeforeMidnightShift}
+                      onChange={(e) => setMinBeforeMidnightShift(e.target.value)}
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -2780,7 +3340,8 @@ export function TimeKeepGroupPage() {
                     </label>
                     <input
                       type="text"
-                      defaultValue="0"
+                      value={minConsiderBreak2In}
+                      onChange={(e) => setMinConsiderBreak2In(e.target.value)}
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -2801,6 +3362,8 @@ export function TimeKeepGroupPage() {
                     </label>
                     <input
                       type="text"
+                      value={devicePolicy}
+                      onChange={(e) => setDevicePolicy(e.target.value)}
                       readOnly={!isEditMode}
                       className={`w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -4331,7 +4894,12 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowOtCodeModal(false)}
+              onClick={() => {
+                setIsEditOTRates(false);
+                setShowOtCodeModal(false);
+                setIsEditOTRatesFor2Shifts(false);
+                setIsEditBirthDayPay(false);
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -4343,7 +4911,12 @@ export function TimeKeepGroupPage() {
                     Search
                   </h2>
                   <button
-                    onClick={() => setShowOtCodeModal(false)}
+                    onClick={() => {
+                      setIsEditOTRates(false);
+                      setShowOtCodeModal(false);
+                      setIsEditOTRatesFor2Shifts(false);
+                      setIsEditBirthDayPay(false);
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -4398,7 +4971,18 @@ export function TimeKeepGroupPage() {
                             index % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }`}
                           onClick={() => {
-                            setOtCodePerWeek(item.oTFileSetupCode);
+                            if (isEditOTRates) {
+                              setOverTimeCode(item.oTFileSetupCode);
+                            } else if (isEditOTRatesFor2Shifts) {
+                              setOverTimeCodeFor2ShiftsDay(item.oTFileSetupCode);
+                            }  else if (isEditBirthDayPay) {
+                              setBirthdayPay(item.oTFileSetupCode);
+                            } else {
+                              setOtCodePerWeek(item.oTFileSetupCode);
+                            }
+                            setIsEditOTRates(false);
+                            setIsEditOTRatesFor2Shifts(false);
+                            setIsEditBirthDayPay(false);
                             setShowOtCodeModal(false);
                           }}
                         >
