@@ -7,15 +7,8 @@
     "\\src\\components\\Export",
     "\\src\\components\\FileSetup",
     "\\src\\components\\FileSetup\\Employment",
-<<<<<<< HEAD
     "\\src\\components\\Maintenance",
     "\\src\\components\\Modals"
   ],
-  "SelectedNode": "\\src\\components\\Modals\\ProcessedDataModals.tsx",
-=======
-    "\\src\\components\\Maintenance"
-  ],
-  "SelectedNode": "\\src\\components\\LeaveApplicationPage.tsx",
->>>>>>> c2f44573d784fd3da088c6bb4eb43fefb359c9f9
   "PreviewInSolutionExplorer": false
 }
