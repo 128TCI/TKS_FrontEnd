@@ -4,6 +4,7 @@ import apiClient from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
 import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
 import CryptoJS from 'crypto-js';
+import { decryptData } from '../services/encryptionService';
 
 // ─── Encryption Helpers ────────────────────────────────────────────────────────
 
@@ -115,7 +116,8 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
         company:     encryptedCompany,
         windowsAuth,
       }, );
-
+      const decryptedUsername = decryptData(response.data.user?.username) || username;
+      
       if (response.status === 200) {
         if (response.data.token) {
           localStorage.setItem('authToken',      response.data.token);
@@ -130,6 +132,24 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
           localStorage.setItem('userData', JSON.stringify(response.data.user));
         }
 
+        try {
+          await auditTrail.log({
+            trans:      `Employee ${decryptedUsername} logged in.`,
+            messages:   `Employee ${decryptedUsername} logged in.`,
+            formName:   'LogIn',
+            accessType: 'LogIn',
+          });
+        } catch (err) {
+          console.error('Audit trail login failed:', err);
+        }
+
+        console.log('Login Response (Decrypted):', {
+          ...response.data,
+          user: {
+            ...response.data.user,
+            username: decryptedUsername,
+          },
+        });
         await showSuccessModal('Login Successful');
 
         onLogin();
