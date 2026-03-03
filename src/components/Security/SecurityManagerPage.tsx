@@ -5,11 +5,10 @@ import {
 } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient, { getLoggedInUsername} from '../../services/apiClient';
+import apiClient from '../../services/apiClient';
 import { securityService } from '../../services/securityService';
 import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../Types/security';
 import { ACCESS_TYPE_LABELS, ACCESS_TYPE_ORDER } from '../Types/security';
-import { get } from 'http';
 
 export function SecurityManagerPage() {
   const [activeTab, setActiveTab] = useState<'security-manager' | 'group-member' | 'security-control'>('security-manager');
@@ -19,7 +18,6 @@ export function SecurityManagerPage() {
   const [securityControlTab, setSecurityControlTab] = useState<'access-type' | 'tks-group'>('access-type');
   const [searchTKGroupTerm, setSearchTKGroupTerm] = useState('');
   const [searchGroupAccessTerm, setSearchGroupAccessTerm] = useState('');
-  const [selectedTKSGroups, setSelectedTKSGroups] = useState<number[]>([]);
   const [selectedTKSGroupAccess, setSelectedTKSGroupAccess] = useState<number[]>([]);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
   const [editedRowData, setEditedRowData] = useState<FormAccess | null>(null);
@@ -32,8 +30,6 @@ export function SecurityManagerPage() {
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<UserGroup | null>(null);
-
   const [currentAccessPage, setCurrentAccessPage] = useState(1);
 
   // User form state
@@ -109,11 +105,11 @@ export function SecurityManagerPage() {
 
   const fetchUserGroups = useCallback(async () => {
     setLoadingGroups(true);
-    try { 
+    try {
       const data = await securityService.getUserGroups();
       setUserGroupsList(data);
       if (data.length > 0 && !selectedUserGroup) {
-        setSelectedUserGroup(data[0].description);
+        setSelectedUserGroup(data[0].groupName);
       }
     } catch {
       showErrorModal('Failed to load user groups.');
@@ -144,6 +140,7 @@ export function SecurityManagerPage() {
     setLoadingAccess(true);
     try {
       const data = await securityService.getGroupAccess(groupName);
+      // Ensure ascending order by formName regardless of API response order
       const sorted = [...data].sort((a, b) => a.formName.localeCompare(b.formName));
       setFormAccessData(sorted);
       setCurrentAccessPage(1);
@@ -163,7 +160,6 @@ export function SecurityManagerPage() {
     }
   }, []);
 
-
   const fetchAccessTypes = useCallback(async () => {
     try {
       const data = await securityService.getFormAccessTypes();
@@ -176,8 +172,8 @@ export function SecurityManagerPage() {
     }
   }, []);
 
-
-  const fetchTKSGroupData = useCallback(async (groupName : string) => {
+  // Matches original pattern: fetches from /Fs/Process/TimeKeepGroupSetUp via securityService
+  const fetchTKSGroupData = useCallback(async (groupName: string) => {
     setLoadingTKSGroup(true);
     try {
       const data = await securityService.getAvailableTksGroups(groupName);
@@ -204,7 +200,7 @@ export function SecurityManagerPage() {
   useEffect(() => {
     fetchUsers(1);
     fetchUserGroups();
-    fetchTKSGroupData(selectedUserGroup);
+    fetchTKSGroupData('Administrator');
     fetchForms();
     fetchAccessTypes();
   }, []);
@@ -215,6 +211,7 @@ export function SecurityManagerPage() {
     if (activeTab === 'security-control') {
       fetchGroupAccess(selectedUserGroup);
       fetchTksGroupAccess(selectedUserGroup);
+      fetchTKSGroupData(selectedUserGroup);
     }
   }, [selectedUserGroup, activeTab]);
 
@@ -234,7 +231,7 @@ export function SecurityManagerPage() {
     currentTKSPage * itemsPerPage
   );
 
-  const getStatusPageNumbers = () => {
+  const getGroupPageNumbers = () => {
     const pages: (number | string)[] = [];
     if (totalTKSPages <= 7) {
       for (let i = 1; i <= totalTKSPages; i++) pages.push(i);
@@ -264,8 +261,9 @@ export function SecurityManagerPage() {
   const tksGroupAccess: TKSGroupAccess[] = tksGroupAccessData;
 
   const filteredAccessGroups = tksGroupAccess.filter(item =>
-    item.tksGroupName.toLowerCase().includes(searchGroupAccessTerm.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchGroupAccessTerm.toLowerCase())
+    (item.tksGroupCode ?? '').toLowerCase().includes(searchGroupAccessTerm.toLowerCase()) ||
+    (item.tksGroupName ?? '').toLowerCase().includes(searchGroupAccessTerm.toLowerCase()) ||
+    (item.description  ?? '').toLowerCase().includes(searchGroupAccessTerm.toLowerCase())
   );
 
   // ── TKS Group Access pagination ────────────────────────────────────────────
@@ -316,7 +314,7 @@ export function SecurityManagerPage() {
 
   const handleAccessPageChange = (page: number) => setCurrentAccessPage(page);
 
-   const getFormAccessPageNumbers = (): (number | string)[] => {
+  const getFormAccessPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     if (totalFormAccessPages <= 7) {
       for (let i = 1; i <= totalFormAccessPages; i++) pages.push(i);
@@ -332,59 +330,77 @@ export function SecurityManagerPage() {
       pages.push('...'); pages.push(totalFormAccessPages);
     }
     return pages;
-  }; 
-
-  const renderAccessPageNumbers = () => {
-    const pages = [];
-    for (let i = 1; i <= totalFormAccessPages; i++) {
-      pages.push(
-        <button key={i} onClick={() => handleAccessPageChange(i)}
-          className={`px-3 py-1 rounded border text-xs ${currentAccessPage === i
-            ? 'border-blue-500 bg-blue-500 text-white'
-            : 'border-gray-300 bg-white hover:bg-gray-100'}`}>
-          {i}
-        </button>
-      );
-    }
-    return pages;
   };
 
   // ── Group member transfer handlers (original logic preserved) ──────────────
 
-  const moveToGroupMembers = () => {
-    if (selectedUsers.length === 0) return;
-    setGroupMembers(prev => [...prev, ...selectedUsers]);
-    setAvailableUsers(prev => prev.filter(u => !selectedUsers.includes(u)));
-    setSelectedUsers([]);
-  };
-
-  const moveToUsers = () => {
-    if (selectedGroupMembers.length === 0) return;
-    setAvailableUsers(prev => [...prev, ...selectedGroupMembers]);
-    setGroupMembers(prev => prev.filter(m => !selectedGroupMembers.includes(m)));
-    setSelectedGroupMembers([]);
-  };
-
-  const moveAllToGroupMembers = () => {
-    if (availableUsers.length === 0) return;
-    setGroupMembers(prev => [...prev, ...availableUsers]);
-    setAvailableUsers([]);
-    setSelectedUsers([]);
-  };
-
-  const moveAllToUsers = () => {
-    if (groupMembers.length === 0) return;
-    setAvailableUsers(prev => [...prev, ...groupMembers]);
-    setGroupMembers([]);
-    setSelectedGroupMembers([]);
-  };
-
-  const handleSaveGroupMembers = async () => {
+  // ── Group member transfer handlers ────────────────────────────────────────
+  // ">" — remove selected group members from tk_UserGroupMember
+  const moveToUsers = async () => {
     try {
-      const res = await securityService.updateMembers(selectedUserGroup, groupMembers);
-      res.success ? showSuccessModal(res.message) : showErrorModal(res.message);
-    } catch {
-      showErrorModal('Failed to save members.');
+      if (selectedGroupMembers.length === 0) {
+        showErrorModal('Please select member(s) to remove.');
+        return
+      }
+      else  
+        await securityService.removeMembers(selectedUserGroup, selectedGroupMembers);
+        setGroupMembers(prev => prev.filter(m => !selectedGroupMembers.includes(m)));
+        setAvailableUsers(prev => [...prev, ...selectedGroupMembers]);
+        setSelectedGroupMembers([]);
+        showSuccessModal(`${selectedGroupMembers.length} member(s) removed successfully.`);
+      } catch (error) {
+        showErrorModal('Failed to remove member(s).');
+        }    
+  };
+
+  // ">>" — remove ALL group members from tk_UserGroupMember
+  const moveAllToUsers = async () => {
+    if (groupMembers.length === 0) return;
+    try {
+      await securityService.removeMembers(selectedUserGroup, groupMembers);
+      setAvailableUsers(prev => [...prev, ...groupMembers]);
+      setGroupMembers([]);
+      setSelectedGroupMembers([]);
+      showSuccessModal(`${groupMembers.length} member(s) removed successfully.`);
+    } catch (error) {
+      showErrorModal('Failed to remove all members.');
+    }
+  };
+
+  // "<" — add selected users to tk_UserGroupMember
+  const moveToGroupMembers = async () => {
+    if (selectedUsers.length === 0) return;
+    try {
+      await securityService.addMembers(selectedUserGroup, selectedUsers);
+      setGroupMembers(prev => [...prev, ...selectedUsers]);
+      setAvailableUsers(prev => prev.filter(u => !selectedUsers.includes(u)));
+      setSelectedUsers([]);
+      showSuccessModal(`${selectedUsers.length} member(s) added successfully.`);
+    } catch (error) {
+      showErrorModal('Failed to add member(s).');
+    }
+  };
+
+  // Access Type handlers
+  const handleToggleAllAccessTypes = (checked: boolean) => {
+    if (checked) {
+      setSelectedAccessTypes([...accessTypes.map(at => at.accessTypeName)]);
+    } else {
+      setSelectedAccessTypes([]);
+    }
+  };  
+
+  // "<<" — add ALL available users to tk_UserGroupMember
+  const moveAllToGroupMembers = async () => {
+    if (availableUsers.length === 0) return;
+    try {
+      await securityService.addMembers(selectedUserGroup, availableUsers);
+      setGroupMembers(prev => [...prev, ...availableUsers]);
+      setAvailableUsers([]);
+      setSelectedUsers([]);
+      showSuccessModal(`${availableUsers.length} member(s) added successfully.`);
+    } catch (error) {
+      showErrorModal('Failed to add all members.');
     }
   };
 
@@ -492,7 +508,7 @@ export function SecurityManagerPage() {
     if (!passwordForm.newPassword.trim()) { showErrorModal('Please enter a new password.'); return; }
     if (passwordForm.newPassword !== passwordForm.confirmNewPassword) { showErrorModal('Passwords do not match.'); return; }
     try {
-      const res = await securityService.resetPassword(selectedUser!.username);
+      const res = await securityService.resetPassword(selectedUser!.username, { newPassword: passwordForm.newPassword });
       if (res.success) { showSuccessModal(res.message); setShowResetPasswordModal(false); }
       else showErrorModal(res.message);
     } catch {
@@ -560,7 +576,70 @@ export function SecurityManagerPage() {
     }
   };
 
+
+  // ── Access Type — Add button handler ──────────────────────────────────────
+  const handleAddAccessType = async () => {
+    if (selectedForms.length === 0) {
+      showErrorModal('Please select at least one Form.');
+      return;
+    }
+    if (selectedAccessTypes.length === 0) {
+      showErrorModal('Please select at least one Access Type.');
+      return;
+    }
+
+    // Check for duplicates against existing User Group Access list
+    const existingFormNames = formAccessData.map(a => a.formName);
+    const duplicates = selectedForms.filter(f => existingFormNames.includes(f));
+
+    if (duplicates.length > 0) {
+      const dupList = duplicates.join(', ');
+      const proceed = await ApiService.showDeleteGroupConfirmDialog(
+        `The following form(s) already exist in User Group Access for "${selectedUserGroup}":\n\n${dupList}\n\nDo you want to overwrite them?`,
+        'Duplicate Form(s) Detected'
+      );
+      if (!proceed) return;
+    }    
+
+    // Build accessFlags: every known access type defaults false, selected ones true
+    const baseFlags: Record<string, boolean> = {};
+    accessTypes.forEach(at => { baseFlags[at.accessTypeName] = false; });
+    selectedAccessTypes.forEach(name => { baseFlags[name] = true; });
+
+    setSavingAccess(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const formName of selectedForms) {
+      try {
+        const res = await securityService.saveGroupAccess({
+          groupName:   selectedUserGroup,
+          formName,
+          accessFlags: baseFlags,
+        });
+        if (res.success) successCount++;
+        else failCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    setSavingAccess(false);
+
+    if (failCount === 0) {
+      showSuccessModal(`Added access for ${successCount} form(s) successfully.`);
+    } else {
+      showErrorModal(`${successCount} saved, ${failCount} failed.`);
+    }
+
+    // Clear selections and refresh the table
+    setSelectedForms([]);
+    setSelectedAccessTypes([]);
+    fetchGroupAccess(selectedUserGroup);
+  };  
+
   // ── TKS Group Access remove ────────────────────────────────────────────────
+
   // ── TKS Group Add handler ──────────────────────────────────────────────────
   const handleAddTksGroupAccess = async () => {
     if (!selectedItems.length) {
@@ -572,13 +651,11 @@ export function SecurityManagerPage() {
       .filter(item => selectedItems.includes(item.id))
       .map(item => item.code);
 
-    console.log('Logs:', selectedCodes);  
-
     try {
       const res = await securityService.saveTksGroupAccess(
         selectedUserGroup,
         selectedCodes,
-        getLoggedInUsername()
+        undefined   // createdBy — pass logged-in username here if available
       );
       if (res.success) {
         showSuccessModal(`Added ${selectedCodes.length} TKS group(s) successfully.`);
@@ -599,17 +676,25 @@ export function SecurityManagerPage() {
       showErrorModal('Please select at least one record to remove.');
       return;
     }
+    // Use tksGroupAccessData (state) — never the const alias which may be stale
+    const selectedCodes = tksGroupAccessData
+      .filter(item => selectedTKSGroupAccess.includes(item.id))
+      .map(item => item.tksGroupCode);
+
+    if (!selectedCodes.length) return;
+
     try {
-      const res = await securityService.removeTksGroupAccessBulk(selectedTKSGroupAccess);
+      const res = await securityService.removeTksGroupAccess(selectedUserGroup, selectedCodes);
       if (res.success) {
         showSuccessModal(res.message);
         setSelectedTKSGroupAccess([]);
         fetchTksGroupAccess(selectedUserGroup);
-        fetchTKSGroupData(selectedUserGroup);   // refresh available TKS groups (removed ones reappear)
+        fetchTKSGroupData(selectedUserGroup);       // removed codes reappear in left panel
+        showSuccessModal(`Removed ${selectedCodes.length} TKS group access record(s) successfully.`);   
       } else {
         showErrorModal(res.message);
       }
-    } catch (error) {
+    } catch {
       showErrorModal('Failed to remove TKS group access.');
     }
   };
@@ -889,13 +974,6 @@ export function SecurityManagerPage() {
                     </select>
                   </div>
                 </div>
-
-                {/* Save button — new addition to persist changes */}
-                <div className="flex justify-end">
-                  <button onClick={handleSaveGroupMembers} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-2">
-                    <Save className="w-4 h-4" /> Save Changes
-                  </button>
-                </div>
               </div>
             )}
 
@@ -919,7 +997,7 @@ export function SecurityManagerPage() {
                   <label className="block text-gray-700 mb-2">User Group</label>
                   <select
                     value={selectedUserGroup}
-                   onChange={e => {
+                    onChange={e => {
                       const g = e.target.value;
                       setSelectedUserGroup(g);
                       setSearchGroupAccessTerm('');
@@ -950,10 +1028,10 @@ export function SecurityManagerPage() {
                                   onChange={e => setSelectedForms(p => e.target.checked ? [...p, form.formName] : p.filter(f => f !== form.formName))}
                                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm text-gray-700 leading-tight">{form.formDescription}</span>
-                                  {/*{form.formDescription && (
+                                  <span className="text-sm text-gray-700 leading-tight">{form.formName}</span>
+                                  {form.formDescription && (
                                     <span className="text-xs text-gray-400 leading-tight truncate">{form.formDescription}</span>
-                                  )}*/}
+                                  )}
                                 </div>
                               </label>
                             ))}
@@ -964,6 +1042,16 @@ export function SecurityManagerPage() {
                       <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                         <h3 className="text-gray-900 mb-3">Access Type</h3>
                         <div className="bg-white border border-gray-200 rounded-lg p-3">
+                          {/* Select All */}
+                          <label className="flex items-center gap-2 hover:bg-blue-50 p-2 rounded cursor-pointer border-b border-gray-200 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedAccessTypes.length === accessTypes.length && accessTypes.length > 0}
+                              onChange={(e) => handleToggleAllAccessTypes(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-50"
+                            />
+                            <span className="text-sm font-small text-gray-900">Select All</span>
+                          </label>                         
                           <div className="space-y-2">
                             {accessTypes.map((type) => (
                               <label key={type.id} className="flex items-center gap-2 hover:bg-gray-50 p-1 rounded cursor-pointer">
@@ -974,8 +1062,11 @@ export function SecurityManagerPage() {
                               </label>
                             ))}
                           </div>
-                          <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2">
-                            <Plus className="w-4 h-4" /> Add
+                          <button
+                            onClick={handleAddAccessType}
+                            disabled={savingAccess || selectedForms.length === 0 || selectedAccessTypes.length === 0} 
+                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2">
+                            <Plus className="w-4 h-4" /> {savingAccess ? 'Saving...' : 'Add'}
                           </button>
                         </div>
                       </div>
@@ -1024,7 +1115,14 @@ export function SecurityManagerPage() {
                                 const currentData = isEditing && editedRowData ? editedRowData : access;
                                 return (
                                   <tr key={access.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 text-sm text-gray-900">{access.formName}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">
+                                      <div className="flex flex-col">
+                                        <span>{access.formDescription || access.formName}</span>
+                                        {access.formDescription && (
+                                          <span className="text-xs text-gray-400">{access.formName}</span>
+                                        )}
+                                      </div>
+                                    </td>
                                     {accessTypes.map(at => (
                                       <td key={at.id} className="px-4 py-3 text-center">
                                         <input
@@ -1051,13 +1149,13 @@ export function SecurityManagerPage() {
                                               setEditingRowId(null); setEditedRowData(null);
                                             }}
                                             disabled={savingAccess}
-                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded flex items-center gap-1 hover:bg-green-700 border border-green-600"
+                                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
                                           >
                                             <Save className="w-3 h-3" /> Save
                                           </button>
                                           <button
                                             onClick={() => { setEditingRowId(null); setEditedRowData(null); }}
-                                            className="px-3 py-1 text-xs bg-red-600 text-white rounded flex items-center gap-1 hover:bg-red-700 border border-red-600"
+                                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1"
                                           >
                                             <X className="w-3 h-3" /> Cancel
                                           </button>
@@ -1110,7 +1208,7 @@ export function SecurityManagerPage() {
                           <h3 className="text-gray-900">TKS Group</h3>
                           <button
                             onClick={handleAddTksGroupAccess}
-                            disabled={selectedItems.length === 0}
+                            //disabled={selectedItems.length === 0}
                             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Plus className="w-4 h-4" /> Add
@@ -1123,56 +1221,59 @@ export function SecurityManagerPage() {
                             className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                         </div>
                         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                          <table className="w-full">
-                            <thead className="bg-gray-100 border-b border-gray-200">
-                              <tr>
-                                <th className="px-4 py-2 text-left text-xs text-gray-600">
-                                  <input type="checkbox"
-                                    checked={selectedItems.length === tksGroup.length && tksGroup.length > 0}
-                                    onChange={e => handleSelectAll(e.target.checked)}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs text-gray-600">TKS Group Name</th>
-                                <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {loadingTKSGroup ? (
-                                <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400 text-sm">Loading...</td></tr>
-                              ) : paginatedItem.map(item => (
-                                <tr key={item.id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-2">
-                                    <input type="checkbox" checked={selectedItems.includes(item.id)}
-                                      onChange={e => handleSelectItem(item.id, e.target.checked)}
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gray-100 border-b border-gray-200">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs text-gray-600">
+                                    <input type="checkbox"
+                                      checked={selectedItems.length === filteredTKGroups.length && filteredTKGroups.length > 0}
+                                      onChange={e => handleSelectAll(e.target.checked)}
                                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
-                                  <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs text-gray-600">TKS Group Name</th>
+                                  <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        {/* Pagination */}
-                        <div className="flex items-center justify-between mt-3">
-                          <div className="text-gray-600 text-xs">
-                            Showing {filteredTKGroups.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredTKGroups.length)} of {filteredTKGroups.length} entries
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {paginatedItem.length === 0 ? (
+                                  <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400 text-sm">No records found.</td></tr>
+                                ) : paginatedItem.map(item => (
+                                  <tr key={item.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-2">
+                                      <input type="checkbox"
+                                        checked={selectedItems.includes(item.id)}
+                                        onChange={e => handleSelectItem(item.id, e.target.checked)}
+                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
+                                    <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                          <div className="flex gap-1">
-                            <button onClick={() => setCurrentTKSPage(prev => Math.max(prev - 1, 1))} disabled={currentTKSPage === 1}
-                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-                            {getStatusPageNumbers().map((page, idx) => (
-                              page === '...' ? (
-                                <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-                              ) : (
-                                <button key={page} onClick={() => setCurrentTKSPage(page as number)}
-                                  className={`px-2 py-1 rounded text-xs ${currentTKSPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
-                                  {page}
-                                </button>
-                              )
-                            ))}
-                            <button onClick={() => setCurrentTKSPage(prev => Math.min(prev + 1, totalTKSPages))} disabled={currentTKSPage === totalTKSPages || totalTKSPages === 0}
-                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                          {/* Pagination */}
+                          <div className="flex items-center justify-between mt-3 px-2 pb-2">
+                            <div className="text-gray-600 text-xs">
+                              Showing {filteredTKGroups.length === 0 ? 0 : (currentTKSPage - 1) * itemsPerPage + 1} to {Math.min(currentTKSPage * itemsPerPage, filteredTKGroups.length)} of {filteredTKGroups.length} entries
+                            </div>
+                            <div className="flex gap-1">
+                              <button onClick={() => setCurrentTKSPage(prev => Math.max(prev - 1, 1))} disabled={currentTKSPage === 1}
+                                className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                              {getGroupPageNumbers().map((page, idx) => (
+                                page === '...' ? (
+                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                                ) : (
+                                  <button key={page} onClick={() => setCurrentTKSPage(page as number)}
+                                    className={`px-2 py-1 rounded text-xs ${currentTKSPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                                    {page}
+                                  </button>
+                                )
+                              ))}
+                              <button onClick={() => setCurrentTKSPage(prev => Math.min(prev + 1, totalTKSPages))} disabled={currentTKSPage === totalTKSPages || totalTKSPages === 0}
+                                className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1217,8 +1318,6 @@ export function SecurityManagerPage() {
                                         checked={selectedTKSGroupAccess.includes(access.id)}
                                         onChange={e => handleSelectItemAccess(access.id, e.target.checked)}
                                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-										  
-															  
                                     </td>
                                     <td className="px-4 py-2 text-sm text-gray-900">{access.tksGroupCode}</td>
                                     <td className="px-4 py-2 text-sm text-gray-600">{access.description}</td>
