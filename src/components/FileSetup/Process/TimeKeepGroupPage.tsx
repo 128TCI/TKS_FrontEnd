@@ -1,4 +1,4 @@
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import {
   Search,
   X,
@@ -20,7 +20,10 @@ import {
 } from "lucide-react";
 import { DatePicker } from "../../DateSetup/DatePicker";
 import { OvertimeRatesTabContent } from "../../OvertimeRatesTabContent";
-import { OtherPoliciesTabContent } from "../../OtherPoliciesTabContent";
+import {
+  OtherPoliciesTabContent,
+  OtherPoliciesTabContentHandle,
+} from "../../OtherPoliciesTabContent";
 import { Footer } from "../../Footer/Footer";
 import apiClient from "../../../services/apiClient";
 import { useTablePagination } from "../../../hooks/useTablePagination";
@@ -237,11 +240,11 @@ interface OTAllowancesItem {
 interface SystemConfigItem {
   id: number;
   groupCode: string;
-  numOfMinBeforeTheShift: string;
-  numOfMinToIgnoreMultipleOutInBreak: string;
-  numOfMinBeforeMidnightShift: string;
+  numOfMinBeforeTheShift: number;
+  numOfMinToIgnoreMultipleOutInBreak: number;
+  numOfMinBeforeMidnightShift: number;
   devicePolicy: string;
-  noOfMinToConsiderBrk2In: string;
+  noOfMinToConsiderBrk2In: number;
   useTKSystemConfig: boolean;
 }
 
@@ -480,13 +483,12 @@ export function TimeKeepGroupPage() {
     useState("3.00");
 
   // System Configuration State
-  const [showSystemConfigModal, setShowSystemConfigModal] = useState(false);
   const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] =
     useState(false);
-  const [minBeforeShift, setMinBeforeShift] = useState("0");
-  const [minIgnoreMultipleBreak, setMinIgnoreMultipleBreak] = useState("0");
-  const [minBeforeMidnightShift, setMinBeforeMidnightShift] = useState("0");
-  const [minConsiderBreak2In, setMinConsiderBreak2In] = useState("0");
+  const [minBeforeShift, setMinBeforeShift] = useState(0);
+  const [minIgnoreMultipleBreak, setMinIgnoreMultipleBreak] = useState(0);
+  const [minBeforeMidnightShift, setMinBeforeMidnightShift] = useState(0);
+  const [minConsiderBreak2In, setMinConsiderBreak2In] = useState(0);
   const [devicePolicy, setDevicePolicy] = useState("");
 
   // Global Edit Mode
@@ -521,7 +523,9 @@ export function TimeKeepGroupPage() {
   const [oTAllowancesList, setOTAllowancesList] = useState<OTAllowancesItem[]>(
     [],
   );
-  const [originalOTAllowances, setOriginalOTAllowances] = useState<OTAllowancesItem[]>([]);
+  const [originalOTAllowances, setOriginalOTAllowances] = useState<
+    OTAllowancesItem[]
+  >([]);
 
   // System Config List
   const [systemConfigList, setSystemConfigList] = useState<SystemConfigItem[]>(
@@ -640,6 +644,14 @@ export function TimeKeepGroupPage() {
     "November",
     "December",
   ];
+
+  const otherPoliciesRef = useRef<OtherPoliciesTabContentHandle>(null);
+
+  const handleParentSave = async () => {
+    if (otherPoliciesRef.current) {
+      await otherPoliciesRef.current.handleSave();
+    }
+  };
 
   // Filter Groups
   const filteredGroups = tksGroupItems.filter(
@@ -989,6 +1001,27 @@ export function TimeKeepGroupPage() {
     return isoStr;
   };
 
+  const isPayloadDifferent = (payload: any, current: any) => {
+  return Object.keys(payload).some((key) => {
+    const pVal = payload[key];
+    const cVal = current[key];
+
+    // Treat null, undefined, or empty string as equivalent
+    if ((pVal === null || pVal === undefined || pVal === "") &&
+        (cVal === null || cVal === undefined || cVal === "")) {
+      return false; // same
+    }
+
+    // Convert numbers in string form to numbers for comparison
+    if (!isNaN(Number(pVal)) && !isNaN(Number(cVal))) {
+      return Number(pVal) !== Number(cVal);
+    }
+
+    // Otherwise, normal strict comparison
+    return pVal !== cVal;
+  });
+};
+
   const updateGroupById = async (
     id: number,
     updatedFields: Partial<GroupItem>,
@@ -1007,11 +1040,9 @@ export function TimeKeepGroupPage() {
 
   const handleSaveGroupSetUpDefinition = async () => {
     try {
-      if (!currentGroupId) {
-        alert("No group selected.");
-        return;
-      }
+      if (!currentGroupId) return;
 
+      // Build payload for current group
       const mainPayload: Partial<GroupItem> = {
         groupCode: tksGroupCode,
         description: payrollDescription,
@@ -1025,12 +1056,23 @@ export function TimeKeepGroupPage() {
         terminalID: terminalId,
       };
 
+      const currentGroup = tksGroupItems.find((g) => g.id === currentGroupId);
+      if (!currentGroup) return;
+
+      if (!isPayloadDifferent(mainPayload, currentGroup)) {
+        return; // skip update if nothing meaningful changed
+        }
+
+
+      // Update current group
       await updateGroupById(currentGroupId, mainPayload);
 
+      // Update selected cut-off rows (excluding current group)
       if (selectedCutOffRows.length > 0) {
         const selectedIds = selectedCutOffRows
           .map(Number)
           .filter((id) => id !== currentGroupId);
+
         await Promise.all(
           selectedIds.map((id) =>
             updateGroupById(id, {
@@ -1043,14 +1085,16 @@ export function TimeKeepGroupPage() {
         );
       }
 
+      // Update selected auto-pairing rows (excluding current group)
       if (selectedAutoPairingRows.length > 0) {
         const selectedIds = selectedAutoPairingRows
           .map(Number)
           .filter((id) => id !== currentGroupId);
+
         await Promise.all(
           selectedIds.map((id) =>
             updateGroupById(id, {
-              cutOffDateMonth: monthNameToStringNumber(cutOffMonth), // if still want month/period synced
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
               cutOffDatePeriod: cutOffPeriod,
               autoPairLogsDateFrom: new Date(autoPairingFrom).toISOString(),
               autoPairLogsDateTo: new Date(autoPairingTo).toISOString(),
@@ -1059,11 +1103,26 @@ export function TimeKeepGroupPage() {
         );
       }
 
+      // Refresh group list
       await loadTKSGroup();
-      alert("Update successful!");
-    } catch (error) {
+
+      // Success notification
+      await Swal.fire({
+        icon: "success",
+        title: "Update Successful",
+        text: "Group setup definition has been updated successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
       console.error("Update failed:", error);
-      alert("Update failed.");
+      const errorMsg =
+        error.response?.data?.message || error.message || "Update failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
     }
   };
 
@@ -1086,11 +1145,9 @@ export function TimeKeepGroupPage() {
 
   const handleSaveLoginPolicy = async () => {
     try {
-      if (!currentGroupId || !tksGroupCode) {
-        alert("No group selected.");
-        return;
-      }
+      if (!currentGroupId || !tksGroupCode) return;
 
+      // Build payload
       const buildLoginPolicyPayload = (): Partial<LoginPolicyItem> => ({
         id: currentGroupId,
         groupCode: tksGroupCode,
@@ -1136,17 +1193,46 @@ export function TimeKeepGroupPage() {
         supGroupCode: supervisoryGroupCode,
       });
 
-      await updateLoginPolicyById(currentGroupId, buildLoginPolicyPayload());
+      const payload = buildLoginPolicyPayload();
 
+      // Fetch current policy from state (or API)
+      const currentPolicy = groupLoginPolicyItems.find(
+        (p) => p.id === currentGroupId,
+      );
+      if (currentPolicy) {
+        // Compare payload with current state to detect changes
+        const isEqual = Object.keys(payload).every(
+          (key) => (payload as any)[key] === (currentPolicy as any)[key],
+        );
+        if (isEqual) return; // no changes, skip update
+      }
+
+      // Perform update
+      await updateLoginPolicyById(currentGroupId, payload);
+
+      // Refresh data
       const updatedPolicy = (await fetchGroupSetupLoginPolicyData(
         tksGroupCode,
       )) as LoginPolicyItem;
       if (updatedPolicy) populateFromGroupSetupLoginPolicy(updatedPolicy);
 
-      alert("Login policy updated successfully!");
-    } catch (error) {
+      // Success notification
+      await Swal.fire({
+        icon: "success",
+        title: "Login Policy Updated",
+        text: "Login policy updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
       console.error("Login policy update failed", error);
-      alert("Update failed.");
+      const errorMsg =
+        error.response?.data?.message || error.message || "Update failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
     }
   };
 
@@ -1169,10 +1255,7 @@ export function TimeKeepGroupPage() {
 
   const handleSaveOTRates = async () => {
     try {
-      if (!overTimeRates || overTimeRates.length === 0) {
-        alert("No OT Rate selected to save.");
-        return;
-      }
+      if (!overTimeRates || overTimeRates.length === 0) return;
 
       const payload: Partial<OverTimeRatesItem> = {
         id: currentOTRatesID,
@@ -1201,32 +1284,19 @@ export function TimeKeepGroupPage() {
         enable24HrOTFlag: enable24HourOT,
         includeUnWorkHolInRegDay: includeUnworkedHolidayInRegular,
         sundayWrkOTIfWrkSaturday: sundayOTIfWorkedSaturday,
-        minHrsToCompOTRegDay: regDayMinHrsToCompOT
-          ? regDayMinHrsToCompOT
-          : undefined,
-        minHrsToCompOTRestDay: restDayMinHrsToCompOT
-          ? restDayMinHrsToCompOT
-          : undefined,
-        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT
-          ? legalHolidayMinHrsToCompOT
-          : undefined,
-        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT
-          ? specialHolidayMinHrsToCompOT
-          : undefined,
-        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT
-          ? specialHoliday2MinHrsToCompOT
-          : undefined,
-        minHrsToCompOTDoubleLegal: doubleLegalHolidayMinHrsToCompOT
-          ? doubleLegalHolidayMinHrsToCompOT
-          : undefined,
-        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT
-          ? nonWorkingHolidayMinHrsToCompOT
-          : undefined,
+        minHrsToCompOTRegDay: regDayMinHrsToCompOT ?? undefined,
+        minHrsToCompOTRestDay: restDayMinHrsToCompOT ?? undefined,
+        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT ?? undefined,
+        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT ?? undefined,
+        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT ?? undefined,
+        minHrsToCompOTDoubleLegal:
+          doubleLegalHolidayMinHrsToCompOT ?? undefined,
+        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT ?? undefined,
         spRDDay: restDayToBeComputedAsOtherRate,
         spRDDayOT: restDayOtherRate,
         otCutOffFlag: isOverTimeCutOffFlag,
         otCutOffOTCode: overTimeCode,
-        otCutOffHours: requiredHours ? requiredHours : undefined,
+        otCutOffHours: requiredHours ?? undefined,
         otCode2ShiftsInADay: overTimeCodeFor2ShiftsDay,
         roundOfftHourMin: oTRoundingToTheNearestHourMin,
         birthDayPayOT: birthdayPay,
@@ -1244,149 +1314,312 @@ export function TimeKeepGroupPage() {
         noPayIfAbsentBeforeHoliday: noPayIfAbsentBeforeHoliday,
         noPayIfAbsentAfterHoliday: noPayIfAbsentAfterHoliday,
         compHolidayWithPaidLeave: compHolidayWithPaidLeave,
-        minimumNoOfHrsRequiredToCompHol: minimumNoOfHrsRequiredToCompHol
-          ? minimumNoOfHrsRequiredToCompHol
-          : undefined,
+        minimumNoOfHrsRequiredToCompHol:
+          minimumNoOfHrsRequiredToCompHol ?? undefined,
         compFirstRestdayHoliday: compFirstRestdayHoliday,
       };
 
+      // Get current OT rate from state
+      const currentRate = overTimeRates.find((r) => r.id === currentOTRatesID);
+      if (currentRate) {
+        const isEqual = Object.keys(payload).every(
+          (key) => (payload as any)[key] === (currentRate as any)[key],
+        );
+        if (isEqual) return; // no changes, skip update
+      }
+
+      // Perform update
       await updateOTRateById(currentOTRatesID, payload);
 
-      // Refresh the OT Rate data from backend
+      // Refresh OT Rates and populate first record
       const refreshed = await fetchOverTimeRates();
       setOverTimeRates(refreshed);
-      populateFromOTRates(refreshed[0]);
+      if (refreshed.length > 0) populateFromOTRates(refreshed[0]);
 
-      alert("OT Rate updated successfully!");
-    } catch (error) {
+      // Success notification
+      await Swal.fire({
+        icon: "success",
+        title: "OT Rate Updated",
+        text: "OT Rate updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
       console.error("Failed to save OT Rate", error);
-      alert("OT Rate save failed.");
-    }
-  };
-
-  const updateOTBreakById = async (
-    id: number,
-    payload: Partial<OTBreakItem>,
-  ) => {
-    try {
-      // Backend expects payload wrapped in { dto: ... }
-      await apiClient.put(
-        `/Fs/Process/TimeKeepGroup/GroupOTBreak/${id}`,
-        { dto: payload },
-        { headers: { "Content-Type": "application/json" } },
-      );
-    } catch (error) {
-      console.error(`Failed to update OT Break for id ${id}`, error);
-      throw error;
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "OT Rate save failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
     }
   };
 
   const handleSaveOTBreak = async () => {
-  try {
-    if (!oTBreakList || oTBreakList.length === 0) {
-      alert("No OT Break data available to save.");
-      return;
+    try {
+      if (!oTBreakList || oTBreakList.length === 0) return;
+
+      // Find OT Break for current group
+      const selectedOTBreak = oTBreakList.find(
+        (item) => item.groupCode === tksGroupCode,
+      );
+      if (!selectedOTBreak || !tksGroupCode) return;
+
+      const payload = {
+        id: selectedOTBreak.id,
+        groupCode: tksGroupCode,
+        regDay: oTBreakAppliesToRegDay ?? false,
+        restDay: oTBreakAppliesToRestDay ?? false,
+        lHoliday: oTBreakAppliesToLegHol ?? false,
+        sHoliday: oTBreakAppliesToSHol ?? false,
+        doubleHoliday: oTBreakAppliesToDoubleLegHol ?? false,
+        s2Holiday: oTBreakAppliesToS2Hol ?? false,
+        nonWorkHoliday: oTBreakAppliesToNonWorkHol ?? false,
+        lHolidayRest: oTBreakAppliesToLegHolRest ?? false,
+        sHolidayRest: oTBreakAppliesToSHolRest ?? false,
+        doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest ?? false,
+        s2HolidayRest: oTBreakAppliesToS2HolRest ?? false,
+        nonWorkHolidayRest: oTBreakAppliesToNonWorkRest ?? false,
+      };
+
+      // Skip update if nothing changed
+      const isEqual = Object.keys(payload).every(
+        (key) => (payload as any)[key] === (selectedOTBreak as any)[key],
+      );
+      if (isEqual) return;
+
+      // Send payload directly
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupOTBreak/${selectedOTBreak.id}`,
+        payload,
+        { headers: { "Content-Type": "application/json" } },
+      );
+
+      // Refresh OT Break data
+      const refreshed = await fetchOTBreakData();
+      setOTBreakList(refreshed);
+
+      const updatedItem = refreshed.find(
+        (item) => item.groupCode === tksGroupCode,
+      );
+      if (updatedItem) populateFromOTBreak(updatedItem);
+
+      // Success notification
+      await Swal.fire({
+        icon: "success",
+        title: "OT Break Updated",
+        text: "OT Break updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to save OT Break", error);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "OT Break save failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
+    }
+  };
+  const hasDuplicateDayType = () => {
+    const seen = new Set<string>();
+
+    for (const item of oTAllowancesList) {
+      // Use the value that will actually be saved
+      const finalDayType = item.dayType || "Any";
+      const key = `${tksGroupCode}_${finalDayType}`;
+
+      if (seen.has(key)) {
+        return true;
+      }
+
+      seen.add(key);
     }
 
-    // Find OT Break for current group
-    const selectedOTBreak = oTBreakList.find(
-      (item) => item.groupCode === tksGroupCode
-    );
-
-    if (!selectedOTBreak) {
-      alert(`No OT Break data found for group ${tksGroupCode}`);
-      return;
-    }
-
-    if (!tksGroupCode) {
-      alert("Current Group Code is empty!");
-      return;
-    }
-
-    const payload = {
-      id: selectedOTBreak.id,
-      groupCode: tksGroupCode,
-      regDay: oTBreakAppliesToRegDay ?? false,
-      restDay: oTBreakAppliesToRestDay ?? false,
-      lHoliday: oTBreakAppliesToLegHol ?? false,
-      sHoliday: oTBreakAppliesToSHol ?? false,
-      doubleHoliday: oTBreakAppliesToDoubleLegHol ?? false,
-      s2Holiday: oTBreakAppliesToS2Hol ?? false,
-      nonWorkHoliday: oTBreakAppliesToNonWorkHol ?? false,
-      lHolidayRest: oTBreakAppliesToLegHolRest ?? false,
-      sHolidayRest: oTBreakAppliesToSHolRest ?? false,
-      doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest ?? false,
-      s2HolidayRest: oTBreakAppliesToS2HolRest ?? false,
-      nonWorkHolidayRest: oTBreakAppliesToNonWorkRest ?? false
-    };
-
-    console.log(tksGroupCode);
-
-    // Send payload directly (no { dto: ... })
-    await apiClient.put(
-      `/Fs/Process/TimeKeepGroup/GroupOTBreak/${selectedOTBreak.id}`,
-      payload,
-      { headers: { "Content-Type": "application/json" } }
-    );
-
-    // Refresh OT Break data
-    const refreshed = await fetchOTBreakData();
-    setOTBreakList(refreshed);
-
-    const updatedItem = refreshed.find(
-      (item) => item.groupCode === tksGroupCode
-    );
-    if (updatedItem) populateFromOTBreak(updatedItem);
-
-    alert("OT Break updated successfully!");
-  } catch (error) {
-    console.error("Failed to save OT Break", error);
-    alert("OT Break save failed.");
-  }
-};
+    return false;
+  };
 
   const handleSaveOTAllowances = async () => {
     try {
-      if (!tksGroupCode) {
-        alert("GroupCode is required.");
-        return;
-      }
+      if (!tksGroupCode) return;
+      if (hasDuplicateDayType()) return;
 
-      if (oTAllowancesList.length === 0) {
-        alert("No OT Allowances to save.");
-        return;
-      }
-
-      // Convert string values to numbers
-      const payload = oTAllowancesList.map((item) => ({
-        id: item.id,
-        groupCode: tksGroupCode,
-        minimumOTHrs:
-          item.minimumOTHours === "" ? 0 : Number(item.minimumOTHours),
-        accumOTHrsToEarnMealAllow:
-          item.accumOTHrsToEarnMealAllow === ""
-            ? 0
-            : Number(item.accumOTHrsToEarnMealAllow),
-        dayType: "Any",
-        earningCode: item.earningCode,
-        amount: item.amount === "" ? 0 : Number(item.amount),
-      }));
-
-      await apiClient.post(
-        "/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances",
-        {
-          dto: payload, // ⚠️ Remove wrapper if backend does not expect dto
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-        }
+      // Check for deleted, new, or updated items
+      const deletedItems = originalOTAllowances.filter(
+        (original) =>
+          !oTAllowancesList.some((current) => current.id === original.id),
       );
 
-      alert("OT Allowances saved successfully!");
+      const newItems = oTAllowancesList.filter((i) => i.id === 0);
 
+      const updatedItems = oTAllowancesList.filter((i) => i.id !== 0);
+
+      // If nothing to change, exit early
+      if (
+        deletedItems.length === 0 &&
+        newItems.length === 0 &&
+        updatedItems.every((item) => {
+          const original = originalOTAllowances.find((o) => o.id === item.id);
+          if (!original) return false;
+          return (
+            original.minimumOTHours === item.minimumOTHours &&
+            original.accumOTHrsToEarnMealAllow ===
+              item.accumOTHrsToEarnMealAllow &&
+            original.earningCode === item.earningCode &&
+            original.amount === item.amount
+          );
+        })
+      ) {
+        return;
+      }
+
+      // Delete removed items
+      for (const item of deletedItems) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/${item.id}`,
+        );
+      }
+
+      // Add new items
+      for (const item of newItems) {
+        const payload = {
+          id: 0,
+          groupCode: tksGroupCode,
+          minimumOTHrs:
+            item.minimumOTHours === "" ? 0 : Number(item.minimumOTHours),
+          accumOTHrsToEarnMealAllow:
+            item.accumOTHrsToEarnMealAllow === ""
+              ? 0
+              : Number(item.accumOTHrsToEarnMealAllow),
+          dayType: "Any",
+          earningCode: item.earningCode,
+          amount: item.amount === "" ? 0 : Number(item.amount),
+        };
+
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances",
+          payload,
+        );
+      }
+
+      // Update existing items
+      for (const item of updatedItems) {
+        const payload = {
+          id: item.id,
+          groupCode: tksGroupCode,
+          minimumOTHrs:
+            item.minimumOTHours === "" ? 0 : Number(item.minimumOTHours),
+          accumOTHrsToEarnMealAllow:
+            item.accumOTHrsToEarnMealAllow === ""
+              ? 0
+              : Number(item.accumOTHrsToEarnMealAllow),
+          dayType: "Any",
+          earningCode: item.earningCode,
+          amount: item.amount === "" ? 0 : Number(item.amount),
+        };
+
+        await apiClient.put(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/${item.id}`,
+          payload,
+        );
+      }
+
+      // Success notification
+      await Swal.fire({
+        icon: "success",
+        title: "OT Allowances Saved",
+        text: "OT Allowances saved successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      setOriginalOTAllowances(oTAllowancesList);
     } catch (error: any) {
       console.error("Failed to save OT Allowances:", error);
-      alert("Save failed.");
+      const errorMsg =
+        error.response?.data?.message || error.message || "Save failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: errorMsg,
+      });
+    }
+  };
+  // Function to update system config by ID
+  const updateSystemConfigById = async (
+    id: number,
+    payload: Partial<SystemConfigItem>,
+  ) => {
+    try {
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig/${id}`,
+        payload,
+        { headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error(`Failed to update system config for id ${id}`, error);
+      throw error;
+    }
+  };
+
+  const handleSaveSystemConfig = async () => {
+    try {
+      if (!systemConfigList || systemConfigList.length === 0) {
+        await Swal.fire({
+          icon: "warning",
+          title: "No System Configuration",
+          text: "No system configuration found.",
+        });
+        return;
+      }
+
+      const currentItem = systemConfigList[0]; // assuming you want to update the first one
+      if (!currentItem) return;
+
+      // Build payload
+      const buildSystemConfigPayload = (): Partial<SystemConfigItem> => ({
+        id: currentItem.id,
+        groupCode: currentItem.groupCode,
+        numOfMinBeforeTheShift: Number(minBeforeShift ?? 0),
+        numOfMinToIgnoreMultipleOutInBreak: Number(minIgnoreMultipleBreak ?? 0),
+        numOfMinBeforeMidnightShift: Number(minBeforeMidnightShift ?? 0),
+        noOfMinToConsiderBrk2In: Number(minConsiderBreak2In ?? 0),
+        devicePolicy: devicePolicy ?? "",
+        useTKSystemConfig: useTimekeepingSystemConfig ?? false,
+      });
+
+      // Send update
+      await updateSystemConfigById(currentItem.id, buildSystemConfigPayload());
+
+      // Refresh data
+      const updatedConfig = await fetchGroupSystemConfig();
+      setSystemConfigList(updatedConfig);
+      if (updatedConfig[0]) populateSystemConfigStates(updatedConfig[0]);
+
+      // Success notification
+      await Swal.fire({
+        icon: "success",
+        title: "System Configuration Updated",
+        text: "System Configuration updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("System Configuration update failed", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Update failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
     }
   };
 
@@ -1471,7 +1704,7 @@ export function TimeKeepGroupPage() {
     loadOvertimeFileSetup();
     loadAllowancesData();
     loadSystemConfig();
-  }, []);
+  }, [tksGroupCode]);
 
   const fetchPayrollLocationData = async (): Promise<PayrollLocationItem[]> => {
     const response = await apiClient.get("/Fs/Process/PayrollLocationSetUp");
@@ -2113,10 +2346,10 @@ export function TimeKeepGroupPage() {
 
     // System Configuration
     setUseTimekeepingSystemConfig(false);
-    setMinBeforeShift("");
-    setMinIgnoreMultipleBreak("");
-    setMinBeforeMidnightShift("");
-    setMinConsiderBreak2In("");
+    setMinBeforeShift(0);
+    setMinIgnoreMultipleBreak(0);
+    setMinBeforeMidnightShift(0);
+    setMinConsiderBreak2In(0);
     setDevicePolicy("");
 
     // Enable edit mode and switch to definition tab
@@ -2271,24 +2504,31 @@ export function TimeKeepGroupPage() {
                 <>
                   <button
                     onClick={async () => {
-                      handleSaveGroupSetUpDefinition();
-                      handleSaveLoginPolicy();
-                      handleSaveOTRates();
-                      handleSaveOTBreak();
-                      handleSaveOTAllowances();
-                      setIsEditMode(false);
+                      try {
+                        await handleParentSave();
+                        await handleSaveSystemConfig();
+                        await handleSaveGroupSetUpDefinition();
+                        await handleSaveLoginPolicy();
+                        await handleSaveOTRates();
+                        await handleSaveOTBreak();
+                        await handleSaveOTAllowances();
+                        setIsEditMode(false);
 
-                      const codeToUse = tksGroupCode || "1";
-                      if (!tksGroupCode) {
-                        setTksGroupCode("1");
-                      }
+                        const codeToUse = tksGroupCode || "1";
+                        if (!tksGroupCode) {
+                          setTksGroupCode("1");
+                        }
 
-                      const item = tksGroupItems.find(
-                        (i) => i.groupCode === codeToUse,
-                      );
+                        const item = tksGroupItems.find(
+                          (i) => i.groupCode === codeToUse,
+                        );
 
-                      if (item) {
-                        await handleGroupRowClick(item);
+                        if (item) {
+                          await handleGroupRowClick(item);
+                        }
+                      } catch (error) {
+                        console.error("Error saving all:", error);
+                        alert("Some saves failed. Check console.");
                       }
                     }}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
@@ -3969,6 +4209,7 @@ export function TimeKeepGroupPage() {
             {/* Tab Content - Other Policies */}
             {activeTab === "other" && (
               <OtherPoliciesTabContent
+                ref={otherPoliciesRef}
                 tksGroupCode={tksGroupCode}
                 tksGroupDescription={tksGroupDescription}
                 isEditMode={isEditMode}
@@ -4003,7 +4244,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="number"
                       value={minBeforeShift}
-                      onChange={(e) => setMinBeforeShift(e.target.value)}
+                      onChange={(e) =>
+                        setMinBeforeShift(parseFloat(e.target.value))
+                      }
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -4025,7 +4268,7 @@ export function TimeKeepGroupPage() {
                       type="number"
                       value={minIgnoreMultipleBreak}
                       onChange={(e) =>
-                        setMinIgnoreMultipleBreak(e.target.value)
+                        setMinIgnoreMultipleBreak(Number(e.target.value))
                       }
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
@@ -4054,7 +4297,7 @@ export function TimeKeepGroupPage() {
                       type="text"
                       value={minBeforeMidnightShift}
                       onChange={(e) =>
-                        setMinBeforeMidnightShift(e.target.value)
+                        setMinBeforeMidnightShift(Number(e.target.value))
                       }
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
@@ -4077,7 +4320,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={minConsiderBreak2In}
-                      onChange={(e) => setMinConsiderBreak2In(e.target.value)}
+                      onChange={(e) =>
+                        setMinConsiderBreak2In(Number(e.target.value))
+                      }
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />

@@ -1,13 +1,24 @@
 import { Code, Search, X } from "lucide-react";
-import { use, useEffect, useState } from "react";
+import {
+  use,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+  useState,
+} from "react";
 import apiClient from "../services/apiClient";
 import { useTablePagination } from "../hooks/useTablePagination";
+import Swal from "sweetalert2";
 
 interface OtherPoliciesTabContentProps {
   tksGroupCode: string;
   tksGroupDescription: string;
   isEditMode: boolean;
   isCreateNew: boolean;
+}
+
+export interface OtherPoliciesTabContentHandle {
+  handleSave: () => Promise<void>;
 }
 
 export interface GroupSetUpOtherPoliciesItem {
@@ -73,9 +84,9 @@ export interface GroupSetUpOtherPoliciesItem {
   noOfHoursFrmTardiToAbsences?: string;
   compNoOfHoursEvnWOutLog?: boolean;
   allowBracketCode?: string;
-  calamYearsOfService?: string;
-  calamConsiderNoOfHours?: string;
-  calamAmount?: string;
+  calamYearsOfService?: number;
+  calamConsiderNoOfHours?: number;
+  calamAmount?: number;
   calamEarnCode?: string;
   compAbsDateSeparated?: boolean;
   compNoOfHoursRD?: boolean;
@@ -142,12 +153,10 @@ interface AllowanceBracketingSetupItem {
   description: string;
 }
 
-export function OtherPoliciesTabContent({
-  tksGroupCode,
-  tksGroupDescription,
-  isEditMode,
-  isCreateNew,
-}: OtherPoliciesTabContentProps) {
+export const OtherPoliciesTabContent = forwardRef<
+  OtherPoliciesTabContentHandle,
+  OtherPoliciesTabContentProps
+>(({ tksGroupCode, tksGroupDescription, isEditMode, isCreateNew }, ref) => {
   const checkboxClass =
     "w-4 h-4 border-2 border-gray-400 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer";
 
@@ -155,6 +164,7 @@ export function OtherPoliciesTabContent({
     useState<GroupSetUpOtherPoliciesItem[]>([]);
 
   // Other Policies States
+  const [groupCode, setGroupCode] = useState(tksGroupCode);
   const [useDefRestDay, setUseDefRestDay] = useState(false);
   const [restDayWithWorkShift, setRestDayWithWorkShift] = useState(false);
   const [defRestDay1, setDefRestDay1] = useState("");
@@ -239,9 +249,9 @@ export function OtherPoliciesTabContent({
   const [allowBracketCode, setAllowBracketCode] = useState("");
   const [byEmploymentStatFlag, setByEmploymentStatFlag] = useState(false);
   const [employmentStatus, setEmploymentStatus] = useState("");
-  const [calamYearsOfService, setCalamYearsOfService] = useState("");
-  const [calamConsiderNoOfHours, setCalamConsiderNoOfHours] = useState("");
-  const [calamAmount, setCalamAmount] = useState("");
+  const [calamYearsOfService, setCalamYearsOfService] = useState(0);
+  const [calamConsiderNoOfHours, setCalamConsiderNoOfHours] = useState(0);
+  const [calamAmount, setCalamAmount] = useState(0);
   const [calamEarnCode, setCalamEarnCode] = useState("");
 
   // Bracket States
@@ -700,9 +710,9 @@ export function OtherPoliciesTabContent({
     setExcludeNonWorkingInSuspension(
       item.excludeNonWorkingInSuspension ?? false,
     );
-    setCalamYearsOfService(item.calamYearsOfService ?? "");
-    setCalamConsiderNoOfHours(item.calamConsiderNoOfHours ?? "");
-    setCalamAmount(item.calamAmount ?? "");
+    setCalamYearsOfService(item.calamYearsOfService ?? 0);
+    setCalamConsiderNoOfHours(item.calamConsiderNoOfHours ?? 0);
+    setCalamAmount(item.calamAmount ?? 0);
     setCalamEarnCode(item.calamEarnCode ?? "");
     setAllowPerClassCode(item.allowPerClassCode ?? "");
     setEnableClassification(item.enableClassification ?? false);
@@ -726,7 +736,7 @@ export function OtherPoliciesTabContent({
     };
 
     loadOtherPoliciesSetUp();
-  }, [tksGroupCode, isCreateNew]);
+  }, [tksGroupCode, isCreateNew, isEditMode]);
 
   // Fetch BracketCodeSetUp
   const fetchBracketCodeSetUp = async (
@@ -919,9 +929,9 @@ export function OtherPoliciesTabContent({
       setExcludeLegalInSuspension(false);
       setExcludeSpecialInSuspension(false);
       setExcludeNonWorkingInSuspension(false);
-      setCalamYearsOfService("");
-      setCalamConsiderNoOfHours("");
-      setCalamAmount("");
+      setCalamYearsOfService(0);
+      setCalamConsiderNoOfHours(0);
+      setCalamAmount(0);
       setCalamEarnCode("");
       setAllowPerClassCode("");
       setEnableClassification(false);
@@ -934,6 +944,109 @@ export function OtherPoliciesTabContent({
   useEffect(() => {
     HandleCreateNew();
   }, [isCreateNew]);
+
+  const handleSave = async () => {
+  if (!groupSetUpOtherPoliciesList.length) return;
+
+  const existingItem = groupSetUpOtherPoliciesList.find(
+    (item) => item.groupCode === tksGroupCode
+  );
+  if (!existingItem) return;
+
+  // Build updated payload from current states
+  const updatedPayload: GroupSetUpOtherPoliciesItem = {
+    ...existingItem, // keep id, groupCode, and any untouched fields
+    useDefRestDay,
+    restDayWithWorkShift,
+    defRestDay1,
+    defRestDay2,
+    defRestDay3,
+    useTardBracket,
+    tardBracketCode,
+    deductFirstHalfBeforeBracket,
+    useUndertimeBracket,
+    underTimeBracketCode,
+    deductSecondHalfBeforeBracket,
+    useAccumBracket,
+    accumulationBracketYear,
+    accumulation,
+    accumulateUndertime,
+    undertimeToAbsences,
+    noOfHoursFrmUnderToAbsences,
+    tardinessToAbsences,
+    noOfHoursFrmTardiToAbsences,
+    compNoOfHoursEvnWOutLog,
+    compAbsDateSeparated,
+    compNoOfHoursRD,
+    compNoOfHoursLegal,
+    compNoOfHoursSpecial,
+    compNoOfHoursNonWork,
+    noAbsBeforeDateHired,
+    exempTard,
+    exempUndertime,
+    exempNightDiffBasic,
+    exempOT,
+    exempAbsences,
+    exempOtherEarnAndAllowance,
+    exempHolidaypay,
+    exempUnProWorkHoliday,
+    applyLeaveForFirstHalfExempt,
+    applyLeaveForSecondHalfExempt,
+    birthdayLeave,
+    dailySchedule,
+    excludeRestDayInSuspension,
+    excludeLegalInSuspension,
+    excludeSpecialInSuspension,
+    excludeNonWorkingInSuspension,
+    calamYearsOfService,
+    calamConsiderNoOfHours,
+    calamAmount,
+    calamEarnCode,
+    allowPerClassCode,
+    enableClassification,
+    allowBracketCode,
+    byEmploymentStatFlag,
+    employmentStatus,
+  };
+
+  // Check if there are any changes compared to existingItem
+  const hasChanges = Object.keys(updatedPayload).some(
+    (key) => (updatedPayload as any)[key] !== (existingItem as any)[key]
+  );
+  if (!hasChanges) return; // Exit early if nothing changed
+
+  try {
+    const response = await apiClient.put(
+      `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies/${existingItem.id}`,
+      updatedPayload
+    );
+
+    const updatedItem: GroupSetUpOtherPoliciesItem =
+      response.data ?? updatedPayload;
+
+    setGroupSetUpOtherPoliciesList([updatedItem]);
+    populateGroupSetUpOtherPolicies(updatedItem);
+
+    await Swal.fire({
+      icon: "success",
+      title: "Other Policies Saved",
+      text: "Other Policies saved successfully!",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  } catch (error: any) {
+    console.error("Failed to save Other Policies:", error);
+    const errorMsg = error.response?.data?.message || error.message || "Save failed.";
+    await Swal.fire({
+      icon: "error",
+      title: "Save Failed",
+      text: errorMsg,
+    });
+  }
+};
+  useImperativeHandle(ref, () => ({
+    handleSave,
+  }));
 
   return (
     <div className="space-y-6">
@@ -998,7 +1111,11 @@ export function OtherPoliciesTabContent({
                 Default Restday 1
               </label>
               {isEditMode ? (
-                <select className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                <select
+                  className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  value={defRestDay1} // <-- bind to state
+                  onChange={(e) => setDefRestDay1(e.target.value)} // <-- update state
+                >
                   <option value="">Select Day</option>
                   <option value="Monday">Monday</option>
                   <option value="Tuesday">Tuesday</option>
@@ -1012,7 +1129,6 @@ export function OtherPoliciesTabContent({
                 <input
                   type="text"
                   value={defRestDay1}
-                  onChange={(e) => setDefRestDay1(e.target.value)}
                   readOnly
                   className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50"
                 />
@@ -1024,7 +1140,11 @@ export function OtherPoliciesTabContent({
                 Default Restday 2
               </label>
               {isEditMode ? (
-                <select className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                <select
+                  className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  value={defRestDay2} // bind to state
+                  onChange={(e) => setDefRestDay2(e.target.value)} // update state
+                >
                   <option value="">Select Day</option>
                   <option value="Monday">Monday</option>
                   <option value="Tuesday">Tuesday</option>
@@ -1038,7 +1158,6 @@ export function OtherPoliciesTabContent({
                 <input
                   type="text"
                   value={defRestDay2}
-                  onChange={(e) => setDefRestDay2(e.target.value)}
                   readOnly
                   className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50"
                 />
@@ -1050,7 +1169,11 @@ export function OtherPoliciesTabContent({
                 Default Restday 3
               </label>
               {isEditMode ? (
-                <select className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                <select
+                  className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  value={defRestDay3} // bind to state
+                  onChange={(e) => setDefRestDay3(e.target.value)} // update state
+                >
                   <option value="">Select Day</option>
                   <option value="Monday">Monday</option>
                   <option value="Tuesday">Tuesday</option>
@@ -1064,7 +1187,6 @@ export function OtherPoliciesTabContent({
                 <input
                   type="text"
                   value={defRestDay3}
-                  onChange={(e) => setDefRestDay3(e.target.value)}
                   readOnly
                   className="w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50"
                 />
@@ -1083,7 +1205,10 @@ export function OtherPoliciesTabContent({
                 checked={useTardBracket}
                 onChange={(e) => {
                   setUseTardBracket(e.target.checked);
-                  !e.target.checked && setDeductFirstHalfBeforeBracket(false);
+                  if(!e.target.checked) {
+                    setDeductFirstHalfBeforeBracket(false);
+                    setTardBracketCode("");  
+                  }
                 }}
                 disabled={!isEditMode}
                 className={checkboxClass}
@@ -1133,7 +1258,10 @@ export function OtherPoliciesTabContent({
                 checked={useUndertimeBracket}
                 onChange={(e) => {
                   setUseUndertimeBracket(e.target.checked);
-                  !e.target.checked && setDeductSecondHalfBeforeBracket(false);
+                  if (!e.target.checked) {
+                    setDeductSecondHalfBeforeBracket(false);
+                    setUnderTimeBracketCode("");
+                  }
                 }}
                 disabled={!isEditMode}
                 className={checkboxClass}
@@ -1392,10 +1520,10 @@ export function OtherPoliciesTabContent({
                   Years of Service
                 </label>
                 <input
-                  type="text"
+                  type="number"
                   value={calamYearsOfService}
                   onChange={(e) =>
-                    isEditMode && setCalamYearsOfService(e.target.value)
+                    isEditMode && setCalamYearsOfService(Number(e.target.value))
                   }
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
@@ -1409,7 +1537,7 @@ export function OtherPoliciesTabContent({
                 <input
                   type="number"
                   value={calamConsiderNoOfHours}
-                  onChange={(e) => setCalamConsiderNoOfHours(e.target.value)}
+                  onChange={(e) => setCalamConsiderNoOfHours(parseFloat(e.target.value))}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
                 />
@@ -1423,7 +1551,7 @@ export function OtherPoliciesTabContent({
                 <input
                   type="text"
                   value={calamAmount}
-                  onChange={(e) => isEditMode && setCalamAmount(e.target.value)}
+                  onChange={(e) => isEditMode && setCalamAmount(parseFloat(e.target.value))}
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
                 />
@@ -2933,4 +3061,4 @@ export function OtherPoliciesTabContent({
       )}
     </div>
   );
-}
+});

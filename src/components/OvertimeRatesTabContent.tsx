@@ -164,9 +164,7 @@ interface OvertimeRatesTabContentProps {
   earningCode: string;
   setEarningCode: (value: string) => void;
   oTAllowancesList: OTAllowancesItem[];
-  setOTAllowancesList: React.Dispatch<
-    React.SetStateAction<OTAllowancesItem[]>
-  >;
+  setOTAllowancesList: React.Dispatch<React.SetStateAction<OTAllowancesItem[]>>;
   id: number;
   setID: (value: number) => void;
   groupCode: string;
@@ -831,28 +829,33 @@ export function OvertimeRatesTabContent({
     };
   }, [showEarningCodeModal]);
 
-  
-    
-  // Handle Add button click
-    const handleAddAllowance = () => {
-    if (!minimumOTHours || !earningCode || !amount) {
-      alert("Minimum OT Hours, Earning Code and Amount are required.");
+  const handleAddAllowance = () => {
+    const finalDayType = dayType || "Any"; // the value that will actually be saved
+
+    const exists = oTAllowancesList.some(
+      (item) =>
+        item.groupCode === tksGroupCode &&
+        (item.dayType || "Any") === finalDayType,
+    );
+
+    if (exists) {
+      alert("Only one Overtime allowance is allowed.");
       return;
     }
 
     const newItem: OTAllowancesItem = {
-      id: 0, // 0 means not yet saved in DB
+      id: 0,
       groupCode: tksGroupCode,
       minimumOTHours,
       accumOTHrsToEarnMealAllow,
-      dayType: "", // set if needed
+      dayType: finalDayType,
       earningCode,
       amount,
     };
 
     setOTAllowancesList((prev) => [...prev, newItem]);
 
-    // Clear input fields
+    // Clear fields
     setMinimumOTHours("");
     setAccumOTHrsToEarnMealAllow("");
     setEarningCode("");
@@ -878,17 +881,17 @@ export function OvertimeRatesTabContent({
 
   const HandleCreateNew = () => {
     if (isCreateNew) {
-      setMinimumOTHours('');
-      setAccumOTHrsToEarnMealAllow('');
-      setAmount('');
-      setEarningCode('');
+      setMinimumOTHours("");
+      setAccumOTHrsToEarnMealAllow("");
+      setAmount("");
+      setEarningCode("");
       setOTAllowancesList([]);
     }
-  }
+  };
 
   useEffect(() => {
     HandleCreateNew();
-  },[isCreateNew]); 
+  }, [isCreateNew]);
 
   return (
     <div className="space-y-6">
@@ -2347,10 +2350,10 @@ export function OvertimeRatesTabContent({
                       <td className="p-3 text-gray-700">
                         {allowance.accumOTHrsToEarnMealAllow}
                       </td>
-                      <td className="p-3 text-gray-700">{allowance.earningCode}</td>
                       <td className="p-3 text-gray-700">
-                        {allowance.amount}
+                        {allowance.earningCode}
                       </td>
+                      <td className="p-3 text-gray-700">{allowance.amount}</td>
                       {isEditMode && (
                         <td className="p-3">
                           <button
@@ -2377,8 +2380,10 @@ export function OvertimeRatesTabContent({
           className="fixed inset-0 flex items-center justify-center z-50"
           onClick={() => setShowEarningCodeModal(false)}
         >
-          <div onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-medium">Search Earning Code</h3>
