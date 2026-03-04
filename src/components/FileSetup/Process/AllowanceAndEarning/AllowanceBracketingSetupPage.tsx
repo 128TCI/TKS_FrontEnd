@@ -111,6 +111,7 @@ export function AllowanceBracketingSetupPage() {
   useEffect(() => {
     fetchBracketingData();
     fetchEarningCodes();
+    fetchWorkshiftCodes();
   }, []);
 
   const fetchBracketingData = async () => {
@@ -182,11 +183,11 @@ export function AllowanceBracketingSetupPage() {
   const fetchWorkshiftCodes = async () => {
     setLoadingWorkshift(true);
     try {
-      const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/WorkShiftSetUp');
+      const response = await apiClient.get('/Fs/Process/WorkShiftSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((item: any) => ({
+        const mappedData = response.data.data.map((item: any) => ({
           id: item.id || item.workShiftID || 0,
-          code: item.code || item.workShiftCode || '',
+          code: item.code || item.workShiftCode || '',  
           description: item.description || item.workShiftDesc || '',
         }));
         setWorkshiftCodes(mappedData);
@@ -430,7 +431,7 @@ export function AllowanceBracketingSetupPage() {
   const handleOpenWorkshiftSearch = () => {
     setWorkshiftSearchTerm('');
     setWorkshiftPage(1);
-    fetchWorkshiftCodes();
+      fetchWorkshiftCodes();
     setShowWorkshiftModal(true);
   };
 
