@@ -4,7 +4,7 @@
   import path from 'path';
 
   export default defineConfig({
-    base: '/TKS_128_TEST/',
+    base: '/128_TKS/',
     plugins: [react()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],

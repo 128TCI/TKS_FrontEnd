@@ -73,7 +73,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await apiClient.get('Security/DatabaseConfiguration/databases');
+        const response = await apiClient.get('/Security/DatabaseConfiguration/databases');
         console.log("API response:", response);
         
         // Convert response to boolean
@@ -199,7 +199,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
               <h2 className="text-gray-900 text-center">Login</h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5" autoComplete='off'>
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-red-700 text-sm">{error}</p>
@@ -212,8 +212,9 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="text"
+                  type="text" 
                   value={username}
+                  autoComplete='username'
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Username"
@@ -228,6 +229,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                 <input
                   type="password"
                   value={password}
+                  autoComplete='new-password'
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Password"

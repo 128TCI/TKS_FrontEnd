@@ -7,6 +7,7 @@ interface OtherPoliciesTabContentProps {
   tksGroupCode: string;
   tksGroupDescription: string;
   isEditMode: boolean;
+  isCreateNew: boolean;
 }
 
 export interface GroupSetUpOtherPoliciesItem {
@@ -101,10 +102,51 @@ interface BracketItem {
   flag: number;
 }
 
+interface DailySchedItem {
+  dailyScheduleId: number;
+  referenceNo: string;
+  monday: string;
+  tuesday: string;
+  wednesday: string;
+  thursday: string;
+  friday: string;
+  saturday: string;
+  sunday: string;
+}
+
+interface EarningCodeItem {
+  earnID: number;
+  earnCode: string;
+  earnDesc: string;
+  earnType: string;
+  sysID: string;
+}
+
+interface AllowancePerClass {
+  id: number;
+  refNo: string;
+  allowanceCode: string;
+  workShiftCode: string;
+  classificationCode: string;
+}
+
+interface AllowBracketCodeItem {
+  id: number;
+  code: string;
+  description: string;
+}
+
+interface AllowanceBracketingSetupItem {
+  id: number;
+  code: string;
+  description: string;
+}
+
 export function OtherPoliciesTabContent({
   tksGroupCode,
   tksGroupDescription,
   isEditMode,
+  isCreateNew
 }: OtherPoliciesTabContentProps) {
   const checkboxClass =
     "w-4 h-4 border-2 border-gray-400 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer";
@@ -202,12 +244,71 @@ export function OtherPoliciesTabContent({
   const [calamAmount, setCalamAmount] = useState("");
   const [calamEarnCode, setCalamEarnCode] = useState("");
 
-  // Tardiness Bracket States
+  // Bracket States
   const [showTardBrackModal, setShowTardBrackModal] = useState(false);
-  const [currentTardBrackPage, setCurrentTardBrackPage] = useState(1);
-  const [tardBrackSearchTerm, setTardBrackSearchTerm] = useState('');
-  const [tardBracketItemList, setTardBracketItemList] = useState<BracketItem[]>([])
+  const [showUnderTimeBrackModal, setShowUnderTimeBrackModal] = useState(false);
+  const [showAccumulateBrackModal, setShowAccumulateBrackModal] =
+    useState(false);
+  const [showDailySchedModal, setShowDailySchedModal] = useState(false);
+  const [showEarningCodeModal, setShowEarningCodeModal] = useState(false);
+  const [showAllowPerClassModal, setShowAllowPerClassModal] = useState(false);
+  const [showAllowBracketCodeModal, setShowAllowBracketCodeModal] =
+    useState(false);
+  const [showAllowBrackByEmpStatModal, setShowAllowBrackByEmpStatModal] =
+    useState(false);
+
+  const [tardBrackSearchTerm, setTardBrackSearchTerm] = useState("");
+  const [underTimeBrackSearchTerm, setUnderTimeBrackSearchTerm] = useState("");
+  const [accumulateBrackSearchTerm, setAccumulateBrackSearchTerm] =
+    useState("");
+  const [dailySchedSearchTerm, setDailySchedSearchTerm] = useState("");
+  const [earningCodeSearchTerm, setEarningCodeSearchTerm] = useState("");
+  const [allowancePerClassSearchTerm, setAllowancePerClassSearchTerm] =
+    useState("");
+  const [allowaBracketCodeSearchTerm, setAllowBracketCodeSearchTerm] =
+    useState("");
+  const [allowBrackByEmpStatSearchTerm, setAllowBrackByEmpStatSearchTerm] =
+    useState("");
+  const [tardBracketItemList, setTardBracketItemList] = useState<BracketItem[]>(
+    [],
+  );
+  const [undertimeBracketItemList, setUndertimeBracketItemlist] = useState<
+    BracketItem[]
+  >([]);
+  const [accumulateBracketItemList, setAccumulateBracektItemList] = useState<
+    BracketItem[]
+  >([]);
+  const [dailyScheduleList, setDailyScheduleList] = useState<DailySchedItem[]>(
+    [],
+  );
+  const [earningCodeList, setEarningCodesetList] = useState<EarningCodeItem[]>(
+    [],
+  );
+  const [allowancePerClassList, setAllowancePerClassList] = useState<
+    AllowancePerClass[]
+  >([]);
+  const [allowBracketCodeList, setAllowBracketCodeList] = useState<
+    AllowBracketCodeItem[]
+  >([]);
+  const [allowBrackByEmpStatList, setAllowBrackByEmpStatList] = useState<
+    AllowanceBracketingSetupItem[]
+  >([]);
+
   const itemsPerPage = 10;
+
+  // Flag Convert to Text Helper
+  const getFlagLabel = (flag: number): string => {
+    switch (flag) {
+      case 1:
+        return "TARDINESS";
+      case 2:
+        return "UNDERTIME";
+      case 3:
+        return "ACCUMULATE";
+      default:
+        return "";
+    }
+  };
 
   // For Tardiness Bracket Pagination and Search
   const {
@@ -219,20 +320,199 @@ export function OtherPoliciesTabContent({
     getPageNumbers: getTardBracketPageNumbers,
   } = useTablePagination(
     tardBracketItemList,
-   tardBrackSearchTerm,
+    tardBrackSearchTerm,
     (item, search) =>
       item.bracketCode.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
+      getFlagLabel(item.flag).toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
   const startTardBracketIndex = (currentTardBracketPage - 1) * itemsPerPage;
   const endTardBracketIndex = startTardBracketIndex + itemsPerPage;
+
+  // For Undertime Bracket Pagination and Search
+  const {
+    filteredData: filteredUTBracket,
+    paginatedData: paginatedUTBracket,
+    totalPages: totalUTBracketPages,
+    currentPage: currentUTBracketPage,
+    setCurrentPage: setCurrentUTBracketPage,
+    getPageNumbers: getUTBracketPageNumbers,
+  } = useTablePagination(
+    undertimeBracketItemList,
+    underTimeBrackSearchTerm,
+    (item, search) =>
+      item.bracketCode.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
+      getFlagLabel(item.flag).toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
+      ),
+    itemsPerPage,
+  );
+
+  const startUTBracketIndex = (currentUTBracketPage - 1) * itemsPerPage;
+  const endUTBracketIndex = startUTBracketIndex + itemsPerPage;
+
+  // For Accumulate Bracket Pagination and Search
+  const {
+    filteredData: filteredACCBracket,
+    paginatedData: paginatedACCBracket,
+    totalPages: totalACCBracketPages,
+    currentPage: currentACCBracketPage,
+    setCurrentPage: setCurrentACCBracketPage,
+    getPageNumbers: getACCBracketPageNumbers,
+  } = useTablePagination(
+    accumulateBracketItemList,
+    accumulateBrackSearchTerm,
+    (item, search) =>
+      item.bracketCode.toLowerCase().includes(search) ||
+      item.description.toLowerCase().includes(search) ||
+      getFlagLabel(item.flag).toLowerCase().includes(search) ||
+      Object.values(item).some(
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
+      ),
+    itemsPerPage,
+  );
+
+  const startACCBracketIndex = (currentACCBracketPage - 1) * itemsPerPage;
+  const endACCBracketIndex = startACCBracketIndex + itemsPerPage;
+
+  // Earning Code Pagination and Search
+  const {
+    filteredData: earningCodeTotalData,
+    paginatedData: filteredEarningCodeData,
+    totalPages: earningCodeTotalPages,
+    currentPage: earningCodeCurrentPage,
+    setCurrentPage: setEarningCodeCurrentPage,
+    getPageNumbers: getEarningCodePageNumbers,
+    startIndex,
+    endIndex,
+  } = useTablePagination(
+    earningCodeList,
+    earningCodeSearchTerm,
+    (item, search) =>
+      item.earnCode?.toLowerCase().includes(search) ||
+      item.earnDesc?.toLowerCase().includes(search),
+    itemsPerPage,
+  );
+
+  const earningCodeStartIndex =
+    filteredEarningCodeData.length === 0 ? 0 : startIndex + 1;
+  const earningCodeEndIndex =
+    filteredEarningCodeData.length === 0 ? 0 : endIndex;
+
+  useEffect(() => {
+    setEarningCodeCurrentPage(1);
+  }, [earningCodeSearchTerm]);
+
+  // For Daily Schedule Pagination and Search
+  const {
+    filteredData: filteredAllowPerClass,
+    paginatedData: paginatedAllowPerClass,
+    totalPages: totalAllowPerClassPages,
+    currentPage: currentAllowPerClassPage,
+    setCurrentPage: setCurrentAllowPerClassPage,
+    getPageNumbers: getAllowPerClassPageNumbers,
+  } = useTablePagination(
+    allowancePerClassList,
+    allowancePerClassSearchTerm,
+    (item, search) => {
+      const s = search.toLowerCase();
+      return (
+        (item.refNo?.toLowerCase().includes(s) ?? false) ||
+        (item.allowanceCode?.toLowerCase().includes(s) ?? false) ||
+        (item.workShiftCode?.toLowerCase().includes(s) ?? false) ||
+        (item.classificationCode?.toLowerCase().includes(s) ?? false)
+      );
+    },
+    itemsPerPage,
+  );
+
+  const startAllowPerClassIndex = (currentAllowPerClassPage - 1) * itemsPerPage;
+  const endAllowPerClassIndex = startAllowPerClassIndex + itemsPerPage;
+
+  // For Daily Schedule Pagination and Search
+  const {
+    filteredData: filteredDailySched,
+    paginatedData: paginatedDailySched,
+    totalPages: totalDailySchedPages,
+    currentPage: currentDailySchedPage,
+    setCurrentPage: setCurrentDailySchedPage,
+    getPageNumbers: getDailySchedPageNumbers,
+  } = useTablePagination(
+    dailyScheduleList,
+    dailySchedSearchTerm,
+    (item, search) => {
+      const s = search.toLowerCase();
+      return (
+        (item.referenceNo?.toLowerCase().includes(s) ?? false) ||
+        (item.monday?.toLowerCase().includes(s) ?? false) ||
+        (item.tuesday?.toLowerCase().includes(s) ?? false) ||
+        (item.wednesday?.toLowerCase().includes(s) ?? false) ||
+        (item.thursday?.toLowerCase().includes(s) ?? false)
+      );
+    },
+    itemsPerPage,
+  );
+
+  const startDailySchedIndex = (currentDailySchedPage - 1) * itemsPerPage;
+  const endDailySchedIndex = startDailySchedIndex + itemsPerPage;
+
+  // For Allowance Bracket Code Pagination and Search
+  const {
+    filteredData: filteredAllowBracketCode,
+    paginatedData: paginatedAllowBracketCode,
+    totalPages: totalAllowBracketCodePages,
+    currentPage: currentAllowBracketCodePage,
+    setCurrentPage: setCurrentAllowBracketCodePage,
+    getPageNumbers: getAllowBracketCodePageNumbers,
+  } = useTablePagination(
+    allowBracketCodeList,
+    allowaBracketCodeSearchTerm,
+    (item, search) => {
+      const s = search.toLowerCase();
+      return (
+        (item.code?.toLowerCase().includes(s) ?? false) ||
+        (item.description?.toLowerCase().includes(s) ?? false)
+      );
+    },
+    itemsPerPage,
+  );
+
+  const startAllowBracketCodeIndex =
+    (currentAllowBracketCodePage - 1) * itemsPerPage;
+  const endAllowBracketCodeIndex = startAllowBracketCodeIndex + itemsPerPage;
+
+  // For Allowance Bracket Code By Employee Status Pagination and Search
+  const {
+    filteredData: filteredAllowBrackByEmpStat,
+    paginatedData: paginatedAllowBrackByEmpStat,
+    totalPages: totalAllowBrackByEmpStatPages,
+    currentPage: currentAllowBrackByEmpStatPage,
+    setCurrentPage: setCurrentAllowBrackByEmpStatPage,
+    getPageNumbers: getAllowBrackByEmpStatPageNumbers,
+  } = useTablePagination(
+    allowBrackByEmpStatList,
+    allowBrackByEmpStatSearchTerm,
+    (item, search) => {
+      const s = search.toLowerCase();
+      return (
+        (item.code?.toLowerCase().includes(s) ?? false) ||
+        (item.description?.toLowerCase().includes(s) ?? false)
+      );
+    },
+    itemsPerPage,
+  );
+
+  const startAllowBrackByEmpStatIndex =
+    (currentAllowBrackByEmpStatPage - 1) * itemsPerPage;
+  const endAllowBrackByEmpStatIndex =
+    startAllowBrackByEmpStatIndex + itemsPerPage;
 
   const fetchGroupSetUpOtherPoliciesData = async (): Promise<
     GroupSetUpOtherPoliciesItem[]
@@ -430,6 +710,214 @@ export function OtherPoliciesTabContent({
     loadOtherPoliciesSetUp();
   }, []);
 
+  // Fetch BracketCodeSetUp
+  const fetchBracketCodeSetUp = async (
+    selectedflag: number,
+  ): Promise<BracketItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/Tardiness/BracketCodeSetup",
+    );
+
+    return response.data
+      .filter((item: any) => item.flag === selectedflag)
+      .map((item: any) => ({
+        id: item.id,
+        bracketCode: item.bracketCode,
+        description: item.description,
+        flag: item.flag,
+      }));
+  };
+
+  // Fetch Daily Schedule API
+  const fetchDailyScheduleSetUp = async (): Promise<DailySchedItem[]> => {
+    const response = await apiClient.get("/Fs/Process/DailyScheduleSetUp/All");
+
+    return response.data.map((item: any) => ({
+      dailyScheduleId: item.dailyScheduleId,
+      referenceNo: item.referenceNo,
+      monday: item.monday,
+      tuesday: item.tuesday,
+      wednesday: item.wednesday,
+      thursday: item.thursday,
+    }));
+  };
+
+  // Fetch EarningCodeSetUp
+  const fetchEarningCodeSetUp = async (): Promise<EarningCodeItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/AllowanceAndEarnings/EarningsSetUp",
+    );
+
+    return response.data.map((item: any) => ({
+      earnID: item.earnID,
+      earnCode: item.earnCode,
+      earnDesc: item.earnDesc,
+      earnType: item.earnType,
+      sysID: item.sysId,
+    }));
+  };
+
+  // Fetch Allowance Per Classification
+  const fetchAllowancePerClassificationSetUp = async (): Promise<
+    AllowancePerClass[]
+  > => {
+    const response = await apiClient.get(
+      "/Fs/Process/AllowanceAndEarnings/AllowancePerClassificationSetUp",
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      refNo: item.refNo,
+      allowanceCode: item.allowanceCode,
+      workShiftCode: item.workShiftCode,
+    }));
+  };
+
+  // Fetch Allowance Bracket Code
+  const fetchAllowanceBracketCodeSetUp = async (): Promise<
+    AllowBracketCodeItem[]
+  > => {
+    const response = await apiClient.get(
+      "/Fs/Process/AllowanceAndEarnings/AllowanceBracketCodeSetUp",
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      description: item.description,
+    }));
+  };
+
+  // Fetch Allowance Bracket Code
+  const fetchAllowanceBracketingSetUp = async (): Promise<
+    AllowanceBracketingSetupItem[]
+  > => {
+    const response = await apiClient.get(
+      "/Fs/Process/AllowanceAndEarnings/AllowanceBracketingSetUp",
+    );
+
+    return response.data.map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      description: item.employmentStatus,
+    }));
+  };
+
+  useEffect(() => {
+    const loadAllowanceBracketingSetUpData = async () => {
+      const items = await fetchAllowanceBracketingSetUp();
+      setAllowBrackByEmpStatList(items);
+    };
+    loadAllowanceBracketingSetUpData();
+  }, []);
+
+  useEffect(() => {
+    const loadAllowanceBracketCodeSetUpData = async () => {
+      const items = await fetchAllowanceBracketCodeSetUp();
+      setAllowBracketCodeList(items);
+    };
+    loadAllowanceBracketCodeSetUpData();
+  }, []);
+
+  useEffect(() => {
+    const loadAllowancePerClassificationSetUpData = async () => {
+      const items = await fetchAllowancePerClassificationSetUp();
+      setAllowancePerClassList(items);
+    };
+    loadAllowancePerClassificationSetUpData();
+  }, []);
+
+  useEffect(() => {
+    const loadTardinessBracketCodeSetupData = async () => {
+      const tard = await fetchBracketCodeSetUp(1);
+      const undertime = await fetchBracketCodeSetUp(2);
+      const accumulate = await fetchBracketCodeSetUp(3);
+      setTardBracketItemList(tard);
+      setUndertimeBracketItemlist(undertime);
+      setAccumulateBracektItemList(accumulate);
+    };
+
+    loadTardinessBracketCodeSetupData();
+  }, []);
+
+  useEffect(() => {
+    const loadDailySchedule = async () => {
+      const items = await fetchDailyScheduleSetUp();
+      setDailyScheduleList(items);
+    };
+    loadDailySchedule();
+  }, [currentDailySchedPage]);
+
+  useEffect(() => {
+    const loadEarningCodeSetUp = async () => {
+      const items = await fetchEarningCodeSetUp();
+      setEarningCodesetList(items);
+    };
+
+    loadEarningCodeSetUp();
+  }, [earningCodeCurrentPage]);
+
+  const HandleCreateNew = () => {
+    if (isCreateNew) {
+    setUseDefRestDay(false);
+    setRestDayWithWorkShift(false);
+    setDefRestDay1("");
+    setDefRestDay2("");
+    setDefRestDay3("");
+    setUseTardBracket(false);
+    setTardBracketCode("");
+    setDeductFirstHalfBeforeBracket(false);
+    setUseUndertimeBracket(false);
+    setUnderTimeBracketCode("");
+    setDeductSecondHalfBeforeBracket(false);
+    setUseAccumBracket(false);
+    setAccumulationBracketYear("");
+    setAccumulation(false);
+    setAccumulateUndertime(false);
+    setUndertimeToAbsences(false);
+    setNoOfHoursFrmUnderToAbsences("0");
+    setTardinessToAbsences(false);
+    setNoOfHoursFrmTardiToAbsences("0");
+    setCompNoOfHoursEvnWOutLog(false);
+    setCompAbsDateSeparated(false);
+    setCompNoOfHoursRD(false);
+    setCompNoOfHoursLegal(false);
+    setCompNoOfHoursSpecial(false);
+    setCompNoOfHoursNonWork(false);
+    setNoAbsBeforeDateHired(false);
+    setExempTard(false);
+    setExempUndertime(false);
+    setExempNightDiffBasic(false);
+    setExempOT(false);
+    setExempAbsences(false);
+    setExempOtherEarnAndAllowance(false);
+    setExempHolidaypay(false);
+    setExempUnProWorkHoliday(false);
+    setApplyLeaveForFirstHalfExempt(false);
+    setApplyLeaveForSecondHalfExempt(false);
+    setBirthdayLeave(false);
+    setDailySchedule("");
+    setExcludeRestDayInSuspension(false);
+    setExcludeLegalInSuspension(false);
+    setExcludeSpecialInSuspension(false);
+    setExcludeNonWorkingInSuspension(false);
+    setCalamYearsOfService("");
+    setCalamConsiderNoOfHours("");
+    setCalamAmount("");
+    setCalamEarnCode("");
+    setAllowPerClassCode("");
+    setEnableClassification(false);
+    setAllowBracketCode("");
+    setByEmploymentStatFlag(false);
+    setEmploymentStatus("");
+    console.log(isCreateNew);
+    }
+  };
+
+  useEffect(() => {
+    HandleCreateNew();
+  }, [isCreateNew]);
+
   return (
     <div className="space-y-6">
       {/* Group Code and Definition */}
@@ -576,7 +1064,10 @@ export function OtherPoliciesTabContent({
               <input
                 type="checkbox"
                 checked={useTardBracket}
-                onChange={(e) => setUseTardBracket(e.target.checked)}
+                onChange={(e) => {
+                  setUseTardBracket(e.target.checked);
+                  !e.target.checked && setDeductFirstHalfBeforeBracket(false);
+                }}
                 disabled={!isEditMode}
                 className={checkboxClass}
               />
@@ -611,7 +1102,7 @@ export function OtherPoliciesTabContent({
                 onChange={(e) =>
                   setDeductFirstHalfBeforeBracket(e.target.checked)
                 }
-                disabled={!isEditMode}
+                disabled={!isEditMode || !useTardBracket}
                 className={checkboxClass}
               />
             </div>
@@ -623,7 +1114,10 @@ export function OtherPoliciesTabContent({
               <input
                 type="checkbox"
                 checked={useUndertimeBracket}
-                onChange={(e) => setUseUndertimeBracket(e.target.checked)}
+                onChange={(e) => {
+                  setUseUndertimeBracket(e.target.checked);
+                  !e.target.checked && setDeductSecondHalfBeforeBracket(false);
+                }}
                 disabled={!isEditMode}
                 className={checkboxClass}
               />
@@ -636,7 +1130,7 @@ export function OtherPoliciesTabContent({
               {isEditMode && (
                 <>
                   <button
-                    // pop up modal
+                    onClick={() => setShowUnderTimeBrackModal(true)}
                     className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
                     <Search className="w-4 h-4" />
@@ -658,7 +1152,7 @@ export function OtherPoliciesTabContent({
                 onChange={(e) =>
                   setDeductSecondHalfBeforeBracket(e.target.checked)
                 }
-                disabled={!isEditMode}
+                disabled={!isEditMode || !useUndertimeBracket}
                 className={checkboxClass}
               />
             </div>
@@ -670,7 +1164,11 @@ export function OtherPoliciesTabContent({
               <input
                 type="checkbox"
                 checked={useAccumBracket}
-                onChange={(e) => setUseAccumBracket(e.target.checked)}
+                onChange={(e) => {
+                  setUseAccumBracket(e.target.checked);
+                  setAccumulation(e.target.checked);
+                  setAccumulateUndertime(e.target.checked);
+                }}
                 disabled={!isEditMode}
                 className={checkboxClass}
               />
@@ -683,7 +1181,7 @@ export function OtherPoliciesTabContent({
               {isEditMode && (
                 <>
                   <button
-                    // pop up modal here
+                    onClick={() => setShowAccumulateBrackModal(true)}
                     className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
                     <Search className="w-4 h-4" />
@@ -703,9 +1201,14 @@ export function OtherPoliciesTabContent({
                 <input
                   type="checkbox"
                   checked={accumulation}
-                  onChange={(e) => setAccumulation(e.target.checked)}
+                  onChange={(e) => {
+                    setAccumulation(e.target.checked);
+                    if (!e.target.checked && !accumulateUndertime) {
+                      setAccumulateUndertime(true);
+                    }
+                  }}
                   className={checkboxClass}
-                  disabled={!isEditMode}
+                  disabled={!isEditMode || !useAccumBracket}
                 />
                 <span className="text-gray-700">Accumulate Tardiness</span>
               </label>
@@ -713,9 +1216,14 @@ export function OtherPoliciesTabContent({
                 <input
                   type="checkbox"
                   checked={accumulateUndertime}
-                  onChange={(e) => setAccumulateUndertime(e.target.checked)}
+                  onChange={(e) => {
+                    setAccumulateUndertime(e.target.checked);
+                    if (!e.target.checked && !accumulation) {
+                      setAccumulation(true);
+                    }
+                  }}
                   className={checkboxClass}
-                  disabled={!isEditMode}
+                  disabled={!isEditMode || !useAccumBracket}
                 />
                 <span className="text-gray-700">Accumulate Undertime</span>
               </label>
@@ -916,7 +1424,7 @@ export function OtherPoliciesTabContent({
                 />
                 {isEditMode && (
                   <button
-                    // modal here set true
+                    onClick={() => setShowEarningCodeModal(true)}
                     className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm"
                   >
                     <Search className="w-4 h-4" />
@@ -941,7 +1449,7 @@ export function OtherPoliciesTabContent({
               {isEditMode && (
                 <>
                   <button
-                    // set pop up here true
+                    onClick={() => setShowAllowPerClassModal(true)}
                     className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm"
                   >
                     <Search className="w-4 h-4" />
@@ -982,7 +1490,7 @@ export function OtherPoliciesTabContent({
               />
               {isEditMode && (
                 <button
-                  //pop up set true here
+                  onClick={() => setShowAllowBracketCodeModal(true)}
                   className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm"
                 >
                   <Search className="w-4 h-4" />
@@ -1013,7 +1521,7 @@ export function OtherPoliciesTabContent({
               />
               {isEditMode && (
                 <button
-                  // pop up here set true
+                  onClick={() => setShowAllowBrackByEmpStatModal(true)}
                   className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm"
                 >
                   <Search className="w-4 h-4" />
@@ -1180,7 +1688,7 @@ export function OtherPoliciesTabContent({
                 {isEditMode && (
                   <>
                     <button
-                      // pop up modal here
+                      onClick={() => setShowDailySchedModal(true)}
                       className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                     >
                       <Search className="w-4 h-4" />
@@ -1312,10 +1820,10 @@ export function OtherPoliciesTabContent({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTardBracket.map((item, index) => (
+                  {paginatedTardBracket.map((item, index) => (
                     <tr
                       key={`${item.id}-${index}`}
-                      className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
+                      className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors"
                       onClick={() => {
                         setTardBracketCode(item.bracketCode);
                         setShowTardBrackModal(false);
@@ -1323,7 +1831,9 @@ export function OtherPoliciesTabContent({
                     >
                       <td className="py-2 text-gray-800">{item.bracketCode}</td>
                       <td className="py-2 text-gray-800">{item.description}</td>
-                      <td className="py-2 text-gray-800">{item.flag}</td>
+                      <td className="py-2 text-gray-800">
+                        {getFlagLabel(item.flag)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1337,22 +1847,16 @@ export function OtherPoliciesTabContent({
                 {filteredTardBracket.length === 0
                   ? 0
                   : startTardBracketIndex + 1}{" "}
-                to{" "}
-                {Math.min(
-                  endTardBracketIndex,
-                  filteredTardBracket.length,
-                )}{" "}
+                to {Math.min(endTardBracketIndex, filteredTardBracket.length)}{" "}
                 of {filteredTardBracket.length} entries
               </div>
 
               <div className="flex gap-1">
                 <button
                   onClick={() =>
-                    setCurrentTardBrackPage((prev) =>
-                      Math.max(prev - 1, 1),
-                    )
+                    setCurrentTardBracketPage((prev) => Math.max(prev - 1, 1))
                   }
-                  disabled={currentTardBrackPage === 1}
+                  disabled={currentTardBracketPage === 1}
                   className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
@@ -1369,9 +1873,9 @@ export function OtherPoliciesTabContent({
                   ) : (
                     <button
                       key={page}
-                      onClick={() => setCurrentTardBrackPage(page)}
+                      onClick={() => setCurrentTardBracketPage(page)}
                       className={`px-2 py-1 rounded text-xs ${
-                        currentTardBrackPage === page
+                        currentTardBracketPage === page
                           ? "bg-blue-600 text-white"
                           : "border border-gray-300 hover:bg-gray-100"
                       }`}
@@ -1383,13 +1887,1023 @@ export function OtherPoliciesTabContent({
 
                 <button
                   onClick={() =>
-                    setCurrentTardBrackPage((prev) =>
+                    setCurrentTardBracketPage((prev) =>
                       Math.min(prev + 1, totalTardBracketPages),
                     )
                   }
                   disabled={
-                    currentTardBrackPage === totalTardBracketPages ||
+                    currentTardBracketPage === totalTardBracketPages ||
                     totalTardBracketPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* For UnderTime Bracket Search Modal */}
+      {showUnderTimeBrackModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowUnderTimeBrackModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Select Code
+              </h2>
+              <button
+                onClick={() => setShowUnderTimeBrackModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Field */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={underTimeBrackSearchTerm}
+                  onChange={(e) => setUnderTimeBrackSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Search by code, description, or hours..."
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Code
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Flag
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedUTBracket.map((item, index) => (
+                    <tr
+                      key={`${item.id}-${index}`}
+                      className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setUnderTimeBracketCode(item.bracketCode);
+                        setShowUnderTimeBrackModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.bracketCode}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                      <td className="py-2 text-gray-800">
+                        {getFlagLabel(item.flag)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredUTBracket.length === 0 ? 0 : startUTBracketIndex + 1}{" "}
+                to {Math.min(endUTBracketIndex, filteredUTBracket.length)} of{" "}
+                {filteredUTBracket.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentUTBracketPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentUTBracketPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getUTBracketPageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentUTBracketPage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentUTBracketPage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentUTBracketPage((prev) =>
+                      Math.min(prev + 1, totalUTBracketPages),
+                    )
+                  }
+                  disabled={
+                    currentUTBracketPage === totalUTBracketPages ||
+                    totalUTBracketPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* For Accumulate Bracket Search Modal */}
+      {showAccumulateBrackModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowAccumulateBrackModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Select Code
+              </h2>
+              <button
+                onClick={() => setShowAccumulateBrackModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Field */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={accumulateBrackSearchTerm}
+                  onChange={(e) => setAccumulateBrackSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Search by code, description, or hours..."
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Code
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Flag
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedACCBracket.map((item, index) => (
+                    <tr
+                      key={`${item.id}-${index}`}
+                      className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setAccumulationBracketYear(item.bracketCode);
+                        setShowAccumulateBrackModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.bracketCode}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                      <td className="py-2 text-gray-800">
+                        {getFlagLabel(item.flag)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredACCBracket.length === 0 ? 0 : startACCBracketIndex + 1}{" "}
+                to {Math.min(endACCBracketIndex, filteredACCBracket.length)} of{" "}
+                {filteredACCBracket.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentACCBracketPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentACCBracketPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getACCBracketPageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentACCBracketPage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentACCBracketPage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentACCBracketPage((prev) =>
+                      Math.min(prev + 1, totalACCBracketPages),
+                    )
+                  }
+                  disabled={
+                    currentACCBracketPage === totalACCBracketPages ||
+                    totalACCBracketPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* For Daily Schedule Search Modal */}
+      {showDailySchedModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+          onClick={() => setShowDailySchedModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Select Schedule
+              </h2>
+              <button
+                onClick={() => setShowDailySchedModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Field */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-end gap-3">
+                <label className="text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={dailySchedSearchTerm}
+                  onChange={(e) => setDailySchedSearchTerm(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Search by Reference No or Monday-Thursday..."
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Reference No
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Monday
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Tuesday
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Wednesday
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Thursday
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedDailySched.map((item, index) => (
+                    <tr
+                      key={`${item.dailyScheduleId}-${index}`}
+                      className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setDailySchedule(item.referenceNo);
+                        setShowDailySchedModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.referenceNo}</td>
+                      <td className="py-2 text-gray-800">{item.monday}</td>
+                      <td className="py-2 text-gray-800">{item.tuesday}</td>
+                      <td className="py-2 text-gray-800">{item.wednesday}</td>
+                      <td className="py-2 text-gray-800">{item.thursday}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredDailySched.length === 0 ? 0 : startDailySchedIndex + 1}{" "}
+                to {Math.min(endDailySchedIndex, filteredDailySched.length)} of{" "}
+                {filteredDailySched.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentDailySchedPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentDailySchedPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getDailySchedPageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentDailySchedPage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentDailySchedPage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentDailySchedPage((prev) =>
+                      Math.min(prev + 1, totalDailySchedPages),
+                    )
+                  }
+                  disabled={
+                    currentDailySchedPage === totalDailySchedPages ||
+                    totalDailySchedPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Earning Code Search Modal */}
+      {showEarningCodeModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-medium">Search Earning Code</h3>
+              <button
+                onClick={() => setShowEarningCodeModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={earningCodeSearchTerm}
+                  onChange={(e) => setEarningCodeSearchTerm(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Search by code or description..."
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Earning Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEarningCodeData.map((item, index) => (
+                    <tr
+                      key={`${item.earnID}-${index}`}
+                      className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => {
+                        setCalamEarnCode(item.earnCode);
+                        setShowEarningCodeModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.earnCode}</td>
+                      <td className="py-2 text-gray-800">{item.earnDesc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing {earningCodeStartIndex} to {earningCodeEndIndex} of{" "}
+                {earningCodeTotalData.length} entries
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setEarningCodeCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={earningCodeCurrentPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getEarningCodePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setEarningCodeCurrentPage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        earningCodeCurrentPage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setEarningCodeCurrentPage((prev) =>
+                      Math.min(prev + 1, earningCodeTotalPages),
+                    )
+                  }
+                  disabled={
+                    earningCodeCurrentPage === earningCodeTotalPages ||
+                    earningCodeTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Earning Code Search Modal */}
+      {showAllowPerClassModal && (
+        <div
+          onClick={() => setShowAllowPerClassModal(false)}
+          className="fixed inset-0 flex items-center justify-center z-50"
+        >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-medium">
+                Search Allowance Classification Setup
+              </h3>
+              <button
+                onClick={() => setShowAllowPerClassModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={allowancePerClassSearchTerm}
+                  onChange={(e) =>
+                    setAllowancePerClassSearchTerm(e.target.value)
+                  }
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Search by code or description..."
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        RefNo
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Allowance Code
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      WorkShift Code
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Classification Code
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAllowPerClass.map((item, index) => (
+                    <tr
+                      key={`${item.id}-${index}`}
+                      className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => {
+                        setAllowPerClassCode(item.refNo);
+                        setShowAllowPerClassModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.refNo}</td>
+                      <td className="py-2 text-gray-800">
+                        {item.allowanceCode}
+                      </td>
+                      <td className="py-2 text-gray-800">
+                        {item.workShiftCode}
+                      </td>
+                      <td className="py-2 text-gray-800">
+                        {item.classificationCode}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredAllowPerClass.length === 0
+                  ? 0
+                  : startAllowPerClassIndex + 1}{" "}
+                to{" "}
+                {Math.min(
+                  startAllowPerClassIndex + paginatedAllowPerClass.length,
+                  filteredAllowPerClass.length,
+                )}{" "}
+                of {filteredAllowPerClass.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentAllowPerClassPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentAllowPerClassPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getAllowPerClassPageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentAllowPerClassPage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentAllowPerClassPage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentAllowPerClassPage((prev) =>
+                      Math.min(prev + 1, totalAllowPerClassPages),
+                    )
+                  }
+                  disabled={
+                    currentAllowPerClassPage === totalAllowPerClassPages ||
+                    totalAllowPerClassPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Allowance Bracket Code Search Modal */}
+      {showAllowBracketCodeModal && (
+        <div
+          onClick={() => setShowAllowBracketCodeModal(false)}
+          className="fixed inset-0 flex items-center justify-center z-50"
+        >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-medium">
+                Search Allowance Bracket Code
+              </h3>
+              <button
+                onClick={() => setShowAllowBracketCodeModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={allowaBracketCodeSearchTerm}
+                  onChange={(e) =>
+                    setAllowBracketCodeSearchTerm(e.target.value)
+                  }
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Search by code or description..."
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAllowBracketCode.map((item, index) => (
+                    <tr
+                      key={`${item.code}-${index}`}
+                      className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => {
+                        setAllowBracketCode(item.code);
+                        setShowAllowBracketCodeModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredAllowBracketCode.length === 0
+                  ? 0
+                  : startAllowBracketCodeIndex + 1}{" "}
+                to{" "}
+                {Math.min(
+                  startAllowBracketCodeIndex + paginatedAllowBracketCode.length,
+                  filteredAllowBracketCode.length,
+                )}{" "}
+                of {filteredAllowBracketCode.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentAllowBracketCodePage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentAllowBracketCodePage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getAllowBracketCodePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentAllowBracketCodePage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentAllowBracketCodePage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentAllowBracketCodePage((prev) =>
+                      Math.min(prev + 1, totalAllowBracketCodePages),
+                    )
+                  }
+                  disabled={
+                    currentAllowBracketCodePage ===
+                      totalAllowBracketCodePages ||
+                    totalAllowBracketCodePages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Allowance by Employmet  Status Code Search Modal */}
+      {showAllowBrackByEmpStatModal && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          onClick={() => setShowAllowBrackByEmpStatModal(false)}
+        >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-medium">
+                Search Allowance Bracket Code
+              </h3>
+              <button
+                onClick={() => setShowAllowBrackByEmpStatModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700">Search:</label>
+                <input
+                  type="text"
+                  value={allowBrackByEmpStatSearchTerm}
+                  onChange={(e) =>
+                    setAllowBrackByEmpStatSearchTerm(e.target.value)
+                  }
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Search by code or description..."
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
+              <table className="w-full">
+                <thead className="border-b-2 border-gray-300">
+                  <tr>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
+                    </th>
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      Description
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedAllowBrackByEmpStat.map((item, index) => (
+                    <tr
+                      key={`${item.code}-${index}`}
+                      className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => {
+                        setEmploymentStatus(item.code);
+                        setShowAllowBrackByEmpStatModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.code}</td>
+                      <td className="py-2 text-gray-800">{item.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredAllowBrackByEmpStat.length === 0
+                  ? 0
+                  : startAllowBrackByEmpStatIndex + 1}{" "}
+                to{" "}
+                {Math.min(
+                  startAllowBrackByEmpStatIndex +
+                    paginatedAllowBrackByEmpStat.length,
+                  filteredAllowBrackByEmpStat.length,
+                )}{" "}
+                of {filteredAllowBrackByEmpStat.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setCurrentAllowBrackByEmpStatPage((prev) =>
+                      Math.max(prev - 1, 1),
+                    )
+                  }
+                  disabled={currentAllowBrackByEmpStatPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {getAllowBrackByEmpStatPageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentAllowBrackByEmpStatPage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        currentAllowBrackByEmpStatPage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentAllowBrackByEmpStatPage((prev) =>
+                      Math.min(prev + 1, totalAllowBrackByEmpStatPages),
+                    )
+                  }
+                  disabled={
+                    currentAllowBrackByEmpStatPage ===
+                      totalAllowBrackByEmpStatPages ||
+                    totalAllowBrackByEmpStatPages === 0
                   }
                   className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >

@@ -42,6 +42,7 @@ export interface Form {
 export interface FormAccess {
   id: number;
   formName: string;
+  formDescription: string;
   accessFlags: Record<string, boolean>;
 }
 
