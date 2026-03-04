@@ -164,7 +164,9 @@ interface OvertimeRatesTabContentProps {
   earningCode: string;
   setEarningCode: (value: string) => void;
   oTAllowancesList: OTAllowancesItem[];
-  setOTAllowancesList: (value: OTAllowancesItem[]) => void;
+  setOTAllowancesList: React.Dispatch<
+    React.SetStateAction<OTAllowancesItem[]>
+  >;
   id: number;
   setID: (value: number) => void;
   groupCode: string;
@@ -829,40 +831,32 @@ export function OvertimeRatesTabContent({
     };
   }, [showEarningCodeModal]);
 
+  
+    
   // Handle Add button click
-  const handleAddAllowance = () => {
-    if (!isEditMode) return;
-
-    // Validate that all fields have values
-    if (
-      !minimumOTHours ||
-      !accumOTHrsToEarnMealAllow ||
-      !amount ||
-      !earningCode
-    ) {
-      alert("Please fill in all fields before adding.");
+    const handleAddAllowance = () => {
+    if (!minimumOTHours || !earningCode || !amount) {
+      alert("Minimum OT Hours, Earning Code and Amount are required.");
       return;
     }
 
-    // Add new allowance to the table
-    setOTAllowancesList([
-      ...oTAllowancesList,
-      {
-        id,
-        groupCode,
-        minimumOTHours,
-        accumOTHrsToEarnMealAllow,
-        dayType,
-        earningCode,
-        amount,
-      },
-    ]);
+    const newItem: OTAllowancesItem = {
+      id: 0, // 0 means not yet saved in DB
+      groupCode: tksGroupCode,
+      minimumOTHours,
+      accumOTHrsToEarnMealAllow,
+      dayType: "", // set if needed
+      earningCode,
+      amount,
+    };
+
+    setOTAllowancesList((prev) => [...prev, newItem]);
 
     // Clear input fields
     setMinimumOTHours("");
     setAccumOTHrsToEarnMealAllow("");
-    setAmount("");
     setEarningCode("");
+    setAmount("");
   };
 
   // Handle earning code selection from modal

@@ -1,4 +1,4 @@
-import { Search, X } from "lucide-react";
+import { Code, Search, X } from "lucide-react";
 import { use, useEffect, useState } from "react";
 import apiClient from "../services/apiClient";
 import { useTablePagination } from "../hooks/useTablePagination";
@@ -146,7 +146,7 @@ export function OtherPoliciesTabContent({
   tksGroupCode,
   tksGroupDescription,
   isEditMode,
-  isCreateNew
+  isCreateNew,
 }: OtherPoliciesTabContentProps) {
   const checkboxClass =
     "w-4 h-4 border-2 border-gray-400 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer";
@@ -514,15 +514,22 @@ export function OtherPoliciesTabContent({
   const endAllowBrackByEmpStatIndex =
     startAllowBrackByEmpStatIndex + itemsPerPage;
 
-  const fetchGroupSetUpOtherPoliciesData = async (): Promise<
-    GroupSetUpOtherPoliciesItem[]
-  > => {
-    const response = await apiClient.get(
-      "/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies",
-    );
+  // Fetch by GroupCode
+  const fetchGroupSetUpOtherPoliciesData = async (
+    groupCode: string,
+  ): Promise<GroupSetUpOtherPoliciesItem | null> => {
+    if (!groupCode) return null;
 
-    return response.data.map(
-      (item: any): GroupSetUpOtherPoliciesItem => ({
+    try {
+      const response = await apiClient.get(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies/ByGroupCode/${groupCode}`,
+      );
+
+      if (!response.data) return null;
+
+      const item = response.data;
+
+      return {
         id: item.id,
         groupCode: item.groupCode,
 
@@ -631,8 +638,11 @@ export function OtherPoliciesTabContent({
 
         byEmploymentStatFlag: item.byEmploymentStatFlag,
         employmentStatus: item.employmentStatus,
-      }),
-    );
+      };
+    } catch (error) {
+      console.error("Error fetching GroupSetUpOtherPolicies:", error);
+      return null;
+    }
   };
 
   const populateGroupSetUpOtherPolicies = (
@@ -703,12 +713,20 @@ export function OtherPoliciesTabContent({
 
   useEffect(() => {
     const loadOtherPoliciesSetUp = async () => {
-      const items = await fetchGroupSetUpOtherPoliciesData();
-      setGroupSetUpOtherPoliciesList(items);
-      populateGroupSetUpOtherPolicies(items[0]);
+      if (!tksGroupCode) return;
+
+      const item = await fetchGroupSetUpOtherPoliciesData(tksGroupCode);
+
+      if (item) {
+        setGroupSetUpOtherPoliciesList([item]);
+        if (!isCreateNew) populateGroupSetUpOtherPolicies(item);
+      } else {
+        setGroupSetUpOtherPoliciesList([]);
+      }
     };
+
     loadOtherPoliciesSetUp();
-  }, []);
+  }, [tksGroupCode, isCreateNew]);
 
   // Fetch BracketCodeSetUp
   const fetchBracketCodeSetUp = async (
@@ -859,58 +877,57 @@ export function OtherPoliciesTabContent({
 
   const HandleCreateNew = () => {
     if (isCreateNew) {
-    setUseDefRestDay(false);
-    setRestDayWithWorkShift(false);
-    setDefRestDay1("");
-    setDefRestDay2("");
-    setDefRestDay3("");
-    setUseTardBracket(false);
-    setTardBracketCode("");
-    setDeductFirstHalfBeforeBracket(false);
-    setUseUndertimeBracket(false);
-    setUnderTimeBracketCode("");
-    setDeductSecondHalfBeforeBracket(false);
-    setUseAccumBracket(false);
-    setAccumulationBracketYear("");
-    setAccumulation(false);
-    setAccumulateUndertime(false);
-    setUndertimeToAbsences(false);
-    setNoOfHoursFrmUnderToAbsences("0");
-    setTardinessToAbsences(false);
-    setNoOfHoursFrmTardiToAbsences("0");
-    setCompNoOfHoursEvnWOutLog(false);
-    setCompAbsDateSeparated(false);
-    setCompNoOfHoursRD(false);
-    setCompNoOfHoursLegal(false);
-    setCompNoOfHoursSpecial(false);
-    setCompNoOfHoursNonWork(false);
-    setNoAbsBeforeDateHired(false);
-    setExempTard(false);
-    setExempUndertime(false);
-    setExempNightDiffBasic(false);
-    setExempOT(false);
-    setExempAbsences(false);
-    setExempOtherEarnAndAllowance(false);
-    setExempHolidaypay(false);
-    setExempUnProWorkHoliday(false);
-    setApplyLeaveForFirstHalfExempt(false);
-    setApplyLeaveForSecondHalfExempt(false);
-    setBirthdayLeave(false);
-    setDailySchedule("");
-    setExcludeRestDayInSuspension(false);
-    setExcludeLegalInSuspension(false);
-    setExcludeSpecialInSuspension(false);
-    setExcludeNonWorkingInSuspension(false);
-    setCalamYearsOfService("");
-    setCalamConsiderNoOfHours("");
-    setCalamAmount("");
-    setCalamEarnCode("");
-    setAllowPerClassCode("");
-    setEnableClassification(false);
-    setAllowBracketCode("");
-    setByEmploymentStatFlag(false);
-    setEmploymentStatus("");
-    console.log(isCreateNew);
+      setUseDefRestDay(false);
+      setRestDayWithWorkShift(false);
+      setDefRestDay1("");
+      setDefRestDay2("");
+      setDefRestDay3("");
+      setUseTardBracket(false);
+      setTardBracketCode("");
+      setDeductFirstHalfBeforeBracket(false);
+      setUseUndertimeBracket(false);
+      setUnderTimeBracketCode("");
+      setDeductSecondHalfBeforeBracket(false);
+      setUseAccumBracket(false);
+      setAccumulationBracketYear("");
+      setAccumulation(false);
+      setAccumulateUndertime(false);
+      setUndertimeToAbsences(false);
+      setNoOfHoursFrmUnderToAbsences("0");
+      setTardinessToAbsences(false);
+      setNoOfHoursFrmTardiToAbsences("0");
+      setCompNoOfHoursEvnWOutLog(false);
+      setCompAbsDateSeparated(false);
+      setCompNoOfHoursRD(false);
+      setCompNoOfHoursLegal(false);
+      setCompNoOfHoursSpecial(false);
+      setCompNoOfHoursNonWork(false);
+      setNoAbsBeforeDateHired(false);
+      setExempTard(false);
+      setExempUndertime(false);
+      setExempNightDiffBasic(false);
+      setExempOT(false);
+      setExempAbsences(false);
+      setExempOtherEarnAndAllowance(false);
+      setExempHolidaypay(false);
+      setExempUnProWorkHoliday(false);
+      setApplyLeaveForFirstHalfExempt(false);
+      setApplyLeaveForSecondHalfExempt(false);
+      setBirthdayLeave(false);
+      setDailySchedule("");
+      setExcludeRestDayInSuspension(false);
+      setExcludeLegalInSuspension(false);
+      setExcludeSpecialInSuspension(false);
+      setExcludeNonWorkingInSuspension(false);
+      setCalamYearsOfService("");
+      setCalamConsiderNoOfHours("");
+      setCalamAmount("");
+      setCalamEarnCode("");
+      setAllowPerClassCode("");
+      setEnableClassification(false);
+      setAllowBracketCode("");
+      setByEmploymentStatFlag(false);
+      setEmploymentStatus("");
     }
   };
 

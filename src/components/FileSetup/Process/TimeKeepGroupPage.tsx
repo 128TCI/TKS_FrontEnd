@@ -26,10 +26,11 @@ import apiClient from "../../../services/apiClient";
 import { useTablePagination } from "../../../hooks/useTablePagination";
 
 import Swal from "sweetalert2";
+import { group } from "console";
 
 interface GroupItem {
   id: number;
-  tksGroupCode: string;
+  groupCode: string;
   description: string;
   payrollGroup: string;
   cutOffDateFrom: string;
@@ -251,13 +252,20 @@ export function TimeKeepGroupPage() {
   const [showTksGroupModal, setShowTksGroupModal] = useState(false);
   const [tksGroupSearchTerm, setTksGroupSearchTerm] = useState("");
   const [tksGroupCode, setTksGroupCode] = useState("1");
+  const [currentOTRatesID, setCurrentOTRateID] = useState(0);
   const [tksGroupDescription, setTksGroupDescription] = useState("");
-  const [showPayrollLocationModal, setShowPayrollLocationModal] =useState(false);
-  const [payrollLocationSearchTerm, setPayrollLocationSearchTerm] =useState("");
+  const [showPayrollLocationModal, setShowPayrollLocationModal] =
+    useState(false);
+  const [payrollLocationSearchTerm, setPayrollLocationSearchTerm] =
+    useState("");
   const [payrollLocationCode, setPayrollLocationCode] = useState("");
   const [payrollDescription, setPayrollDescription] = useState("");
+  // Time Keep Cut Off Dates
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  // Auto Pairing Logs Cut-Off Dates
+  const [autoPairingFrom, setAutoPairingFrom] = useState("09/29/2025");
+  const [autoPairingTo, setAutoPairingTo] = useState("09/29/2025");
   const [cutOffMonth, setCutOffMonth] = useState("");
   const [cutOffPeriod, setcutOffPeriod] = useState("");
   const [terminalId, setTerminalId] = useState("");
@@ -274,28 +282,25 @@ export function TimeKeepGroupPage() {
   const [showForNoBreak2OutModal, setShowForNoBreak2OutModal] = useState(false);
   const [forNoBreak2OutSearchTerm, setForNoBreak2OutSearchTerm] = useState("");
 
-
   // Modals for Supervisory GroupCode and OT Code Per Week
-  const [showSupervisoryGroupModal, setShowSupervisoryGroupModal] = useState(false);
-  const [supervisoryGroupSearchTerm, setSupervisoryGroupSearchTerm] = useState("");
+  const [showSupervisoryGroupModal, setShowSupervisoryGroupModal] =
+    useState(false);
+  const [supervisoryGroupSearchTerm, setSupervisoryGroupSearchTerm] =
+    useState("");
   const [showOtCodeModal, setShowOtCodeModal] = useState(false);
   const [otCodeSearchTerm, setOtCodeSearchTerm] = useState("");
   const [isEditOTRates, setIsEditOTRates] = useState(false);
   const [isEditOTRatesFor2Shifts, setIsEditOTRatesFor2Shifts] = useState(false);
   const [isEditBirthDayPay, setIsEditBirthDayPay] = useState(false);
 
-  
-
-  // Auto Pairing Logs Cut-Off Dates
-  const [autoPairingFrom, setAutoPairingFrom] = useState("09/29/2025");
-  const [autoPairingTo, setAutoPairingTo] = useState("09/29/2025");
-
-  // Login Policy StateF
+  // Login Policy State
   const [gracePeriodSemiAnnual, setGracePeriodSemiAnnual] = useState(false);
   const [gracePeriodPerDay, setGracePeriodPerDay] = useState("");
-  const [gracePeriodIncludeTardiness, setGracePeriodIncludeTardiness] =useState(false);
+  const [gracePeriodIncludeTardiness, setGracePeriodIncludeTardiness] =
+    useState(false);
   const [includeBreak2InGrace, setIncludeBreak2InGrace] = useState(false);
-  const [deductibleEvenWithinGrace, setDeductibleEvenWithinGrace] =useState(false);
+  const [deductibleEvenWithinGrace, setDeductibleEvenWithinGrace] =
+    useState(false);
   const [gracePeriodPerSemiAnnual, setGracePeriodPerSemiAnnual] = useState("");
   const [firstHalfDateFrom, setFirstHalfDateFrom] = useState("");
   const [firstHalfDateTo, setFirstHalfDateTo] = useState("");
@@ -303,24 +308,30 @@ export function TimeKeepGroupPage() {
   const [secondHalfDateTo, setSecondHalfDateTo] = useState("");
   const [deductOverBreak, setDeductOverBreak] = useState(true);
   const [gracePeriodCalamity2, setGracePeriodCalamity2] = useState("");
-  const [combineTardinessTimeInBreak2, setCombineTardinessTimeInBreak2] = useState(false);
-  const [computeTardinessNoLogout, setComputeTardinessNoLogout] = useState(false);
+  const [combineTardinessTimeInBreak2, setCombineTardinessTimeInBreak2] =
+    useState(false);
+  const [computeTardinessNoLogout, setComputeTardinessNoLogout] =
+    useState(false);
 
   const [nightDiffStartTime, setNightDiffStartTime] = useState("10:00 PM");
   const [nightDiffEndTime, setNightDiffEndTime] = useState("6:00 AM");
   const [deductMealBreakND, setDeductMealBreakND] = useState(false);
   const [twoShiftsInDay, setTwoShiftsInDay] = useState(true);
   const [hoursIntervalTwoShifts, setHoursIntervalTwoShifts] = useState("2.00");
-  const [allowableGracePeriodMonth, setAllowableGracePeriodMonth] = useState("3");
-  const [excludeAllowableGraceBracket, setExcludeAllowableGraceBracket] = useState(false);
-  const [allowableGraceActualMonth, setAllowableGraceActualMonth] = useState(true);
+  const [allowableGracePeriodMonth, setAllowableGracePeriodMonth] =
+    useState("3");
+  const [excludeAllowableGraceBracket, setExcludeAllowableGraceBracket] =
+    useState(false);
+  const [allowableGraceActualMonth, setAllowableGraceActualMonth] =
+    useState(true);
   const [considerSaturdayPaid, setConsiderSaturdayPaid] = useState(true);
   const [maxDaysPerWeekSaturday, setMaxDaysPerWeekSaturday] = useState("3.00");
   const [allowableTardyExcess, setAllowableTardyExcess] = useState("");
   const [excludeTardinessInGrace, setExcludeTardinessInGrace] = useState(false);
   const [supervisoryGroupCode, setSupervisoryGroupCode] = useState("");
   const [applyOccurancesBreak, setApplyOccurancesBreak] = useState(false);
-  const [maxOccurancesNoDeduction, setMaxOccurancesNoDeduction] = useState("12");
+  const [maxOccurancesNoDeduction, setMaxOccurancesNoDeduction] =
+    useState("12");
   const [gracePeriodOccurance, setGracePeriodOccurance] = useState("");
   const [hoursRequiredPerWeek, setHoursRequiredPerWeek] = useState("");
   const [startOfWeek, setStartOfWeek] = useState("");
@@ -339,27 +350,33 @@ export function TimeKeepGroupPage() {
   const [legalHolidayOT, setLegalHolidayOT] = useState("");
   const [specialHolidayOT, setSpecialHolidayOT] = useState("");
   const [doubleLegalHolidayOT, setDoubleLegalHolidayOT] = useState("");
-  const [specialHolidayOT2, setSpecialHolidayOT2] = useState("")
+  const [specialHolidayOT2, setSpecialHolidayOT2] = useState("");
   const [nonWorkingHolidayOT, setNonWorkingHolidayOT] = useState("");
 
   // Late Filing
   const [regularDayOTLateFiling, setRegularDayOTLateFiling] = useState("");
   const [restDayOTLateFiling, setRestDayOTLateFiling] = useState("");
   const [legalHolidayOTLateFiling, setLegalHolidayOTLateFiling] = useState("");
-  const [specialHolidayOTLateFiling, setSpecialHolidayOTLateFiling] = useState("");
-  const [doubleLegalHolidayOTLateFiling, setDoubleLegalHolidayOTLateFiling] = useState("");
-  const [specialHoliday2OTLateFiling, setSpecialHoliday2OTLateFiling] = useState("")
-  const [nonWorkingHolidayOTLateFiling, setNonWorkingHolidayOTLateFiling] = useState("");
+  const [specialHolidayOTLateFiling, setSpecialHolidayOTLateFiling] =
+    useState("");
+  const [doubleLegalHolidayOTLateFiling, setDoubleLegalHolidayOTLateFiling] =
+    useState("");
+  const [specialHoliday2OTLateFiling, setSpecialHoliday2OTLateFiling] =
+    useState("");
+  const [nonWorkingHolidayOTLateFiling, setNonWorkingHolidayOTLateFiling] =
+    useState("");
 
-  // 
+  //
   const [useOTPremium, setUseOTPremium] = useState(false);
   const [useActualDayType, setUseActualDayType] = useState(false);
   const [holidayWithWorkshift, setHolidayWithWorkshift] = useState(false);
   const [deductMealBreakFromOT, setDeductMealBreakFromOT] = useState(false);
   const [computeOTForBreak2, setComputeOTForBreak2] = useState(false);
   const [enable24HourOT, setEnable24HourOT] = useState(false);
-  const [includeUnworkedHolidayInRegular, setIncludeUnworkedHolidayInRegular] = useState(false);
-  const [sundayOTIfWorkedSaturday, setSundayOTIfWorkedSaturday] = useState(false);
+  const [includeUnworkedHolidayInRegular, setIncludeUnworkedHolidayInRegular] =
+    useState(false);
+  const [sundayOTIfWorkedSaturday, setSundayOTIfWorkedSaturday] =
+    useState(false);
 
   // OT Break
   const [otBreakMinHours, setOtBreakMinHours] = useState(0);
@@ -367,56 +384,93 @@ export function TimeKeepGroupPage() {
   const [oTBreakAppliesToRegDay, setOTBreakAppliesToRegDay] = useState(false);
   const [oTBreakAppliesToLegHol, setOTBreakAppliesToLegHol] = useState(false);
   const [oTBreakAppliesToSHol, setOTBreakAppliesToSHol] = useState(false);
-  const [oTBreakAppliesToDoubleLegHol, setOTBreakAppliesToDoubleLegHol] = useState(false);
+  const [oTBreakAppliesToDoubleLegHol, setOTBreakAppliesToDoubleLegHol] =
+    useState(false);
   const [oTBreakAppliesToS2Hol, setOTBreakAppliesToS2Hol] = useState(false);
-  const [oTBreakAppliesToNonWorkHol, setOTBreakAppliesToNonWorkHol] = useState(false);
+  const [oTBreakAppliesToNonWorkHol, setOTBreakAppliesToNonWorkHol] =
+    useState(false);
   const [oTBreakAppliesToRestDay, setOTBreakAppliesToRestDay] = useState(false);
-  const [oTBreakAppliesToLegHolRest, setOTBreakAppliesToLegHolRest] = useState(false);
-  const [oTBreakAppliesToSHolRest, setOTBreakAppliesToSHolRest] = useState(false);
-  const [oTBreakAppliesToDoubleLegHolRest, setOTBreakAppliesToDoubleLegHolRest] = useState(false);
-  const [oTBreakAppliesToS2HolRest, setOTBreakAppliesToS2HolRest] = useState(false);
-  const [oTBreakAppliesToNonWorkRest, setOTBreakAppliesToNonWorkRest] = useState(false);
+  const [oTBreakAppliesToLegHolRest, setOTBreakAppliesToLegHolRest] =
+    useState(false);
+  const [oTBreakAppliesToSHolRest, setOTBreakAppliesToSHolRest] =
+    useState(false);
+  const [
+    oTBreakAppliesToDoubleLegHolRest,
+    setOTBreakAppliesToDoubleLegHolRest,
+  ] = useState(false);
+  const [oTBreakAppliesToS2HolRest, setOTBreakAppliesToS2HolRest] =
+    useState(false);
+  const [oTBreakAppliesToNonWorkRest, setOTBreakAppliesToNonWorkRest] =
+    useState(false);
 
   // Minimum Hrs To Compute OT
   const [regDayMinHrsToCompOT, setRegDayMinHrsToCompOT] = useState("");
   const [restDayMinHrsToCompOT, setRestDayMinHrsToCompOT] = useState("");
-  const [legalHolidayMinHrsToCompOT, setLegalHolidayMinHrsToCompOT] = useState("");
-  const [specialHolidayMinHrsToCompOT, setSpecialHolidayMinHrsToCompOT] = useState("");
-  const [specialHoliday2MinHrsToCompOT, setSpecialHoliday2MinHrsToCompOT] = useState("");
-  const [doubleLegalHolidayMinHrsToCompOT, setDoubleLegalHolidayMinHrsToCompOT] = useState("");
-  const [nonWorkingHolidayMinHrsToCompOT, setNonWorkingHolidayMinHrsToCompOT] = useState("");
+  const [legalHolidayMinHrsToCompOT, setLegalHolidayMinHrsToCompOT] =
+    useState("");
+  const [specialHolidayMinHrsToCompOT, setSpecialHolidayMinHrsToCompOT] =
+    useState("");
+  const [specialHoliday2MinHrsToCompOT, setSpecialHoliday2MinHrsToCompOT] =
+    useState("");
+  const [
+    doubleLegalHolidayMinHrsToCompOT,
+    setDoubleLegalHolidayMinHrsToCompOT,
+  ] = useState("");
+  const [nonWorkingHolidayMinHrsToCompOT, setNonWorkingHolidayMinHrsToCompOT] =
+    useState("");
 
-  const [restDayToBeComputedAsOtherRate, setRestDayToBeComputedAsOtherRate] = useState("");
+  const [restDayToBeComputedAsOtherRate, setRestDayToBeComputedAsOtherRate] =
+    useState("");
   const [restDayOtherRate, setRestDayOtherRate] = useState("");
   const [isOverTimeCutOffFlag, setIsOverTimeCutoffFlag] = useState(false);
-  const [overTimeCode, setOverTimeCode] = useState(""); 
+  const [overTimeCode, setOverTimeCode] = useState("");
   const [requiredHours, setRequiredHours] = useState("");
-  const [overTimeCodeFor2ShiftsDay, setOverTimeCodeFor2ShiftsDay] = useState("");
-  const [oTRoundingToTheNearestHourMin, setOTRoundingToTheNearestHourMin] = useState("");
+  const [overTimeCodeFor2ShiftsDay, setOverTimeCodeFor2ShiftsDay] =
+    useState("");
+  const [oTRoundingToTheNearestHourMin, setOTRoundingToTheNearestHourMin] =
+    useState("");
   const [birthdayPay, setBirthdayPay] = useState("");
-  const [nDBasicRoundingToTheNearestHourMin, setNDBasicRoundingToTheNearestHourMin] = useState("");
-  const [useOverTimeAuthorization, setUseOverTimeAuthorization] = useState(false);
+  const [
+    nDBasicRoundingToTheNearestHourMin,
+    setNDBasicRoundingToTheNearestHourMin,
+  ] = useState("");
+  const [useOverTimeAuthorization, setUseOverTimeAuthorization] =
+    useState(false);
   const [isSpecialOTCompFlag, setIsSpecialOTCompFlag] = useState(false);
   const [isHolPayLegalFlag, setIsHolPayLegalFlag] = useState(false);
-  const [isHolPaySpecialFlag, setIsHolPaySpecialFlag] = useState(false)
+  const [isHolPaySpecialFlag, setIsHolPaySpecialFlag] = useState(false);
   const [compHolPayForMonth, setCompHolPayForMonth] = useState(false);
-  const [compHolPayIfWorkBeforeHolidayRestDay, setCompHolPayIfWorkBeforeHolidayRestDay] = useState(false);
-  const [compHolPayIfWorkBeforeHolidayLegalHoliday, setCompHolPayIfWorkBeforeHolidayLegalHoliday] = useState(false);
-  const [compHolPayIfWorkBeforeHolidaySpecialHoliday, setCompHolPayIfWorkBeforeHolidaySpecialHoliday] = useState(false);
-  const [noPayIfAbsentBeforeHoliday, setNoPayIfAbsentBeforeHoliday] = useState(false);
-  const [noPayIfAbsentAfterHoliday, setNoPayIfAbsentAfterHoliday] = useState(false);
-  const [compHolidayWithPaidLeave, setCompHolidayWithPaidLeave ] = useState(false);
-  const [minimumNoOfHrsRequiredToCompHol, setMinimumNoOfHrsRequiredToCompHol] = useState('');
+  const [
+    compHolPayIfWorkBeforeHolidayRestDay,
+    setCompHolPayIfWorkBeforeHolidayRestDay,
+  ] = useState(false);
+  const [
+    compHolPayIfWorkBeforeHolidayLegalHoliday,
+    setCompHolPayIfWorkBeforeHolidayLegalHoliday,
+  ] = useState(false);
+  const [
+    compHolPayIfWorkBeforeHolidaySpecialHoliday,
+    setCompHolPayIfWorkBeforeHolidaySpecialHoliday,
+  ] = useState(false);
+  const [noPayIfAbsentBeforeHoliday, setNoPayIfAbsentBeforeHoliday] =
+    useState(false);
+  const [noPayIfAbsentAfterHoliday, setNoPayIfAbsentAfterHoliday] =
+    useState(false);
+  const [compHolidayWithPaidLeave, setCompHolidayWithPaidLeave] =
+    useState(false);
+  const [minimumNoOfHrsRequiredToCompHol, setMinimumNoOfHrsRequiredToCompHol] =
+    useState("");
   const [compFirstRestdayHoliday, setCompFirstRestdayHoliday] = useState(false);
 
-  // OT Allowances States
-  const [oTAllowanceseID, setOTAllowancesID] = useState(0)
-  const [oTAllowancesGroupCode, setOTAllowancesGroupCode] = useState('');
-  const [minOTHrs, setMinOTHrs] = useState('');
-  const [accumOTHrsToEarnMealAllow, setAccumOTHrsToEarnMealAllow] = useState('');
-  const [dayType, setDayType] = useState('')
-  const [amount, setAmount] = useState('');
-  const [earningCode, setEarningCode] = useState('');
+  // Fs States
+  const [oTAllowanceseID, setOTAllowancesID] = useState(0);
+  const [oTAllowancesGroupCode, setOTAllowancesGroupCode] = useState("");
+  const [minOTHrs, setMinOTHrs] = useState("");
+  const [accumOTHrsToEarnMealAllow, setAccumOTHrsToEarnMealAllow] =
+    useState("");
+  const [dayType, setDayType] = useState("");
+  const [amount, setAmount] = useState("");
+  const [earningCode, setEarningCode] = useState("");
 
   // Other Policies State
   const [useDefaultRestday, setUseDefaultRestday] = useState(false);
@@ -427,7 +481,8 @@ export function TimeKeepGroupPage() {
 
   // System Configuration State
   const [showSystemConfigModal, setShowSystemConfigModal] = useState(false);
-  const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] = useState(false);
+  const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] =
+    useState(false);
   const [minBeforeShift, setMinBeforeShift] = useState("0");
   const [minIgnoreMultipleBreak, setMinIgnoreMultipleBreak] = useState("0");
   const [minBeforeMidnightShift, setMinBeforeMidnightShift] = useState("0");
@@ -438,19 +493,23 @@ export function TimeKeepGroupPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isCreateNew, setIsCreateNew] = useState(false);
 
-  // Values Before Editing (for Cancel action)
-  const [snapshot, setSnapshot] = useState<Record<string, any>>({});
-
   // TKSGroup List states
   const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
   const [tksGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
 
-  // Payroll Location List 
-  const [payrollLocationList, setPayrollLocationList] = useState<PayrollLocationItem[]>([]);
+  // Update States
+  const [currentGroupId, setCurrentGroupId] = useState<number | null>(null);
+
+  // Payroll Location List
+  const [payrollLocationList, setPayrollLocationList] = useState<
+    PayrollLocationItem[]
+  >([]);
 
   // Group Login Policy List
-  const [groupLoginPolicyItems, setGroupLoginPolicyItems] = useState<LoginPolicyItem[]>([]);
+  const [groupLoginPolicyItems, setGroupLoginPolicyItems] = useState<
+    LoginPolicyItem[]
+  >([]);
 
   // Overtime Rates List
   const [overTimeRates, setOverTimeRates] = useState<OverTimeRatesItem[]>([]);
@@ -458,39 +517,59 @@ export function TimeKeepGroupPage() {
   // Overtime Break List
   const [oTBreakList, setOTBreakList] = useState<OTBreakItem[]>([]);
 
-  //  GroupSetup Overtime Allowancs List 
-  const [oTAllowancesList, setOTAllowancesList] = useState<OTAllowancesItem[]>([]);
+  //  GroupSetup Overtime Allowancs List
+  const [oTAllowancesList, setOTAllowancesList] = useState<OTAllowancesItem[]>(
+    [],
+  );
+  const [originalOTAllowances, setOriginalOTAllowances] = useState<OTAllowancesItem[]>([]);
 
   // System Config List
-  const [systemConfigList, setSystemConfigList] = useState<SystemConfigItem[]>([])
+  const [systemConfigList, setSystemConfigList] = useState<SystemConfigItem[]>(
+    [],
+  );
 
   // Cutoff Group States
   const [cutOffTableSearchTerm, setCutOffTableSearchTerm] = useState("");
   const [selectedCutOffRows, setSelectedCutOffRows] = useState<string[]>([]);
 
   //Supervisory Group states
-  const [supervisoryGroupsList, setSupervisoryGroupsList] = useState<GroupItem[]>([]);
-  const [otCodePerWeekList, setOtCodePerWeekList] = useState<OvertimeFileSetupItem[]>([]);
-  const [equivDayAbsentList, setEquivDayAbsentList] = useState<EquivDayItem[]>([],);
-  const [equivDayNoLoginList, setEquivDayNoLoginList] = useState<EquivDayItem[]>([]);
-  const [equivDayNoLogoutList, setEquivDayNoLogoutList] = useState<EquivDayItem[]>([],);
-  const [equivDayForNoBreak2InList, setEquivDayForNoBreak2InList] = useState<EquivDayItem[]>([],);
-  const [equivDayForNoBreak2OutList, setEquivDayForNoBreak2OutList] = useState<EquivDayItem[]>([],);
- 
+  const [supervisoryGroupsList, setSupervisoryGroupsList] = useState<
+    GroupItem[]
+  >([]);
+  const [otCodePerWeekList, setOtCodePerWeekList] = useState<
+    OvertimeFileSetupItem[]
+  >([]);
+  const [equivDayAbsentList, setEquivDayAbsentList] = useState<EquivDayItem[]>(
+    [],
+  );
+  const [equivDayNoLoginList, setEquivDayNoLoginList] = useState<
+    EquivDayItem[]
+  >([]);
+  const [equivDayNoLogoutList, setEquivDayNoLogoutList] = useState<
+    EquivDayItem[]
+  >([]);
+  const [equivDayForNoBreak2InList, setEquivDayForNoBreak2InList] = useState<
+    EquivDayItem[]
+  >([]);
+  const [equivDayForNoBreak2OutList, setEquivDayForNoBreak2OutList] = useState<
+    EquivDayItem[]
+  >([]);
 
   // Pagination Numbers of Page
   const itemsPerPage = 10;
 
-  
-  const [autoPairingTableSearchTerm, setAutoPairingTableSearchTerm] =useState("");
-  const [selectedAutoPairingRows, setSelectedAutoPairingRows] = useState<string[]>([]);
+  const [autoPairingTableSearchTerm, setAutoPairingTableSearchTerm] =
+    useState("");
+  const [selectedAutoPairingRows, setSelectedAutoPairingRows] = useState<
+    string[]
+  >([]);
   const [autoPairingCurrentPage, setAutoPairingCurrentPage] = useState(1);
   const autoPairingPageSize = 10;
 
   const autoPairingFilteredData = tksGroupItems.filter(
     (item: GroupItem) =>
       autoPairingTableSearchTerm === "" ||
-      item.tksGroupCode
+      item.groupCode
         .toLowerCase()
         .includes(autoPairingTableSearchTerm.toLowerCase()) ||
       item.description
@@ -565,7 +644,7 @@ export function TimeKeepGroupPage() {
   // Filter Groups
   const filteredGroups = tksGroupItems.filter(
     (item) =>
-      (item.tksGroupCode
+      (item.groupCode
         ?.toLowerCase()
         .includes(tksGroupSearchTerm.toLowerCase()) ??
         false) ||
@@ -591,8 +670,7 @@ export function TimeKeepGroupPage() {
       if (
         i === 1 ||
         i === totalGroupPages ||
-        (i >= currentGroupPage - 1 &&
-          i <= currentGroupPage + 1)
+        (i >= currentGroupPage - 1 && i <= currentGroupPage + 1)
       ) {
         pages.push(i);
       } else if (pages[pages.length - 1] !== "...") {
@@ -609,20 +687,18 @@ export function TimeKeepGroupPage() {
     totalPages: cutOffTotalPages,
     currentPage: cutOffCurrentPage,
     setCurrentPage: setCutOffCurrentPage,
-    getPageNumbers: getCutOffPageNumbers
+    getPageNumbers: getCutOffPageNumbers,
   } = useTablePagination(
     tksGroupItems,
     cutOffTableSearchTerm,
     (item, search) =>
-      item.tksGroupCode?.toLowerCase().includes(search) ||
+      item.groupCode?.toLowerCase().includes(search) ||
       item.description?.toLowerCase().includes(search),
-    itemsPerPage
+    itemsPerPage,
   );
 
   const cutOffStartIndex = (cutOffCurrentPage - 1) * itemsPerPage;
   const cutOffEndIndex = cutOffStartIndex + itemsPerPage;
-
-
 
   useEffect(() => {
     setCutOffCurrentPage(1);
@@ -639,9 +715,9 @@ export function TimeKeepGroupPage() {
     supervisoryGroupsList,
     supervisoryGroupSearchTerm,
     (item, search) =>
-      item.tksGroupCode?.toLowerCase().includes(search) ||
+      item.groupCode?.toLowerCase().includes(search) ||
       item.description?.toLowerCase().includes(search),
-    itemsPerPage
+    itemsPerPage,
   );
 
   const getSupervisoryPageNumbers = (): number[] => {
@@ -651,7 +727,6 @@ export function TimeKeepGroupPage() {
     }
     return pages;
   };
-
 
   const startSupervisoryIndex = (currentSupervisoryPage - 1) * itemsPerPage;
   const endSupervisoryIndex = startSupervisoryIndex + itemsPerPage;
@@ -671,11 +746,9 @@ export function TimeKeepGroupPage() {
       item.oTFileSetupCode.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
   const startOtCodesIndex = (currentOtCodePerWeekPage - 1) * itemsPerPage;
@@ -696,14 +769,13 @@ export function TimeKeepGroupPage() {
       item.locationCode.toLowerCase().includes(search) ||
       item.locationName.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startPayrollLocationsIndex = (currentPayrollLocationsPage - 1) * itemsPerPage;
+  const startPayrollLocationsIndex =
+    (currentPayrollLocationsPage - 1) * itemsPerPage;
   const endPayrollLocationsIndex = startPayrollLocationsIndex + itemsPerPage;
 
   useEffect(() => {
@@ -725,14 +797,13 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayAbsentIndex = (currentEquivDayAbsentPage - 1) * itemsPerPage;
+  const startEquivDayAbsentIndex =
+    (currentEquivDayAbsentPage - 1) * itemsPerPage;
   const endEquivDayAbsentIndex = startEquivDayAbsentIndex + itemsPerPage;
 
   // For No Login Pagination and Search
@@ -750,16 +821,14 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoLoginIndex = (currentEquivDayNoLoginPage - 1) * itemsPerPage;
+  const startEquivDayNoLoginIndex =
+    (currentEquivDayNoLoginPage - 1) * itemsPerPage;
   const endEquivDayNoLoginIndex = startEquivDayNoLoginIndex + itemsPerPage;
-
 
   // For No Logout Pagination and Search
   const {
@@ -776,14 +845,13 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoLogoutIndex = (currentEquivDayNoLogoutPage - 1) * itemsPerPage;
+  const startEquivDayNoLogoutIndex =
+    (currentEquivDayNoLogoutPage - 1) * itemsPerPage;
   const endEquivDayNoLogoutIndex = startEquivDayNoLogoutIndex + itemsPerPage;
 
   // For No Break 2 In Pagination and Search
@@ -801,16 +869,15 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoBreak2InIndex = (currentEquivDayForNoBreak2InPage - 1) * itemsPerPage;
-  const endEquivDayNoBreak2InIndex = startEquivDayNoBreak2InIndex + itemsPerPage;
-
+  const startEquivDayNoBreak2InIndex =
+    (currentEquivDayForNoBreak2InPage - 1) * itemsPerPage;
+  const endEquivDayNoBreak2InIndex =
+    startEquivDayNoBreak2InIndex + itemsPerPage;
 
   // For No Break 2 OutPagination and Search
   const {
@@ -827,16 +894,16 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoBreak2OutIndex = (currentEquivDayForNoBreak2OutPage - 1) * itemsPerPage;
-  const endEquivDayNoBreak2OutIndex = startEquivDayNoBreak2OutIndex + itemsPerPage;
-  
+  const startEquivDayNoBreak2OutIndex =
+    (currentEquivDayForNoBreak2OutPage - 1) * itemsPerPage;
+  const endEquivDayNoBreak2OutIndex =
+    startEquivDayNoBreak2OutIndex + itemsPerPage;
+
   // Converts "2021-05-05T00:00:00" → "05/05/2021"
   const formatApiDate = (apiDate: string | null | undefined) => {
     if (!apiDate) return "";
@@ -862,7 +929,7 @@ export function TimeKeepGroupPage() {
 
     return response.data.map((item: any) => ({
       id: item.ID || item.id,
-      tksGroupCode: item.groupCode ?? "",
+      groupCode: item.groupCode ?? "",
       description: item.groupDescription ?? "",
       cutOffDateMonth: item.cutOffDateMonth ?? "",
       cutOffDateFrom: item.cutOffDateFrom ?? "",
@@ -872,6 +939,455 @@ export function TimeKeepGroupPage() {
       autoPairLogsDateFrom: item.autoPairLogsDateFrom ?? "",
       autoPairLogsDateTo: item.autoPairLogsDateTo ?? "",
     }));
+  };
+
+  const monthNameToStringNumber = (monthName: string): string => {
+    const monthMap: Record<string, string> = {
+      january: "1",
+      february: "2",
+      march: "3",
+      april: "4",
+      may: "5",
+      june: "6",
+      july: "7",
+      august: "8",
+      september: "9",
+      october: "10",
+      november: "11",
+      december: "12",
+    };
+    return monthMap[monthName.toLowerCase()] ?? "0"; // fallback "0" if invalid
+  };
+
+  const convertTimeToISOString = (timeStr: string) => {
+    if (!timeStr) return "";
+
+    const today = new Date();
+    const [hoursStr, minutesStr] = timeStr
+      .toUpperCase()
+      .replace("AM", "")
+      .replace("PM", "")
+      .trim()
+      .split(":");
+
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+
+    if (timeStr.includes("PM") && hours < 12) hours += 12;
+    if (timeStr.includes("AM") && hours === 12) hours = 0;
+
+    const isoStr = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      hours,
+      minutes,
+      0,
+      0,
+    ).toISOString();
+
+    return isoStr;
+  };
+
+  const updateGroupById = async (
+    id: number,
+    updatedFields: Partial<GroupItem>,
+  ) => {
+    const { data: currentGroup } = await apiClient.get<GroupItem>(
+      `/Fs/Process/TimeKeepGroupSetUp/${id}`,
+    );
+
+    const payload: GroupItem = {
+      ...currentGroup,
+      ...updatedFields,
+    };
+
+    await apiClient.put(`/Fs/Process/TimeKeepGroupSetUp/${id}`, payload);
+  };
+
+  const handleSaveGroupSetUpDefinition = async () => {
+    try {
+      if (!currentGroupId) {
+        alert("No group selected.");
+        return;
+      }
+
+      const mainPayload: Partial<GroupItem> = {
+        groupCode: tksGroupCode,
+        description: payrollDescription,
+        payrollGroup: payrollLocationCode,
+        cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+        cutOffDatePeriod: cutOffPeriod,
+        cutOffDateFrom: new Date(dateFrom).toISOString(),
+        cutOffDateTo: new Date(dateTo).toISOString(),
+        autoPairLogsDateFrom: new Date(autoPairingFrom).toISOString(),
+        autoPairLogsDateTo: new Date(autoPairingTo).toISOString(),
+        terminalID: terminalId,
+      };
+
+      await updateGroupById(currentGroupId, mainPayload);
+
+      if (selectedCutOffRows.length > 0) {
+        const selectedIds = selectedCutOffRows
+          .map(Number)
+          .filter((id) => id !== currentGroupId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+              cutOffDatePeriod: cutOffPeriod,
+              cutOffDateFrom: new Date(dateFrom).toISOString(),
+              cutOffDateTo: new Date(dateTo).toISOString(),
+            }),
+          ),
+        );
+      }
+
+      if (selectedAutoPairingRows.length > 0) {
+        const selectedIds = selectedAutoPairingRows
+          .map(Number)
+          .filter((id) => id !== currentGroupId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth), // if still want month/period synced
+              cutOffDatePeriod: cutOffPeriod,
+              autoPairLogsDateFrom: new Date(autoPairingFrom).toISOString(),
+              autoPairLogsDateTo: new Date(autoPairingTo).toISOString(),
+            }),
+          ),
+        );
+      }
+
+      await loadTKSGroup();
+      alert("Update successful!");
+    } catch (error) {
+      console.error("Update failed:", error);
+      alert("Update failed.");
+    }
+  };
+
+  const updateLoginPolicyById = async (
+    id: number,
+    payload: Partial<LoginPolicyItem>,
+  ) => {
+    try {
+      // Send the payload directly, not wrapped in { dto: ... }
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy/${id}`,
+        payload,
+        { headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error(`Failed to update login policy for id ${id}`, error);
+      throw error;
+    }
+  };
+
+  const handleSaveLoginPolicy = async () => {
+    try {
+      if (!currentGroupId || !tksGroupCode) {
+        alert("No group selected.");
+        return;
+      }
+
+      const buildLoginPolicyPayload = (): Partial<LoginPolicyItem> => ({
+        id: currentGroupId,
+        groupCode: tksGroupCode,
+        gracePeriod: Number(gracePeriodPerDay),
+        gracePeriodIncTard: gracePeriodIncludeTardiness,
+        incldBrk2: includeBreak2InGrace,
+        dedEvnWGrace: deductibleEvenWithinGrace,
+        computeShrtBrkTardy: applyOccurancesBreak,
+        maxTimePerMonth: Number(maxOccurancesNoDeduction),
+        shrtBrkGracePeriod: Number(gracePeriodOccurance),
+        hrsCompleteWeek: Number(hoursRequiredPerWeek),
+        startWkToComplete: startOfWeek,
+        compAsPerWeek: computeType,
+        nightDiffStartTime: convertTimeToISOString(nightDiffStartTime),
+        nightDiffEndTime: convertTimeToISOString(nightDiffEndTime),
+        dedForAbsent: forAbsent,
+        dedForNoLogin: forNoLogin,
+        dedForNoLogout: forNoLogout,
+        deductMealBreakinNDComput: deductMealBreakND,
+        deductOverbreak: deductOverBreak,
+        gracePerSemiAnnualFlag: gracePeriodSemiAnnual,
+        graceSemiNoofHours: Number(gracePeriodPerSemiAnnual),
+        firstHalfFrom: firstHalfDateFrom,
+        firstHalfTo: firstHalfDateTo,
+        secondHalfFrom: secondHalfDateFrom,
+        secondHalfTo: secondHalfDateTo,
+        dedForNoBrk2out: forNoBreak2Out,
+        dedForNoBrk2In: forNoBreak2In,
+        otCodePerWeek: otCodePerWeek,
+        combineTardiOfTimeInBrk2: combineTardinessTimeInBreak2,
+        compTardinessForNoLogout: computeTardinessNoLogout,
+        twoShiftsInADay: twoShiftsInDay,
+        twoShiftsInADayInterval: Number(hoursIntervalTwoShifts),
+        numberAllowGracePrdInAMonth: Number(allowableGracePeriodMonth),
+        maxDaysPerWeekSatWrk: Number(maxDaysPerWeekSaturday),
+        saturdayPdRegHrsFlag: considerSaturdayPaid,
+        excludeAllowGracePrdFlag: excludeAllowableGraceBracket,
+        allowableGracePrdInAMonthBasedActualMonthFlag:
+          allowableGraceActualMonth,
+        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag:
+          excludeTardinessInGrace,
+        numberAllowTardyExcessGracePrd: Number(allowableTardyExcess),
+        supGroupCode: supervisoryGroupCode,
+      });
+
+      await updateLoginPolicyById(currentGroupId, buildLoginPolicyPayload());
+
+      const updatedPolicy = (await fetchGroupSetupLoginPolicyData(
+        tksGroupCode,
+      )) as LoginPolicyItem;
+      if (updatedPolicy) populateFromGroupSetupLoginPolicy(updatedPolicy);
+
+      alert("Login policy updated successfully!");
+    } catch (error) {
+      console.error("Login policy update failed", error);
+      alert("Update failed.");
+    }
+  };
+
+  const updateOTRateById = async (
+    id: number,
+    payload: Partial<OverTimeRatesItem>,
+  ) => {
+    try {
+      // Send the payload directly, not wrapped in { dto: ... }
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${id}`,
+        payload,
+        { headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error(`Failed to update OT Rate for id ${id}`, error);
+      throw error;
+    }
+  };
+
+  const handleSaveOTRates = async () => {
+    try {
+      if (!overTimeRates || overTimeRates.length === 0) {
+        alert("No OT Rate selected to save.");
+        return;
+      }
+
+      const payload: Partial<OverTimeRatesItem> = {
+        id: currentOTRatesID,
+        groupCode: tksGroupCode,
+        regDayOT: regularDayOT,
+        restDayOT: restDayOT,
+        legalHolidayOT: legalHolidayOT,
+        specHolidayOT: specialHolidayOT,
+        doubleLegalHolidayOT: doubleLegalHolidayOT,
+        specialHoliday2: specialHolidayOT2,
+        nonWrkHolidayOT: nonWorkingHolidayOT,
+        regDayOTAdj: regularDayOTLateFiling,
+        restDayOTAdj: restDayOTLateFiling,
+        legalHolidayOTAdj: legalHolidayOTLateFiling,
+        specHolidayOTAdj: specialHolidayOTLateFiling,
+        doubleLegalHolidayOTAdj: doubleLegalHolidayOTLateFiling,
+        specialHoliday2Adj: specialHoliday2OTLateFiling,
+        nonWrkHolidayOTAdj: nonWorkingHolidayOTLateFiling,
+        minHoursOTBreak: otBreakMinHours,
+        hoursOTBreakDeduction: oTBreakNoOfHrsDed,
+        useOTPremiumBreakdown: useOTPremium,
+        useDayType2: useActualDayType,
+        holidayWithWorkShift: holidayWithWorkshift,
+        deductMealBreakOTComputation: deductMealBreakFromOT,
+        computeBrk2OI: computeOTForBreak2,
+        enable24HrOTFlag: enable24HourOT,
+        includeUnWorkHolInRegDay: includeUnworkedHolidayInRegular,
+        sundayWrkOTIfWrkSaturday: sundayOTIfWorkedSaturday,
+        minHrsToCompOTRegDay: regDayMinHrsToCompOT
+          ? regDayMinHrsToCompOT
+          : undefined,
+        minHrsToCompOTRestDay: restDayMinHrsToCompOT
+          ? restDayMinHrsToCompOT
+          : undefined,
+        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT
+          ? legalHolidayMinHrsToCompOT
+          : undefined,
+        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT
+          ? specialHolidayMinHrsToCompOT
+          : undefined,
+        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT
+          ? specialHoliday2MinHrsToCompOT
+          : undefined,
+        minHrsToCompOTDoubleLegal: doubleLegalHolidayMinHrsToCompOT
+          ? doubleLegalHolidayMinHrsToCompOT
+          : undefined,
+        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT
+          ? nonWorkingHolidayMinHrsToCompOT
+          : undefined,
+        spRDDay: restDayToBeComputedAsOtherRate,
+        spRDDayOT: restDayOtherRate,
+        otCutOffFlag: isOverTimeCutOffFlag,
+        otCutOffOTCode: overTimeCode,
+        otCutOffHours: requiredHours ? requiredHours : undefined,
+        otCode2ShiftsInADay: overTimeCodeFor2ShiftsDay,
+        roundOfftHourMin: oTRoundingToTheNearestHourMin,
+        birthDayPayOT: birthdayPay,
+        roundOffNDBasicHourMin: nDBasicRoundingToTheNearestHourMin,
+        useOTAuthorization: useOverTimeAuthorization,
+        holidayPayLegal: isHolPayLegalFlag,
+        holidayPaySpecial: isHolPaySpecialFlag,
+        compHolPayMonth: compHolPayForMonth,
+        compHolPayIfWorkBeforeHolidayRestDay:
+          compHolPayIfWorkBeforeHolidayRestDay,
+        compHolPayIfWorkBeforeHolidayLegalHoliday:
+          compHolPayIfWorkBeforeHolidayLegalHoliday,
+        compHolPayIfWorkBeforeHolidaySpecialHoliday:
+          compHolPayIfWorkBeforeHolidaySpecialHoliday,
+        noPayIfAbsentBeforeHoliday: noPayIfAbsentBeforeHoliday,
+        noPayIfAbsentAfterHoliday: noPayIfAbsentAfterHoliday,
+        compHolidayWithPaidLeave: compHolidayWithPaidLeave,
+        minimumNoOfHrsRequiredToCompHol: minimumNoOfHrsRequiredToCompHol
+          ? minimumNoOfHrsRequiredToCompHol
+          : undefined,
+        compFirstRestdayHoliday: compFirstRestdayHoliday,
+      };
+
+      await updateOTRateById(currentOTRatesID, payload);
+
+      // Refresh the OT Rate data from backend
+      const refreshed = await fetchOverTimeRates();
+      setOverTimeRates(refreshed);
+      populateFromOTRates(refreshed[0]);
+
+      alert("OT Rate updated successfully!");
+    } catch (error) {
+      console.error("Failed to save OT Rate", error);
+      alert("OT Rate save failed.");
+    }
+  };
+
+  const updateOTBreakById = async (
+    id: number,
+    payload: Partial<OTBreakItem>,
+  ) => {
+    try {
+      // Backend expects payload wrapped in { dto: ... }
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupOTBreak/${id}`,
+        { dto: payload },
+        { headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error(`Failed to update OT Break for id ${id}`, error);
+      throw error;
+    }
+  };
+
+  const handleSaveOTBreak = async () => {
+  try {
+    if (!oTBreakList || oTBreakList.length === 0) {
+      alert("No OT Break data available to save.");
+      return;
+    }
+
+    // Find OT Break for current group
+    const selectedOTBreak = oTBreakList.find(
+      (item) => item.groupCode === tksGroupCode
+    );
+
+    if (!selectedOTBreak) {
+      alert(`No OT Break data found for group ${tksGroupCode}`);
+      return;
+    }
+
+    if (!tksGroupCode) {
+      alert("Current Group Code is empty!");
+      return;
+    }
+
+    const payload = {
+      id: selectedOTBreak.id,
+      groupCode: tksGroupCode,
+      regDay: oTBreakAppliesToRegDay ?? false,
+      restDay: oTBreakAppliesToRestDay ?? false,
+      lHoliday: oTBreakAppliesToLegHol ?? false,
+      sHoliday: oTBreakAppliesToSHol ?? false,
+      doubleHoliday: oTBreakAppliesToDoubleLegHol ?? false,
+      s2Holiday: oTBreakAppliesToS2Hol ?? false,
+      nonWorkHoliday: oTBreakAppliesToNonWorkHol ?? false,
+      lHolidayRest: oTBreakAppliesToLegHolRest ?? false,
+      sHolidayRest: oTBreakAppliesToSHolRest ?? false,
+      doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest ?? false,
+      s2HolidayRest: oTBreakAppliesToS2HolRest ?? false,
+      nonWorkHolidayRest: oTBreakAppliesToNonWorkRest ?? false
+    };
+
+    console.log(tksGroupCode);
+
+    // Send payload directly (no { dto: ... })
+    await apiClient.put(
+      `/Fs/Process/TimeKeepGroup/GroupOTBreak/${selectedOTBreak.id}`,
+      payload,
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    // Refresh OT Break data
+    const refreshed = await fetchOTBreakData();
+    setOTBreakList(refreshed);
+
+    const updatedItem = refreshed.find(
+      (item) => item.groupCode === tksGroupCode
+    );
+    if (updatedItem) populateFromOTBreak(updatedItem);
+
+    alert("OT Break updated successfully!");
+  } catch (error) {
+    console.error("Failed to save OT Break", error);
+    alert("OT Break save failed.");
+  }
+};
+
+  const handleSaveOTAllowances = async () => {
+    try {
+      if (!tksGroupCode) {
+        alert("GroupCode is required.");
+        return;
+      }
+
+      if (oTAllowancesList.length === 0) {
+        alert("No OT Allowances to save.");
+        return;
+      }
+
+      // Convert string values to numbers
+      const payload = oTAllowancesList.map((item) => ({
+        id: item.id,
+        groupCode: tksGroupCode,
+        minimumOTHrs:
+          item.minimumOTHours === "" ? 0 : Number(item.minimumOTHours),
+        accumOTHrsToEarnMealAllow:
+          item.accumOTHrsToEarnMealAllow === ""
+            ? 0
+            : Number(item.accumOTHrsToEarnMealAllow),
+        dayType: "Any",
+        earningCode: item.earningCode,
+        amount: item.amount === "" ? 0 : Number(item.amount),
+      }));
+
+      await apiClient.post(
+        "/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances",
+        {
+          dto: payload, // ⚠️ Remove wrapper if backend does not expect dto
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      alert("OT Allowances saved successfully!");
+
+    } catch (error: any) {
+      console.error("Failed to save OT Allowances:", error);
+      alert("Save failed.");
+    }
   };
 
   // Fetch OvertimeFileSetup data from API
@@ -890,7 +1406,7 @@ export function TimeKeepGroupPage() {
     }));
   };
 
- // Fetch Group System Config data from API
+  // Fetch Group System Config data from API
   const fetchGroupSystemConfig = async (): Promise<SystemConfigItem[]> => {
     const response = await apiClient.get(
       "/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig",
@@ -900,29 +1416,41 @@ export function TimeKeepGroupPage() {
       id: item.id,
       groupCode: item.groupCode,
       numOfMinBeforeTheShift: item.numOfMinBeforeTheShift?.toString() ?? "0",
-      numOfMinToIgnoreMultipleOutInBreak: item.numOfMinToIgnoreMultipleOutInBreak?.toString() ?? "0",
-      numOfMinBeforeMidnightShift: item.numOfMinBeforeMidnightShift?.toString() ?? "0",
+      numOfMinToIgnoreMultipleOutInBreak:
+        item.numOfMinToIgnoreMultipleOutInBreak?.toString() ?? "0",
+      numOfMinBeforeMidnightShift:
+        item.numOfMinBeforeMidnightShift?.toString() ?? "0",
       devicePolicy: item.devicePolicy ?? "",
       noOfMinToConsiderBrk2In: item.noOfMinToConsiderBrk2In?.toString() ?? "0",
       useTKSystemConfig: item.useTKSystemConfig ?? false,
     }));
   };
 
-  // Fetch 
-  const fetchOTAllowancesData = async (): Promise<OTAllowancesItem[]> => {
-    const response = await apiClient.get(
-      `Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/ByGroupCode/${tksGroupCode}`,
-    );
+  const fetchOTAllowancesData = async (
+    groupCode: string,
+  ): Promise<OTAllowancesItem[]> => {
+    try {
+      const response = await apiClient.get(
+        `Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/ByGroupCode/${groupCode}`,
+      );
 
-    return response.data.map((item: any) => ({
-      id: item.id,
-      groupCode: item.groupCode,
-      minimumOTHours: item.minimumOTHrs,
-      accumOTHrsToEarnMealAllow: item.accumOTHrsToEarnMealAllow,
-      dayType: item.dayType,
-      earningCode: item.earningCode,
-      amount: item.amount
-    }));
+      return response.data.map((item: any) => ({
+        id: item.id,
+        groupCode: item.groupCode,
+        minimumOTHours: item.minimumOTHrs,
+        accumOTHrsToEarnMealAllow: item.accumOTHrsToEarnMealAllow,
+        dayType: item.dayType,
+        earningCode: item.earningCode,
+        amount: item.amount,
+      }));
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.warn(`No OT Allowances found for groupCode: ${groupCode}`);
+        return [];
+      }
+      console.error("Error fetching OT Allowances:", error);
+      return [];
+    }
   };
 
   useEffect(() => {
@@ -930,15 +1458,16 @@ export function TimeKeepGroupPage() {
       const items = await fetchOvertimeFileSetup();
       setOtCodePerWeekList(items);
     };
-    const loadAllowancesData =  async () => {
-      const items = await fetchOTAllowancesData();
+    const loadAllowancesData = async () => {
+      const items = await fetchOTAllowancesData(tksGroupCode);
       setOTAllowancesList(items);
+      setOriginalOTAllowances(items);
     };
-    const loadSystemConfig = async () =>  {
+    const loadSystemConfig = async () => {
       const items = await fetchGroupSystemConfig();
       setSystemConfigList(items);
       populateSystemConfigStates(items[0]);
-    }
+    };
     loadOvertimeFileSetup();
     loadAllowancesData();
     loadSystemConfig();
@@ -963,10 +1492,11 @@ export function TimeKeepGroupPage() {
     loadPayrollLocation();
   }, []);
 
-
   // Fetch Over Time Rates
   const fetchOverTimeRates = async (): Promise<OverTimeRatesItem[]> => {
-    const response = await apiClient.get("/Fs/Process/TimeKeepGroup/GroupSetUpOTRates");
+    const response = await apiClient.get(
+      "/Fs/Process/TimeKeepGroup/GroupSetUpOTRates",
+    );
 
     return response.data.map((item: any) => ({
       id: item.id,
@@ -1011,9 +1541,12 @@ export function TimeKeepGroupPage() {
       compHolPayMonth: item.compHolPayMonth,
       nonWrkHolidayOT: item.nonWrkHolidayOT,
       minimumNoOfHrsRequiredToCompHol: item.minimumNoOfHrsRequiredToCompHol,
-      compHolPayIfWorkBeforeHolidayRestDay: item.compHolPayIfWorkBeforeHolidayRestDay,
-      compHolPayIfWorkBeforeHolidaySpecialHoliday: item.compHolPayIfWorkBeforeHolidaySpecialHoliday,
-      compHolPayIfWorkBeforeHolidayLegalHoliday: item.compHolPayIfWorkBeforeHolidayLegalHoliday,
+      compHolPayIfWorkBeforeHolidayRestDay:
+        item.compHolPayIfWorkBeforeHolidayRestDay,
+      compHolPayIfWorkBeforeHolidaySpecialHoliday:
+        item.compHolPayIfWorkBeforeHolidaySpecialHoliday,
+      compHolPayIfWorkBeforeHolidayLegalHoliday:
+        item.compHolPayIfWorkBeforeHolidayLegalHoliday,
       minHrsToCompOTRegDay: item.minHrsToCompOTRegDay,
       minHrsToCompOTRestDay: item.minHrsToCompOTRestDay,
       minHrsToCompOTLegal: item.minHrsToCompOTLegal,
@@ -1036,7 +1569,7 @@ export function TimeKeepGroupPage() {
       roundOffNDBasicHourMin: item.roundOffNDBasicHourMin,
       includeUnWorkHolInRegDay: item.includeUnWorkHolInRegDay,
       sundayWrkOTIfWrkSaturday: item.sundayWrkOTIfWrkSaturday,
-      otCode2ShiftsInADay: item.otCode2ShiftsInADay
+      otCode2ShiftsInADay: item.otCode2ShiftsInADay,
     }));
   };
 
@@ -1049,7 +1582,7 @@ export function TimeKeepGroupPage() {
     setOTBreakAppliesToNonWorkHol(item.nonWorkingHoliday ?? false);
     setOTBreakAppliesToRestDay(item.restDay ?? false);
     setOTBreakAppliesToLegHolRest(item.legalHolidayRest ?? false);
-    setOTBreakAppliesToSHolRest(item.specialHolidayRest ?? false)
+    setOTBreakAppliesToSHolRest(item.specialHolidayRest ?? false);
     setOTBreakAppliesToDoubleLegHolRest(item.doubleHolidayRest ?? false);
     setOTBreakAppliesToS2HolRest(item.specialHoliday2Rest ?? false);
     setOTBreakAppliesToNonWorkRest(item.nonWorkingHolidayRest ?? false);
@@ -1065,88 +1598,97 @@ export function TimeKeepGroupPage() {
   };
 
   const populateFromOTRates = (item: OverTimeRatesItem) => {
-    setRegularDayOT(item.regDayOT ?? '');
-    setRestDayOT(item.restDayOT ?? '');
-    setLegalHolidayOT(item.legalHolidayOT ?? '');
-    setSpecialHolidayOT(item.specHolidayOT ?? '');
-    setDoubleLegalHolidayOT(item.doubleLegalHolidayOT ?? '')
-    setSpecialHolidayOT2(item.specialHoliday2 ?? '');
-    setNonWorkingHolidayOT(item.nonWrkHolidayOT ?? '');
+    setCurrentOTRateID(item.id);
+    setRegularDayOT(item.regDayOT ?? "");
+    setRestDayOT(item.restDayOT ?? "");
+    setLegalHolidayOT(item.legalHolidayOT ?? "");
+    setSpecialHolidayOT(item.specHolidayOT ?? "");
+    setDoubleLegalHolidayOT(item.doubleLegalHolidayOT ?? "");
+    setSpecialHolidayOT2(item.specialHoliday2 ?? "");
+    setNonWorkingHolidayOT(item.nonWrkHolidayOT ?? "");
 
-    setRegularDayOTLateFiling(item.regDayOTAdj ?? '');
-    setRestDayOTLateFiling(item.restDayOTAdj ?? '');
-    setLegalHolidayOTLateFiling(item.legalHolidayOTAdj ?? '');
-    setSpecialHolidayOTLateFiling(item.legalHolidayOTAdj ?? '');
-    setDoubleLegalHolidayOTLateFiling(item.doubleLegalHolidayOTAdj ?? '');
-    setSpecialHoliday2OTLateFiling(item.specialHoliday2Adj ?? '');
-    setNonWorkingHolidayOTLateFiling(item.nonWrkHolidayOTAdj ?? '');
-    
-    setOtBreakMinHours(item.minHoursOTBreak ?? 0)
-    setOTBreakNoOfHrsDed(item.hoursOTBreakDeduction ?? 0)
+    setRegularDayOTLateFiling(item.regDayOTAdj ?? "");
+    setRestDayOTLateFiling(item.restDayOTAdj ?? "");
+    setLegalHolidayOTLateFiling(item.legalHolidayOTAdj ?? "");
+    setSpecialHolidayOTLateFiling(item.legalHolidayOTAdj ?? "");
+    setDoubleLegalHolidayOTLateFiling(item.doubleLegalHolidayOTAdj ?? "");
+    setSpecialHoliday2OTLateFiling(item.specialHoliday2Adj ?? "");
+    setNonWorkingHolidayOTLateFiling(item.nonWrkHolidayOTAdj ?? "");
+
+    setOtBreakMinHours(item.minHoursOTBreak ?? 0);
+    setOTBreakNoOfHrsDed(item.hoursOTBreakDeduction ?? 0);
     setUseOTPremium(item.useOTPremiumBreakdown ?? false);
     setUseActualDayType(item.useDayType2 ?? false);
-    setHolidayWithWorkshift(item.holidayWithWorkShift ?? false)
-    setDeductMealBreakFromOT(item.deductMealBreakOTComputation ?? false); 
+    setHolidayWithWorkshift(item.holidayWithWorkShift ?? false);
+    setDeductMealBreakFromOT(item.deductMealBreakOTComputation ?? false);
     setComputeOTForBreak2(item.computeBrk2OI ?? false);
     setEnable24HourOT(item.enable24HrOTFlag ?? false);
     setIncludeUnworkedHolidayInRegular(item.includeUnWorkHolInRegDay ?? false);
     setSundayOTIfWorkedSaturday(item.sundayWrkOTIfWrkSaturday ?? false);
 
-    setRegDayMinHrsToCompOT(item.minHrsToCompOTRegDay ?? '');
-    setRestDayMinHrsToCompOT(item.minHrsToCompOTRestDay ?? '');
-    setLegalHolidayMinHrsToCompOT(item.minHrsToCompOTLegal ?? '');
-    setSpecialHolidayMinHrsToCompOT(item.minHrsToCompOTSpecial ?? '');
-    setSpecialHoliday2MinHrsToCompOT(item.minHrsToCompOTSpecial2 ?? '');
-    setDoubleLegalHolidayMinHrsToCompOT(item.minHrsToCompOTDoubleLegal ?? '');
-    setNonWorkingHolidayMinHrsToCompOT(item.minHrsToCompOTNWH ?? '');
+    setRegDayMinHrsToCompOT(item.minHrsToCompOTRegDay ?? "");
+    setRestDayMinHrsToCompOT(item.minHrsToCompOTRestDay ?? "");
+    setLegalHolidayMinHrsToCompOT(item.minHrsToCompOTLegal ?? "");
+    setSpecialHolidayMinHrsToCompOT(item.minHrsToCompOTSpecial ?? "");
+    setSpecialHoliday2MinHrsToCompOT(item.minHrsToCompOTSpecial2 ?? "");
+    setDoubleLegalHolidayMinHrsToCompOT(item.minHrsToCompOTDoubleLegal ?? "");
+    setNonWorkingHolidayMinHrsToCompOT(item.minHrsToCompOTNWH ?? "");
 
-    setRestDayToBeComputedAsOtherRate(item.spRDDay ?? '');
-    setRestDayOtherRate(item.spRDDayOT ?? '');
-    setIsOverTimeCutoffFlag(item.otCutOffFlag ?? false)
-    setOverTimeCode(item.otCutOffOTCode ?? '');
-    setRequiredHours(item.otCutOffHours ?? '');
-    setOverTimeCodeFor2ShiftsDay(item.otCode2ShiftsInADay?? '');
-    setOTRoundingToTheNearestHourMin(item.roundOfftHourMin ?? '')
-    setBirthdayPay(item.birthDayPayOT ?? '');
-    setNDBasicRoundingToTheNearestHourMin(item.roundOffNDBasicHourMin ?? '');
+    setRestDayToBeComputedAsOtherRate(item.spRDDay ?? "");
+    setRestDayOtherRate(item.spRDDayOT ?? "");
+    setIsOverTimeCutoffFlag(item.otCutOffFlag ?? false);
+    setOverTimeCode(item.otCutOffOTCode ?? "");
+    setRequiredHours(item.otCutOffHours ?? "");
+    setOverTimeCodeFor2ShiftsDay(item.otCode2ShiftsInADay ?? "");
+    setOTRoundingToTheNearestHourMin(item.roundOfftHourMin ?? "");
+    setBirthdayPay(item.birthDayPayOT ?? "");
+    setNDBasicRoundingToTheNearestHourMin(item.roundOffNDBasicHourMin ?? "");
     setUseOverTimeAuthorization(item.useOTAuthorization ?? false);
     setIsSpecialOTCompFlag(item.useDayType2 ?? false);
     setIsHolPayLegalFlag(item.holidayPayLegal ?? false);
     setIsHolPaySpecialFlag(item.holidayPaySpecial ?? false);
     setCompHolPayForMonth(item.compHolPayMonth ?? false);
-    setCompHolPayIfWorkBeforeHolidayRestDay(item.compHolPayIfWorkBeforeHolidayRestDay ?? false);
-    setCompHolPayIfWorkBeforeHolidayLegalHoliday(item.compHolPayIfWorkBeforeHolidayLegalHoliday ?? false);
-    setCompHolPayIfWorkBeforeHolidaySpecialHoliday(item.compHolPayIfWorkBeforeHolidaySpecialHoliday ?? false);
+    setCompHolPayIfWorkBeforeHolidayRestDay(
+      item.compHolPayIfWorkBeforeHolidayRestDay ?? false,
+    );
+    setCompHolPayIfWorkBeforeHolidayLegalHoliday(
+      item.compHolPayIfWorkBeforeHolidayLegalHoliday ?? false,
+    );
+    setCompHolPayIfWorkBeforeHolidaySpecialHoliday(
+      item.compHolPayIfWorkBeforeHolidaySpecialHoliday ?? false,
+    );
     setNoPayIfAbsentBeforeHoliday(item.noPayIfAbsentBeforeHoliday ?? false);
     setNoPayIfAbsentAfterHoliday(item.noPayIfAbsentAfterHoliday ?? false);
-    setCompHolidayWithPaidLeave(item.compHolidayWithPaidLeave ?? false );
-    setMinimumNoOfHrsRequiredToCompHol(item.minimumNoOfHrsRequiredToCompHol ?? '')
+    setCompHolidayWithPaidLeave(item.compHolidayWithPaidLeave ?? false);
+    setMinimumNoOfHrsRequiredToCompHol(
+      item.minimumNoOfHrsRequiredToCompHol ?? "",
+    );
     setCompFirstRestdayHoliday(item.compFirstRestdayHoliday ?? false);
   };
-  
-
 
   const fetchOTBreakData = async (): Promise<OTBreakItem[]> => {
     const response = await apiClient.get(
-      "/Fs/Process/TimeKeepGroup/GroupOTBreak"
+      "/Fs/Process/TimeKeepGroup/GroupOTBreak",
     );
 
-    return response.data.map((item: any): OTBreakItem => ({
-      id: item.id,
-      regDay: item.regDay,
-      restDay: item.restDay,
-      legalHoliday: item.lHoliday,
-      specialHoliday: item.sHoliday,
-      legalHolidayRest: item.lHolidayRest,
-      specialHolidayRest: item.sHolidayRest,
-      groupCode: item.groupCode,
-      doubleHoliday: item.doubleHoliday,
-      doubleHolidayRest: item.doubleHolidayRest,
-      specialHoliday2: item.s2Holiday,
-      specialHoliday2Rest: item.s2HolidayRest,
-      nonWorkingHoliday: item.nonWorkHoliday,
-      nonWorkingHolidayRest: item.nonWorkHolidayRest,
-    }));
+    return response.data.map(
+      (item: any): OTBreakItem => ({
+        id: item.id,
+        regDay: item.regDay,
+        restDay: item.restDay,
+        legalHoliday: item.lHoliday,
+        specialHoliday: item.sHoliday,
+        legalHolidayRest: item.lHolidayRest,
+        specialHolidayRest: item.sHolidayRest,
+        groupCode: item.groupCode,
+        doubleHoliday: item.doubleHoliday,
+        doubleHolidayRest: item.doubleHolidayRest,
+        specialHoliday2: item.s2Holiday,
+        specialHoliday2Rest: item.s2HolidayRest,
+        nonWorkingHoliday: item.nonWorkHoliday,
+        nonWorkingHolidayRest: item.nonWorkHolidayRest,
+      }),
+    );
   };
 
   useEffect(() => {
@@ -1164,7 +1706,6 @@ export function TimeKeepGroupPage() {
     loadOTBreakData();
   }, []);
 
-  // Generic fetch function
   const fetchEquivDayData = async (
     endpoint: string,
   ): Promise<EquivDayItem[]> => {
@@ -1214,13 +1755,11 @@ export function TimeKeepGroupPage() {
     loadData();
   }, []);
 
-
-  
-
   const populateFromGroup = (firstGroup: GroupItem) => {
-    setTksGroupCode(firstGroup.tksGroupCode ?? "");
+    setCurrentGroupId(firstGroup.id);
+    setTksGroupCode(firstGroup.groupCode);
     setTksGroupDescription(firstGroup.description ?? "");
-    setPayrollLocationCode(firstGroup.tksGroupCode ?? "");
+    setPayrollLocationCode(firstGroup.groupCode);
     setPayrollDescription(firstGroup.description ?? "");
     setDateFrom(formatApiDate(firstGroup.cutOffDateFrom) ?? "");
     setDateTo(formatApiDate(firstGroup.cutOffDateTo) ?? "");
@@ -1232,18 +1771,18 @@ export function TimeKeepGroupPage() {
     setAutoPairingTo(formatApiDate(firstGroup.autoPairLogsDateTo) ?? "");
   };
 
+  const loadTKSGroup = async () => {
+    const items = await fetchTKSGroupData();
+    setTKSGroupItems(items); // TKSGroup items
+    setSupervisoryGroupsList(items); // Supervisory Groups
+    if (items.length > 0) {
+      populateFromGroup(items[0]); // Populate form with first item
+    }
+  };
+
   useEffect(() => {
-    const loadTKSGroup = async () => {
-      const items = await fetchTKSGroupData();
-      setTKSGroupItems(items); // Set TKSGroup items to state
-      setSupervisoryGroupsList(items); // Set Supervisory Groups
-      if (items.length > 0) {
-        populateFromGroup(items[0]);
-      }
-    };
     loadTKSGroup();
   }, []);
-
 
   const formatTimeTo12Hour = (isoString: string | null): string => {
     if (!isoString) return "";
@@ -1276,13 +1815,21 @@ export function TimeKeepGroupPage() {
     setDeductMealBreakND(item.deductMealBreakinNDComput ?? false);
     setTwoShiftsInDay(item.twoShiftsInADay ?? false);
     setHoursIntervalTwoShifts(item.twoShiftsInADayInterval?.toString() ?? "");
-    setAllowableGracePeriodMonth(item.numberAllowGracePrdInAMonth?.toString() ?? "",);
+    setAllowableGracePeriodMonth(
+      item.numberAllowGracePrdInAMonth?.toString() ?? "",
+    );
     setExcludeAllowableGraceBracket(item.excludeAllowGracePrdFlag ?? false);
-    setAllowableGraceActualMonth(item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,);
+    setAllowableGraceActualMonth(
+      item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
+    );
     setConsiderSaturdayPaid(item.saturdayPdRegHrsFlag ?? false);
     setMaxDaysPerWeekSaturday(item.maxDaysPerWeekSatWrk?.toString() ?? "");
-    setAllowableTardyExcess(item.numberAllowTardyExcessGracePrd?.toString() ?? "",);
-    setExcludeTardinessInGrace(item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,);
+    setAllowableTardyExcess(
+      item.numberAllowTardyExcessGracePrd?.toString() ?? "",
+    );
+    setExcludeTardinessInGrace(
+      item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,
+    );
     setSupervisoryGroupCode(item.supGroupCode ?? "");
     setApplyOccurancesBreak(item.computeShrtBrkTardy ?? false);
     setMaxOccurancesNoDeduction(item.maxTimePerMonth?.toString() ?? "");
@@ -1325,8 +1872,10 @@ export function TimeKeepGroupPage() {
         deductMealBreakinNDComput: item.deductMealBreakinNDComput ?? false,
         incRestdayinNDComput: item.incRestdayinNDComput ?? false,
         incHolidayinNDComput: item.incHolidayinNDComput ?? false,
-        restdayNDComputBasedOnDateIn: item.restdayNDComputBasedOnDateIn ?? false,
-        holidayNDComputbasedOnDateIn: item.holidayNDComputbasedOnDateIn ?? false,
+        restdayNDComputBasedOnDateIn:
+          item.restdayNDComputBasedOnDateIn ?? false,
+        holidayNDComputbasedOnDateIn:
+          item.holidayNDComputbasedOnDateIn ?? false,
         tardinessMaxHours: item.tardinessMaxHours ?? null,
         undertimeMaxHours: item.undertimeMaxHours ?? null,
         undertimeHoursFromTardy: item.undertimeHoursFromTardy ?? null,
@@ -1358,9 +1907,13 @@ export function TimeKeepGroupPage() {
         maxDaysPerWeekSatWrk: item.maxDaysPerWeekSatWrk ?? null,
         saturdayPdRegHrsFlag: item.saturdayPdRegHrsFlag ?? false,
         excludeAllowGracePrdFlag: item.excludeAllowGracePrdFlag ?? false,
-        allowableGracePrdInAMonthBasedActualMonthFlag: item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
-        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag: item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,
-        numberAllowTardyExcessGracePrd: item.numberAllowTardyExcessGracePrd ?? null,
+        allowableGracePrdInAMonthBasedActualMonthFlag:
+          item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
+        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag:
+          item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ??
+          false,
+        numberAllowTardyExcessGracePrd:
+          item.numberAllowTardyExcessGracePrd ?? null,
         supGroupCode: item.supGroupCode ?? "",
       }));
 
@@ -1385,8 +1938,6 @@ export function TimeKeepGroupPage() {
     };
     loadGroupLoginSetupPolicy();
   }, []);
-
-
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -1573,6 +2124,48 @@ export function TimeKeepGroupPage() {
     setActiveTab("definition");
   };
 
+  const handleGroupRowClick = async (item: GroupItem | null) => {
+    if (!item) return;
+
+    const groupCode = item.groupCode;
+    setCurrentGroupId(item.id);
+    setTksGroupCode(item.groupCode);
+    setTksGroupDescription(item.description);
+    setPayrollDescription(item.description);
+    setPayrollLocationCode(item.groupCode);
+    setcutOffPeriod(item.cutOffDatePeriod);
+    setTerminalId(item.terminalID ?? "");
+
+    const monthIndex = parseInt(item.cutOffDateMonth, 10) - 1;
+    setCutOffMonth(months[monthIndex] || "");
+
+    const latestPolicy = (await fetchGroupSetupLoginPolicyData(
+      item.groupCode,
+    )) as LoginPolicyItem;
+    if (latestPolicy) populateFromGroupSetupLoginPolicy(latestPolicy);
+
+    const allOTRates = await fetchOverTimeRates();
+    const groupOTRates = allOTRates.find((r) => r.groupCode === item.groupCode);
+    if (groupOTRates) populateFromOTRates(groupOTRates);
+
+    const allOTBreaks = await fetchOTBreakData();
+    const groupOTBreak = allOTBreaks.find(
+      (b) => b.groupCode === item.groupCode,
+    );
+    if (groupOTBreak) populateFromOTBreak(groupOTBreak);
+
+    const allowances = await fetchOTAllowancesData(groupCode);
+    setOTAllowancesList(allowances);
+
+    const systemConfigs = await fetchGroupSystemConfig();
+    const groupSystemConfig = systemConfigs.find(
+      (s) => s.groupCode === groupCode,
+    );
+    if (groupSystemConfig) populateSystemConfigStates(groupSystemConfig);
+
+    setShowTksGroupModal(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Main Content */}
@@ -1655,19 +2248,6 @@ export function TimeKeepGroupPage() {
                   </button>
                   <button
                     onClick={() => {
-                      setSnapshot({
-                        payrollLocationCode,
-                        payrollDescription,
-                        tksGroupCode,
-                        tksGroupDescription,
-                        dateFrom,
-                        dateTo,
-                        cutOffMonth,
-                        cutOffPeriod,
-                        terminalId,
-                        autoPairingFrom,
-                        autoPairingTo,
-                      });
                       setIsEditMode(true);
                     }}
                     className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm"
@@ -1690,9 +2270,26 @@ export function TimeKeepGroupPage() {
               ) : (
                 <>
                   <button
-                    onClick={() => {
-                      // Save logic would go here
+                    onClick={async () => {
+                      handleSaveGroupSetUpDefinition();
+                      handleSaveLoginPolicy();
+                      handleSaveOTRates();
+                      handleSaveOTBreak();
+                      handleSaveOTAllowances();
                       setIsEditMode(false);
+
+                      const codeToUse = tksGroupCode || "1";
+                      if (!tksGroupCode) {
+                        setTksGroupCode("1");
+                      }
+
+                      const item = tksGroupItems.find(
+                        (i) => i.groupCode === codeToUse,
+                      );
+
+                      if (item) {
+                        await handleGroupRowClick(item);
+                      }
                     }}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                   >
@@ -1700,25 +2297,22 @@ export function TimeKeepGroupPage() {
                     Save
                   </button>
                   <button
-                    onClick={() => {
-                      // Restore all values from snapshot
-                      setPayrollLocationCode(
-                        snapshot.payrollLocationCode ?? "",
-                      );
-                      setPayrollDescription(snapshot.payrollDescription ?? "");
-                      setTksGroupCode(snapshot.tksGroupCode ?? "");
-                      setTksGroupDescription(
-                        snapshot.tksGroupDescription ?? "",
-                      );
-                      setDateFrom(snapshot.dateFrom ?? "");
-                      setDateTo(snapshot.dateTo ?? "");
-                      setCutOffMonth(snapshot.cutOffMonth ?? "");
-                      setcutOffPeriod(snapshot.cutOffPeriod ?? "");
-                      setTerminalId(snapshot.terminalId ?? "");
-                      setAutoPairingFrom(snapshot.autoPairingFrom ?? "");
-                      setAutoPairingTo(snapshot.autoPairingTo ?? "");
+                    onClick={async () => {
                       setIsEditMode(false);
                       setIsCreateNew(false);
+                      const codeToUse = tksGroupCode || "1";
+
+                      if (!tksGroupCode) {
+                        setTksGroupCode("1");
+                      }
+
+                      const item = tksGroupItems.find(
+                        (i) => i.groupCode === codeToUse,
+                      );
+
+                      if (item) {
+                        await handleGroupRowClick(item);
+                      }
                     }}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
                   >
@@ -1961,7 +2555,6 @@ export function TimeKeepGroupPage() {
                                               selectedCutOffRows.includes(
                                                 item.id.toString(),
                                               ),
-                                              
                                           )
                                         }
                                         onChange={(e) => {
@@ -1991,11 +2584,18 @@ export function TimeKeepGroupPage() {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                  {filteredCutOffData.map(
-                                    (item: GroupItem, index: number) => (
+                                  {filteredCutOffData
+                                    .filter(
+                                      (item) => item.groupCode !== tksGroupCode,
+                                    ) // exclude current group
+                                    .map((item: GroupItem, index: number) => (
                                       <tr
                                         key={item.id}
-                                        className={`hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                                        className={`hover:bg-gray-50 ${
+                                          index % 2 === 0
+                                            ? "bg-white"
+                                            : "bg-gray-50"
+                                        }`}
                                       >
                                         <td className="px-4 py-2">
                                           <input
@@ -2023,16 +2623,17 @@ export function TimeKeepGroupPage() {
                                           />
                                         </td>
                                         <td className="px-4 py-2 text-sm text-gray-900">
-                                          {item.tksGroupCode}
+                                          {item.groupCode}
                                         </td>
                                         <td className="px-4 py-2 text-sm text-gray-600">
                                           {item.description}
                                         </td>
                                       </tr>
-                                    ),
-                                  )}
+                                    ))}
 
-                                  {filteredCutOffData.length === 0 && (
+                                  {filteredCutOffData.filter(
+                                    (item) => item.groupCode !== tksGroupCode,
+                                  ).length === 0 && (
                                     <tr>
                                       <td
                                         colSpan={3}
@@ -2230,8 +2831,11 @@ export function TimeKeepGroupPage() {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                  {autoPairingPaginatedData.map(
-                                    (item: GroupItem, index: number) => (
+                                  {autoPairingPaginatedData
+                                    .filter(
+                                      (item) => item.groupCode !== tksGroupCode,
+                                    ) // exclude current group
+                                    .map((item: GroupItem, index: number) => (
                                       <tr
                                         key={item.id}
                                         className={`hover:bg-gray-50 ${
@@ -2267,16 +2871,17 @@ export function TimeKeepGroupPage() {
                                           />
                                         </td>
                                         <td className="px-4 py-2 text-sm text-gray-900">
-                                          {item.tksGroupCode}
+                                          {item.groupCode}
                                         </td>
                                         <td className="px-4 py-2 text-sm text-gray-600">
                                           {item.description}
                                         </td>
                                       </tr>
-                                    ),
-                                  )}
+                                    ))}
 
-                                  {autoPairingPaginatedData.length === 0 && (
+                                  {autoPairingPaginatedData.filter(
+                                    (item) => item.groupCode !== tksGroupCode,
+                                  ).length === 0 && (
                                     <tr>
                                       <td
                                         colSpan={3}
@@ -2418,8 +3023,8 @@ export function TimeKeepGroupPage() {
                       <input
                         type="checkbox"
                         checked={gracePeriodSemiAnnual}
-                        onChange={(e) => { 
-                          setGracePeriodSemiAnnual(e.target.checked)
+                        onChange={(e) => {
+                          setGracePeriodSemiAnnual(e.target.checked);
                           uncheckedGracePeriodSemiAnnual();
                         }}
                         disabled={!isEditMode}
@@ -3040,14 +3645,16 @@ export function TimeKeepGroupPage() {
                       />
                       {isEditMode && (
                         <>
-                          <button 
+                          <button
                             onClick={() => setShowForNoBreak2OutModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
                             <Search className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => setForNoBreak2Out("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          >
                             <X className="w-4 h-4" />
                           </button>
                         </>
@@ -3096,13 +3703,16 @@ export function TimeKeepGroupPage() {
                       />
                       {isEditMode && (
                         <>
-                          <button className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            onClick={() => setShowForNoBreak2InModal(true)}>
+                          <button
+                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            onClick={() => setShowForNoBreak2InModal(true)}
+                          >
                             <Search className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => setForNoBreak2In("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          >
                             <X className="w-4 h-4" />
                           </button>
                         </>
@@ -3157,7 +3767,6 @@ export function TimeKeepGroupPage() {
                 setIsEditOTRatesFor2Shifts={setIsEditOTRatesFor2Shifts}
                 isEditBirthDayPay={isEditBirthDayPay}
                 setIsEditBirthDayPay={setIsEditBirthDayPay}
-
                 regularDayOT={regularDayOT}
                 setRegularDayOT={setRegularDayOT}
                 restDayOT={restDayOT}
@@ -3172,7 +3781,6 @@ export function TimeKeepGroupPage() {
                 setSpecialHolidayOT2={setSpecialHolidayOT2}
                 nonWorkingHolidayOT={nonWorkingHolidayOT}
                 setNonWorkingHolidayOT={setNonWorkingHolidayOT}
-
                 regularDayOTLateFiling={regularDayOTLateFiling}
                 setRegularDayOTLateFiling={setRegularDayOTLateFiling}
                 restDayOTLateFiling={restDayOTLateFiling}
@@ -3182,12 +3790,15 @@ export function TimeKeepGroupPage() {
                 specialHolidayOTLateFiling={specialHolidayOTLateFiling}
                 setSpecialHolidayOTLateFiling={setSpecialHolidayOTLateFiling}
                 doubleLegalHolidayOTLateFiling={doubleLegalHolidayOTLateFiling}
-                setDoubleLegalHolidayOTLateFiling={setDoubleLegalHolidayOTLateFiling}
+                setDoubleLegalHolidayOTLateFiling={
+                  setDoubleLegalHolidayOTLateFiling
+                }
                 specialHoliday2OTLateFiling={specialHoliday2OTLateFiling}
                 setSpecialHoliday2OTLateFiling={setSpecialHoliday2OTLateFiling}
                 nonWorkingHolidayOTLateFiling={nonWorkingHolidayOTLateFiling}
-                setNonWorkingHolidayOTLateFiling={setNonWorkingHolidayOTLateFiling}
-
+                setNonWorkingHolidayOTLateFiling={
+                  setNonWorkingHolidayOTLateFiling
+                }
                 regDayMinHrsToCompOT={regDayMinHrsToCompOT}
                 setRegDayMinHrsToCompOT={setRegDayMinHrsToCompOT}
                 restDayMinHrsToCompOT={restDayMinHrsToCompOT}
@@ -3195,19 +3806,29 @@ export function TimeKeepGroupPage() {
                 legalHolidayMinHrsToCompOT={legalHolidayMinHrsToCompOT}
                 setLegalHolidayMinHrsToCompOT={setLegalHolidayMinHrsToCompOT}
                 specialHolidayMinHrsToCompOT={specialHolidayMinHrsToCompOT}
-                setSpecialHolidayMinHrsToCompOT={setSpecialHolidayMinHrsToCompOT}
+                setSpecialHolidayMinHrsToCompOT={
+                  setSpecialHolidayMinHrsToCompOT
+                }
                 specialHoliday2MinHrsToCompOT={specialHoliday2MinHrsToCompOT}
-                setSpecialHoliday2MinHrsToCompOT={setSpecialHoliday2MinHrsToCompOT}
-                doubleLegalHolidayMinHrsToCompOT={doubleLegalHolidayMinHrsToCompOT}
-                setDoubleLegalHolidayMinHrsToCompOT={setDoubleLegalHolidayMinHrsToCompOT}
-                nonWorkingHolidayMinHrsToCompOT={nonWorkingHolidayMinHrsToCompOT}
-                setNonWorkingHolidayMinHrsToCompOT={setNonWorkingHolidayMinHrsToCompOT}
-
+                setSpecialHoliday2MinHrsToCompOT={
+                  setSpecialHoliday2MinHrsToCompOT
+                }
+                doubleLegalHolidayMinHrsToCompOT={
+                  doubleLegalHolidayMinHrsToCompOT
+                }
+                setDoubleLegalHolidayMinHrsToCompOT={
+                  setDoubleLegalHolidayMinHrsToCompOT
+                }
+                nonWorkingHolidayMinHrsToCompOT={
+                  nonWorkingHolidayMinHrsToCompOT
+                }
+                setNonWorkingHolidayMinHrsToCompOT={
+                  setNonWorkingHolidayMinHrsToCompOT
+                }
                 otBreakMinHours={otBreakMinHours}
                 setOtBreakMinHours={setOtBreakMinHours}
                 oTBreakNoOfHrsDed={oTBreakNoOfHrsDed}
                 setOTBreakNoOfHrsDed={setOTBreakNoOfHrsDed}
-
                 oTBreakAppliesToRegDay={oTBreakAppliesToRegDay}
                 setOTBreakAppliesToRegDay={setOTBreakAppliesToRegDay}
                 oTBreakAppliesToLegHol={oTBreakAppliesToLegHol}
@@ -3215,7 +3836,9 @@ export function TimeKeepGroupPage() {
                 oTBreakAppliesToSHol={oTBreakAppliesToSHol}
                 setOTBreakAppliesToSHol={setOTBreakAppliesToSHol}
                 oTBreakAppliesToDoubleLegHol={oTBreakAppliesToDoubleLegHol}
-                setOTBreakAppliesToDoubleLegHol={setOTBreakAppliesToDoubleLegHol}
+                setOTBreakAppliesToDoubleLegHol={
+                  setOTBreakAppliesToDoubleLegHol
+                }
                 oTBreakAppliesToS2Hol={oTBreakAppliesToS2Hol}
                 setOTBreakAppliesToS2Hol={setOTBreakAppliesToS2Hol}
                 oTBreakAppliesToNonWorkHol={oTBreakAppliesToNonWorkHol}
@@ -3226,13 +3849,16 @@ export function TimeKeepGroupPage() {
                 setOTBreakAppliesToLegHolRest={setOTBreakAppliesToLegHolRest}
                 oTBreakAppliesToSHolRest={oTBreakAppliesToSHolRest}
                 setOTBreakAppliesToSHolRest={setOTBreakAppliesToSHolRest}
-                oTBreakAppliesToDoubleLegHolRest={oTBreakAppliesToDoubleLegHolRest}
-                setOTBreakAppliesToDoubleLegHolRest={setOTBreakAppliesToDoubleLegHolRest}
+                oTBreakAppliesToDoubleLegHolRest={
+                  oTBreakAppliesToDoubleLegHolRest
+                }
+                setOTBreakAppliesToDoubleLegHolRest={
+                  setOTBreakAppliesToDoubleLegHolRest
+                }
                 oTBreakAppliesToS2HolRest={oTBreakAppliesToS2HolRest}
                 setOTBreakAppliesToS2HolRest={setOTBreakAppliesToS2HolRest}
                 oTBreakAppliesToNonWorkRest={oTBreakAppliesToNonWorkRest}
                 setOTBreakAppliesToNonWorkRest={setOTBreakAppliesToNonWorkRest}
-
                 useOTPremiumBreakDwn={useOTPremium}
                 setOTPremiumBreakDwn={setUseOTPremium}
                 useActualDayType={useActualDayType}
@@ -3245,13 +3871,18 @@ export function TimeKeepGroupPage() {
                 setComputeOTForBreak2={setComputeOTForBreak2}
                 enable24HourOT={enable24HourOT}
                 setEnable24HourOT={setEnable24HourOT}
-                includeUnworkedHolidayInRegular={includeUnworkedHolidayInRegular}
-                setIncludeUnworkedHolidayInRegular={setIncludeUnworkedHolidayInRegular}
+                includeUnworkedHolidayInRegular={
+                  includeUnworkedHolidayInRegular
+                }
+                setIncludeUnworkedHolidayInRegular={
+                  setIncludeUnworkedHolidayInRegular
+                }
                 sundayOTIfWorkedSaturday={sundayOTIfWorkedSaturday}
                 setSundayOTIfWorkedSaturday={setSundayOTIfWorkedSaturday}
-
                 restDayToBeComputedAsOtherRate={restDayToBeComputedAsOtherRate}
-                setRestDayToBeComputedAsOtherRate={setRestDayToBeComputedAsOtherRate}
+                setRestDayToBeComputedAsOtherRate={
+                  setRestDayToBeComputedAsOtherRate
+                }
                 restDayOtherRate={restDayOtherRate}
                 setRestDayOtherRate={setRestDayOtherRate}
                 isOverTimeCutOffFlag={isOverTimeCutOffFlag}
@@ -3263,11 +3894,17 @@ export function TimeKeepGroupPage() {
                 overTimeCodeFor2ShiftsDay={overTimeCodeFor2ShiftsDay}
                 setOverTimeCodeFor2ShiftsDay={setOverTimeCodeFor2ShiftsDay}
                 oTRoundingToTheNearestHourMin={oTRoundingToTheNearestHourMin}
-                setOTRoundingToTheNearestHourMin={setOTRoundingToTheNearestHourMin}
+                setOTRoundingToTheNearestHourMin={
+                  setOTRoundingToTheNearestHourMin
+                }
                 birthdayPay={birthdayPay}
                 setBirthdayPay={setBirthdayPay}
-                nDBasicRoundingToTheNearestHourMin={nDBasicRoundingToTheNearestHourMin}
-                setNDBasicRoundingToTheNearestHourMin={setNDBasicRoundingToTheNearestHourMin}
+                nDBasicRoundingToTheNearestHourMin={
+                  nDBasicRoundingToTheNearestHourMin
+                }
+                setNDBasicRoundingToTheNearestHourMin={
+                  setNDBasicRoundingToTheNearestHourMin
+                }
                 useOverTimeAuthorization={useOverTimeAuthorization}
                 setUseOverTimeAuthorization={setUseOverTimeAuthorization}
                 isSpecialOTCompFlag={isSpecialOTCompFlag}
@@ -3278,23 +3915,38 @@ export function TimeKeepGroupPage() {
                 setIsHolPaySpecialFlag={setIsHolPaySpecialFlag}
                 compHolPayForMonth={compHolPayForMonth}
                 setCompHolPayForMonth={setCompHolPayForMonth}
-                compHolPayIfWorkBeforeHolidayRestDay={compHolPayIfWorkBeforeHolidayRestDay}
-                setCompHolPayIfWorkBeforeHolidayRestDay={setCompHolPayIfWorkBeforeHolidayRestDay}
-                compHolPayIfWorkBeforeHolidayLegalHoliday={compHolPayIfWorkBeforeHolidayLegalHoliday}
-                setCompHolPayIfWorkBeforeHolidayLegalHoliday={setCompHolPayIfWorkBeforeHolidayLegalHoliday}
-                compHolPayIfWorkBeforeHolidaySpecialHoliday={compHolPayIfWorkBeforeHolidaySpecialHoliday}
-                setCompHolPayIfWorkBeforeHolidaySpecialHoliday={setCompHolPayIfWorkBeforeHolidaySpecialHoliday}
+                compHolPayIfWorkBeforeHolidayRestDay={
+                  compHolPayIfWorkBeforeHolidayRestDay
+                }
+                setCompHolPayIfWorkBeforeHolidayRestDay={
+                  setCompHolPayIfWorkBeforeHolidayRestDay
+                }
+                compHolPayIfWorkBeforeHolidayLegalHoliday={
+                  compHolPayIfWorkBeforeHolidayLegalHoliday
+                }
+                setCompHolPayIfWorkBeforeHolidayLegalHoliday={
+                  setCompHolPayIfWorkBeforeHolidayLegalHoliday
+                }
+                compHolPayIfWorkBeforeHolidaySpecialHoliday={
+                  compHolPayIfWorkBeforeHolidaySpecialHoliday
+                }
+                setCompHolPayIfWorkBeforeHolidaySpecialHoliday={
+                  setCompHolPayIfWorkBeforeHolidaySpecialHoliday
+                }
                 noPayIfAbsentBeforeHoliday={noPayIfAbsentBeforeHoliday}
                 setNoPayIfAbsentBeforeHoliday={setNoPayIfAbsentBeforeHoliday}
                 noPayIfAbsentAfterHoliday={noPayIfAbsentAfterHoliday}
                 setNoPayIfAbsentAfterHoliday={setNoPayIfAbsentAfterHoliday}
                 compHolidayWithPaidLeave={compHolidayWithPaidLeave}
                 setCompHolidayWithPaidLeave={setCompHolidayWithPaidLeave}
-                minimumNoOfHrsRequiredToCompHol={minimumNoOfHrsRequiredToCompHol}
-                setMinimumNoOfHrsRequiredToCompHol={setMinimumNoOfHrsRequiredToCompHol}
+                minimumNoOfHrsRequiredToCompHol={
+                  minimumNoOfHrsRequiredToCompHol
+                }
+                setMinimumNoOfHrsRequiredToCompHol={
+                  setMinimumNoOfHrsRequiredToCompHol
+                }
                 compFirstRestdayHoliday={compFirstRestdayHoliday}
                 setCompFirstRestdayHoliday={setCompFirstRestdayHoliday}
-
                 minimumOTHours={minOTHrs}
                 setMinimumOTHours={setMinOTHrs}
                 accumOTHrsToEarnMealAllow={accumOTHrsToEarnMealAllow}
@@ -3372,7 +4024,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="number"
                       value={minIgnoreMultipleBreak}
-                      onChange={(e) => setMinIgnoreMultipleBreak(e.target.value)}
+                      onChange={(e) =>
+                        setMinIgnoreMultipleBreak(e.target.value)
+                      }
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -3399,7 +4053,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={minBeforeMidnightShift}
-                      onChange={(e) => setMinBeforeMidnightShift(e.target.value)}
+                      onChange={(e) =>
+                        setMinBeforeMidnightShift(e.target.value)
+                      }
                       readOnly={!isEditMode}
                       className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                     />
@@ -3440,14 +4096,28 @@ export function TimeKeepGroupPage() {
                     <label className="text-gray-700 text-sm">
                       Device Policy :
                     </label>
-                    <input
-                      type="text"
+
+                    <select
                       value={devicePolicy}
                       onChange={(e) => setDevicePolicy(e.target.value)}
-                      readOnly={!isEditMode}
-                      className={`w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
+                      disabled={!isEditMode}
+                      className={`w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                        !isEditMode ? "bg-gray-50" : ""
+                      }`}
+                    >
+                      <option value="">-- Select Device --</option>
+
+                      {Array.from({ length: 10 }, (_, i) => {
+                        const device = `Device${i + 1}`;
+                        return (
+                          <option key={device} value={device}>
+                            {device}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
+
                   <ul className="ml-6 space-y-1">
                     <li className="text-green-600 text-sm">
                       • Leave blank if you want the default pairing of logs.
@@ -3624,28 +4294,10 @@ export function TimeKeepGroupPage() {
                           className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
                             index % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }`}
-                          onClick={async () => {
-                            setTksGroupCode(item.tksGroupCode);
-                            setTksGroupDescription(item.description);
-                            setPayrollDescription(item.description);
-                            setPayrollLocationCode(item.tksGroupCode);
-                            setcutOffPeriod(item.cutOffDatePeriod);
-                            const monthIndex =
-                              parseInt(item.cutOffDateMonth, 10) - 1;
-                            setCutOffMonth(months[monthIndex] || "");
-
-                            const latestPolicy =
-                              (await fetchGroupSetupLoginPolicyData(
-                                item.tksGroupCode,
-                              )) as LoginPolicyItem;
-                            if (latestPolicy)
-                              populateFromGroupSetupLoginPolicy(latestPolicy);
-
-                            setShowTksGroupModal(false);
-                          }}
+                          onClick={() => handleGroupRowClick(item)}
                         >
                           <td className="py-2 text-gray-800">
-                            {item.tksGroupCode}
+                            {item.groupCode}
                           </td>
                           <td className="py-2 text-gray-800">
                             {item.description}
@@ -3760,7 +4412,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={payrollLocationSearchTerm}
-                      onChange={(e) => setPayrollLocationSearchTerm(e.target.value)}
+                      onChange={(e) =>
+                        setPayrollLocationSearchTerm(e.target.value)
+                      }
                       className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Search by code or description..."
                     />
@@ -3815,15 +4469,23 @@ export function TimeKeepGroupPage() {
                 <div className="flex items-center justify-between mt-3 px-6 pb-4">
                   <div className="text-gray-600 text-xs">
                     Showing{" "}
-                    {filteredPayrollLocations.length === 0 ? 0 : startPayrollLocationsIndex + 1} to{" "}
-                    {Math.min(endPayrollLocationsIndex, filteredPayrollLocations.length)} of{" "}
-                    {filteredPayrollLocations.length} entries
+                    {filteredPayrollLocations.length === 0
+                      ? 0
+                      : startPayrollLocationsIndex + 1}{" "}
+                    to{" "}
+                    {Math.min(
+                      endPayrollLocationsIndex,
+                      filteredPayrollLocations.length,
+                    )}{" "}
+                    of {filteredPayrollLocations.length} entries
                   </div>
 
                   <div className="flex gap-1">
                     <button
                       onClick={() =>
-                        setCurrentPayrollLocationsPage((prev) => Math.max(prev - 1, 1))
+                        setCurrentPayrollLocationsPage((prev) =>
+                          Math.max(prev - 1, 1),
+                        )
                       }
                       disabled={currentPayrollLocationsPage === 1}
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
@@ -3842,7 +4504,9 @@ export function TimeKeepGroupPage() {
                       ) : (
                         <button
                           key={page}
-                          onClick={() => setCurrentPayrollLocationsPage(page as number)}
+                          onClick={() =>
+                            setCurrentPayrollLocationsPage(page as number)
+                          }
                           className={`px-2 py-1 rounded text-xs ${
                             currentPayrollLocationsPage === page
                               ? "bg-blue-600 text-white"
@@ -3861,7 +4525,8 @@ export function TimeKeepGroupPage() {
                         )
                       }
                       disabled={
-                        currentPayrollLocationsPage === totalPayrollLocationsPages ||
+                        currentPayrollLocationsPage ===
+                          totalPayrollLocationsPages ||
                         totalPayrollLocationsPages === 0
                       }
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
@@ -4007,7 +4672,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayAbsent.length === 0
                       ? 0
                       : startEquivDayAbsentIndex + 1}{" "}
-                    to {Math.min(endEquivDayAbsentIndex, filteredEquivDayAbsent.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayAbsentIndex,
+                      filteredEquivDayAbsent.length,
+                    )}{" "}
                     of {filteredEquivDayAbsent.length} entries
                   </div>
 
@@ -4147,42 +4816,47 @@ export function TimeKeepGroupPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedEquivDayNoLogin.map((item, index) => (//dito yun
-                        <tr
-                          key={`${item.id}-${index}`}
-                          className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
-                          onClick={() => {
-                            setForNoLogin(item.code);
-                            setShowForNoLoginModal(false);
-                          }}
-                        >
-                          <td className="py-2 text-gray-800">{item.code}</td>
-                          <td className="py-2 text-gray-800">
-                            {item.description}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.monday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.tuesday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.wednesday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.thursday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.friday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.saturday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.sunday ?? 0).toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
+                      {paginatedEquivDayNoLogin.map(
+                        (
+                          item,
+                          index, //dito yun
+                        ) => (
+                          <tr
+                            key={`${item.id}-${index}`}
+                            className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
+                            onClick={() => {
+                              setForNoLogin(item.code);
+                              setShowForNoLoginModal(false);
+                            }}
+                          >
+                            <td className="py-2 text-gray-800">{item.code}</td>
+                            <td className="py-2 text-gray-800">
+                              {item.description}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.monday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.tuesday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.wednesday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.thursday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.friday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.saturday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.sunday ?? 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -4194,7 +4868,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoLogin.length === 0
                       ? 0
                       : startEquivDayNoLoginIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoLoginIndex, filteredEquivDayNoLogin.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoLoginIndex,
+                      filteredEquivDayNoLogin.length,
+                    )}{" "}
                     of {filteredEquivDayNoLogin.length} entries
                   </div>
 
@@ -4381,7 +5059,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoLogout.length === 0
                       ? 0
                       : startEquivDayNoLogoutIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoLogoutIndex, filteredEquivDayNoLogout.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoLogoutIndex,
+                      filteredEquivDayNoLogout.length,
+                    )}{" "}
                     of {filteredEquivDayNoLogout.length} entries
                   </div>
 
@@ -4473,7 +5155,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={forNoBreak2InSearchTerm}
-                      onChange={(e) => setForNoBreak2InSearchTerm(e.target.value)}
+                      onChange={(e) =>
+                        setForNoBreak2InSearchTerm(e.target.value)
+                      }
                       className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder=""
                     />
@@ -4568,7 +5252,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoBreak2In.length === 0
                       ? 0
                       : startEquivDayNoBreak2InIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoBreak2InIndex, filteredEquivDayNoBreak2In.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoBreak2InIndex,
+                      filteredEquivDayNoBreak2In.length,
+                    )}{" "}
                     of {filteredEquivDayNoBreak2In.length} entries
                   </div>
 
@@ -4596,7 +5284,9 @@ export function TimeKeepGroupPage() {
                       ) : (
                         <button
                           key={page}
-                          onClick={() => setCurrentEquivDayForNoBreak2InPage(page)}
+                          onClick={() =>
+                            setCurrentEquivDayForNoBreak2InPage(page)
+                          }
                           className={`px-2 py-1 rounded text-xs ${
                             currentEquivDayForNoBreak2InPage === page
                               ? "bg-blue-600 text-white"
@@ -4660,7 +5350,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={forNoBreak2OutSearchTerm}
-                      onChange={(e) => setForNoBreak2OutSearchTerm(e.target.value)}
+                      onChange={(e) =>
+                        setForNoBreak2OutSearchTerm(e.target.value)
+                      }
                       className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder=""
                     />
@@ -4755,7 +5447,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoBreak2Out.length === 0
                       ? 0
                       : startEquivDayNoBreak2OutIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoBreak2OutIndex, filteredEquivDayNoBreak2Out.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoBreak2OutIndex,
+                      filteredEquivDayNoBreak2Out.length,
+                    )}{" "}
                     of {filteredEquivDayNoBreak2Out.length} entries
                   </div>
 
@@ -4783,7 +5479,9 @@ export function TimeKeepGroupPage() {
                       ) : (
                         <button
                           key={page}
-                          onClick={() => setCurrentEquivDayForNoBreak2OutPage(page)}
+                          onClick={() =>
+                            setCurrentEquivDayForNoBreak2OutPage(page)
+                          }
                           className={`px-2 py-1 rounded text-xs ${
                             currentEquivDayForNoBreak2OutPage === page
                               ? "bg-blue-600 text-white"
@@ -4815,7 +5513,6 @@ export function TimeKeepGroupPage() {
               </div>
             </div>
           )}
-
 
           {/* Supervisory Group Search Modal */}
           {showSupervisoryGroupModal && (
@@ -4882,12 +5579,12 @@ export function TimeKeepGroupPage() {
                             index % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }`}
                           onClick={() => {
-                            setSupervisoryGroupCode(item.tksGroupCode);
+                            setSupervisoryGroupCode(item.groupCode);
                             setShowSupervisoryGroupModal(false);
                           }}
                         >
                           <td className="py-2 text-gray-800">
-                            {item.tksGroupCode}
+                            {item.groupCode}
                           </td>
                           <td className="py-2 text-gray-800">
                             {item.description}
@@ -5054,8 +5751,10 @@ export function TimeKeepGroupPage() {
                             if (isEditOTRates) {
                               setOverTimeCode(item.oTFileSetupCode);
                             } else if (isEditOTRatesFor2Shifts) {
-                              setOverTimeCodeFor2ShiftsDay(item.oTFileSetupCode);
-                            }  else if (isEditBirthDayPay) {
+                              setOverTimeCodeFor2ShiftsDay(
+                                item.oTFileSetupCode,
+                              );
+                            } else if (isEditBirthDayPay) {
                               setBirthdayPay(item.oTFileSetupCode);
                             } else {
                               setOtCodePerWeek(item.oTFileSetupCode);
@@ -5088,8 +5787,8 @@ export function TimeKeepGroupPage() {
                 <div className="flex items-center justify-between mt-3 px-6 pb-4">
                   <div className="text-gray-600 text-xs">
                     Showing{" "}
-                    {filteredOtCodes.length === 0 ? 0 : startOtCodesIndex + 1} to{" "}
-                    {Math.min(endOtCodesIndex, filteredOtCodes.length)} of{" "}
+                    {filteredOtCodes.length === 0 ? 0 : startOtCodesIndex + 1}{" "}
+                    to {Math.min(endOtCodesIndex, filteredOtCodes.length)} of{" "}
                     {filteredOtCodes.length} entries
                   </div>
 
@@ -5148,7 +5847,6 @@ export function TimeKeepGroupPage() {
               </div>
             </div>
           )}
-
         </div>
       </div>
 
