@@ -155,6 +155,9 @@ import { AuditTrailPage } from '../components/Security/AuditTrailPage';
 import { EmailConfigurationPage } from '../components/Security/EmailConfigurationPage';
 import { CreateNewDatabasePage } from '../components/Security/CreateNewDatabasePage';
 
+// ─── Unknown Page Path ─────────────────────────────────────────────────────────────────
+import { NotFoundPage } from '../components/NotFoundPage';
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface AppRoutesProps {
@@ -340,7 +343,7 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
         <Route path="/security/create-new-database" element={<CreateNewDatabasePage />} />
 
         {/* Catch-all: unknown protected paths → home */}
-        <Route path="*" element={<Navigate to="/home" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );

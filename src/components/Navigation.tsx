@@ -11,6 +11,8 @@ import {
   Clock, LogOut, User, X, Menu,
 } from 'lucide-react';
 import { decryptData } from '../services/encryptionService';
+import { usePermissions } from '../hooks/usePermissions';
+import { ROUTE_PERMISSIONS } from '../config/routePermissions';
 
 interface NavigationProps {
   onLogout: () => void;
@@ -54,8 +56,46 @@ export function Navigation({ onLogout }: NavigationProps) {
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
   const token = localStorage.getItem('token');
 
-  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-  const hasPermission = (accessType: string) => permissions[accessType] === true;
+  const { canView } = usePermissions();
+
+  const canViewPath = (path?: string): boolean => {
+    if (!path) return true;
+    const formName = ROUTE_PERMISSIONS[path];
+    if (!formName) return true;
+    return canView(formName);
+  };
+
+  const filterSubmenu = (items: SubMenuItem[]): SubMenuItem[] =>
+    items.reduce<SubMenuItem[]>((acc, item) => {
+      if (item.separator) { acc.push(item); return acc; }
+      if (item.children) {
+        const visibleChildren = filterSubmenu(item.children);
+        if (visibleChildren.length > 0) acc.push({ ...item, children: visibleChildren });
+        return acc;
+      }
+      if (canViewPath(item.path)) acc.push(item);
+      return acc;
+    }, []);
+
+    // ── Reset mobile state when switching to desktop ───────────────────────────
+    useEffect(() => {
+      const mediaQuery = window.matchMedia('(min-width: 1024px)'); // Tailwind lg
+
+      const handleScreenChange = (e: MediaQueryListEvent | MediaQueryList) => {
+        if (e.matches) {
+          setMobileMenuOpen(false);
+          setMobileExpandedMainMenu(null);
+          setMobileExpandedSubmenus(new Set());
+        }
+      };
+
+      handleScreenChange(mediaQuery);
+      mediaQuery.addEventListener('change', handleScreenChange);
+
+      return () => {
+        mediaQuery.removeEventListener('change', handleScreenChange);
+      };
+    }, []);
 
   // ── Inactivity auto-logout ──────────────────────────────────────────────────
   useEffect(() => {
@@ -114,29 +154,6 @@ export function Navigation({ onLogout }: NavigationProps) {
       localStorage.removeItem('loginPayload');
       localStorage.removeItem('userData');
       onLogout();
-    }
-  };
-
-  // ── Permissions ────────────────────────────────────────────────────────────
-  useEffect(() => { getBranchPermissions(); }, []);
-
-  const getBranchPermissions = () => {
-    const rawPayload = localStorage.getItem('loginPayload');
-    if (!rawPayload) return;
-    try {
-      const parsedPayload = JSON.parse(rawPayload);
-      const encryptedArray: any[] = parsedPayload.permissions || [];
-      const branchEntries = encryptedArray.filter(
-        (p) => decryptData(p.formName) === 'BranchSetup'
-      );
-      const permMap: Record<string, boolean> = {};
-      branchEntries.forEach((p) => {
-        const accessType = decryptData(p.accessTypeName);
-        if (accessType) permMap[accessType] = true;
-      });
-      setPermissions(permMap);
-    } catch (e) {
-      console.error('Error parsing or decrypting payload', e);
     }
   };
 
@@ -816,7 +833,10 @@ export function Navigation({ onLogout }: NavigationProps) {
           {/* Desktop menu buttons */}
           <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center relative">
             <div className="flex items-center space-x-1 overflow-x-auto nav-scroll max-w-full">
-              {menuItems.map((item) => (
+              {menuItems.map((item) => {
+                const visibleSubmenu = item.submenu ? filterSubmenu(item.submenu) : undefined;
+                if (item.submenu && visibleSubmenu!.length === 0) return null;
+                return (
                 <div key={item.id} className="flex-shrink-0">
                   <button
                     onClick={(e) => handleMenuClick(item, e)}
@@ -833,7 +853,7 @@ export function Navigation({ onLogout }: NavigationProps) {
                     )}
                   </button>
                 </div>
-              ))}
+              ); })}
             </div>
           </div>
 
@@ -854,12 +874,12 @@ export function Navigation({ onLogout }: NavigationProps) {
                       item.id === 'process' ? 'py-2 w-80' : 'py-2 w-56'
                     }`}
                   >
-                    {item.id === 'file-setup'   ? renderFileSetupMegaMenu(item.submenu) :
-                     item.id === 'maintenance'  ? renderCategoryMegaMenu(item.submenu, 'min-w-[800px]') :
-                     item.id === 'utilities'    ? renderCategoryMegaMenu(item.submenu, 'min-w-[900px]') :
-                     item.id === 'import'       ? renderCategoryMegaMenu(item.submenu, 'min-w-[800px]') :
-                     item.id === 'process'      ? renderSimpleSubmenu(item.submenu, item.id) :
-                     item.submenu.map((sub, i) => renderSubmenuItem(sub, i, item.id))}
+                    {item.id === 'file-setup'   ? renderFileSetupMegaMenu(filterSubmenu(item.submenu)) :
+                     item.id === 'maintenance'  ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[800px]') :
+                     item.id === 'utilities'    ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[900px]') :
+                     item.id === 'import'       ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[800px]') :
+                     item.id === 'process'      ? renderSimpleSubmenu(filterSubmenu(item.submenu), item.id) :
+                     filterSubmenu(item.submenu).map((sub, i) => renderSubmenuItem(sub, i, item.id))}
                   </div>
                 );
               })}
@@ -902,7 +922,10 @@ export function Navigation({ onLogout }: NavigationProps) {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="xl:hidden pb-3 space-y-1 max-h-[calc(100vh-10rem)] overflow-y-auto mobile-menu-scroll">
-            {menuItems.map((item) => (
+            {menuItems.map((item) => {
+                const visibleSubmenu = item.submenu ? filterSubmenu(item.submenu) : undefined;
+                if (item.submenu && visibleSubmenu!.length === 0) return null;
+                return (
               <div key={item.id}>
                 <button
                   onClick={() => handleMobileMenuClick(item)}
@@ -923,13 +946,13 @@ export function Navigation({ onLogout }: NavigationProps) {
 
                 {item.submenu && mobileExpandedMainMenu === item.id && (
                   <div className="mt-1 space-y-0.5 bg-green-700 rounded-lg p-2">
-                    {item.submenu.map((subItem, index) =>
+                    {filterSubmenu(item.submenu).map((subItem, index) =>
                       renderMobileSubmenuItem(subItem, index, `mobile-${item.id}`)
                     )}
                   </div>
                 )}
               </div>
-            ))}
+            ); })}
 
             <button
               onClick={handleLogout}

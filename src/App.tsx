@@ -16,30 +16,6 @@ export default function App() {
       setIsLoggedIn(true);
     }
 
-    if (rawPayload) {
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-
-        const deepDecrypt = (obj: any): any => {
-          if (typeof obj === 'string') {
-            try { return decryptData(obj); } catch { return obj; }
-          }
-          if (Array.isArray(obj)) return obj.map(deepDecrypt);
-          if (typeof obj === 'object' && obj !== null) {
-            return Object.keys(obj).reduce((acc: any, key) => {
-              acc[key] = deepDecrypt(obj[key]);
-              return acc;
-            }, {});
-          }
-          return obj;
-        };
-
-        console.log('Fully Decrypted loginPayload:', deepDecrypt(parsedPayload));
-      } catch (err) {
-        console.error('Failed to parse/decrypt loginPayload:', err);
-      }
-    }
-
     setIsLoading(false);
   }, []);
 

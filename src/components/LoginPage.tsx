@@ -143,13 +143,6 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
           console.error('Audit trail login failed:', err);
         }
 
-        console.log('Login Response (Decrypted):', {
-          ...response.data,
-          user: {
-            ...response.data.user,
-            username: decryptedUsername,
-          },
-        });
         await showSuccessModal('Login Successful');
 
         onLogin();

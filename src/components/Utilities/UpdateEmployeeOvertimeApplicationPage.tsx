@@ -333,7 +333,7 @@ export function UpdateEmployeeOvertimeApplicationPage() {
 
   // Fetch employee data from API
   const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
-    const response = await apiClient.get('/EmployeeMasterFile');
+    const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
 
     const list = Array.isArray(response.data) ? response.data : [];
 
@@ -361,7 +361,7 @@ export function UpdateEmployeeOvertimeApplicationPage() {
     setEmployeeError('');
 
     try {
-      const response = await apiClient.get('/EmployeeMasterFile');
+      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
 
       if (response.status === 200 && response.data) {
       const employeeItems: EmployeeItem[] = response.data.map((item: any) => ({
