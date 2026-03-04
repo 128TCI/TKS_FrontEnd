@@ -320,7 +320,7 @@ export function DeductTardinessToOvertimePage() {
 
   // Fetch employee data from API
   const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
-    const response = await apiClient.get('/EmployeeMasterFile');
+    const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
 
     const list = Array.isArray(response.data) ? response.data : [];
 

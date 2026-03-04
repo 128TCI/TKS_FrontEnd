@@ -105,12 +105,16 @@ export function NoOfHoursModal({
             <h3 className="text-blue-600 mb-3">Adjustments</h3>
             <div className="space-y-3">
 
-              {/* EmpCode */}
-              <div className="flex items-center gap-2">
-                <label className="w-40 text-gray-700">EmpCode :</label>
-                <input type="text" value={empCode} onChange={(e) => setEmpCode(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
-              </div>
+            {/* EmpCode */}
+            <div className="flex items-center gap-2">
+              <label className="w-40 text-gray-700">EmpCode :</label>
+              <input
+                type="text"
+                value={empCode}
+                readOnly
+                className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+              />
+            </div>
 
               {/* Workshift */}
               <div className="flex items-center gap-2">
@@ -410,9 +414,13 @@ export function TardinessModal({
 
                         {/* EmpCode */}
                         <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-700 w-24 shrink-0">EmpCode :</label>
-                            <input type="text" value={empCode} onChange={e => setEmpCode(e.target.value)}
-                                className="w-48 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm" />
+                          <label className="w-35 text-gray-700">EmpCode :</label>
+                          <input
+                            type="text"
+                            value={empCode}
+                            readOnly
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+                          />
                         </div>
 
                         {/* ── CARD 1: Schedule ── */}
@@ -731,9 +739,13 @@ export function UndertimeModal({
 
                         {/* EmpCode */}
                         <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-700 w-24 shrink-0">EmpCode :</label>
-                            <input type="text" value={empCode} onChange={e => setEmpCode(e.target.value)}
-                                className="w-48 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm" />
+                          <label className="w-35 text-gray-700">EmpCode :</label>
+                          <input
+                            type="text"
+                            value={empCode}
+                            readOnly
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+                          />
                         </div>
 
                         {/* ── CARD 1: Schedule ── */}
@@ -974,9 +986,13 @@ export function LeaveAbsencesModal({
 
                         {/* EmpCode */}
                         <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-700 w-24 shrink-0">EmpCode :</label>
-                            <input type="text" value={empCode} onChange={e => setEmpCode(e.target.value)}
-                                className="w-48 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm" />
+                          <label className="w-35 text-gray-700">EmpCode :</label>
+                          <input
+                            type="text"
+                            value={empCode}
+                            readOnly
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+                          />
                         </div>
 
                         {/* ── CARD 1: Leave Info ── */}
@@ -1189,9 +1205,13 @@ export function OvertimeModal({
 
                         {/* EmpCode */}
                         <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-700 w-24 shrink-0">EmpCode :</label>
-                            <input type="text" value={empCode} onChange={e => setEmpCode(e.target.value)}
-                                className="w-48 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm" />
+                          <label className="w-35 text-gray-700">EmpCode :</label>
+                          <input
+                            type="text"
+                            value={empCode}
+                            readOnly
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+                          />
                         </div>
 
                         {/* ── CARD 1: Schedule ── */}
@@ -1428,14 +1448,14 @@ export function OtherEarningsModal({
             {/* Form Fields */}
             <div className="space-y-3">
 
-              {/* Employee Code */}
+              {/* EmpCode */}
               <div className="flex items-center gap-2">
                 <label className="w-40 text-gray-700">EmpCode :</label>
                 <input
                   type="text"
                   value={empCode}
-                  onChange={(e) => setEmpCode(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  readOnly
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                 />
               </div>
 
@@ -1631,11 +1651,14 @@ export function AdjustmentModal({
 
                         {/* EmpCode */}
                         <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-700 w-24 shrink-0">EmpCode :</label>
-                            <input type="text" value={empCode} onChange={e => setEmpCode(e.target.value)}
-                                className="w-48 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm" />
+                          <label className="w-35 text-gray-700">EmpCode :</label>
+                          <input
+                            type="text"
+                            value={empCode}
+                            readOnly
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+                          />
                         </div>
-
                         {/* ── CARD 1: Transaction Info ── */}
                         <div className={card}>
                             <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide">Transaction Info</p>
@@ -1858,11 +1881,15 @@ export function AdvancedModal({
 
                         <div className="space-y-3">
 
-                            {/* Employee Code */}
+                            {/* EmpCode */}
                             <div className="flex items-center gap-2">
-                                <label className="w-40 text-gray-700">EmpCode :</label>
-                                <input type="text" value={empCode} onChange={e => setEmpCode(e.target.value)}
-                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              <label className="w-40 text-gray-700">EmpCode :</label>
+                              <input
+                                type="text"
+                                value={empCode}
+                                readOnly
+                                className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+                              />
                             </div>
 
                             {/* Transaction Date */}
