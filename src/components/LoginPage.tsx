@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { Building2, User, Lock } from 'lucide-react';
 import apiClient from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
-import lifeBankHeader from '../assets/Lifebank.png';
-import techLogo from '../assets/128Tech_Logo.jpg';
-import Swal from 'sweetalert2';
+import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
 import CryptoJS from 'crypto-js';
+import { decryptData } from '../services/encryptionService';
 
 // ─── Encryption Helpers ────────────────────────────────────────────────────────
 
@@ -74,7 +73,13 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await apiClient.get('Security/DatabaseConfiguration/databases');
+        const response = await apiClient.get('/Security/DatabaseConfiguration/databases');
+        console.log("API response:", response);
+        
+        // Convert response to boolean
+        const isSuccess = ApiService.isApiSuccess(response);
+        console.log("Is success:", isSuccess);   
+
         const servers: string[] = response.data?.servers ?? [];
         setCompanies(servers);
         if (servers.length > 0) {
@@ -82,6 +87,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
         }
       } catch (err) {
         console.error('Failed to fetch companies:', err);
+        await showErrorModal("Failed to load company list. Please try again later.");
         // Fallback list in case the API is unreachable
         const fallback = ['DEMO COMPANY INC'];
         setCompanies(fallback);
@@ -109,8 +115,9 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
         password:    encryptedPassword,
         company:     encryptedCompany,
         windowsAuth,
-      });
-
+      }, );
+      const decryptedUsername = decryptData(response.data.user?.username) || username;
+      
       if (response.status === 200) {
         if (response.data.token) {
           localStorage.setItem('authToken',      response.data.token);
@@ -125,13 +132,18 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
           localStorage.setItem('userData', JSON.stringify(response.data.user));
         }
 
-        await Swal.fire({
-          icon:              'success',
-          title:             'Login Successful',
-          text:              'Welcome back!',
-          timer:             2000,
-          showConfirmButton: false,
-        });
+        try {
+          await auditTrail.log({
+            trans:      `Employee ${decryptedUsername} logged in.`,
+            messages:   `Employee ${decryptedUsername} logged in.`,
+            formName:   'LogIn',
+            accessType: 'LogIn',
+          });
+        } catch (err) {
+          console.error('Audit trail login failed:', err);
+        }
+
+        await showSuccessModal('Login Successful');
 
         onLogin();
       }
@@ -149,17 +161,17 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
     setError(message);
 
     if (status === 401) {
-      await Swal.fire({ icon: 'error',   title: 'Invalid Credentials', text: 'Invalid username or password.', confirmButtonColor: '#dc2626' });
+      await showErrorModal('Invalid username or password.');
     } else if (status === 403) {
-      await Swal.fire({ icon: 'warning', title: 'Account Suspended',   text: message,                        confirmButtonColor: '#dc2626' });
+      await showErrorModal('Account is suspended.');
     } else if (status === 400) {
-      await Swal.fire({ icon: 'warning', title: 'Invalid Input',        text: message,                        confirmButtonColor: '#dc2626' });
+      await showErrorModal('Invalid input data.');
     } else if (status >= 500) {
-      await Swal.fire({ icon: 'error',   title: 'Server Error',         text: 'Server error. Please try again later.', confirmButtonColor: '#dc2626' });
+      await showErrorModal('Server error. Please try again later.');
     } else if (err.message === 'Network Error' || !err.response) {
-      await Swal.fire({ icon: 'error',   title: 'Connection Error',     text: 'Unable to connect to the server.',      confirmButtonColor: '#dc2626' });
+      await showErrorModal('Unable to connect to the server.');
     } else {
-      await Swal.fire({ icon: 'error',   title: 'Login Failed',         text: message,                        confirmButtonColor: '#dc2626' });
+      await showErrorModal(message);
     }
   };
 
@@ -187,7 +199,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
               <h2 className="text-gray-900 text-center">Login</h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5" autoComplete='off'>
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-red-700 text-sm">{error}</p>
@@ -200,8 +212,9 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="text"
+                  type="text" 
                   value={username}
+                  autoComplete='username'
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Username"
@@ -216,6 +229,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                 <input
                   type="password"
                   value={password}
+                  autoComplete='new-password'
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Password"

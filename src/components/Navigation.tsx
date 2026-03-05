@@ -1,42 +1,46 @@
 import { useState, useEffect, useRef } from 'react';
-import apiClient from '../services/apiClient';
-import auditTrail from '../services/auditTrail'
+import { useNavigate, useLocation } from 'react-router-dom';
+import apiClient, { getLoggedInUsername } from '../services/apiClient';
+import auditTrail from '../services/auditTrail';
 import Swal from 'sweetalert2';
-import { 
-  Home, FileText, Settings, 
-  Play, BarChart3, Download, 
-  Upload, Wrench, Shield, 
-  ExternalLink, ChevronDown, ChevronRight,
-  Clock, LogOut, User, X, Menu
+import {
+  Home, FileText, Settings,
+  Play, BarChart3, Download,
+  Upload, Wrench, Shield,
+  ChevronDown, ChevronRight,
+  Clock, LogOut, User, X, Menu,
 } from 'lucide-react';
-import lifeBankLogo from '../assets/Lifebank.png';
 import { decryptData } from '../services/encryptionService';
+import { usePermissions } from '../hooks/usePermissions';
+import { ROUTE_PERMISSIONS } from '../config/routePermissions';
 
 interface NavigationProps {
   onLogout: () => void;
-  activeSection: string;
-  setActiveSection: (section: string) => void;
 }
 
 interface MenuItem {
   id: string;
   label: string;
   icon: React.ComponentType<any>;
+  // path is the base URL segment used for active-state detection
+  path: string;
   submenu?: SubMenuItem[];
 }
 
 interface SubMenuItem {
   label?: string;
-  formName?: string;
-  action?: string;
+  // Full absolute path this item navigates to
+  path?: string;
   separator?: boolean;
   isCategory?: boolean;
-  indent?: number;
-  children?: SubMenuItem[];
   hasSubmenu?: boolean;
+  children?: SubMenuItem[];
 }
 
-export function Navigation({ onLogout, activeSection, setActiveSection }: NavigationProps) {
+export function Navigation({ onLogout }: NavigationProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [hoveredSubmenu, setHoveredSubmenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -45,58 +49,70 @@ export function Navigation({ onLogout, activeSection, setActiveSection }: Naviga
   const [mobileExpandedSubmenus, setMobileExpandedSubmenus] = useState<Set<string>>(new Set());
   const [mobileExpandedMainMenu, setMobileExpandedMainMenu] = useState<string | null>(null);
   const [buttonPositions, setButtonPositions] = useState<{ [key: string]: { left: number; top: number; width: number } }>({});
-  const [dropdownPosition, setDropdownPosition] = useState<{ left: number; top: number } | null>(null);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
-    // Permissions
-const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-const hasPermission = (accessType: string) => permissions[accessType] === true;
+  const token = localStorage.getItem('token');
 
-// Auto logout functionality
-useEffect(() => {
-  // Reset inactivity timer
-  const resetInactivityTimer = () => {
-    // Clear existing timeout
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current);
-    }
+  const { canView } = usePermissions();
 
-    // Set new timeout
-    inactivityTimeoutRef.current = setTimeout(() => {
-      handleAutoLogout();
-    }, INACTIVITY_TIMEOUT);
+  const canViewPath = (path?: string): boolean => {
+    if (!path) return true;
+    const formName = ROUTE_PERMISSIONS[path];
+    if (!formName) return true;
+    return canView(formName);
   };
 
-  // Events that indicate user activity
-  const activityEvents = [
-    'mousedown',
-    'mousemove',
-    'keypress',
-    'scroll',
-    'touchstart',
-    'click'
-  ];
+  const filterSubmenu = (items: SubMenuItem[]): SubMenuItem[] =>
+    items.reduce<SubMenuItem[]>((acc, item) => {
+      if (item.separator) { acc.push(item); return acc; }
+      if (item.children) {
+        const visibleChildren = filterSubmenu(item.children);
+        if (visibleChildren.length > 0) acc.push({ ...item, children: visibleChildren });
+        return acc;
+      }
+      if (canViewPath(item.path)) acc.push(item);
+      return acc;
+    }, []);
 
-  // Add event listeners
-  activityEvents.forEach(event => {
-    document.addEventListener(event, resetInactivityTimer);
-  });
+    // ── Reset mobile state when switching to desktop ───────────────────────────
+    useEffect(() => {
+      const mediaQuery = window.matchMedia('(min-width: 1024px)'); // Tailwind lg
 
-  // Initialize timer
-  resetInactivityTimer();
+      const handleScreenChange = (e: MediaQueryListEvent | MediaQueryList) => {
+        if (e.matches) {
+          setMobileMenuOpen(false);
+          setMobileExpandedMainMenu(null);
+          setMobileExpandedSubmenus(new Set());
+        }
+      };
 
-  // Cleanup
-  return () => {
-    activityEvents.forEach(event => {
-      document.removeEventListener(event, resetInactivityTimer);
-    });
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current);
-    }
-  };
-}, []);
+      handleScreenChange(mediaQuery);
+      mediaQuery.addEventListener('change', handleScreenChange);
+
+      return () => {
+        mediaQuery.removeEventListener('change', handleScreenChange);
+      };
+    }, []);
+
+  // ── Inactivity auto-logout ──────────────────────────────────────────────────
+  useEffect(() => {
+    const resetInactivityTimer = () => {
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = setTimeout(handleAutoLogout, INACTIVITY_TIMEOUT);
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(e => document.addEventListener(e, resetInactivityTimer));
+    resetInactivityTimer();
+
+    return () => {
+      activityEvents.forEach(e => document.removeEventListener(e, resetInactivityTimer));
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+    };
+  }, []);
 
   const handleAutoLogout = async () => {
     setIsLoggingOut(true);
@@ -109,8 +125,8 @@ useEffect(() => {
       await apiClient.post('UserLogin/logout', { userId });
       try {
         await auditTrail.log({
-          trans: `Employee ${username} logged out (auto).`,
-          messages: `Employee ${username} logged out due to inactivity.`,
+          trans: `Employee ${decryptData(username)} logged out (auto).`,
+          messages: `Employee ${decryptData(username)} logged out due to inactivity.`,
           formName: 'LogOut',
           accessType: 'LogOut',
         });
@@ -118,7 +134,6 @@ useEffect(() => {
         console.error('Audit trail failed for auto logout:', err);
       }
 
-      // Clear local storage
       localStorage.removeItem('authToken');
       localStorage.removeItem('loginTimestamp');
       localStorage.removeItem('loginPayload');
@@ -133,8 +148,7 @@ useEffect(() => {
       });
 
       onLogout();
-    } catch (error: any) {
-      console.error('Auto logout error:', error);
+    } catch {
       localStorage.removeItem('authToken');
       localStorage.removeItem('loginTimestamp');
       localStorage.removeItem('loginPayload');
@@ -143,36 +157,7 @@ useEffect(() => {
     }
   };
 
-  useEffect(() => {
-    getBranchPermissions();
-  }, []);
-  
-  const getBranchPermissions = () => {
-    const rawPayload = localStorage.getItem("loginPayload");
-    if (!rawPayload) return;
-  
-    try {
-      const parsedPayload = JSON.parse(rawPayload);
-      const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-      const branchEntries = encryptedArray.filter(
-        (p) => decryptData(p.formName) === "BranchSetup"
-      );
-  
-      // Build a map: { Add: true, Edit: true, ... }
-      const permMap: Record<string, boolean> = {};
-      branchEntries.forEach((p) => {
-        const accessType = decryptData(p.accessTypeName);
-        if (accessType) permMap[accessType] = true;
-      });
-  
-      setPermissions(permMap);
-  
-    } catch (e) {
-      console.error("Error parsing or decrypting payload", e);
-    }
-  };
-
+  // ── Manual logout ──────────────────────────────────────────────────────────
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -181,13 +166,12 @@ useEffect(() => {
       const username = loginPayload.username || loginPayload.userName || 'Unknown';
       const userId = loginPayload.userID || loginPayload.userId || loginPayload.id || 0;
 
-      await apiClient.post('UserLogin/logout', { userId });
+      await apiClient.post('UserLogin/logout', { userId }, { headers: { Authorization: `Bearer ${token}` } });
 
-      // Audit trail for manual logout
       try {
         await auditTrail.log({
-          trans: `Employee ${username} logged out.`,
-          messages: `Employee ${username} logged out.`,
+          trans: `Employee ${decryptData(username)} logged out.`,
+          messages: `Employee ${decryptData(username)} logged out.`,
           formName: 'LogOut',
           accessType: 'LogOut',
         });
@@ -195,7 +179,6 @@ useEffect(() => {
         console.error('Audit trail failed for logout:', err);
       }
 
-      // Clear local storage
       localStorage.removeItem('authToken');
       localStorage.removeItem('loginTimestamp');
       localStorage.removeItem('loginPayload');
@@ -212,440 +195,402 @@ useEffect(() => {
       onLogout();
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'Logout failed';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Logout Error',
-        text: errorMsg,
-      });
-      console.error('Logout error:', error);
+      await Swal.fire({ icon: 'error', title: 'Logout Error', text: errorMsg });
       setIsLoggingOut(false);
     }
   };
 
+  // ── Menu definition (paths mirror AppRoutes) ───────────────────────────────
   const menuItems: MenuItem[] = [
     {
       id: 'home',
       label: 'Home',
-      icon: Home
+      icon: Home,
+      path: '/home',
     },
     {
       id: 'file-setup',
       label: 'File Setup',
       icon: FileText,
+      path: '/file-setup',
       submenu: [
         {
           label: 'System',
           isCategory: true,
           children: [
-            { label: 'Company Information', formName:'', action: 'company-information' }
-          ]
+            { label: 'Company Information', path: '/file-setup/system/company-information' },
+          ],
         },
         {
           label: 'Process',
           isCategory: true,
           children: [
-            { 
+            {
               label: 'Allowance and Earnings',
               hasSubmenu: true,
               children: [
-                { label: 'Allowance Bracket Code Setup', action: 'allowance-bracket-code-setup' },
-                { label: 'Allowance Bracketing Setup', action: 'allowance-bracketing-setup' },
-                { label: 'Allowance per Classification Setup', action: 'allowance-per-classification-setup' },
-                { label: 'Classification Setup', action: 'classification-setup' },
-                { label: 'Earning Setup', action: 'earning-setup' }
-              ]
+                { label: 'Allowance Bracket Code Setup', path: '/file-setup/process/allowance-and-earnings/allowance-bracket-code-setup' },
+                { label: 'Allowance Bracketing Setup', path: '/file-setup/process/allowance-and-earnings/allowance-bracketing-setup' },
+                { label: 'Allowance per Classification Setup', path: '/file-setup/process/allowance-and-earnings/allowance-per-classification-setup' },
+                { label: 'Classification Setup', path: '/file-setup/process/allowance-and-earnings/classification-setup' },
+                { label: 'Earning Setup', path: '/file-setup/process/allowance-and-earnings/earning-setup' },
+              ],
             },
-            { label: 'Calendar Setup', action: 'calendar-setup' },
-            { label: 'Day Type Setup', action: 'day-type-setup' },
-            { 
+            { label: 'Calendar Setup', path: '/file-setup/process/calendar-setup' },
+            { label: 'Day Type Setup', path: '/file-setup/process/day-type-setup' },
+            {
               label: 'Device',
               hasSubmenu: true,
               children: [
-                { label: 'AMS Database Configuration Setup', action: 'ams-database-configuration-setup' },
-                { label: 'Borrowed Device Name', action: 'borrowed-device-name' },
-                { label: 'Coordinates Setup', action: 'coordinates-setup' },
-                { label: 'Device Type Setup', action: 'device-type-setup' },
-                { label: 'DTR Flag Setup', action: 'dtr-flag-setup' },
-                { label: 'DTR Log Fields Setup', action: 'dtr-log-fields-setup' },
-                { label: 'SDK List Setup', action: 'sdk-list-setup' },
-                { label: 'MYSQL Database Configuration Setup', action: 'mysql-database-configuration-setup' }
-              ]
+                { label: 'AMS Database Configuration Setup', path: '/file-setup/process/device/ams-database-configuration-setup' },
+                { label: 'Borrowed Device Name', path: '/file-setup/process/device/borrowed-device-name' },
+                { label: 'Coordinates Setup', path: '/file-setup/process/device/coordinates-setup' },
+                { label: 'Device Type Setup', path: '/file-setup/process/device/device-type-setup' },
+                { label: 'DTR Flag Setup', path: '/file-setup/process/device/dtr-flag-setup' },
+                { label: 'DTR Log Fields Setup', path: '/file-setup/process/device/dtr-log-fields-setup' },
+                { label: 'SDK List Setup', path: '/file-setup/process/device/sdk-list-setup' },
+                { label: 'MYSQL Database Configuration Setup', path: '/file-setup/process/device/mysql-database-configuration-setup' },
+              ],
             },
-            { label: 'Equivalent Hours Deduction Setup', action: 'equivalent-hours-deduction-setup' },
-            { label: 'Group Schedule Setup', action: 'group-schedule-setup' },
-            { label: 'Help Setup', action: 'help-setup' },
-            { label: 'Leave Type Setup', action: 'leave-type-setup' },
-            { 
+            { label: 'Equivalent Hours Deduction Setup', path: '/file-setup/process/equivalent-hours-deduction-setup' },
+            { label: 'Group Schedule Setup', path: '/file-setup/process/group-schedule-setup' },
+            { label: 'Help Setup', path: '/file-setup/process/help-setup' },
+            { label: 'Leave Type Setup', path: '/file-setup/process/leave-type-setup' },
+            {
               label: 'Overtime',
               hasSubmenu: true,
               children: [
-                { label: 'Additional OT Hours Per Week', action: 'additional-ot-hours-per-week' },
-                { label: 'Holiday OT Rates Setup', action: 'holiday-ot-rates-setup' },
-                { label: 'Overtime Setup', action: 'overtime-setup' },
-                { label: 'Regular Overtime Setup', action: 'regular-overtime-setup' },
-                { label: 'RestDay Overtime Setup', action: 'rest-day-overtime-setup' }
-              ]
+                { label: 'Additional OT Hours Per Week', path: '/file-setup/process/overtime/additional-ot-hours-per-week' },
+                { label: 'Holiday OT Rates Setup', path: '/file-setup/process/overtime/holiday-ot-rates-setup' },
+                { label: 'Overtime Setup', path: '/file-setup/process/overtime/overtime-setup' },
+                { label: 'Regular Overtime Setup', path: '/file-setup/process/overtime/regular-overtime-setup' },
+                { label: 'RestDay Overtime Setup', path: '/file-setup/process/overtime/rest-day-overtime-setup' },
+              ],
             },
-            { label: 'Payroll Location Setup', action: 'payroll-location-setup' },
-            { label: 'System Configuration Setup', action: 'system-configuration-setup' },
-            { 
+            { label: 'Payroll Location Setup', path: '/file-setup/process/payroll-location-setup' },
+            { label: 'System Configuration Setup', path: '/file-setup/process/system-configuration-setup' },
+            {
               label: 'Tardiness/Undertime/Accumulation Bracket',
               hasSubmenu: true,
               children: [
-                { label: 'Bracket Code Setup', action: 'bracket-code-setup' },
-                { label: 'Tardiness/ Undertime/ Accumulation Table Setup', action: 'tardiness-undertime-accumulation-table-setup' }
-              ]
+                { label: 'Bracket Code Setup', path: '/file-setup/process/tardiness/bracket-code-setup' },
+                { label: 'Tardiness/Undertime/Accumulation Table Setup', path: '/file-setup/process/tardiness/tardiness-undertime-accumulation-table-setup' },
+              ],
             },
-            { label: 'Timekeep Group Setup', action: 'timekeep-group-setup' },
-            { 
+            { label: 'Timekeep Group Setup', path: '/file-setup/process/timekeep-group-setup' },
+            {
               label: 'Workshift and Restday',
               hasSubmenu: true,
               children: [
-                { label: 'Daily Schedule Setup', action: 'daily-schedule-setup' },
-                { label: 'Restday Setup', action: 'rest-day-setup' },
-                { label: 'Workshift Setup', action: 'workshift-setup' }
-              ]
+                { label: 'Daily Schedule Setup', path: '/file-setup/process/workshift-and-restday/daily-schedule-setup' },
+                { label: 'Restday Setup', path: '/file-setup/process/workshift-and-restday/rest-day-setup' },
+                { label: 'Workshift Setup', path: '/file-setup/process/workshift-and-restday/workshift-setup' },
+              ],
             },
-            { label: 'Unpaid Lunch Deduction Bracket Setup', action: 'unpaid-lunch-deduction-bracket-setup' }
-          ]
+            { label: 'Unpaid Lunch Deduction Bracket Setup', path: '/file-setup/process/unpaid-lunch-deduction-bracket-setup' },
+          ],
         },
         {
           label: 'Employment',
           isCategory: true,
           children: [
-            { label: 'Area Setup', action: 'area-setup' },
-            { label: 'Branch Setup', action: 'branch-setup' },
-            { label: 'Department Setup', action: 'department-setup' },
-            { label: 'Division Setup', action: 'division-setup' },
-            { label: 'Employee Designation Setup', action: 'employee-designation-setup' },
-            { label: 'Employee Status Setup', action: 'employee-status-setup' },
-            { label: 'Group Setup', action: 'group-setup' },
-            { label: 'Job Level Setup', action: 'job-level-setup' },
-            { label: 'Location Setup', action: 'location-setup' },
-            { label: 'Pay House Setup', action: 'pay-house-setup' },
-            { label: 'Online Approval Setup', action: 'online-approval-setup' },
-            { label: 'Section Setup', action: 'section-setup' },
-            { label: 'Unit Setup', action: 'unit-setup' }
-          ]
-        }
-      ]
+            { label: 'Area Setup', path: '/file-setup/employment/area-setup' },
+            { label: 'Branch Setup', path: '/file-setup/employment/branch-setup' },
+            { label: 'Department Setup', path: '/file-setup/employment/department-setup' },
+            { label: 'Division Setup', path: '/file-setup/employment/division-setup' },
+            { label: 'Employee Designation Setup', path: '/file-setup/employment/employee-designation-setup' },
+            { label: 'Employee Status Setup', path: '/file-setup/employment/employee-status-setup' },
+            { label: 'Group Setup', path: '/file-setup/employment/group-setup' },
+            { label: 'Job Level Setup', path: '/file-setup/employment/job-level-setup' },
+            { label: 'Location Setup', path: '/file-setup/employment/location-setup' },
+            { label: 'Pay House Setup', path: '/file-setup/employment/pay-house-setup' },
+            { label: 'Online Approval Setup', path: '/file-setup/employment/online-approval-setup' },
+            { label: 'Section Setup', path: '/file-setup/employment/section-setup' },
+            { label: 'Unit Setup', path: '/file-setup/employment/unit-setup' },
+          ],
+        },
+      ],
     },
     {
       id: 'maintenance',
       label: 'Maintenance',
       icon: Settings,
+      path: '/maintenance',
       submenu: [
         {
           label: 'Employee Management',
           isCategory: true,
           children: [
-            { label: 'Employee Master File', action: 'employee-master-file' },
-            { label: 'Employee Timekeep Configuration', action: 'employee-timekeep-configuration' },
+            { label: 'Employee Master File', path: '/maintenance/employee-master-file' },
+            { label: 'Employee Timekeep Configuration', path: '/maintenance/employee-timekeep-configuration' },
             { separator: true },
-            { label: 'Rawdata', action: 'raw-data' },
-            { label: 'Rawdata Ot Gap', action: 'rawdata-ot-gap' },
-            { label: 'Rawdata On Straight Duty', action: 'rawdata-on-straight-duty' },
+            { label: 'Rawdata', path: '/maintenance/raw-data' },
+            { label: 'Rawdata Ot Gap', path: '/maintenance/rawdata-ot-gap' },
+            { label: 'Rawdata On Straight Duty', path: '/maintenance/rawdata-on-straight-duty' },
             { separator: true },
-            { label: 'Processed Data', action: 'processed-data' }
-          ]
+            { label: 'Processed Data', path: '/maintenance/processed-data' },
+          ],
         },
         {
           label: '2 Shifts In A Day',
           isCategory: true,
           children: [
-            { label: '2 Shifts In A Day - Employee Timekeep Configuration', action: '2-shifts-employee-timekeep-config' },
-            { label: '2 Shifts In A Day - Rawdata', action: '2-shifts-rawdata' }
-          ]
-        }
-      ]
+            { label: '2 Shifts In A Day - Employee Timekeep Configuration', path: '/maintenance/2-shifts/employee-timekeep-config' },
+            { label: '2 Shifts In A Day - Rawdata', path: '/maintenance/2-shifts/raw-data' },
+          ],
+        },
+      ],
     },
     {
       id: 'process',
       label: 'Process',
       icon: Play,
+      path: '/process',
       submenu: [
-        { label: 'Process Data', action: 'process-data' },
-        { label: 'Process 2 Shifts In A Day Payroll', action: 'process-2-shifts-payroll' }
-      ]
+        { label: 'Process Data', path: '/process/process-data' },
+        { label: 'Process 2 Shifts In A Day Payroll', path: '/process/process-2-shifts-payroll' },
+      ],
     },
     {
       id: 'utilities',
       label: 'Utilities',
       icon: Wrench,
+      path: '/utilities',
       submenu: [
         {
           isCategory: true,
           label: 'Utility On Employee Configuration',
           children: [
-            { label: 'Update Status', action: 'update-status' },
-            { label: 'Update Employee Overtime Application', action: 'update-employee-overtime-application' },
-            { label: 'Update Employee Workshift', action: 'update-employee-workshift' },
-            { label: 'Update Employee Leave Application', action: 'update-employee-leave-application' },
-            { label: 'Update Employee Pay House', action: 'update-employee-pay-house' },
-            { label: 'Update Batch Restday', action: 'update-batch-rest-day' },
-            { label: 'Update Employee Classification', action: 'update-employee-classification' },
-            { label: 'Delete Employee Transactions', action: 'delete-employee-transactions' },
-            { label: 'Update Rawdata Online', action: 'update-rawdata-online' }
-          ]
+            { label: 'Update Status', path: '/utilities/employee/update-status' },
+            { label: 'Update Employee Overtime Application', path: '/utilities/employee/update-overtime-application' },
+            { label: 'Update Employee Workshift', path: '/utilities/employee/update-workshift' },
+            { label: 'Update Employee Leave Application', path: '/utilities/employee/update-leave-application' },
+            { label: 'Update Employee Pay House', path: '/utilities/employee/update-pay-house' },
+            { label: 'Update Batch Restday', path: '/utilities/employee/update-batch-rest-day' },
+            { label: 'Update Employee Classification', path: '/utilities/employee/update-classification' },
+            { label: 'Delete Employee Transactions', path: '/utilities/employee/delete-transactions' },
+            { label: 'Update Rawdata Online', path: '/utilities/employee/update-rawdata-online' },
+          ],
         },
         {
           isCategory: true,
           label: 'Utility On Rawdata',
           children: [
-            { label: 'Update Daytype In Rawdata', action: 'update-daytype-rawdata' },
-            { label: 'Update Workshift In Rawdata', action: 'update-workshift-rawdata' },
-            { label: 'Delete Incomplete Logs', action: 'delete-incomplete-logs' },
-            { label: 'Delete Rawdata', action: 'delete-rawdata' }
-          ]
+            { label: 'Update Daytype In Rawdata', path: '/utilities/rawdata/update-daytype' },
+            { label: 'Update Workshift In Rawdata', path: '/utilities/rawdata/update-workshift' },
+            { label: 'Delete Incomplete Logs', path: '/utilities/rawdata/delete-incomplete-logs' },
+            { label: 'Delete Rawdata', path: '/utilities/rawdata/delete-rawdata' },
+          ],
         },
         {
           isCategory: true,
           label: 'Utility On Processed Data',
           children: [
-            { label: 'Unpost Transaction', action: 'unpost-transaction' },
-            { label: 'Additional Hours Per Week', action: 'additional-hours-per-week' },
-            { label: 'Apply Ot Allowance', action: 'apply-ot-allowances' },
-            { label: 'Apply Break1 And Break3 Overbreak', action: 'apply-break-overbreak' },
-            { label: 'Update Allowance Per Bracket', action: 'update-allowance-per-bracket' },
-            { label: 'Update SSS Notification', action: 'update-sss-notification' },
-            { label: 'Update No. Of Hours Per Week', action: 'update-hours-per-week' },
-            { label: 'Update Tardiness Penalty', action: 'update-tardiness-penalty' },
-            { label: 'Deduct Tardiness To Overtime Of The Day', action: 'deduct-tardiness-to-overtime' },
-            { label: 'Delete Ot During Restday If Absent Or Incomplete In Previous Day', action: 'delete-ot-restday-absent' },
-            { label: 'Process Overtime Per Cut-Off', action: 'process-overtime-cutoff' },
-            { label: 'Update Assumed Days', action: 'update-assumed-days' },
-            { label: 'Process Overtime 24 Hours Rule', action: 'process-overtime-24hours' },
-            { label: 'Deduct Absences In Excess Of Total Hours With Pay If With Filed Leave', action: 'deduct-absences-excess' },
-            { label: 'Post Processed Timekeeping Transactions', action: 'post-processed-timekeeping' },
-            { label: 'Utility To Update The Time Flag Based On Set Policy Of Breaks', action: 'update-time-flag-breaks' },
-            { label: 'Unpaid Lunch Deduction', action: 'unpaid-lunch-deduction' },
-            { label: 'Update Flexi Break', action: 'update-flexi-break' },
-            { label: 'Update GL Code Utility', action: 'update-gl-code-utility' }
-          ]
+            { label: 'Unpost Transaction', path: '/utilities/processed/unpost-transaction' },
+            { label: 'Additional Hours Per Week', path: '/utilities/processed/additional-hours-per-week' },
+            { label: 'Apply Ot Allowance', path: '/utilities/processed/apply-ot-allowances' },
+            { label: 'Apply Break1 And Break3 Overbreak', path: '/utilities/processed/apply-break-overbreak' },
+            { label: 'Update Allowance Per Bracket', path: '/utilities/processed/update-allowance-per-bracket' },
+            { label: 'Update SSS Notification', path: '/utilities/processed/update-sss-notification' },
+            { label: 'Update No. Of Hours Per Week', path: '/utilities/processed/update-hours-per-week' },
+            { label: 'Update Tardiness Penalty', path: '/utilities/processed/update-tardiness-penalty' },
+            { label: 'Deduct Tardiness To Overtime Of The Day', path: '/utilities/processed/deduct-tardiness-to-overtime' },
+            { label: 'Delete Ot During Restday If Absent Or Incomplete In Previous Day', path: '/utilities/processed/delete-ot-restday-absent' },
+            { label: 'Process Overtime Per Cut-Off', path: '/utilities/processed/process-overtime-cutoff' },
+            { label: 'Update Assumed Days', path: '/utilities/processed/update-assumed-days' },
+            { label: 'Process Overtime 24 Hours Rule', path: '/utilities/processed/process-overtime-24hours' },
+            { label: 'Deduct Absences In Excess Of Total Hours With Pay If With Filed Leave', path: '/utilities/processed/deduct-absences-excess' },
+            { label: 'Post Processed Timekeeping Transactions', path: '/utilities/processed/post-processed-timekeeping' },
+            { label: 'Utility To Update The Time Flag Based On Set Policy Of Breaks', path: '/utilities/processed/update-time-flag-breaks' },
+            { label: 'Unpaid Lunch Deduction', path: '/utilities/processed/unpaid-lunch-deduction' },
+            { label: 'Update Flexi Break', path: '/utilities/processed/update-flexi-break' },
+            { label: 'Update GL Code Utility', path: '/utilities/processed/update-gl-code-utility' },
+          ],
         },
         {
           isCategory: true,
           label: 'Utility On Reports',
           children: [
-            { label: 'Timekeep Email Distribution', action: 'timekeep-email-distribution' },
-          ]
+            { label: 'Timekeep Email Distribution', path: '/utilities/reports/timekeep-email-distribution' },
+          ],
         },
         {
           isCategory: true,
           label: 'Utility On 2 Shifts In A Day',
           children: [
-            { label: 'Include Unworked Holiday Pay in the Regular Days/Hours', action: 'include-unworked-holiday-pay-regular-days-hours' },
-            { label: 'ND Basic Round Down', action: 'nd-basic-round-down' },
-            { label: 'Saturday Unworked Considered as Paid Regular Hours', action: 'saturday-unworked-paid-regular-hours' },
-            { label: 'Sunday Work Is Considered OT if Worked on Saturday', action: 'sunday-work-ot-if-worked-saturday' },
-            { label: 'Unpost 2 Shifts In A Day Transaction', action: 'unpost-2-shifts-transaction' },
-            { label: 'Delete Incomplete Logs 2 Shifts In A Day', action: 'delete-incomplete-logs-2-shifts' },
-            { label: 'Delete Records In Raw Data 2 Shifts In A Day', action: 'delete-records-raw-data-2-shifts' }
-          ]
-        }
-      ]
+            { label: 'Include Unworked Holiday Pay in the Regular Days/Hours', path: '/utilities/2-shifts/include-unworked-holiday-pay' },
+            { label: 'ND Basic Round Down', path: '/utilities/2-shifts/nd-basic-round-down' },
+            { label: 'Saturday Unworked Considered as Paid Regular Hours', path: '/utilities/2-shifts/saturday-unworked-paid-regular-hours' },
+            { label: 'Sunday Work Is Considered OT if Worked on Saturday', path: '/utilities/2-shifts/sunday-work-ot-if-worked-saturday' },
+            { label: 'Unpost 2 Shifts In A Day Transaction', path: '/utilities/2-shifts/unpost-transaction' },
+            { label: 'Delete Incomplete Logs 2 Shifts In A Day', path: '/utilities/2-shifts/delete-incomplete-logs' },
+            { label: 'Delete Records In Raw Data 2 Shifts In A Day', path: '/utilities/2-shifts/delete-records-raw-data' },
+          ],
+        },
+      ],
     },
     {
       id: 'reports',
       label: 'Reports',
       icon: BarChart3,
+      path: '/reports',
       submenu: [
-        { label: 'Daily Time Record Monitoring', action: 'daily-time-record-monitoring' }
-      ]
+        { label: 'Daily Time Record Monitoring', path: '/reports/daily-time-record-monitoring' },
+      ],
     },
     {
       id: 'import',
       label: 'Import',
       icon: Upload,
+      path: '/import',
       submenu: [
         {
           label: '1 shift in a Day',
           isCategory: true,
           children: [
-            { label: 'Import Workshift Variable', action: 'import-workshift-variable' },
-            { label: 'Import Leave Application', action: 'import-leave-application' },
-            { label: 'Import Overtime Application', action: 'import-overtime-application' },
-            { label: 'Import Device Code', action: 'import-device-code' },
-            { label: 'Import Employee Masterfile', action: 'import-employee-masterfile' },
-            { label: 'Import Logs From Device V2', action: 'import-logs-from-device-v2' },
-            { label: 'Update Raw Data', action: 'update-rawdata-import' },
-            { label: 'Import Adjustment', action: 'import-adjustment' }
-          ]
+            { label: 'Import Workshift Variable', path: '/import/workshift-variable' },
+            { label: 'Import Leave Application', path: '/import/leave-application' },
+            { label: 'Import Overtime Application', path: '/import/overtime-application' },
+            { label: 'Import Device Code', path: '/import/device-code' },
+            { label: 'Import Employee Masterfile', path: '/import/employee-masterfile' },
+            { label: 'Import Logs From Device V2', path: '/import/logs-from-device-v2' },
+            { label: 'Update Raw Data', path: '/import/update-rawdata' },
+            { label: 'Import Adjustment', path: '/import/adjustment' },
+          ],
         },
         {
           label: '2 Shift in a Day',
           isCategory: true,
           children: [
-            { label: 'Import Overtime Application', action: 'overtime-application-2-shifts' },
-            { label: 'Import Workshift Variable', action: 'workshift-variable-2-shifts' },
-            { label: 'Import Logs From Device V2', action: 'logs-from-device-2-shifts' }
-          ]
-        }
-      ]
+            { label: 'Import Overtime Application', path: '/import/2-shifts/overtime-application' },
+            { label: 'Import Workshift Variable', path: '/import/2-shifts/workshift-variable' },
+            { label: 'Import Logs From Device V2', path: '/import/2-shifts/logs-from-device-v2' },
+          ],
+        },
+      ],
     },
     {
       id: 'export',
       label: 'Export',
       icon: Download,
+      path: '/export',
       submenu: [
-        { label: 'Payroll Data', action: 'export-payroll-data' },
-        { label: 'Export NAV', action: 'export-nav' },
-        { label: 'Payroll DTR Allowance', action: 'payroll-dtr-allowance' }
-      ]
+        { label: 'Payroll Data', path: '/export/payroll-data' },
+        { label: 'Export NAV', path: '/export/nav' },
+        { label: 'Payroll DTR Allowance', path: '/export/payroll-dtr-allowance' },
+      ],
     },
     {
       id: 'security',
       label: 'Security',
       icon: Shield,
+      path: '/security',
       submenu: [
-        { label: 'Security Manager', action: 'security-manager' },
-        { label: 'Audit Trail', action: 'audit-trail' },
-        { label: 'Email Configuration', action: 'email-configuration' },
-        { label: 'Create New Database', action: 'create-new-database' }
-      ]
-    }
+        { label: 'Security Manager', path: '/security/security-manager' },
+        { label: 'Audit Trail', path: '/security/audit-trail' },
+        { label: 'Email Configuration', path: '/security/email-configuration' },
+        { label: 'Create New Database', path: '/security/create-new-database' },
+      ],
+    },
   ];
 
+  // ── Click outside closes dropdown ─────────────────────────────────────────
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setExpandedMenu(null);
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleMenuClick = (itemId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
-    const item = menuItems.find(m => m.id === itemId);
-    if (item?.submenu) {
-      if (expandedMenu === itemId) {
-        // Close menu
+  // ── Navigation helpers ────────────────────────────────────────────────────
+  const goTo = (path: string) => {
+    navigate(path);
+    setExpandedMenu(null);
+    setMobileMenuOpen(false);
+    setMobileExpandedMainMenu(null);
+    setMobileExpandedSubmenus(new Set());
+    setButtonPositions({});
+  };
+
+  const handleMenuClick = (item: MenuItem, event?: React.MouseEvent<HTMLButtonElement>) => {
+    if (item.submenu) {
+      if (expandedMenu === item.id) {
         setExpandedMenu(null);
         setButtonPositions({});
       } else {
-        // Open menu and calculate position relative to nav container
         if (event) {
           const button = event.currentTarget;
           const buttonRect = button.getBoundingClientRect();
-          const navContainer = button.closest('.px-4.lg\\:px-6'); // Find the nav's padding container
-          
+          const navContainer = button.closest('.px-4.lg\\:px-6');
           if (navContainer) {
             const navRect = navContainer.getBoundingClientRect();
             setButtonPositions({
-              [itemId]: {
-                left: buttonRect.left - navRect.left, // Relative to nav container
+              [item.id]: {
+                left: buttonRect.left - navRect.left,
                 top: buttonRect.bottom - navRect.top,
-                width: buttonRect.width
-              }
+                width: buttonRect.width,
+              },
             });
           }
         }
-        setExpandedMenu(itemId);
+        setExpandedMenu(item.id);
       }
     } else {
-      setActiveSection(itemId);
-      setExpandedMenu(null);
-      setMobileMenuOpen(false);
-      setMobileExpandedMainMenu(null);
-      setMobileExpandedSubmenus(new Set());
-      setButtonPositions({});
+      goTo(item.path);
     }
   };
 
-  const handleMobileMenuClick = (itemId: string) => {
-    const item = menuItems.find(m => m.id === itemId);
-    if (item?.submenu) {
-      // Toggle mobile main menu
-      setMobileExpandedMainMenu(mobileExpandedMainMenu === itemId ? null : itemId);
+  const handleMobileMenuClick = (item: MenuItem) => {
+    if (item.submenu) {
+      setMobileExpandedMainMenu(mobileExpandedMainMenu === item.id ? null : item.id);
     } else {
-      setActiveSection(itemId);
-      setMobileMenuOpen(false);
-      setMobileExpandedMainMenu(null);
-      setMobileExpandedSubmenus(new Set());
+      goTo(item.path);
     }
-  };
-
-  const handleSubmenuClick = (action: string) => {
-    setActiveSection(action);
-    setExpandedMenu(null);
-    setMobileMenuOpen(false); 
-    setMobileExpandedMainMenu(null);
-    setMobileExpandedSubmenus(new Set());
   };
 
   const toggleMobileSubmenu = (key: string) => {
-    const newExpanded = new Set(mobileExpandedSubmenus);
-    if (newExpanded.has(key)) {
-      newExpanded.delete(key);
-    } else {
-      newExpanded.add(key);
-    }
-    setMobileExpandedSubmenus(newExpanded);
+    const next = new Set(mobileExpandedSubmenus);
+    next.has(key) ? next.delete(key) : next.add(key);
+    setMobileExpandedSubmenus(next);
   };
 
-  // Helper function to check if a menu item contains the active section
-  const isMenuItemActive = (item: MenuItem): boolean => {
-    if (item.id === activeSection) return true;
-    if (!item.submenu) return false;
-    
-    const checkSubmenuActive = (submenuItems: SubMenuItem[]): boolean => {
-      return submenuItems.some(subItem => {
-        if (subItem.action === activeSection) return true;
-        if (subItem.children) return checkSubmenuActive(subItem.children);
-        return false;
-      });
-    };
-    
-    return checkSubmenuActive(item.submenu);
-  };
+  // ── Active state helpers (path-based) ─────────────────────────────────────
+  const isMenuItemActive = (item: MenuItem): boolean =>
+    location.pathname === item.path || location.pathname.startsWith(item.path + '/');
 
-  // Helper functions for delayed menu closing
-  const handleFlyoutEnter = (menuKey: string) => {
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-    setExpandedMenu(menuKey);
+  const isSubItemActive = (path?: string): boolean =>
+    !!path && location.pathname === path;
+
+  // ── Flyout helpers ─────────────────────────────────────────────────────────
+  const handleFlyoutEnter = (key: string) => {
+    if (closeTimeoutRef.current) { clearTimeout(closeTimeoutRef.current); closeTimeoutRef.current = null; }
+    setExpandedMenu(key);
   };
 
   const handleFlyoutLeave = () => {
-    closeTimeoutRef.current = setTimeout(() => {
-      setExpandedMenu(null);
-    }, 200);
+    closeTimeoutRef.current = setTimeout(() => setExpandedMenu(null), 200);
   };
 
-  const handleDirectItemHover = () => {
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-    setExpandedMenu(null);
-  };
-  
+  // ── Desktop mega-menu renderers ────────────────────────────────────────────
 
-  // Render mega-menu for File Setup (multi-column layout)
   const renderFileSetupMegaMenu = (submenu: SubMenuItem[]) => {
-    const categories = submenu.filter(item => item.isCategory);
-    
+    const categories = submenu.filter(i => i.isCategory);
     return (
       <div className="flex gap-8 p-6 min-w-[900px]">
         {categories.map((category, catIndex) => (
           <div key={catIndex} className="flex-1 min-w-0">
-            {/* Category Header */}
             <h3 className="text-cyan-600 font-semibold text-base mb-3 pb-2 border-b border-green-300">
               {category.label}
             </h3>
-            
-            {/* Category Items */}
             <div className="space-y-0.5">
               {category.children?.map((child, childIndex) => {
                 if (child.hasSubmenu && child.children) {
-                  // Item with submenu (like Allowance and Earnings)
                   return (
                     <div key={childIndex} className="relative group">
-                      <div 
+                      <div
                         className="w-full text-left px-2 py-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors duration-150 text-sm rounded flex items-center justify-between cursor-pointer"
                         onMouseEnter={() => setHoveredSubmenu(`file-setup-${catIndex}-${childIndex}`)}
                         onMouseLeave={() => setHoveredSubmenu(null)}
@@ -653,108 +598,54 @@ useEffect(() => {
                         <span>{child.label}</span>
                         <ChevronRight className="w-3 h-3" />
                       </div>
-                      
-                      {/* Flyout submenu */}
                       {hoveredSubmenu === `file-setup-${catIndex}-${childIndex}` && (
-                        <div 
+                        <div
                           className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-72 z-50 animate-slideRight"
                           onMouseEnter={() => setHoveredSubmenu(`file-setup-${catIndex}-${childIndex}`)}
                           onMouseLeave={() => setHoveredSubmenu(null)}
                         >
-                          {child.children.map((subChild, subChildIndex) => (
+                          {child.children.map((sub, subIdx) => (
                             <button
-                              key={subChildIndex}
-                              onClick={() => handleSubmenuClick(subChild.action || '')}
+                              key={subIdx}
+                              onClick={() => goTo(sub.path || '')}
                               className={`w-full text-left px-4 py-2 transition-colors duration-150 text-sm ${
-                                activeSection === subChild.action
-                                  ? 'bg-blue-100 text-blue-700 font-medium'
-                                  : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                                isSubItemActive(sub.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
                               }`}
                             >
-                              {subChild.label}
+                              {sub.label}
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
                   );
-                } else if (child.children) {
-                  // Subcategory with children (legacy structure)
+                }
+                if (child.children) {
                   return (
                     <div key={childIndex} className="mb-2">
-                      <div className="text-gray-800 font-medium text-sm mb-1 px-2">
-                        {child.label}
-                      </div>
+                      <div className="text-gray-800 font-medium text-sm mb-1 px-2">{child.label}</div>
                       <div className="space-y-0.5 pl-2">
-                        {child.children.map((subChild, subChildIndex) => (
+                        {child.children.map((sub, subIdx) => (
                           <button
-                            key={subChildIndex}
-                            onClick={() => handleSubmenuClick(subChild.action || '')}
+                            key={subIdx}
+                            onClick={() => goTo(sub.path || '')}
                             className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${
-                              activeSection === subChild.action
-                                ? 'bg-blue-100 text-blue-700 font-medium'
-                                : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                              isSubItemActive(sub.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
                             }`}
                           >
-                            {subChild.label}
+                            {sub.label}
                           </button>
                         ))}
                       </div>
                     </div>
                   );
-                } else {
-                  {
-                    // Direct action item
-                  return (
-                    <button
-                      key={childIndex}
-                      onClick={() => handleSubmenuClick(child.action || '')}
-                      className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${
-                        activeSection === child.action
-                          ? 'bg-blue-100 text-blue-700 font-medium'
-                          : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
-                      }`}
-                    >
-                      {child.label}
-                    </button>
-                  );
-                  }
-                }
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  // Render mega-menu for Maintenance (multi-column layout)
-  const renderMaintenanceMegaMenu = (submenu: SubMenuItem[]) => {
-    const categories = submenu.filter(item => item.isCategory);
-    
-    return (
-      <div className="flex gap-8 p-6 min-w-[800px]">
-        {categories.map((category, catIndex) => (
-          <div key={catIndex} className="flex-1 min-w-0">
-            {/* Category Header */}
-            <h3 className="text-cyan-600 font-semibold text-base mb-3 pb-2 border-b border-gray-300">
-              {category.label}
-            </h3>
-            
-            {/* Category Items */}
-            <div className="space-y-0.5">
-              {category.children?.map((child, childIndex) => {
-                if (child.separator) {
-                  return <div key={childIndex} className="my-2 border-t border-gray-300"></div>;
                 }
                 return (
                   <button
                     key={childIndex}
-                    onClick={() => handleSubmenuClick(child.action || '')}
+                    onClick={() => goTo(child.path || '')}
                     className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${
-                      activeSection === child.action
-                        ? 'bg-blue-100 text-blue-700 font-medium'
-                        : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                      isSubItemActive(child.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
                     }`}
                   >
                     {child.label}
@@ -768,43 +659,24 @@ useEffect(() => {
     );
   };
 
-  // Render mega-menu for Process (multi-column layout)
-  const renderProcessMegaMenu = (submenu: SubMenuItem[]) => {
-    // Use standard submenu rendering for responsive dropdown
+  const renderCategoryMegaMenu = (submenu: SubMenuItem[], minWidth = 'min-w-[800px]') => {
+    const categories = submenu.filter(i => i.isCategory);
     return (
-      <div className="py-2">
-        {submenu.map((item, index) => renderSubmenuItem(item, index, 'process'))}
-      </div>
-    );
-  };
-
-  // Render mega-menu for Utilities (multi-column layout)
-  const renderUtilitiesMegaMenu = (submenu: SubMenuItem[]) => {
-    const categories = submenu.filter(item => item.isCategory);
-    
-    return (
-      <div className="flex gap-8 p-6 min-w-[900px]">
+      <div className={`flex gap-8 p-6 ${minWidth}`}>
         {categories.map((category, catIndex) => (
           <div key={catIndex} className="flex-1 min-w-0">
-            {/* Category Header */}
             <h3 className="text-cyan-600 font-semibold text-base mb-3 pb-2 border-b border-gray-300">
               {category.label}
             </h3>
-            
-            {/* Category Items */}
             <div className="space-y-0.5">
               {category.children?.map((child, childIndex) => {
-                if (child.separator) {
-                  return <div key={childIndex} className="my-2 border-t border-gray-300"></div>;
-                }
+                if (child.separator) return <div key={childIndex} className="my-2 border-t border-gray-300" />;
                 return (
                   <button
                     key={childIndex}
-                    onClick={() => handleSubmenuClick(child.action || '')}
+                    onClick={() => goTo(child.path || '')}
                     className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${
-                      activeSection === child.action
-                        ? 'bg-blue-100 text-blue-700 font-medium'
-                        : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                      isSubItemActive(child.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
                     }`}
                   >
                     {child.label}
@@ -818,295 +690,121 @@ useEffect(() => {
     );
   };
 
-  // Render mega-menu for Import (multi-column layout)
-  const renderImportMegaMenu = (submenu: SubMenuItem[]) => {
-    const categories = submenu.filter(item => item.isCategory);
-    
-    return (
-        <div className="flex gap-8 p-6 min-w-[800px]">
-            {categories.map((category, catIndex) => (
-                <div key={catIndex} className="flex-1 min-w-0">
-                    {/* Category Header */}
-                    <h3 className="text-cyan-600 font-semibold text-base mb-3 pb-2 border-b border-gray-300">
-                        {category.label}
-                    </h3>
+  const renderSimpleSubmenu = (submenu: SubMenuItem[], parentKey = 'submenu') => (
+    <div className="py-2">
+      {submenu.map((item, index) => renderSubmenuItem(item, index, parentKey))}
+    </div>
+  );
 
-                    {/* Category Items */}
-                    <div className="space-y-0.5">
-                        {category.children?.map((child, childIndex) => {
-                            if (child.separator) {
-                                return <div key={childIndex} className="my-2 border-t border-gray-300"></div>;
-                            }
-                            return (
-                                <button
-                                    key={childIndex}
-                                    onClick={() => handleSubmenuClick(child.action || '')}
-                                    className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${activeSection === child.action
-                                            ? 'bg-blue-100 text-blue-700 font-medium'
-                                            : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
-                                        }`}
-                                >
-                                    {child.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-  };
-
-  // Render submenu items (used for Import, Export, Security, Reports, etc.)
-  const renderSubmenuItem = (subItem: SubMenuItem, index: number, parentKey: string = 'submenu') => {
+  const renderSubmenuItem = (subItem: SubMenuItem, index: number, parentKey = 'submenu'): React.ReactNode => {
     const itemKey = `${parentKey}-${index}`;
-    
-    if (subItem.separator) {
-      return <div key={itemKey} className="my-1 border-t border-gray-200"></div>;
-    }
-    
+
+    if (subItem.separator) return <div key={itemKey} className="my-1 border-t border-gray-200" />;
+
     if (subItem.isCategory && subItem.children) {
       return (
         <div key={itemKey} className="relative group">
           <div
             className="px-4 py-2 text-gray-900 font-semibold text-sm flex items-center justify-between hover:bg-gray-50 cursor-default"
-            onMouseEnter={() => {
-              if (closeTimeoutRef.current) {
-                clearTimeout(closeTimeoutRef.current);
-                closeTimeoutRef.current = null;
-              }
-              setExpandedMenu(itemKey);
-            }}
-            onMouseLeave={() => {
-              closeTimeoutRef.current = window.setTimeout(() => {
-                setExpandedMenu(null);
-              }, 200);
-            }}
+            onMouseEnter={() => handleFlyoutEnter(itemKey)}
+            onMouseLeave={handleFlyoutLeave}
           >
             {subItem.label}
             <ChevronRight className="w-4 h-4 text-gray-400" />
           </div>
-          
-          {/* Flyout Menu */}
           {expandedMenu === itemKey && (
-            <div 
+            <div
               className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-80 max-h-[70vh] overflow-y-auto animate-slideRight z-50"
-              onMouseEnter={() => {
-                if (closeTimeoutRef.current) {
-                  clearTimeout(closeTimeoutRef.current);
-                  closeTimeoutRef.current = null;
-                }
-                setExpandedMenu(itemKey);
-              }}
-              onMouseLeave={() => {
-                closeTimeoutRef.current = window.setTimeout(() => {
-                  setExpandedMenu(null);
-                }, 200);
-              }}
+              onMouseEnter={() => handleFlyoutEnter(itemKey)}
+              onMouseLeave={handleFlyoutLeave}
             >
-              {subItem.children.map((child, childIndex) => renderSubmenuItem(child, childIndex, itemKey))}
+              {subItem.children.map((child, i) => renderSubmenuItem(child, i, itemKey))}
             </div>
           )}
         </div>
       );
     }
-    
+
     if (subItem.children) {
       return (
         <div key={itemKey} className="relative group">
           <div
             className="px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150 text-sm flex items-center justify-between cursor-pointer"
-            onMouseEnter={() => {
-              if (closeTimeoutRef.current) {
-                clearTimeout(closeTimeoutRef.current);
-                closeTimeoutRef.current = null;
-              }
-              setExpandedMenu(itemKey);
-            }}
-            onMouseLeave={() => {
-              closeTimeoutRef.current = window.setTimeout(() => {
-                setExpandedMenu(null);
-              }, 200);
-            }}
+            onMouseEnter={() => handleFlyoutEnter(itemKey)}
+            onMouseLeave={handleFlyoutLeave}
           >
             {subItem.label}
             <ChevronRight className="w-4 h-4" />
           </div>
-          
-          {/* Flyout Menu */}
           {expandedMenu === itemKey && (
-            <div 
+            <div
               className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-80 max-h-[70vh] overflow-y-auto animate-slideRight z-50"
-              onMouseEnter={() => {
-                if (closeTimeoutRef.current) {
-                  clearTimeout(closeTimeoutRef.current);
-                  closeTimeoutRef.current = null;
-                }
-                setExpandedMenu(itemKey);
-              }}
-              onMouseLeave={() => {
-                closeTimeoutRef.current = window.setTimeout(() => {
-                  setExpandedMenu(null);
-                }, 200);
-              }}
+              onMouseEnter={() => handleFlyoutEnter(itemKey)}
+              onMouseLeave={handleFlyoutLeave}
             >
-              {subItem.children.map((child, childIndex) => renderSubmenuItem(child, childIndex, itemKey))}
+              {subItem.children.map((child, i) => renderSubmenuItem(child, i, itemKey))}
             </div>
           )}
         </div>
       );
     }
-    
-    // Regular menu item with action
-    if (subItem.action) {
+
+    if (subItem.path) {
       return (
         <button
           key={itemKey}
-          onClick={() => handleSubmenuClick(subItem.action || '')}
+          onClick={() => goTo(subItem.path!)}
           className={`w-full text-left px-4 py-2 transition-colors duration-150 text-sm ${
-            activeSection === subItem.action
-              ? 'bg-blue-100 text-blue-700 font-medium'
-              : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+            isSubItemActive(subItem.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
           }`}
         >
           {subItem.label}
         </button>
       );
     }
-    
-    // Fallback for items without action (shouldn't happen but just in case)
+
     return null;
   };
 
-  // Mobile-specific submenu renderer
-  const renderMobileSubmenuItem = (subItem: SubMenuItem, index: number, parentKey: string = 'mobile-submenu', depth: number = 0) => {
+  // ── Mobile submenu renderer ────────────────────────────────────────────────
+  const renderMobileSubmenuItem = (subItem: SubMenuItem, index: number, parentKey = 'mobile-submenu', depth = 0): React.ReactNode => {
     const itemKey = `${parentKey}-${index}`;
-    const paddingLeft = `${(depth + 1) * 1}rem`; // Increase indentation per level
-    
-    if (subItem.separator) {
-      return <div key={itemKey} className="my-1 border-t border-gray-300"></div>;
-    }
-    
-    // Category with children
-    if (subItem.isCategory && subItem.children) {
+    const paddingLeft = `${(depth + 1) * 1}rem`;
+
+    if (subItem.separator) return <div key={itemKey} className="my-1 border-t border-gray-300" />;
+
+    if ((subItem.isCategory || subItem.hasSubmenu || subItem.children) && subItem.children) {
       const isExpanded = mobileExpandedSubmenus.has(itemKey);
-      
       return (
         <div key={itemKey} className="w-full">
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggleMobileSubmenu(itemKey);
-            }}
-            className="w-full text-left px-3 py-2.5 text-slate-200 font-semibold text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMobileSubmenu(itemKey); }}
+            className={`w-full text-left px-3 py-2.5 text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation ${
+              subItem.isCategory ? 'text-slate-200 font-semibold' : 'text-slate-200'
+            }`}
             style={{ paddingLeft }}
           >
             <span className="flex-1">{subItem.label}</span>
-            <ChevronDown 
-              className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${
-                isExpanded ? 'rotate-180' : ''
-              }`}
-            />
+            <ChevronDown className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${isExpanded ? 'rotate-180' : ''}`} />
           </button>
-          
           {isExpanded && (
             <div className="space-y-0.5 mt-0.5 bg-green-800/40 rounded py-1">
-              {subItem.children.map((child, childIndex) => 
-                renderMobileSubmenuItem(child, childIndex, itemKey, depth + 1)
-              )}
+              {subItem.children.map((child, i) => renderMobileSubmenuItem(child, i, itemKey, depth + 1))}
             </div>
           )}
         </div>
       );
     }
-    
-    // Item with hasSubmenu (nested submenu) - like "Allowance and Earnings"
-    if (subItem.hasSubmenu && subItem.children) {
-      const isExpanded = mobileExpandedSubmenus.has(itemKey);
-      
-      return (
-        <div key={itemKey} className="w-full">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggleMobileSubmenu(itemKey);
-            }}
-            className="w-full text-left px-3 py-2.5 text-slate-200 text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation"
-            style={{ paddingLeft }}
-          >
-            <span className="flex-1">{subItem.label}</span>
-            <ChevronDown 
-              className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${
-                isExpanded ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
-          
-          {isExpanded && (
-            <div className="space-y-0.5 mt-0.5 bg-green-800/40 rounded py-1">
-              {subItem.children.map((child, childIndex) => 
-                renderMobileSubmenuItem(child, childIndex, itemKey, depth + 1)
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-    
-    // Item with children (generic nested structure)
-    if (subItem.children) {
-      const isExpanded = mobileExpandedSubmenus.has(itemKey);
-      
-      return (
-        <div key={itemKey} className="w-full">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggleMobileSubmenu(itemKey);
-            }}
-            className="w-full text-left px-3 py-2.5 text-slate-200 text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation"
-            style={{ paddingLeft }}
-          >
-            <span className="flex-1">{subItem.label}</span>
-            <ChevronDown 
-              className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${
-                isExpanded ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
-          
-          {isExpanded && (
-            <div className="space-y-0.5 mt-0.5 bg-green-800/40 rounded py-1">
-              {subItem.children.map((child, childIndex) => 
-                renderMobileSubmenuItem(child, childIndex, itemKey, depth + 1)
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-    
-    // Regular action item (leaf node)
-    if (subItem.action) {
+
+    if (subItem.path) {
       return (
         <button
           key={itemKey}
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSubmenuClick(subItem.action || '');
-          }}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); goTo(subItem.path!); }}
           className={`w-full text-left px-3 py-2.5 text-sm rounded transition-colors touch-manipulation ${
-            activeSection === subItem.action
-              ? 'bg-blue-500 text-white font-medium'
-              : 'text-slate-200 hover:bg-slate-600 active:bg-slate-700'
+            isSubItemActive(subItem.path) ? 'bg-blue-500 text-white font-medium' : 'text-slate-200 hover:bg-slate-600 active:bg-slate-700'
           }`}
           style={{ paddingLeft }}
         >
@@ -1114,269 +812,188 @@ useEffect(() => {
         </button>
       );
     }
-    
+
     return null;
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <>
-      {/* LifeBank Foundation Header */}
-      {/* <div className="bg-white border-b border-cyan-200 shadow-sm">
-        <div className="px-4 lg:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <img 
-                src={lifeBankLogo} 
-                alt="LifeBank Foundation" 
-                className="h-10 object-contain"
-              />
+    <nav className="bg-green-600 border-b border-green-600 sticky top-0 z-50 shadow-lg">
+      <div className="px-4 lg:px-6">
+        <div className="flex items-center justify-between h-14">
+
+          {/* Logo */}
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
+              <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
             </div>
-            <div className="hidden md:block">
-              <p className="text-orange-500 italic" style={{ fontSize: '1.1rem' }}>
-                we <span className="font-semibold">excel</span>, we <span className="font-semibold">care</span>, we <span className="font-semibold">share</span>
-              </p>
+            <h1 className="text-white text-lg">DEMO ACCOUNT</h1>
+          </div>
+
+          {/* Desktop menu buttons */}
+          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center relative">
+            <div className="flex items-center space-x-1 overflow-x-auto nav-scroll max-w-full">
+              {menuItems.map((item) => {
+                const visibleSubmenu = item.submenu ? filterSubmenu(item.submenu) : undefined;
+                if (item.submenu && visibleSubmenu!.length === 0) return null;
+                return (
+                <div key={item.id} className="flex-shrink-0">
+                  <button
+                    onClick={(e) => handleMenuClick(item, e)}
+                    className={`flex items-center space-x-2 px-3 py-3 rounded-lg transition-all duration-200 whitespace-nowrap ${
+                      expandedMenu === item.id || isMenuItemActive(item)
+                        ? 'bg-amber-100 text-gray-800 font-semibold'
+                        : 'text-slate-200 hover:bg-green-700 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span className="text-sm">{item.label}</span>
+                    {item.submenu && (
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedMenu === item.id ? 'rotate-180' : ''}`} />
+                    )}
+                  </button>
+                </div>
+              ); })}
             </div>
           </div>
-        </div>
-      </div> */}
 
-      <nav className="bg-green-600 border-b border-green-600 sticky top-0 z-50 shadow-lg">
-        <div className="px-4 lg:px-6">
-          <div className="flex items-center justify-between h-14">
-            {/* Logo and Brand */}
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
-                <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </div>
-              <div>
-                <h1 className="text-white text-lg">DEMO ACCOUNT</h1>
-              </div>
-            </div>
-
-            {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center relative">
-              {/* Scrollable Menu Buttons */}
-              <div className="flex items-center space-x-1 overflow-x-auto nav-scroll max-w-full">
-                {menuItems.map((item) => (
-                  <div key={item.id} className="flex-shrink-0">
-                    <button
-                      onClick={(e) => handleMenuClick(item.id, e)}
-                      className={`flex items-center space-x-2 px-3 py-3 rounded-lg transition-all duration-200 whitespace-nowrap ${
-                        expandedMenu === item.id || isMenuItemActive(item)
-                          ? 'bg-amber-100 text-gray-800 font-semibold'
-                          : 'text-slate-200 hover:bg-green-700 hover:text-white'
-                      }`}
-                    >
-                      <item.icon className="w-4 h-4" />
-                      <span className="text-sm">{item.label}</span>
-                      {item.submenu && (
-                        <ChevronDown 
-                          className={`w-4 h-4 transition-transform duration-200 ${
-                            expandedMenu === item.id ? 'rotate-180' : ''
-                          }`}
-                        />
-                      )}
-                    </button>
+          {/* Dropdown menus rendered at nav level */}
+          {expandedMenu && buttonPositions[expandedMenu] && (
+            <div
+              ref={dropdownRef}
+              className="absolute z-50"
+              style={{ left: `${buttonPositions[expandedMenu].left}px`, top: '56px' }}
+            >
+              {menuItems.map((item) => {
+                if (expandedMenu !== item.id || !item.submenu) return null;
+                return (
+                  <div
+                    key={`dropdown-${item.id}`}
+                    className={`bg-white rounded-lg shadow-xl border border-gray-200 animate-slideDown ${
+                      ['file-setup', 'maintenance', 'utilities', 'import'].includes(item.id) ? '' :
+                      item.id === 'process' ? 'py-2 w-80' : 'py-2 w-56'
+                    }`}
+                  >
+                    {item.id === 'file-setup'   ? renderFileSetupMegaMenu(filterSubmenu(item.submenu)) :
+                     item.id === 'maintenance'  ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[800px]') :
+                     item.id === 'utilities'    ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[900px]') :
+                     item.id === 'import'       ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[800px]') :
+                     item.id === 'process'      ? renderSimpleSubmenu(filterSubmenu(item.submenu), item.id) :
+                     filterSubmenu(item.submenu).map((sub, i) => renderSubmenuItem(sub, i, item.id))}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
+          )}
 
-            {/* Dropdown Menus - Rendered at nav level, outside scroll container */}
-            {expandedMenu && buttonPositions[expandedMenu] && (
-              <div 
-                ref={dropdownRef}
-                className="absolute z-50"
-                style={{
-                  left: `${buttonPositions[expandedMenu].left}px`,
-                  top: '56px', // Height of nav bar (h-14 = 56px)
-                }}
-              >
-                {menuItems.map((item) => {
-                  if (expandedMenu !== item.id || !item.submenu) return null;
-                  
-                  return (
-                    <div 
-                      key={`dropdown-${item.id}`}
-                      className={`bg-white rounded-lg shadow-xl border border-gray-200 animate-slideDown ${
-                        item.id === 'file-setup' || item.id === 'maintenance' || item.id === 'utilities' || item.id === 'import' ? '' : item.id === 'process' ? 'py-2' : 'py-2 w-56'
-                      } ${
-                        item.id === 'process' ? 'w-80' : ''
-                      }`}
-                    >
-                      {item.id === 'file-setup' ? renderFileSetupMegaMenu(item.submenu) : 
-                       item.id === 'maintenance' ? renderMaintenanceMegaMenu(item.submenu) : 
-                       item.id === 'process' ? renderProcessMegaMenu(item.submenu) : 
-                       item.id === 'utilities' ? renderUtilitiesMegaMenu(item.submenu) : 
-                       item.id === 'import' ? renderImportMegaMenu(item.submenu) : 
-                       item.submenu.map((subItem, index) => renderSubmenuItem(subItem, index))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          {/* User menu */}
+          <div className="flex items-center space-x-3">
+            <div
+              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-slate-600 rounded-lg relative cursor-pointer"
+              onMouseEnter={() => setShowVersionTooltip(true)}
+              onMouseLeave={() => setShowVersionTooltip(false)}
+            >
+              <User className="w-4 h-4 text-slate-200" />
+              <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>
+              {showVersionTooltip && (
+                <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded shadow-lg whitespace-nowrap z-50 animate-fadeIn">
+                  <div className="text-sm">v910.000 20251201</div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-500 rotate-45" />
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden flex items-center justify-center w-10 h-10 text-slate-200 hover:text-white hover:bg-slate-600 rounded-lg transition-all duration-200"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
 
-            {/* User Menu */}
-            <div className="flex items-center space-x-3">
-              <div 
-                className="hidden md:flex items-center space-x-2 px-3 py-2 bg-slate-600 rounded-lg relative cursor-pointer"
-                onMouseEnter={() => setShowVersionTooltip(true)}
-                onMouseLeave={() => setShowVersionTooltip(false)}
-              >
-                <User className="w-4 h-4 text-slate-200" />
-                <span className="text-slate-200 text-sm">Admin</span>
-                
-                {/* Version Tooltip */}
-                {showVersionTooltip && (
-                  <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded shadow-lg whitespace-nowrap z-50 animate-fadeIn">
-                    <div className="text-sm">v910.000 20251201</div>
-                    {/* Arrow pointer */}
-                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-500 rotate-45"></div>
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="xl:hidden pb-3 space-y-1 max-h-[calc(100vh-10rem)] overflow-y-auto mobile-menu-scroll">
+            {menuItems.map((item) => {
+                const visibleSubmenu = item.submenu ? filterSubmenu(item.submenu) : undefined;
+                if (item.submenu && visibleSubmenu!.length === 0) return null;
+                return (
+              <div key={item.id}>
+                <button
+                  onClick={() => handleMobileMenuClick(item)}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 ${
+                    mobileExpandedMainMenu === item.id || isMenuItemActive(item)
+                      ? 'bg-slate-700 text-white font-semibold'
+                      : 'text-slate-200 hover:bg-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <item.icon className="w-4 h-4" />
+                    <span className="text-sm">{item.label}</span>
+                  </div>
+                  {item.submenu && (
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileExpandedMainMenu === item.id ? 'rotate-180' : ''}`} />
+                  )}
+                </button>
+
+                {item.submenu && mobileExpandedMainMenu === item.id && (
+                  <div className="mt-1 space-y-0.5 bg-green-700 rounded-lg p-2">
+                    {filterSubmenu(item.submenu).map((subItem, index) =>
+                      renderMobileSubmenuItem(subItem, index, `mobile-${item.id}`)
+                    )}
                   </div>
                 )}
               </div>
-              <button
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
-              </button>
+            ); })}
 
-              {/* Mobile Menu Toggle */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden flex items-center justify-center w-10 h-10 text-slate-200 hover:text-white hover:bg-slate-600 rounded-lg transition-all duration-200"
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+            </button>
           </div>
+        )}
+      </div>
 
-          {/* Mobile Navigation */}
-          {mobileMenuOpen && (
-              <div className="xl:hidden pb-3 space-y-1 max-h-[calc(100vh-10rem)] overflow-y-auto mobile-menu-scroll">              {menuItems.map((item) => (
-                <div key={item.id}>
-                  <button
-                    onClick={() => handleMobileMenuClick(item.id)}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 ${
-                      mobileExpandedMainMenu === item.id || isMenuItemActive(item)
-                        ? 'bg-slate-700 text-white font-semibold'
-                        : 'text-slate-200 hover:bg-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <item.icon className="w-4 h-4" />
-                      <span className="text-sm">{item.label}</span>
-                    </div>
-                    {item.submenu && (
-                      <ChevronDown 
-                        className={`w-4 h-4 transition-transform duration-200 ${
-                          mobileExpandedMainMenu === item.id ? 'rotate-180' : ''
-                        }`}
-                      />
-                    )}
-                  </button>
-                  
-                  {item.submenu && mobileExpandedMainMenu === item.id && (
-                    <div className="mt-1 space-y-0.5 bg-green-700 rounded-lg p-2">
-                      {item.submenu.map((subItem, index) => 
-                        renderMobileSubmenuItem(subItem, index, `mobile-${item.id}`)
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              {/* Mobile Logout Button */}
-              <button
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
-              </button>
-            </div>
-          )}
-        </div>
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slideDown { animation: slideDown 0.2s ease-out; }
 
-        <style>{`
-          @keyframes slideDown {
-            from {
-              opacity: 0;
-              transform: translateY(-10px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          .animate-slideDown {
-            animation: slideDown 0.2s ease-out;
-          }
+        @keyframes slideRight {
+          from { opacity: 0; transform: translateX(-10px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        .animate-slideRight { animation: slideRight 0.2s ease-out; }
 
-          @keyframes slideRight {
-            from {
-              opacity: 0;
-              transform: translateX(-10px);
-            }
-            to {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
-          .animate-slideRight {
-            animation: slideRight 0.2s ease-out;
-          }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
 
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-            }
-            to {
-              opacity: 1;
-            }
-          }
-          .animate-fadeIn {
-            animation: fadeIn 0.2s ease-out;
-          }
+        .nav-scroll::-webkit-scrollbar { height: 6px; }
+        .nav-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        .nav-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+        .nav-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
 
-          /* Custom scrollbar for desktop navigation */
-          .nav-scroll::-webkit-scrollbar {
-            height: 6px;
-          }
-          
-          .nav-scroll::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-          }
-          
-          .nav-scroll::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 3px;
-          }
-          
-          .nav-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.5);
-          }
-
-          /* Hide scrollbar for mobile menu */
-          .mobile-menu-scroll::-webkit-scrollbar {
-            width: 4px;
-          }
-          
-          .mobile-menu-scroll::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          
-          .mobile-menu-scroll::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 2px;
-          }
-        `}</style>
-      </nav>
-    </>
+        .mobile-menu-scroll::-webkit-scrollbar { width: 4px; }
+        .mobile-menu-scroll::-webkit-scrollbar-track { background: transparent; }
+        .mobile-menu-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+      `}</style>
+    </nav>
   );
 }
