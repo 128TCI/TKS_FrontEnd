@@ -35,6 +35,7 @@ interface GroupItem {
   id: number;
   groupCode: string;
   description: string;
+  groupDescription?: string; // add this to handle direct GET response
   payrollGroup: string;
   cutOffDateFrom: string;
   cutOffDateTo: string;
@@ -50,7 +51,7 @@ interface GroupItem {
   notedByPosition: string | null;
   approvedBy: string | null;
   approvedByPosition: string | null;
-  terminalID: string | null; //
+  terminalID: string | null;
   autoPairLogsDateFrom: string;
   autoPairLogsDateTo: string;
 }
@@ -190,19 +191,19 @@ interface LoginPolicyItem {
 
 interface OTBreakItem {
   id: number;
-  regDay: boolean;
-  restDay: boolean;
-  legalHoliday: boolean;
-  specialHoliday: boolean;
-  legalHolidayRest: boolean;
-  specialHolidayRest: boolean;
+  regDay: boolean | null;
+  restDay: boolean | null;
+  lHoliday: boolean | null;
+  sHoliday: boolean | null;
+  lHolidayRest: boolean | null;
+  sHolidayRest: boolean | null;
   groupCode: string;
-  doubleHoliday: boolean;
-  doubleHolidayRest: boolean;
-  specialHoliday2: boolean;
-  specialHoliday2Rest: boolean;
-  nonWorkingHoliday: boolean;
-  nonWorkingHolidayRest: boolean;
+  doubleHoliday: boolean | null;
+  doubleHolidayRest: boolean | null;
+  s2Holiday: boolean | null;
+  s2HolidayRest: boolean | null;
+  nonWorkHoliday: boolean | null;
+  nonWorkHolidayRest: boolean | null;
 }
 
 interface OvertimeFileSetupItem {
@@ -267,8 +268,8 @@ export function TimeKeepGroupPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   // Auto Pairing Logs Cut-Off Dates
-  const [autoPairingFrom, setAutoPairingFrom] = useState("09/29/2025");
-  const [autoPairingTo, setAutoPairingTo] = useState("09/29/2025");
+  const [autoPairingFrom, setAutoPairingFrom] = useState("");
+  const [autoPairingTo, setAutoPairingTo] = useState("");
   const [cutOffMonth, setCutOffMonth] = useState("");
   const [cutOffPeriod, setcutOffPeriod] = useState("");
   const [terminalId, setTerminalId] = useState("");
@@ -501,7 +502,7 @@ export function TimeKeepGroupPage() {
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
 
   // Update States
-  const [currentGroupId, setCurrentGroupId] = useState<number | null>(null);
+  const [currentGroupId, setCurrentGroupId] = useState<number>(0);
 
   // Payroll Location List
   const [payrollLocationList, setPayrollLocationList] = useState<
@@ -596,7 +597,6 @@ export function TimeKeepGroupPage() {
   useEffect(() => {
     setAutoPairingCurrentPage(1);
   }, [autoPairingTableSearchTerm]);
-
   const getAutoPairingPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     if (autoPairingTotalPages <= 7) {
@@ -648,7 +648,10 @@ export function TimeKeepGroupPage() {
   const otherPoliciesRef = useRef<OtherPoliciesTabContentHandle>(null);
 
   const handleParentSave = async () => {
-    if (otherPoliciesRef.current) {
+    if (!otherPoliciesRef.current) return;
+    if (isCreateNew) {
+      await otherPoliciesRef.current.handleSaveNew();
+    } else {
       await otherPoliciesRef.current.handleSave();
     }
   };
@@ -938,11 +941,12 @@ export function TimeKeepGroupPage() {
   // Fetch TKSGroup data from API
   const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     const response = await apiClient.get("/Fs/Process/TimeKeepGroupSetUp");
-
     return response.data.map((item: any) => ({
       id: item.ID || item.id,
       groupCode: item.groupCode ?? "",
-      description: item.groupDescription ?? "",
+      description: item.groupDescription ?? item.description ?? "", // handle both
+      groupDescription: item.groupDescription ?? "",
+      payrollGroup: item.payrollGroup ?? "",
       cutOffDateMonth: item.cutOffDateMonth ?? "",
       cutOffDateFrom: item.cutOffDateFrom ?? "",
       cutOffDateTo: item.cutOffDateTo ?? "",
@@ -971,10 +975,9 @@ export function TimeKeepGroupPage() {
     return monthMap[monthName.toLowerCase()] ?? "0"; // fallback "0" if invalid
   };
 
-  const convertTimeToISOString = (timeStr: string) => {
+  const convertTimeToISOString = (timeStr: string): string => {
     if (!timeStr) return "";
 
-    const today = new Date();
     const [hoursStr, minutesStr] = timeStr
       .toUpperCase()
       .replace("AM", "")
@@ -988,39 +991,79 @@ export function TimeKeepGroupPage() {
     if (timeStr.includes("PM") && hours < 12) hours += 12;
     if (timeStr.includes("AM") && hours === 12) hours = 0;
 
-    const isoStr = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-      hours,
-      minutes,
-      0,
-      0,
-    ).toISOString();
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
 
-    return isoStr;
+    return (
+      `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}` +
+      `T${pad(hours)}:${pad(minutes)}:00`
+    );
+  };
+
+  const normalizeDateValue = (val: any): string | null => {
+    if (val === null || val === undefined || val === "") return null;
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString().slice(0, 10);
+  };
+
+  const toLocalISOString = (val: string | Date): string => {
+    if (!val || val === "") return "";
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return (
+      `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+      `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    );
   };
 
   const isPayloadDifferent = (payload: any, current: any) => {
-  return Object.keys(payload).some((key) => {
-    const pVal = payload[key];
-    const cVal = current[key];
+    return Object.keys(payload).some((key) => {
+      const pVal = payload[key];
+      const cVal = current[key];
 
-    // Treat null, undefined, or empty string as equivalent
-    if ((pVal === null || pVal === undefined || pVal === "") &&
-        (cVal === null || cVal === undefined || cVal === "")) {
-      return false; // same
-    }
+      if (
+        (pVal === null || pVal === undefined || pVal === "") &&
+        (cVal === null || cVal === undefined || cVal === "")
+      ) {
+        return false;
+      }
 
-    // Convert numbers in string form to numbers for comparison
-    if (!isNaN(Number(pVal)) && !isNaN(Number(cVal))) {
-      return Number(pVal) !== Number(cVal);
-    }
+      const normalizeBool = (v: any): boolean | null => {
+        if (v === true || v === 1 || v === "true" || v === "1") return true;
+        if (v === false || v === 0 || v === "false" || v === "0") return false;
+        return null;
+      };
+      const pBool = normalizeBool(pVal);
+      const cBool = normalizeBool(cVal);
+      if (pBool !== null && cBool !== null) {
+        return pBool !== cBool;
+      }
 
-    // Otherwise, normal strict comparison
-    return pVal !== cVal;
-  });
-};
+      const looksLikeDate = (v: any) =>
+        typeof v === "string" && !isNaN(Date.parse(v)) && v.includes("-");
+      if (looksLikeDate(pVal) || looksLikeDate(cVal)) {
+        const normalizeDate = (v: any) => {
+          if (v === null || v === undefined || v === "") return null;
+          const d = new Date(v);
+          return isNaN(d.getTime()) ? String(v) : d.toISOString().slice(0, 10);
+        };
+        return normalizeDate(pVal) !== normalizeDate(cVal);
+      }
+
+      if (
+        pVal !== "" &&
+        cVal !== "" &&
+        !isNaN(Number(pVal)) &&
+        !isNaN(Number(cVal))
+      ) {
+        return Number(pVal) !== Number(cVal);
+      }
+
+      return pVal !== cVal;
+    });
+  };
 
   const updateGroupById = async (
     id: number,
@@ -1030,83 +1073,88 @@ export function TimeKeepGroupPage() {
       `/Fs/Process/TimeKeepGroupSetUp/${id}`,
     );
 
-    const payload: GroupItem = {
+    const merged: GroupItem = {
       ...currentGroup,
       ...updatedFields,
+      groupCode: currentGroup.groupCode, // preserve original groupCode
     };
 
-    await apiClient.put(`/Fs/Process/TimeKeepGroupSetUp/${id}`, payload);
+    const dateFields = [
+      "cutOffDateFrom",
+      "cutOffDateTo",
+      "autoPairLogsDateFrom",
+      "autoPairLogsDateTo",
+    ];
+
+    const sanitized = Object.fromEntries(
+      Object.entries(merged).map(([k, v]) => [
+        k,
+        dateFields.includes(k) && (v === "" || v === undefined) ? null : v,
+      ]),
+    );
+
+    await apiClient.put(`/Fs/Process/TimeKeepGroupSetUp/${id}`, sanitized, {
+      headers: { "Content-Type": "application/json" },
+    });
   };
 
   const handleSaveGroupSetUpDefinition = async () => {
     try {
       if (!currentGroupId) return;
 
-      // Build payload for current group
+      const activeId = currentGroupId; // capture before async ops
+
       const mainPayload: Partial<GroupItem> = {
         groupCode: tksGroupCode,
         description: payrollDescription,
         payrollGroup: payrollLocationCode,
         cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
         cutOffDatePeriod: cutOffPeriod,
-        cutOffDateFrom: new Date(dateFrom).toISOString(),
-        cutOffDateTo: new Date(dateTo).toISOString(),
-        autoPairLogsDateFrom: new Date(autoPairingFrom).toISOString(),
-        autoPairLogsDateTo: new Date(autoPairingTo).toISOString(),
+        cutOffDateFrom: toLocalISOString(dateFrom),
+        cutOffDateTo: toLocalISOString(dateTo),
+        autoPairLogsDateFrom: toLocalISOString(autoPairingFrom),
+        autoPairLogsDateTo: toLocalISOString(autoPairingTo),
         terminalID: terminalId,
       };
 
-      const currentGroup = tksGroupItems.find((g) => g.id === currentGroupId);
+      const currentGroup = tksGroupItems.find((g) => g.id === activeId);
       if (!currentGroup) return;
 
-      if (!isPayloadDifferent(mainPayload, currentGroup)) {
-        return; // skip update if nothing meaningful changed
-        }
+      if (!isPayloadDifferent(mainPayload, currentGroup)) return;
 
+      await updateGroupById(activeId, mainPayload);
 
-      // Update current group
-      await updateGroupById(currentGroupId, mainPayload);
-
-      // Update selected cut-off rows (excluding current group)
       if (selectedCutOffRows.length > 0) {
         const selectedIds = selectedCutOffRows
           .map(Number)
-          .filter((id) => id !== currentGroupId);
-
+          .filter((id) => id !== activeId);
         await Promise.all(
           selectedIds.map((id) =>
             updateGroupById(id, {
               cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
               cutOffDatePeriod: cutOffPeriod,
-              cutOffDateFrom: new Date(dateFrom).toISOString(),
-              cutOffDateTo: new Date(dateTo).toISOString(),
+              cutOffDateFrom: toLocalISOString(dateFrom),
+              cutOffDateTo: toLocalISOString(dateTo),
             }),
           ),
         );
       }
 
-      // Update selected auto-pairing rows (excluding current group)
       if (selectedAutoPairingRows.length > 0) {
         const selectedIds = selectedAutoPairingRows
           .map(Number)
-          .filter((id) => id !== currentGroupId);
-
+          .filter((id) => id !== activeId);
         await Promise.all(
           selectedIds.map((id) =>
             updateGroupById(id, {
               cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
               cutOffDatePeriod: cutOffPeriod,
-              autoPairLogsDateFrom: new Date(autoPairingFrom).toISOString(),
-              autoPairLogsDateTo: new Date(autoPairingTo).toISOString(),
+              autoPairLogsDateFrom: toLocalISOString(autoPairingFrom),
+              autoPairLogsDateTo: toLocalISOString(autoPairingTo),
             }),
           ),
         );
       }
-
-      // Refresh group list
-      await loadTKSGroup();
-
-      // Success notification
       await Swal.fire({
         icon: "success",
         title: "Update Successful",
@@ -1131,10 +1179,16 @@ export function TimeKeepGroupPage() {
     payload: Partial<LoginPolicyItem>,
   ) => {
     try {
-      // Send the payload directly, not wrapped in { dto: ... }
+      const sanitized = Object.fromEntries(
+        Object.entries(payload).map(([k, v]) => [
+          k,
+          v === undefined || v === "" ? null : v,
+        ]),
+      );
+
       await apiClient.put(
         `/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy/${id}`,
-        payload,
+        sanitized, // no dto wrapper
         { headers: { "Content-Type": "application/json" } },
       );
     } catch (error) {
@@ -1161,8 +1215,8 @@ export function TimeKeepGroupPage() {
         hrsCompleteWeek: Number(hoursRequiredPerWeek),
         startWkToComplete: startOfWeek,
         compAsPerWeek: computeType,
-        nightDiffStartTime: convertTimeToISOString(nightDiffStartTime),
-        nightDiffEndTime: convertTimeToISOString(nightDiffEndTime),
+        nightDiffStartTime: convertTimeToISOString(nightDiffStartTime) ?? null,
+        nightDiffEndTime: convertTimeToISOString(nightDiffEndTime) ?? null,
         dedForAbsent: forAbsent,
         dedForNoLogin: forNoLogin,
         dedForNoLogout: forNoLogout,
@@ -1194,27 +1248,16 @@ export function TimeKeepGroupPage() {
       });
 
       const payload = buildLoginPolicyPayload();
-
       // Fetch current policy from state (or API)
       const currentPolicy = groupLoginPolicyItems.find(
         (p) => p.id === currentGroupId,
       );
-      if (currentPolicy) {
-        // Compare payload with current state to detect changes
-        const isEqual = Object.keys(payload).every(
-          (key) => (payload as any)[key] === (currentPolicy as any)[key],
-        );
-        if (isEqual) return; // no changes, skip update
+      if (currentPolicy && !isPayloadDifferent(payload, currentPolicy)) {
+        return; // no changes, skip update
       }
 
       // Perform update
       await updateLoginPolicyById(currentGroupId, payload);
-
-      // Refresh data
-      const updatedPolicy = (await fetchGroupSetupLoginPolicyData(
-        tksGroupCode,
-      )) as LoginPolicyItem;
-      if (updatedPolicy) populateFromGroupSetupLoginPolicy(updatedPolicy);
 
       // Success notification
       await Swal.fire({
@@ -1238,13 +1281,45 @@ export function TimeKeepGroupPage() {
 
   const updateOTRateById = async (
     id: number,
-    payload: Partial<OverTimeRatesItem>,
+    updatedFields: Partial<OverTimeRatesItem>,
   ) => {
     try {
-      // Send the payload directly, not wrapped in { dto: ... }
+      const { data: currentOTRate } = await apiClient.get<OverTimeRatesItem>(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${id}`,
+      );
+
+      const merged: OverTimeRatesItem = {
+        ...currentOTRate,
+        ...updatedFields,
+        groupCode: currentOTRate.groupCode, // always preserve original groupCode
+      };
+
+      const decimalFields = [
+        "roundOfftHourMin",
+        "roundOffNDBasicHourMin",
+        "minHoursOTBreak",
+        "hoursOTBreakDeduction",
+        "minHrsToCompOTRegDay",
+        "minHrsToCompOTRestDay",
+        "minHrsToCompOTLegal",
+        "minHrsToCompOTSpecial",
+        "minHrsToCompOTSpecial2",
+        "minHrsToCompOTDoubleLegal",
+        "minHrsToCompOTNWH",
+        "otCutOffHours",
+        "minimumNoOfHrsRequiredToCompHol",
+      ];
+
+      const sanitized = Object.fromEntries(
+        Object.entries(merged).map(([k, v]) => [
+          k,
+          decimalFields.includes(k) && (v === "" || v === undefined) ? null : v,
+        ]),
+      );
+
       await apiClient.put(
         `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${id}`,
-        payload,
+        sanitized,
         { headers: { "Content-Type": "application/json" } },
       );
     } catch (error) {
@@ -1256,6 +1331,14 @@ export function TimeKeepGroupPage() {
   const handleSaveOTRates = async () => {
     try {
       if (!overTimeRates || overTimeRates.length === 0) return;
+
+      // Find the OT rate for the current group specifically
+      const freshOTRates = await fetchOverTimeRates();
+
+      const currentRate = freshOTRates.find(
+        (r) => r.groupCode === tksGroupCode && r.id === currentOTRatesID,
+      );
+      if (!currentRate) return;
 
       const payload: Partial<OverTimeRatesItem> = {
         id: currentOTRatesID,
@@ -1284,23 +1367,22 @@ export function TimeKeepGroupPage() {
         enable24HrOTFlag: enable24HourOT,
         includeUnWorkHolInRegDay: includeUnworkedHolidayInRegular,
         sundayWrkOTIfWrkSaturday: sundayOTIfWorkedSaturday,
-        minHrsToCompOTRegDay: regDayMinHrsToCompOT ?? undefined,
-        minHrsToCompOTRestDay: restDayMinHrsToCompOT ?? undefined,
-        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT ?? undefined,
-        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT ?? undefined,
-        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT ?? undefined,
-        minHrsToCompOTDoubleLegal:
-          doubleLegalHolidayMinHrsToCompOT ?? undefined,
-        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT ?? undefined,
+        minHrsToCompOTRegDay: regDayMinHrsToCompOT ?? null,
+        minHrsToCompOTRestDay: restDayMinHrsToCompOT ?? null,
+        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT ?? null,
+        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT ?? null,
+        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT ?? null,
+        minHrsToCompOTDoubleLegal: doubleLegalHolidayMinHrsToCompOT ?? null,
+        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT ?? null,
         spRDDay: restDayToBeComputedAsOtherRate,
         spRDDayOT: restDayOtherRate,
         otCutOffFlag: isOverTimeCutOffFlag,
         otCutOffOTCode: overTimeCode,
-        otCutOffHours: requiredHours ?? undefined,
+        otCutOffHours: requiredHours ?? null,
         otCode2ShiftsInADay: overTimeCodeFor2ShiftsDay,
-        roundOfftHourMin: oTRoundingToTheNearestHourMin,
+        roundOfftHourMin: oTRoundingToTheNearestHourMin ?? null,
         birthDayPayOT: birthdayPay,
-        roundOffNDBasicHourMin: nDBasicRoundingToTheNearestHourMin,
+        roundOffNDBasicHourMin: nDBasicRoundingToTheNearestHourMin ?? null,
         useOTAuthorization: useOverTimeAuthorization,
         holidayPayLegal: isHolPayLegalFlag,
         holidayPaySpecial: isHolPaySpecialFlag,
@@ -1315,28 +1397,14 @@ export function TimeKeepGroupPage() {
         noPayIfAbsentAfterHoliday: noPayIfAbsentAfterHoliday,
         compHolidayWithPaidLeave: compHolidayWithPaidLeave,
         minimumNoOfHrsRequiredToCompHol:
-          minimumNoOfHrsRequiredToCompHol ?? undefined,
+          minimumNoOfHrsRequiredToCompHol ?? null,
         compFirstRestdayHoliday: compFirstRestdayHoliday,
       };
 
-      // Get current OT rate from state
-      const currentRate = overTimeRates.find((r) => r.id === currentOTRatesID);
-      if (currentRate) {
-        const isEqual = Object.keys(payload).every(
-          (key) => (payload as any)[key] === (currentRate as any)[key],
-        );
-        if (isEqual) return; // no changes, skip update
-      }
+      if (!isPayloadDifferent(payload, currentRate)) return;
 
-      // Perform update
-      await updateOTRateById(currentOTRatesID, payload);
+      await updateOTRateById(currentRate.id, payload);
 
-      // Refresh OT Rates and populate first record
-      const refreshed = await fetchOverTimeRates();
-      setOverTimeRates(refreshed);
-      if (refreshed.length > 0) populateFromOTRates(refreshed[0]);
-
-      // Success notification
       await Swal.fire({
         icon: "success",
         title: "OT Rate Updated",
@@ -1371,26 +1439,21 @@ export function TimeKeepGroupPage() {
       const payload = {
         id: selectedOTBreak.id,
         groupCode: tksGroupCode,
-        regDay: oTBreakAppliesToRegDay ?? false,
-        restDay: oTBreakAppliesToRestDay ?? false,
-        lHoliday: oTBreakAppliesToLegHol ?? false,
-        sHoliday: oTBreakAppliesToSHol ?? false,
-        doubleHoliday: oTBreakAppliesToDoubleLegHol ?? false,
-        s2Holiday: oTBreakAppliesToS2Hol ?? false,
-        nonWorkHoliday: oTBreakAppliesToNonWorkHol ?? false,
-        lHolidayRest: oTBreakAppliesToLegHolRest ?? false,
-        sHolidayRest: oTBreakAppliesToSHolRest ?? false,
-        doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest ?? false,
-        s2HolidayRest: oTBreakAppliesToS2HolRest ?? false,
-        nonWorkHolidayRest: oTBreakAppliesToNonWorkRest ?? false,
+        regDay: oTBreakAppliesToRegDay,
+        restDay: oTBreakAppliesToRestDay,
+        lHoliday: oTBreakAppliesToLegHol,
+        sHoliday: oTBreakAppliesToSHol,
+        doubleHoliday: oTBreakAppliesToDoubleLegHol,
+        s2Holiday: oTBreakAppliesToS2Hol,
+        nonWorkHoliday: oTBreakAppliesToNonWorkHol,
+        lHolidayRest: oTBreakAppliesToLegHolRest,
+        sHolidayRest: oTBreakAppliesToSHolRest,
+        doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest,
+        s2HolidayRest: oTBreakAppliesToS2HolRest,
+        nonWorkHolidayRest: oTBreakAppliesToNonWorkRest,
       };
 
-      // Skip update if nothing changed
-      const isEqual = Object.keys(payload).every(
-        (key) => (payload as any)[key] === (selectedOTBreak as any)[key],
-      );
-      if (isEqual) return;
-
+      if (!isPayloadDifferent(payload, selectedOTBreak)) return;
       // Send payload directly
       await apiClient.put(
         `/Fs/Process/TimeKeepGroup/GroupOTBreak/${selectedOTBreak.id}`,
@@ -1428,6 +1491,7 @@ export function TimeKeepGroupPage() {
       });
     }
   };
+
   const hasDuplicateDayType = () => {
     const seen = new Set<string>();
 
@@ -1571,7 +1635,13 @@ export function TimeKeepGroupPage() {
 
   const handleSaveSystemConfig = async () => {
     try {
-      if (!systemConfigList || systemConfigList.length === 0) {
+      // Fetch fresh data instead of stale state
+      const freshConfigs = await fetchGroupSystemConfig();
+      const currentItem = freshConfigs.find(
+        (s) => s.groupCode === tksGroupCode,
+      );
+
+      if (!currentItem) {
         await Swal.fire({
           icon: "warning",
           title: "No System Configuration",
@@ -1580,10 +1650,6 @@ export function TimeKeepGroupPage() {
         return;
       }
 
-      const currentItem = systemConfigList[0]; // assuming you want to update the first one
-      if (!currentItem) return;
-
-      // Build payload
       const buildSystemConfigPayload = (): Partial<SystemConfigItem> => ({
         id: currentItem.id,
         groupCode: currentItem.groupCode,
@@ -1595,15 +1661,19 @@ export function TimeKeepGroupPage() {
         useTKSystemConfig: useTimekeepingSystemConfig ?? false,
       });
 
-      // Send update
-      await updateSystemConfigById(currentItem.id, buildSystemConfigPayload());
+      const payload = buildSystemConfigPayload();
+      if (!isPayloadDifferent(payload, currentItem)) return;
 
-      // Refresh data
+      await updateSystemConfigById(currentItem.id, payload);
+
+      // Refresh and populate correct group
       const updatedConfig = await fetchGroupSystemConfig();
       setSystemConfigList(updatedConfig);
-      if (updatedConfig[0]) populateSystemConfigStates(updatedConfig[0]);
+      const updatedItem = updatedConfig.find(
+        (s) => s.groupCode === tksGroupCode,
+      );
+      if (updatedItem) populateSystemConfigStates(updatedItem);
 
-      // Success notification
       await Swal.fire({
         icon: "success",
         title: "System Configuration Updated",
@@ -1662,6 +1732,8 @@ export function TimeKeepGroupPage() {
   const fetchOTAllowancesData = async (
     groupCode: string,
   ): Promise<OTAllowancesItem[]> => {
+    if (!groupCode || groupCode === "") return [];
+
     try {
       const response = await apiClient.get(
         `Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/ByGroupCode/${groupCode}`,
@@ -1699,7 +1771,7 @@ export function TimeKeepGroupPage() {
     const loadSystemConfig = async () => {
       const items = await fetchGroupSystemConfig();
       setSystemConfigList(items);
-      populateSystemConfigStates(items[0]);
+      populateSystemConfigStates(items[currentGroupId]);
     };
     loadOvertimeFileSetup();
     loadAllowancesData();
@@ -1808,26 +1880,26 @@ export function TimeKeepGroupPage() {
 
   const populateFromOTBreak = (item: OTBreakItem) => {
     setOTBreakAppliesToRegDay(item.regDay ?? false);
-    setOTBreakAppliesToLegHol(item.doubleHoliday ?? false);
-    setOTBreakAppliesToSHol(item.specialHoliday ?? false);
-    setOTBreakAppliesToDoubleLegHol(item.doubleHoliday ?? false);
-    setOTBreakAppliesToS2Hol(item.specialHoliday2 ?? false);
-    setOTBreakAppliesToNonWorkHol(item.nonWorkingHoliday ?? false);
     setOTBreakAppliesToRestDay(item.restDay ?? false);
-    setOTBreakAppliesToLegHolRest(item.legalHolidayRest ?? false);
-    setOTBreakAppliesToSHolRest(item.specialHolidayRest ?? false);
+    setOTBreakAppliesToLegHol(item.lHoliday ?? false);
+    setOTBreakAppliesToSHol(item.sHoliday ?? false);
+    setOTBreakAppliesToDoubleLegHol(item.doubleHoliday ?? false);
+    setOTBreakAppliesToS2Hol(item.s2Holiday ?? false);
+    setOTBreakAppliesToNonWorkHol(item.nonWorkHoliday ?? false);
+    setOTBreakAppliesToLegHolRest(item.lHolidayRest ?? false);
+    setOTBreakAppliesToSHolRest(item.sHolidayRest ?? false);
     setOTBreakAppliesToDoubleLegHolRest(item.doubleHolidayRest ?? false);
-    setOTBreakAppliesToS2HolRest(item.specialHoliday2Rest ?? false);
-    setOTBreakAppliesToNonWorkRest(item.nonWorkingHolidayRest ?? false);
+    setOTBreakAppliesToS2HolRest(item.s2HolidayRest ?? false);
+    setOTBreakAppliesToNonWorkRest(item.nonWorkHolidayRest ?? false);
   };
 
   const populateSystemConfigStates = (item: SystemConfigItem) => {
-    setUseTimekeepingSystemConfig(item.useTKSystemConfig);
-    setMinBeforeShift(item.numOfMinBeforeTheShift);
-    setMinIgnoreMultipleBreak(item.numOfMinToIgnoreMultipleOutInBreak);
-    setMinBeforeMidnightShift(item.numOfMinBeforeMidnightShift);
-    setMinConsiderBreak2In(item.noOfMinToConsiderBrk2In);
-    setDevicePolicy(item.devicePolicy);
+    setUseTimekeepingSystemConfig(item.useTKSystemConfig ?? false);
+    setMinBeforeShift(item.numOfMinBeforeTheShift ?? 0);
+    setMinIgnoreMultipleBreak(item.numOfMinToIgnoreMultipleOutInBreak ?? 0);
+    setMinBeforeMidnightShift(item.numOfMinBeforeMidnightShift ?? 0);
+    setMinConsiderBreak2In(item.noOfMinToConsiderBrk2In ?? 0);
+    setDevicePolicy(item.devicePolicy ?? "");
   };
 
   const populateFromOTRates = (item: OverTimeRatesItem) => {
@@ -1909,17 +1981,17 @@ export function TimeKeepGroupPage() {
         id: item.id,
         regDay: item.regDay,
         restDay: item.restDay,
-        legalHoliday: item.lHoliday,
-        specialHoliday: item.sHoliday,
-        legalHolidayRest: item.lHolidayRest,
-        specialHolidayRest: item.sHolidayRest,
+        lHoliday: item.lHoliday,
+        sHoliday: item.sHoliday,
+        lHolidayRest: item.lHolidayRest,
+        sHolidayRest: item.sHolidayRest,
         groupCode: item.groupCode,
         doubleHoliday: item.doubleHoliday,
         doubleHolidayRest: item.doubleHolidayRest,
-        specialHoliday2: item.s2Holiday,
-        specialHoliday2Rest: item.s2HolidayRest,
-        nonWorkingHoliday: item.nonWorkHoliday,
-        nonWorkingHolidayRest: item.nonWorkHolidayRest,
+        s2Holiday: item.s2Holiday,
+        s2HolidayRest: item.s2HolidayRest,
+        nonWorkHoliday: item.nonWorkHoliday,
+        nonWorkHolidayRest: item.nonWorkHolidayRest,
       }),
     );
   };
@@ -1928,12 +2000,12 @@ export function TimeKeepGroupPage() {
     const loadOverTimeRates = async () => {
       const items = await fetchOverTimeRates();
       setOverTimeRates(items);
-      populateFromOTRates(items[0]);
+      populateFromOTRates(items[currentGroupId]);
     };
     const loadOTBreakData = async () => {
       const items = await fetchOTBreakData();
       setOTBreakList(items);
-      populateFromOTBreak(items[0]);
+      populateFromOTBreak(items[currentGroupId]);
     };
     loadOverTimeRates();
     loadOTBreakData();
@@ -1988,29 +2060,34 @@ export function TimeKeepGroupPage() {
     loadData();
   }, []);
 
-  const populateFromGroup = (firstGroup: GroupItem) => {
-    setCurrentGroupId(firstGroup.id);
-    setTksGroupCode(firstGroup.groupCode);
-    setTksGroupDescription(firstGroup.description ?? "");
-    setPayrollLocationCode(firstGroup.groupCode);
-    setPayrollDescription(firstGroup.description ?? "");
-    setDateFrom(formatApiDate(firstGroup.cutOffDateFrom) ?? "");
-    setDateTo(formatApiDate(firstGroup.cutOffDateTo) ?? "");
-    const monthIndex = parseInt(firstGroup.cutOffDateMonth ?? "0", 10) - 1;
+  const populateFromGroup = (item: GroupItem) => {
+    setCurrentGroupId(item.id);
+    setTksGroupCode(item.groupCode);
+    setTksGroupDescription(item.description || item.groupDescription || "");
+    setPayrollLocationCode(item.payrollGroup ?? "");
+    setPayrollDescription(item.description || item.groupDescription || "");
+    setDateFrom(formatApiDate(item.cutOffDateFrom) ?? "");
+    setDateTo(formatApiDate(item.cutOffDateTo) ?? "");
+    const monthIndex = parseInt(item.cutOffDateMonth ?? "0", 10) - 1;
     setCutOffMonth(months[monthIndex] || "");
-    setcutOffPeriod(firstGroup.cutOffDatePeriod ?? "");
-    setTerminalId(firstGroup.terminalID ?? "");
-    setAutoPairingFrom(formatApiDate(firstGroup.autoPairLogsDateFrom) ?? "");
-    setAutoPairingTo(formatApiDate(firstGroup.autoPairLogsDateTo) ?? "");
+    setcutOffPeriod(item.cutOffDatePeriod ?? "");
+    setTerminalId(item.terminalID ?? "");
+    setAutoPairingFrom(formatApiDate(item.autoPairLogsDateFrom) ?? "");
+    setAutoPairingTo(formatApiDate(item.autoPairLogsDateTo) ?? "");
   };
 
-  const loadTKSGroup = async () => {
+  const loadTKSGroup = async (activeGroupId?: number) => {
     const items = await fetchTKSGroupData();
-    setTKSGroupItems(items); // TKSGroup items
-    setSupervisoryGroupsList(items); // Supervisory Groups
+    setTKSGroupItems(items);
+    setSupervisoryGroupsList(items);
     if (items.length > 0) {
-      populateFromGroup(items[0]); // Populate form with first item
+      const targetId = activeGroupId ?? currentGroupId;
+      const current = targetId
+        ? (items.find((g: GroupItem) => g.id === targetId) ?? items[0])
+        : items[0];
+      populateFromGroup(current);
     }
+    return items;
   };
 
   useEffect(() => {
@@ -2167,7 +2244,11 @@ export function TimeKeepGroupPage() {
       const items =
         (await fetchGroupSetupLoginPolicyData()) as LoginPolicyItem[];
       setGroupLoginPolicyItems(items);
-      if (items.length > 0) populateFromGroupSetupLoginPolicy(items[0]);
+      if (items.length > 0) {
+        const current =
+          items.find((p) => p.groupCode === tksGroupCode) ?? items[0];
+        populateFromGroupSetupLoginPolicy(current);
+      }
     };
     loadGroupLoginSetupPolicy();
   }, []);
@@ -2210,7 +2291,6 @@ export function TimeKeepGroupPage() {
 
   // Function to create new record - clears all fields
   const handleCreateNew = () => {
-    console.log("Creating new record...");
     // TKS Group Definition
     setTksGroupCode("");
     setTksGroupDescription("");
@@ -2357,25 +2437,421 @@ export function TimeKeepGroupPage() {
     setActiveTab("definition");
   };
 
+  const handleSaveNew = async () => {
+    try {
+      const missingFields: string[] = [];
+
+      if (!tksGroupCode) missingFields.push("Group Code");
+      if (!payrollDescription) missingFields.push("Group Description");
+      if (!payrollLocationCode) missingFields.push("Payroll Group");
+      if (!dateFrom) missingFields.push("Cut-Off Date From");
+      if (!dateTo) missingFields.push("Cut-Off Date To");
+      if (!autoPairingFrom) missingFields.push("Auto Pair Logs Date From");
+      if (!autoPairingTo) missingFields.push("Auto Pair Logs Date To");
+
+      if (missingFields.length > 0) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Required Fields Missing",
+          text: `Please fill in: ${missingFields.join(", ")}`,
+        });
+        setIsCreateNew(false);
+        setIsEditMode(false);
+
+        const codeToUse = tksGroupCode || "1";
+        if (!tksGroupCode) setTksGroupCode("1");
+        const item = tksGroupItems.find((i) => i.groupCode === codeToUse);
+        if (item) await handleGroupRowClick(item);
+
+        return;
+      }
+
+      const existingGroup = tksGroupItems.find(
+        (g) => g.groupCode === tksGroupCode,
+      );
+      if (existingGroup) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Group Code Already In Use",
+          text: `Group Code "${tksGroupCode}" is already taken. Please use a different code.`,
+        });
+        setIsCreateNew(false);
+        setIsEditMode(false);
+
+        const codeToUse = tksGroupCode || "1";
+        if (!tksGroupCode) setTksGroupCode("1");
+        const item = tksGroupItems.find((i) => i.groupCode === codeToUse);
+        if (item) await handleGroupRowClick(item);
+
+        return;
+      }
+
+      // 1. Create Group Definition
+      const groupPayload = {
+        id: 0,
+        groupCode: tksGroupCode,
+        groupDescription: payrollDescription,
+        payrollGroup: payrollLocationCode,
+        cutOffDateFrom: toLocalISOString(dateFrom) || null,
+        cutOffDateTo: toLocalISOString(dateTo) || null,
+        cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+        cutOffDatePeriod: cutOffPeriod,
+        integrationPayroll: null,
+        integrationHRIS: null,
+        preparedBy: null,
+        preparedByPostion: null,
+        checkedBy: null,
+        checkedByPosition: null,
+        notedBy: null,
+        notedByPosition: null,
+        approvedBy: null,
+        approvedByPosition: null,
+        terminalID: terminalId || null,
+        autoPairLogsDateFrom: toLocalISOString(autoPairingFrom) || null,
+        autoPairLogsDateTo: toLocalISOString(autoPairingTo) || null,
+      };
+      const groupResponse = await apiClient.post(
+        "/Fs/Process/TimeKeepGroupSetUp",
+        groupPayload,
+      );
+      console.log("groupResponse.data:", groupResponse.data);
+      const newGroupCode = groupResponse.data.groupCode ?? tksGroupCode;
+      const newGroupId = groupResponse.data.id;
+
+      await Swal.fire({
+        icon: "success",
+        title: "Group Definition Created",
+        text: `Group "${newGroupCode}" has been created. Setting up remaining configurations...`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      // 2. Create Login Policy
+      const loginPolicyPayload = {
+        id: 0,
+        groupCode: newGroupCode,
+        gracePeriod: Number(gracePeriodPerDay) || 0,
+        gracePeriodIncTard: gracePeriodIncludeTardiness,
+        dedExcessGPInAMonth: false,
+        maxGPInMonth: null,
+        empLogsConfig: "",
+        nightDiffStartTime: convertTimeToISOString(nightDiffStartTime) || null,
+        nightDiffEndTime: convertTimeToISOString(nightDiffEndTime) || null,
+        otInandOTOut: false,
+        dedForAbsent: forAbsent || null,
+        dedForNoLogin: forNoLogin || null,
+        dedForNoLogout: forNoLogout || null,
+        deductMealBreakinNDComput: deductMealBreakND,
+        incRestdayinNDComput: false,
+        incHolidayinNDComput: false,
+        restdayNDComputBasedOnDateIn: false,
+        holidayNDComputbasedOnDateIn: false,
+        tardinessMaxHours: null,
+        undertimeMaxHours: null,
+        undertimeHoursFromTardy: null,
+        deductOverbreak: deductOverBreak,
+        gracePerSemiAnnualFlag: gracePeriodSemiAnnual,
+        graceSemiNoofHours: Number(gracePeriodPerSemiAnnual) || 0,
+        firstHalfFrom: firstHalfDateFrom || null,
+        firstHalfTo: firstHalfDateTo || null,
+        secondHalfFrom: secondHalfDateFrom || null,
+        secondHalfTo: secondHalfDateTo || null,
+        dedForNoBrk2out: forNoBreak2Out || null,
+        dedForNoBrk2In: forNoBreak2In || null,
+        useTardinessBracketNDD: false,
+        computeShrtBrkTardy: applyOccurancesBreak,
+        maxTimePerMonth: Number(maxOccurancesNoDeduction) || 0,
+        shrtBrkGracePeriod: Number(gracePeriodOccurance) || 0,
+        incldBrk2: includeBreak2InGrace,
+        dedEvnWGrace: deductibleEvenWithinGrace,
+        calamityWFlood: null,
+        hrsCompleteWeek: Number(hoursRequiredPerWeek) || 0,
+        startWkToComplete: startOfWeek || null,
+        compAsPerWeek: computeType || null,
+        otCodePerWeek: otCodePerWeek || null,
+        combineTardiOfTimeInBrk2: combineTardinessTimeInBreak2,
+        compTardinessForNoLogout: computeTardinessNoLogout,
+        twoShiftsInADay: twoShiftsInDay,
+        twoShiftsInADayInterval: Number(hoursIntervalTwoShifts) || 0,
+        numberAllowGracePrdInAMonth: Number(allowableGracePeriodMonth) || 0,
+        maxDaysPerWeekSatWrk: Number(maxDaysPerWeekSaturday) || 0,
+        saturdayPdRegHrsFlag: considerSaturdayPaid,
+        excludeAllowGracePrdFlag: excludeAllowableGraceBracket,
+        allowableGracePrdInAMonthBasedActualMonthFlag:
+          allowableGraceActualMonth,
+        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag:
+          excludeTardinessInGrace,
+        numberAllowTardyExcessGracePrd: Number(allowableTardyExcess) || 0,
+        supGroupCode: supervisoryGroupCode || null,
+      };
+      await apiClient.post(
+        "/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy",
+        loginPolicyPayload,
+      );
+
+      // 3. Create OT Rates
+      const otRatesPayload = {
+        id: 0,
+        groupCode: newGroupCode,
+        regDayOT: regularDayOT || null,
+        restDayOT: restDayOT || null,
+        legalHolidayOT: legalHolidayOT || null,
+        specHolidayOT: specialHolidayOT || null,
+        minHoursToComputeOT: null,
+        roundOfftHourMin: oTRoundingToTheNearestHourMin || null,
+        offsetLate: null,
+        useOTAuthorization: useOverTimeAuthorization,
+        holidayPayLegal: isHolPayLegalFlag,
+        holidayPaySpecial: isHolPaySpecialFlag,
+        noPayIfAbsentBeforeHoliday: noPayIfAbsentBeforeHoliday,
+        noPayIfAbsentAfterHoliday: noPayIfAbsentAfterHoliday,
+        considerTardinessDayBeforeHoliday: null,
+        considerUndertimeDayBeforeHoliday: null,
+        computeUnprodHourIfInc: null,
+        computeUnprodHourIfIncLegal: null,
+        computeUnprodHourIfIncSpecial: null,
+        computeUnprodHourIfLeave: null,
+        minHoursToPriorToHoliday: null,
+        computeBasedDateIn: null,
+        holidayWithWorkShift: holidayWithWorkshift,
+        deductMealBreakOTComputation: deductMealBreakFromOT,
+        compHolidayWithPaidLeave: compHolidayWithPaidLeave,
+        compUnprodWithPaidLeave: null,
+        compHolidayWithPaidLeaveMinHr: null,
+        compUnprodWithPaidLeaveMinHR: null,
+        useOTPremiumBreakdown: useOTPremium,
+        useDayType2: useActualDayType,
+        minHoursOTBreak: otBreakMinHours || null,
+        hoursOTBreakDeduction: oTBreakNoOfHrsDed || null,
+        spRDDay: restDayToBeComputedAsOtherRate || null,
+        spRDDayOT: restDayOtherRate || null,
+        computeBrk2OI: computeOTForBreak2,
+        useDOLEOT: null,
+        doubleLegalHolidayOT: doubleLegalHolidayOT || null,
+        specialHoliday2: specialHolidayOT2 || null,
+        birthDayPayOT: birthdayPay || null,
+        compHolPayMonth: compHolPayForMonth,
+        nonWrkHolidayOT: nonWorkingHolidayOT || null,
+        minimumNoOfHrsRequiredToCompHol:
+          minimumNoOfHrsRequiredToCompHol || null,
+        compHolPayIfWorkBeforeHolidayRestDay:
+          compHolPayIfWorkBeforeHolidayRestDay,
+        compHolPayIfWorkBeforeHolidaySpecialHoliday:
+          compHolPayIfWorkBeforeHolidaySpecialHoliday,
+        compHolPayIfWorkBeforeHolidayLegalHoliday:
+          compHolPayIfWorkBeforeHolidayLegalHoliday,
+        minHrsToCompOTRegDay: regDayMinHrsToCompOT || null,
+        minHrsToCompOTRestDay: restDayMinHrsToCompOT || null,
+        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT || null,
+        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT || null,
+        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT || null,
+        minHrsToCompOTDoubleLegal: doubleLegalHolidayMinHrsToCompOT || null,
+        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT || null,
+        regDayOTAdj: regularDayOTLateFiling || null,
+        restDayOTAdj: restDayOTLateFiling || null,
+        legalHolidayOTAdj: legalHolidayOTLateFiling || null,
+        specHolidayOTAdj: specialHolidayOTLateFiling || null,
+        doubleLegalHolidayOTAdj: doubleLegalHolidayOTLateFiling || null,
+        specialHoliday2Adj: specialHoliday2OTLateFiling || null,
+        nonWrkHolidayOTAdj: nonWorkingHolidayOTLateFiling || null,
+        compFirstRestdayHoliday: compFirstRestdayHoliday,
+        otCutOffFlag: isOverTimeCutOffFlag,
+        otCutOffOTCode: overTimeCode || null,
+        otCutOffHours: requiredHours || null,
+        enable24HrOTFlag: enable24HourOT,
+        roundOffNDBasicHourMin: nDBasicRoundingToTheNearestHourMin || null,
+        includeUnWorkHolInRegDay: includeUnworkedHolidayInRegular,
+        sundayWrkOTIfWrkSaturday: sundayOTIfWorkedSaturday,
+        otCode2ShiftsInADay: overTimeCodeFor2ShiftsDay || null,
+      };
+      await apiClient.post(
+        "/Fs/Process/TimeKeepGroup/GroupSetUpOTRates",
+        otRatesPayload,
+      );
+
+      // 4. Create OT Break (array)
+      const otBreakPayload = [
+        {
+          id: 0,
+          groupCode: newGroupCode,
+          regDay: oTBreakAppliesToRegDay,
+          restDay: oTBreakAppliesToRestDay,
+          lHoliday: oTBreakAppliesToLegHol,
+          sHoliday: oTBreakAppliesToSHol,
+          lHolidayRest: oTBreakAppliesToLegHolRest,
+          sHolidayRest: oTBreakAppliesToSHolRest,
+          doubleHoliday: oTBreakAppliesToDoubleLegHol,
+          doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest,
+          s2Holiday: oTBreakAppliesToS2Hol,
+          s2HolidayRest: oTBreakAppliesToS2HolRest,
+          nonWorkHoliday: oTBreakAppliesToNonWorkHol,
+          nonWorkHolidayRest: oTBreakAppliesToNonWorkRest,
+        },
+      ];
+      await apiClient.post("/Fs/Process/TimeKeepGroup/GroupOTBreak", {
+        id: 0,
+        groupCode: newGroupCode,
+        regDay: oTBreakAppliesToRegDay,
+        restDay: oTBreakAppliesToRestDay,
+        lHoliday: oTBreakAppliesToLegHol,
+        sHoliday: oTBreakAppliesToSHol,
+        lHolidayRest: oTBreakAppliesToLegHolRest,
+        sHolidayRest: oTBreakAppliesToSHolRest,
+        doubleHoliday: oTBreakAppliesToDoubleLegHol,
+        doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest,
+        s2Holiday: oTBreakAppliesToS2Hol,
+        s2HolidayRest: oTBreakAppliesToS2HolRest,
+        nonWorkHoliday: oTBreakAppliesToNonWorkHol,
+        nonWorkHolidayRest: oTBreakAppliesToNonWorkRest,
+      });
+
+      // 5. Create System Config
+      const systemConfigPayload = {
+        id: 0,
+        groupCode: newGroupCode,
+        numOfMinBeforeTheShift: Number(minBeforeShift) || 0,
+        numOfMinToIgnoreMultipleOutInBreak: Number(minIgnoreMultipleBreak) || 0,
+        numOfMinBeforeMidnightShift: Number(minBeforeMidnightShift) || 0,
+        devicePolicy: devicePolicy || null,
+        noOfMinToConsiderBrk2In: Number(minConsiderBreak2In) || 0,
+        useTKSystemConfig: useTimekeepingSystemConfig,
+      };
+      await apiClient.post(
+        "/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig",
+        systemConfigPayload,
+      );
+
+      // Reload and populate
+      await loadTKSGroup(newGroupId);
+
+      await Swal.fire({
+        icon: "success",
+        title: "Created Successfully",
+        text: "New group setup has been created successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      setIsCreateNew(false);
+      setIsEditMode(false);
+    } catch (error: any) {
+      console.error("Failed to create new group setup:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Create failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Create Failed",
+        text: errorMsg,
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!currentGroupId) return;
+
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Delete Group",
+      text: `Are you sure you want to delete Group Code "${tksGroupCode}"? This cannot be undone.`,
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const [freshPolicy, freshOTRates, freshOTBreak, freshSystemConfig] =
+        await Promise.all([
+          fetchGroupSetupLoginPolicyData(
+            tksGroupCode,
+          ) as Promise<LoginPolicyItem>,
+          fetchOverTimeRates(),
+          fetchOTBreakData(),
+          fetchGroupSystemConfig(),
+        ]);
+
+      const otRate = freshOTRates.find(
+        (r: OverTimeRatesItem) => r.groupCode === tksGroupCode,
+      );
+      const otBreak = freshOTBreak.find(
+        (b: OTBreakItem) => b.groupCode === tksGroupCode,
+      );
+      const systemConfig = freshSystemConfig.find(
+        (s: SystemConfigItem) => s.groupCode === tksGroupCode,
+      );
+
+      await Promise.all([
+        freshPolicy?.id &&
+          apiClient.delete(
+            `/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy/${freshPolicy.id}`,
+          ),
+        otRate?.id &&
+          apiClient.delete(
+            `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${otRate.id}`,
+          ),
+        otBreak?.id &&
+          apiClient.delete(
+            `/Fs/Process/TimeKeepGroup/GroupOTBreak/${otBreak.id}`,
+          ),
+        systemConfig?.id &&
+          apiClient.delete(
+            `/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig/${systemConfig.id}`,
+          ),
+        otherPoliciesRef.current?.handleDelete(),
+      ]);
+
+      await apiClient.delete(
+        `/Fs/Process/TimeKeepGroupSetUp/${currentGroupId}`,
+      );
+
+      const updatedItems = await fetchTKSGroupData();
+      setTKSGroupItems(updatedItems);
+      setSupervisoryGroupsList(updatedItems);
+
+      if (updatedItems.length > 0) {
+        await handleGroupRowClick(updatedItems[0]);
+      } else {
+        handleCreateNew();
+      }
+
+      await Swal.fire({
+        icon: "success",
+        title: "Deleted Successfully",
+        text: `Group "${tksGroupCode}" has been deleted.`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to delete group:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Delete failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Delete Failed",
+        text: errorMsg,
+      });
+    }
+  };
+
   const handleGroupRowClick = async (item: GroupItem | null) => {
     if (!item) return;
 
     const groupCode = item.groupCode;
-    setCurrentGroupId(item.id);
-    setTksGroupCode(item.groupCode);
-    setTksGroupDescription(item.description);
-    setPayrollDescription(item.description);
-    setPayrollLocationCode(item.groupCode);
-    setcutOffPeriod(item.cutOffDatePeriod);
-    setTerminalId(item.terminalID ?? "");
 
-    const monthIndex = parseInt(item.cutOffDateMonth, 10) - 1;
-    setCutOffMonth(months[monthIndex] || "");
+    // Use populateFromGroup instead of manual state sets
+    populateFromGroup(item);
 
     const latestPolicy = (await fetchGroupSetupLoginPolicyData(
       item.groupCode,
     )) as LoginPolicyItem;
-    if (latestPolicy) populateFromGroupSetupLoginPolicy(latestPolicy);
+    if (latestPolicy) {
+      setGroupLoginPolicyItems((prev) =>
+        prev.map((p) => (p.groupCode === item.groupCode ? latestPolicy : p)),
+      );
+      populateFromGroupSetupLoginPolicy(latestPolicy);
+    }
 
     const allOTRates = await fetchOverTimeRates();
     const groupOTRates = allOTRates.find((r) => r.groupCode === item.groupCode);
@@ -2488,7 +2964,11 @@ export function TimeKeepGroupPage() {
                     <Pencil className="w-4 h-4" />
                     Edit
                   </button>
-                  <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm">
+                  <button 
+                    onClick={ async () => {
+                      await handleDelete();
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm">
                     <Trash2 className="w-4 h-4" />
                     Delete
                   </button>
@@ -2505,27 +2985,44 @@ export function TimeKeepGroupPage() {
                   <button
                     onClick={async () => {
                       try {
-                        await handleParentSave();
-                        await handleSaveSystemConfig();
-                        await handleSaveGroupSetUpDefinition();
-                        await handleSaveLoginPolicy();
-                        await handleSaveOTRates();
-                        await handleSaveOTBreak();
-                        await handleSaveOTAllowances();
+                        if (isCreateNew) {
+                          await handleParentSave();
+                          await handleSaveNew();
+                        } else {
+                          await handleParentSave();
+                          await handleSaveSystemConfig();
+                          await handleSaveGroupSetUpDefinition();
+                          await handleSaveLoginPolicy();
+                          await handleSaveOTRates();
+                          await handleSaveOTBreak();
+                          await handleSaveOTAllowances();
+
+                          const activeId = currentGroupId;
+                          const { data: updatedGroup } =
+                            await apiClient.get<GroupItem>(
+                              `/Fs/Process/TimeKeepGroupSetUp/${activeId}`,
+                            );
+                          await loadTKSGroup(activeId);
+                          populateFromGroup(updatedGroup);
+
+                          const updatedPolicy =
+                            (await fetchGroupSetupLoginPolicyData(
+                              tksGroupCode,
+                            )) as LoginPolicyItem;
+                          if (updatedPolicy) {
+                            setGroupLoginPolicyItems((prev) =>
+                              prev.map((p) =>
+                                p.groupCode === tksGroupCode
+                                  ? updatedPolicy
+                                  : p,
+                              ),
+                            );
+                            populateFromGroupSetupLoginPolicy(updatedPolicy);
+                          }
+                        }
+
                         setIsEditMode(false);
-
-                        const codeToUse = tksGroupCode || "1";
-                        if (!tksGroupCode) {
-                          setTksGroupCode("1");
-                        }
-
-                        const item = tksGroupItems.find(
-                          (i) => i.groupCode === codeToUse,
-                        );
-
-                        if (item) {
-                          await handleGroupRowClick(item);
-                        }
+                        setIsCreateNew(false);
                       } catch (error) {
                         console.error("Error saving all:", error);
                         alert("Some saves failed. Check console.");

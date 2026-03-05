@@ -19,6 +19,8 @@ interface OtherPoliciesTabContentProps {
 
 export interface OtherPoliciesTabContentHandle {
   handleSave: () => Promise<void>;
+  handleSaveNew: () => Promise<void>;
+  handleDelete: () => Promise<void>;
 }
 
 export interface GroupSetUpOtherPoliciesItem {
@@ -736,7 +738,7 @@ export const OtherPoliciesTabContent = forwardRef<
     };
 
     loadOtherPoliciesSetUp();
-  }, [tksGroupCode, isCreateNew, isEditMode]);
+  }, [tksGroupCode, isCreateNew]);
 
   // Fetch BracketCodeSetUp
   const fetchBracketCodeSetUp = async (
@@ -946,108 +948,242 @@ export const OtherPoliciesTabContent = forwardRef<
   }, [isCreateNew]);
 
   const handleSave = async () => {
-  if (!groupSetUpOtherPoliciesList.length) return;
+    if (!groupSetUpOtherPoliciesList.length) return;
 
-  const existingItem = groupSetUpOtherPoliciesList.find(
-    (item) => item.groupCode === tksGroupCode
-  );
-  if (!existingItem) return;
+    const existingItem = groupSetUpOtherPoliciesList.find(
+      (item) => item.groupCode === tksGroupCode,
+    );
+    if (!existingItem) return;
 
-  // Build updated payload from current states
-  const updatedPayload: GroupSetUpOtherPoliciesItem = {
-    ...existingItem, // keep id, groupCode, and any untouched fields
-    useDefRestDay,
-    restDayWithWorkShift,
-    defRestDay1,
-    defRestDay2,
-    defRestDay3,
-    useTardBracket,
-    tardBracketCode,
-    deductFirstHalfBeforeBracket,
-    useUndertimeBracket,
-    underTimeBracketCode,
-    deductSecondHalfBeforeBracket,
-    useAccumBracket,
-    accumulationBracketYear,
-    accumulation,
-    accumulateUndertime,
-    undertimeToAbsences,
-    noOfHoursFrmUnderToAbsences,
-    tardinessToAbsences,
-    noOfHoursFrmTardiToAbsences,
-    compNoOfHoursEvnWOutLog,
-    compAbsDateSeparated,
-    compNoOfHoursRD,
-    compNoOfHoursLegal,
-    compNoOfHoursSpecial,
-    compNoOfHoursNonWork,
-    noAbsBeforeDateHired,
-    exempTard,
-    exempUndertime,
-    exempNightDiffBasic,
-    exempOT,
-    exempAbsences,
-    exempOtherEarnAndAllowance,
-    exempHolidaypay,
-    exempUnProWorkHoliday,
-    applyLeaveForFirstHalfExempt,
-    applyLeaveForSecondHalfExempt,
-    birthdayLeave,
-    dailySchedule,
-    excludeRestDayInSuspension,
-    excludeLegalInSuspension,
-    excludeSpecialInSuspension,
-    excludeNonWorkingInSuspension,
-    calamYearsOfService,
-    calamConsiderNoOfHours,
-    calamAmount,
-    calamEarnCode,
-    allowPerClassCode,
-    enableClassification,
-    allowBracketCode,
-    byEmploymentStatFlag,
-    employmentStatus,
+    // Build updated payload from current states
+    const updatedPayload: GroupSetUpOtherPoliciesItem = {
+      ...existingItem, // keep id, groupCode, and any untouched fields
+      useDefRestDay,
+      restDayWithWorkShift,
+      defRestDay1,
+      defRestDay2,
+      defRestDay3,
+      useTardBracket,
+      tardBracketCode,
+      deductFirstHalfBeforeBracket,
+      useUndertimeBracket,
+      underTimeBracketCode,
+      deductSecondHalfBeforeBracket,
+      useAccumBracket,
+      accumulationBracketYear,
+      accumulation,
+      accumulateUndertime,
+      undertimeToAbsences,
+      noOfHoursFrmUnderToAbsences,
+      tardinessToAbsences,
+      noOfHoursFrmTardiToAbsences,
+      compNoOfHoursEvnWOutLog,
+      compAbsDateSeparated,
+      compNoOfHoursRD,
+      compNoOfHoursLegal,
+      compNoOfHoursSpecial,
+      compNoOfHoursNonWork,
+      noAbsBeforeDateHired,
+      exempTard,
+      exempUndertime,
+      exempNightDiffBasic,
+      exempOT,
+      exempAbsences,
+      exempOtherEarnAndAllowance,
+      exempHolidaypay,
+      exempUnProWorkHoliday,
+      applyLeaveForFirstHalfExempt,
+      applyLeaveForSecondHalfExempt,
+      birthdayLeave,
+      dailySchedule,
+      excludeRestDayInSuspension,
+      excludeLegalInSuspension,
+      excludeSpecialInSuspension,
+      excludeNonWorkingInSuspension,
+      calamYearsOfService,
+      calamConsiderNoOfHours,
+      calamAmount,
+      calamEarnCode,
+      allowPerClassCode,
+      enableClassification,
+      allowBracketCode,
+      byEmploymentStatFlag,
+      employmentStatus,
+    };
+
+    // Check if there are any changes compared to existingItem
+    const hasChanges = Object.keys(updatedPayload).some(
+      (key) => (updatedPayload as any)[key] !== (existingItem as any)[key],
+    );
+    if (!hasChanges) return; // Exit early if nothing changed
+
+    try {
+      const response = await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies/${existingItem.id}`,
+        updatedPayload,
+      );
+
+      const updatedItem: GroupSetUpOtherPoliciesItem =
+        response.data ?? updatedPayload;
+
+      setGroupSetUpOtherPoliciesList([updatedItem]);
+      populateGroupSetUpOtherPolicies(updatedItem);
+
+      await Swal.fire({
+        icon: "success",
+        title: "Other Policies Saved",
+        text: "Other Policies saved successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to save Other Policies:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Save failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: errorMsg,
+      });
+    }
   };
 
-  // Check if there are any changes compared to existingItem
-  const hasChanges = Object.keys(updatedPayload).some(
-    (key) => (updatedPayload as any)[key] !== (existingItem as any)[key]
-  );
-  if (!hasChanges) return; // Exit early if nothing changed
+  const handleSaveNew = async () => {
+    if (!tksGroupCode) return;
 
+    try {
+      const otherPoliciesPayload = {
+        id: 0,
+        groupCode: tksGroupCode,
+        useDefRestDay,
+        defRestDay1: defRestDay1 || null,
+        defRestDay2: defRestDay2 || null,
+        defRestDay3: defRestDay3 || null,
+        useTardBracket,
+        useUndertimeBracket,
+        exempTard,
+        exempUndertime,
+        exempNightDiffBasic,
+        exempOT,
+        exempAbsences,
+        exempOtherEarnAndAllowance,
+        exempHolidaypay,
+        exempUnProWorkHoliday,
+        allowMealSubsidyCode: null,
+        allowsMealSubsidyAmount: 0,
+        allowMinHoursToBeMealSubsidy: 0,
+        transSubsidyCode: null,
+        transSubsidyAmount: 0,
+        transSubsidyMinHours: 0,
+        weekOTSubsidyCode: null,
+        weekOTSubsidyAmount: 0,
+        weekOTMinHours: 0,
+        restDayOTSubsidyCode: null,
+        restDayOTSubsidyAmount: 0,
+        restDayOTSubsidyMinHours: 0,
+        legalHolidayOTSubsidyCode: null,
+        legalHolidayOTSubsidyAmount: 0,
+        legalHolidayOTSubsidyMinHours: 0,
+        specialHolidayOTSubsidyCode: null,
+        specialHolidayOTSubsidyAmount: 0,
+        specialHolidayOTSubsidyMinHours: 0,
+        dailySchedule: dailySchedule || null,
+        useAutoAssignedShift: false,
+        numHoursBefore: 0,
+        numHoursAfter: 0,
+        unprodWorkOnHoliday: false,
+        restDayWithWorkShift,
+        numWorkHrsPerPeriodPerMosCode: null,
+        allowPerClassCode: allowPerClassCode || null,
+        basedonFixedNoDaysRule: false,
+        regOTSubsidyCode: null,
+        regOTSubsidyAmount: 0,
+        regOTSubsidyTime: null,
+        regOTSubsidyShift: null,
+        birthdayLeave,
+        useOvertimeBracket: false,
+        tardBracketCode: tardBracketCode || null,
+        underTimeBracketCode: underTimeBracketCode || null,
+        enableClassification,
+        accumulation,
+        accumulateUndertime,
+        useAccumBracket,
+        accumulationBracketYear: accumulationBracketYear || null,
+        undertimeToAbsences,
+        noOfHoursFrmUnderToAbsences: Number(noOfHoursFrmUnderToAbsences) || 0,
+        tardinessToAbsences,
+        noOfHoursFrmTardiToAbsences: Number(noOfHoursFrmTardiToAbsences) || 0,
+        compNoOfHoursEvnWOutLog,
+        allowBracketCode: allowBracketCode || null,
+        calamYearsOfService: calamYearsOfService || 0,
+        calamConsiderNoOfHours: calamConsiderNoOfHours || 0,
+        calamAmount: calamAmount || 0,
+        calamEarnCode: calamEarnCode || null,
+        compAbsDateSeparated,
+        compNoOfHoursRD,
+        compNoOfHoursLegal,
+        compNoOfHoursSpecial,
+        compNoOfHoursNonWork,
+        noAbsBeforeDateHired,
+        applyLeaveForFirstHalfExempt,
+        applyLeaveForSecondHalfExempt,
+        excludeRestDayInSuspension,
+        excludeLegalInSuspension,
+        excludeSpecialInSuspension,
+        excludeNonWorkingInSuspension,
+        deductFirstHalfBeforeBracket,
+        deductSecondHalfBeforeBracket,
+        byEmploymentStatFlag,
+        employmentStatus: employmentStatus || null,
+      };
+
+      const response = await apiClient.post(
+        "/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies",
+        otherPoliciesPayload,
+      );
+
+      const newItem: GroupSetUpOtherPoliciesItem =
+        response.data ?? otherPoliciesPayload;
+      setGroupSetUpOtherPoliciesList([newItem]);
+      populateGroupSetUpOtherPolicies(newItem);
+
+      await Swal.fire({
+        icon: "success",
+        title: "Other Policies Created",
+        text: "Other Policies created successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to create Other Policies:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Create failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Create Failed",
+        text: errorMsg,
+      });
+    }
+  };
+
+const handleDelete = async () => {
   try {
-    const response = await apiClient.put(
-      `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies/${existingItem.id}`,
-      updatedPayload
+    const freshItem = await fetchGroupSetUpOtherPoliciesData(tksGroupCode);
+    if (!freshItem?.id) return;
+    await apiClient.delete(
+      `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies/${freshItem.id}`,
     );
-
-    const updatedItem: GroupSetUpOtherPoliciesItem =
-      response.data ?? updatedPayload;
-
-    setGroupSetUpOtherPoliciesList([updatedItem]);
-    populateGroupSetUpOtherPolicies(updatedItem);
-
-    await Swal.fire({
-      icon: "success",
-      title: "Other Policies Saved",
-      text: "Other Policies saved successfully!",
-      timer: 2000,
-      showConfirmButton: false,
-    });
-  } catch (error: any) {
-    console.error("Failed to save Other Policies:", error);
-    const errorMsg = error.response?.data?.message || error.message || "Save failed.";
-    await Swal.fire({
-      icon: "error",
-      title: "Save Failed",
-      text: errorMsg,
-    });
+  } catch (error) {
+    console.error("Failed to delete Other Policies:", error);
+    throw error;
   }
 };
+
   useImperativeHandle(ref, () => ({
     handleSave,
+    handleSaveNew,
+    handleDelete,
   }));
-
   return (
     <div className="space-y-6">
       {/* Group Code and Definition */}
@@ -1205,9 +1341,9 @@ export const OtherPoliciesTabContent = forwardRef<
                 checked={useTardBracket}
                 onChange={(e) => {
                   setUseTardBracket(e.target.checked);
-                  if(!e.target.checked) {
+                  if (!e.target.checked) {
                     setDeductFirstHalfBeforeBracket(false);
-                    setTardBracketCode("");  
+                    setTardBracketCode("");
                   }
                 }}
                 disabled={!isEditMode}
@@ -1537,7 +1673,9 @@ export const OtherPoliciesTabContent = forwardRef<
                 <input
                   type="number"
                   value={calamConsiderNoOfHours}
-                  onChange={(e) => setCalamConsiderNoOfHours(parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    setCalamConsiderNoOfHours(parseFloat(e.target.value))
+                  }
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
                 />
@@ -1551,7 +1689,9 @@ export const OtherPoliciesTabContent = forwardRef<
                 <input
                   type="text"
                   value={calamAmount}
-                  onChange={(e) => isEditMode && setCalamAmount(parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    isEditMode && setCalamAmount(parseFloat(e.target.value))
+                  }
                   readOnly={!isEditMode}
                   className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
                 />
