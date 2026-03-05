@@ -16,6 +16,7 @@ import type {
   ChangePasswordRequest,
   SaveGroupAccessRequest,
 } from '../components/Types/security';
+
 const BASE = '/Security';
 
 export const securityService = {
@@ -73,6 +74,7 @@ export const securityService = {
 
   async updateUser(username: string, data: UpdateUserRequest): Promise<User> {
     const res = await apiClient.put(`${BASE}/SecurityManager/users/${username}`, {
+      UserName:              data.username,
       Expiration:            data.expiration || null,
       MachineName:           data.machineName,
       Suspended:             data.suspended,

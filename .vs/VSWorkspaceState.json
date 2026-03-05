@@ -3,8 +3,13 @@
     "",
     "\\src",
     "\\src\\components",
-    "\\src\\components\\FileSetup\\Employment"
+    "\\src\\components\\Dashboard",
+    "\\src\\components\\Export",
+    "\\src\\components\\FileSetup",
+    "\\src\\components\\FileSetup\\Employment",
+    "\\src\\components\\Maintenance",
+    "\\src\\components\\Modals"
   ],
-  "SelectedNode": "\\src\\components\\LoginPage.tsx",
+  "SelectedNode": "\\src\\App.tsx",
   "PreviewInSolutionExplorer": false
 }

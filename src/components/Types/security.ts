@@ -112,6 +112,7 @@ export interface CreateUserRequest {
 }
 
 export interface UpdateUserRequest {
+  username?: string;
   expiration?: string;
   machineName?: string;
   suspended: boolean;

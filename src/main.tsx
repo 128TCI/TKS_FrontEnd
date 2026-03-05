@@ -6,7 +6,7 @@ import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename="/TKS_128_TEST">
+    <BrowserRouter basename="/128_TKS">
       <App />
     </BrowserRouter>
   </StrictMode>
