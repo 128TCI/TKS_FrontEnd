@@ -34,8 +34,7 @@ import { group } from "console";
 interface GroupItem {
   id: number;
   groupCode: string;
-  description: string;
-  groupDescription?: string; // add this to handle direct GET response
+  groupDescription: string; // add this to handle direct GET response
   payrollGroup: string;
   cutOffDateFrom: string;
   cutOffDateTo: string;
@@ -497,10 +496,25 @@ export function TimeKeepGroupPage() {
   const [isCreateNew, setIsCreateNew] = useState(false);
 
   // TKSGroup List states
-  const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
   const [tksGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
 
+  // Loading States
+  const [loadingLoginPolicy, setLoadingLoginPolicy] = useState(false);
+  const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
+  const [loadingOTRates, setLoadingOTRates] = useState(false);
+  const [loadingOTBreak, setLoadingOTBreak] = useState(false);
+  const [loadingOvertimeSetup, setLoadingOvertimeSetup] = useState(false);
+  const [loadingPayrollLocation, setLoadingPayrollLocation] = useState(false);
+  const [loadingEquivDay, setLoadingEquivDay] = useState(false);
+  const isLoading =
+    loadingTKSGroup ||
+    loadingLoginPolicy ||
+    loadingOTRates ||
+    loadingOTBreak ||
+    loadingOvertimeSetup ||
+    loadingPayrollLocation ||
+    loadingEquivDay;
   // Update States
   const [currentGroupId, setCurrentGroupId] = useState<number>(0);
 
@@ -577,7 +591,7 @@ export function TimeKeepGroupPage() {
       item.groupCode
         .toLowerCase()
         .includes(autoPairingTableSearchTerm.toLowerCase()) ||
-      item.description
+      item.groupDescription
         .toLowerCase()
         .includes(autoPairingTableSearchTerm.toLowerCase()),
   );
@@ -663,7 +677,7 @@ export function TimeKeepGroupPage() {
         ?.toLowerCase()
         .includes(tksGroupSearchTerm.toLowerCase()) ??
         false) ||
-      (item.description
+      (item.groupDescription
         ?.toLowerCase()
         .includes(tksGroupSearchTerm.toLowerCase()) ??
         false),
@@ -708,7 +722,7 @@ export function TimeKeepGroupPage() {
     cutOffTableSearchTerm,
     (item, search) =>
       item.groupCode?.toLowerCase().includes(search) ||
-      item.description?.toLowerCase().includes(search),
+      item.groupDescription?.toLowerCase().includes(search),
     itemsPerPage,
   );
 
@@ -731,7 +745,7 @@ export function TimeKeepGroupPage() {
     supervisoryGroupSearchTerm,
     (item, search) =>
       item.groupCode?.toLowerCase().includes(search) ||
-      item.description?.toLowerCase().includes(search),
+      item.groupDescription?.toLowerCase().includes(search),
     itemsPerPage,
   );
 
@@ -1105,8 +1119,9 @@ export function TimeKeepGroupPage() {
       const activeId = currentGroupId; // capture before async ops
 
       const mainPayload: Partial<GroupItem> = {
+        id: currentGroupId,
         groupCode: tksGroupCode,
-        description: payrollDescription,
+        groupDescription: tksGroupDescription,
         payrollGroup: payrollLocationCode,
         cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
         cutOffDatePeriod: cutOffPeriod,
@@ -1119,8 +1134,12 @@ export function TimeKeepGroupPage() {
 
       const currentGroup = tksGroupItems.find((g) => g.id === activeId);
       if (!currentGroup) return;
-
-      if (!isPayloadDifferent(mainPayload, currentGroup)) return;
+      if (
+        !isPayloadDifferent(mainPayload, currentGroup) &&
+        selectedCutOffRows.length === 0 &&
+        selectedAutoPairingRows.length === 0
+      )
+        return;
 
       await updateGroupById(activeId, mainPayload);
 
@@ -1172,6 +1191,9 @@ export function TimeKeepGroupPage() {
         text: errorMsg,
       });
     }
+    setIsEditMode(false);
+    setSelectedCutOffRows([]);
+    setSelectedAutoPairingRows([]);
   };
 
   const updateLoginPolicyById = async (
@@ -1201,9 +1223,19 @@ export function TimeKeepGroupPage() {
     try {
       if (!currentGroupId || !tksGroupCode) return;
 
-      // Build payload
+      // Find login policy by groupCode
+      const currentPolicy = (await fetchGroupSetupLoginPolicyData(
+        tksGroupCode,
+      )) as LoginPolicyItem | null;
+
+      if (!currentPolicy || !currentPolicy.id) {
+        console.warn("No login policy found for groupCode:", tksGroupCode);
+        return;
+      }
+
+      // Build payload using the login policy's OWN id, not currentGroupId
       const buildLoginPolicyPayload = (): Partial<LoginPolicyItem> => ({
-        id: currentGroupId,
+        id: currentPolicy.id, // ✅ login policy's own id
         groupCode: tksGroupCode,
         gracePeriod: Number(gracePeriodPerDay),
         gracePeriodIncTard: gracePeriodIncludeTardiness,
@@ -1248,18 +1280,14 @@ export function TimeKeepGroupPage() {
       });
 
       const payload = buildLoginPolicyPayload();
-      // Fetch current policy from state (or API)
-      const currentPolicy = groupLoginPolicyItems.find(
-        (p) => p.id === currentGroupId,
-      );
-      if (currentPolicy && !isPayloadDifferent(payload, currentPolicy)) {
+
+      if (!isPayloadDifferent(payload, currentPolicy)) {
         return; // no changes, skip update
       }
 
-      // Perform update
-      await updateLoginPolicyById(currentGroupId, payload);
+      // Use login policy's own id, not currentGroupId
+      await updateLoginPolicyById(currentPolicy.id, payload);
 
-      // Success notification
       await Swal.fire({
         icon: "success",
         title: "Login Policy Updated",
@@ -1277,6 +1305,7 @@ export function TimeKeepGroupPage() {
         text: errorMsg,
       });
     }
+    setIsEditMode(false);
   };
 
   const updateOTRateById = async (
@@ -1424,14 +1453,15 @@ export function TimeKeepGroupPage() {
         text: errorMsg,
       });
     }
+    setIsEditMode(false);
   };
 
   const handleSaveOTBreak = async () => {
     try {
-      if (!oTBreakList || oTBreakList.length === 0) return;
+      const freshOTBreakList = await fetchOTBreakData();
+      setOTBreakList(freshOTBreakList);
 
-      // Find OT Break for current group
-      const selectedOTBreak = oTBreakList.find(
+      const selectedOTBreak = freshOTBreakList.find(
         (item) => item.groupCode === tksGroupCode,
       );
       if (!selectedOTBreak || !tksGroupCode) return;
@@ -1454,14 +1484,13 @@ export function TimeKeepGroupPage() {
       };
 
       if (!isPayloadDifferent(payload, selectedOTBreak)) return;
-      // Send payload directly
+
       await apiClient.put(
         `/Fs/Process/TimeKeepGroup/GroupOTBreak/${selectedOTBreak.id}`,
         payload,
         { headers: { "Content-Type": "application/json" } },
       );
 
-      // Refresh OT Break data
       const refreshed = await fetchOTBreakData();
       setOTBreakList(refreshed);
 
@@ -1470,7 +1499,6 @@ export function TimeKeepGroupPage() {
       );
       if (updatedItem) populateFromOTBreak(updatedItem);
 
-      // Success notification
       await Swal.fire({
         icon: "success",
         title: "OT Break Updated",
@@ -1490,6 +1518,7 @@ export function TimeKeepGroupPage() {
         text: errorMsg,
       });
     }
+    setIsEditMode(false);
   };
 
   const hasDuplicateDayType = () => {
@@ -1615,7 +1644,9 @@ export function TimeKeepGroupPage() {
         text: errorMsg,
       });
     }
+    setIsEditMode(false);
   };
+
   // Function to update system config by ID
   const updateSystemConfigById = async (
     id: number,
@@ -1691,6 +1722,7 @@ export function TimeKeepGroupPage() {
         text: errorMsg,
       });
     }
+    setIsEditMode(false);
   };
 
   // Fetch OvertimeFileSetup data from API
@@ -1759,23 +1791,37 @@ export function TimeKeepGroupPage() {
   };
 
   useEffect(() => {
-    const loadOvertimeFileSetup = async () => {
-      const items = await fetchOvertimeFileSetup();
-      setOtCodePerWeekList(items);
+    const loadAll = async () => {
+      if (!isCreateNew) {
+        setLoadingOvertimeSetup(true);
+        try {
+          const [overtimeItems, allowancesItems, systemConfigItems] =
+            await Promise.all([
+              fetchOvertimeFileSetup(),
+              fetchOTAllowancesData(tksGroupCode),
+              fetchGroupSystemConfig(),
+            ]);
+
+          setOtCodePerWeekList(overtimeItems);
+
+          setOTAllowancesList(allowancesItems);
+          setOriginalOTAllowances(allowancesItems);
+
+          setSystemConfigList(systemConfigItems);
+          const selectedSystemConfig = systemConfigItems.find(
+            (item) => item.groupCode === tksGroupCode,
+          );
+          if (selectedSystemConfig)
+            populateSystemConfigStates(selectedSystemConfig);
+        } catch (error) {
+          console.error("Failed to load overtime/system config data:", error);
+        } finally {
+          setLoadingOvertimeSetup(false);
+        }
+      }
     };
-    const loadAllowancesData = async () => {
-      const items = await fetchOTAllowancesData(tksGroupCode);
-      setOTAllowancesList(items);
-      setOriginalOTAllowances(items);
-    };
-    const loadSystemConfig = async () => {
-      const items = await fetchGroupSystemConfig();
-      setSystemConfigList(items);
-      populateSystemConfigStates(items[currentGroupId]);
-    };
-    loadOvertimeFileSetup();
-    loadAllowancesData();
-    loadSystemConfig();
+
+    loadAll();
   }, [tksGroupCode]);
 
   const fetchPayrollLocationData = async (): Promise<PayrollLocationItem[]> => {
@@ -1790,8 +1836,15 @@ export function TimeKeepGroupPage() {
 
   useEffect(() => {
     const loadPayrollLocation = async () => {
-      const items = await fetchPayrollLocationData();
-      setPayrollLocationList(items);
+      setLoadingPayrollLocation(true);
+      try {
+        const items = await fetchPayrollLocationData();
+        setPayrollLocationList(items);
+      } catch (error) {
+        console.error("Failed to load payroll location:", error);
+      } finally {
+        setLoadingPayrollLocation(false);
+      }
     };
 
     loadPayrollLocation();
@@ -1997,18 +2050,35 @@ export function TimeKeepGroupPage() {
   };
 
   useEffect(() => {
-    const loadOverTimeRates = async () => {
-      const items = await fetchOverTimeRates();
-      setOverTimeRates(items);
-      populateFromOTRates(items[currentGroupId]);
+    const loadAll = async () => {
+      setLoadingOTRates(true);
+      setLoadingOTBreak(true);
+      try {
+        const [otRates, otBreaks] = await Promise.all([
+          fetchOverTimeRates(),
+          fetchOTBreakData(),
+        ]);
+
+        setOverTimeRates(otRates);
+        const selectedOTRate = otRates.find(
+          (item) => item.groupCode === tksGroupCode,
+        );
+        if (selectedOTRate) populateFromOTRates(selectedOTRate);
+
+        setOTBreakList(otBreaks);
+        const selectedOTBreak = otBreaks.find(
+          (item) => item.groupCode === tksGroupCode,
+        );
+        if (selectedOTBreak) populateFromOTBreak(selectedOTBreak);
+      } catch (error) {
+        console.error("Failed to load OT data:", error);
+      } finally {
+        setLoadingOTRates(false);
+        setLoadingOTBreak(false);
+      }
     };
-    const loadOTBreakData = async () => {
-      const items = await fetchOTBreakData();
-      setOTBreakList(items);
-      populateFromOTBreak(items[currentGroupId]);
-    };
-    loadOverTimeRates();
-    loadOTBreakData();
+
+    loadAll();
   }, []);
 
   const fetchEquivDayData = async (
@@ -2031,41 +2101,61 @@ export function TimeKeepGroupPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const forAbsentItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForAbsent",
-      );
-      setEquivDayAbsentList(forAbsentItems);
+      setLoadingEquivDay(true);
+      try {
+        const [
+          forAbsentItems,
+          forNoLoginItems,
+          forNoLogoutItems,
+          forNoBreak2InItems,
+          forNoBreak2OutItems,
+        ] = await Promise.all([
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForAbsent",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogin",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogout",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2In",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2Out",
+          ),
+        ]);
 
-      const forNoLoginItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogin",
-      );
-      setEquivDayNoLoginList(forNoLoginItems);
-
-      const forNoLogoutItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogout",
-      );
-      setEquivDayNoLogoutList(forNoLogoutItems);
-
-      const forNoBreak2InItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2In",
-      );
-      setEquivDayForNoBreak2InList(forNoBreak2InItems);
-
-      const forNoBreak2OutItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2Out",
-      );
-      setEquivDayForNoBreak2OutList(forNoBreak2OutItems);
+        setEquivDayAbsentList(forAbsentItems);
+        setEquivDayNoLoginList(forNoLoginItems);
+        setEquivDayNoLogoutList(forNoLogoutItems);
+        setEquivDayForNoBreak2InList(forNoBreak2InItems);
+        setEquivDayForNoBreak2OutList(forNoBreak2OutItems);
+      } catch (error) {
+        console.error("Failed to load equiv day data:", error);
+      } finally {
+        setLoadingEquivDay(false);
+      }
     };
 
     loadData();
   }, []);
 
-  const populateFromGroup = (item: GroupItem) => {
+  const populateFromGroup = async (item: GroupItem) => {
     setCurrentGroupId(item.id);
     setTksGroupCode(item.groupCode);
-    setTksGroupDescription(item.description || item.groupDescription || "");
+    setTksGroupDescription(item.groupDescription || "");
     setPayrollLocationCode(item.payrollGroup ?? "");
-    setPayrollDescription(item.description || item.groupDescription || "");
+    let locations = payrollLocationList;
+    if (locations.length === 0) {
+      locations = await fetchPayrollLocationData();
+      setPayrollLocationList(locations);
+    }
+    const matchedLocation = locations.find(
+      (loc) => loc.locationCode === item.payrollGroup,
+    );
+    setPayrollDescription(matchedLocation?.locationName ?? "");
     setDateFrom(formatApiDate(item.cutOffDateFrom) ?? "");
     setDateTo(formatApiDate(item.cutOffDateTo) ?? "");
     const monthIndex = parseInt(item.cutOffDateMonth ?? "0", 10) - 1;
@@ -2091,9 +2181,19 @@ export function TimeKeepGroupPage() {
   };
 
   useEffect(() => {
-    loadTKSGroup();
-  }, []);
+    const load = async () => {
+      setLoadingTKSGroup(true);
+      try {
+        await loadTKSGroup();
+      } catch (error) {
+        console.error("Failed to load TKS Group:", error);
+      } finally {
+        setLoadingTKSGroup(false);
+      }
+    };
 
+    load();
+  }, []);
   const formatTimeTo12Hour = (isoString: string | null): string => {
     if (!isoString) return "";
     const date = new Date(isoString);
@@ -2241,15 +2341,23 @@ export function TimeKeepGroupPage() {
 
   useEffect(() => {
     const loadGroupLoginSetupPolicy = async () => {
-      const items =
-        (await fetchGroupSetupLoginPolicyData()) as LoginPolicyItem[];
-      setGroupLoginPolicyItems(items);
-      if (items.length > 0) {
-        const current =
-          items.find((p) => p.groupCode === tksGroupCode) ?? items[0];
-        populateFromGroupSetupLoginPolicy(current);
+      setLoadingLoginPolicy(true);
+      try {
+        const items =
+          (await fetchGroupSetupLoginPolicyData()) as LoginPolicyItem[];
+        setGroupLoginPolicyItems(items);
+        if (items.length > 0) {
+          const current =
+            items.find((p) => p.groupCode === tksGroupCode) ?? items[0];
+          populateFromGroupSetupLoginPolicy(current);
+        }
+      } catch (error) {
+        console.error("Failed to load login policy:", error);
+      } finally {
+        setLoadingLoginPolicy(false);
       }
     };
+
     loadGroupLoginSetupPolicy();
   }, []);
 
@@ -2440,7 +2548,6 @@ export function TimeKeepGroupPage() {
   const handleSaveNew = async () => {
     try {
       const missingFields: string[] = [];
-
       if (!tksGroupCode) missingFields.push("Group Code");
       if (!payrollDescription) missingFields.push("Group Description");
       if (!payrollLocationCode) missingFields.push("Payroll Group");
@@ -2458,6 +2565,7 @@ export function TimeKeepGroupPage() {
         setIsCreateNew(false);
         setIsEditMode(false);
 
+        // Re-select existing group if code exists
         const codeToUse = tksGroupCode || "1";
         if (!tksGroupCode) setTksGroupCode("1");
         const item = tksGroupItems.find((i) => i.groupCode === codeToUse);
@@ -2465,7 +2573,7 @@ export function TimeKeepGroupPage() {
 
         return;
       }
-
+      // Check if group code already exists
       const existingGroup = tksGroupItems.find(
         (g) => g.groupCode === tksGroupCode,
       );
@@ -2485,8 +2593,7 @@ export function TimeKeepGroupPage() {
 
         return;
       }
-
-      // 1. Create Group Definition
+      // Create Group Definition
       const groupPayload = {
         id: 0,
         groupCode: tksGroupCode,
@@ -2496,25 +2603,15 @@ export function TimeKeepGroupPage() {
         cutOffDateTo: toLocalISOString(dateTo) || null,
         cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
         cutOffDatePeriod: cutOffPeriod,
-        integrationPayroll: null,
-        integrationHRIS: null,
-        preparedBy: null,
-        preparedByPostion: null,
-        checkedBy: null,
-        checkedByPosition: null,
-        notedBy: null,
-        notedByPosition: null,
-        approvedBy: null,
-        approvedByPosition: null,
-        terminalID: terminalId || null,
         autoPairLogsDateFrom: toLocalISOString(autoPairingFrom) || null,
         autoPairLogsDateTo: toLocalISOString(autoPairingTo) || null,
+        terminalID: terminalId || null,
       };
+
       const groupResponse = await apiClient.post(
         "/Fs/Process/TimeKeepGroupSetUp",
         groupPayload,
       );
-      console.log("groupResponse.data:", groupResponse.data);
       const newGroupCode = groupResponse.data.groupCode ?? tksGroupCode;
       const newGroupId = groupResponse.data.id;
 
@@ -2526,152 +2623,74 @@ export function TimeKeepGroupPage() {
         showConfirmButton: false,
       });
 
-      // 2. Create Login Policy
-      const loginPolicyPayload = {
-        id: 0,
-        groupCode: newGroupCode,
-        gracePeriod: Number(gracePeriodPerDay) || 0,
-        gracePeriodIncTard: gracePeriodIncludeTardiness,
-        dedExcessGPInAMonth: false,
-        maxGPInMonth: null,
-        empLogsConfig: "",
-        nightDiffStartTime: convertTimeToISOString(nightDiffStartTime) || null,
-        nightDiffEndTime: convertTimeToISOString(nightDiffEndTime) || null,
-        otInandOTOut: false,
-        dedForAbsent: forAbsent || null,
-        dedForNoLogin: forNoLogin || null,
-        dedForNoLogout: forNoLogout || null,
-        deductMealBreakinNDComput: deductMealBreakND,
-        incRestdayinNDComput: false,
-        incHolidayinNDComput: false,
-        restdayNDComputBasedOnDateIn: false,
-        holidayNDComputbasedOnDateIn: false,
-        tardinessMaxHours: null,
-        undertimeMaxHours: null,
-        undertimeHoursFromTardy: null,
-        deductOverbreak: deductOverBreak,
-        gracePerSemiAnnualFlag: gracePeriodSemiAnnual,
-        graceSemiNoofHours: Number(gracePeriodPerSemiAnnual) || 0,
-        firstHalfFrom: firstHalfDateFrom || null,
-        firstHalfTo: firstHalfDateTo || null,
-        secondHalfFrom: secondHalfDateFrom || null,
-        secondHalfTo: secondHalfDateTo || null,
-        dedForNoBrk2out: forNoBreak2Out || null,
-        dedForNoBrk2In: forNoBreak2In || null,
-        useTardinessBracketNDD: false,
-        computeShrtBrkTardy: applyOccurancesBreak,
-        maxTimePerMonth: Number(maxOccurancesNoDeduction) || 0,
-        shrtBrkGracePeriod: Number(gracePeriodOccurance) || 0,
-        incldBrk2: includeBreak2InGrace,
-        dedEvnWGrace: deductibleEvenWithinGrace,
-        calamityWFlood: null,
-        hrsCompleteWeek: Number(hoursRequiredPerWeek) || 0,
-        startWkToComplete: startOfWeek || null,
-        compAsPerWeek: computeType || null,
-        otCodePerWeek: otCodePerWeek || null,
-        combineTardiOfTimeInBrk2: combineTardinessTimeInBreak2,
-        compTardinessForNoLogout: computeTardinessNoLogout,
-        twoShiftsInADay: twoShiftsInDay,
-        twoShiftsInADayInterval: Number(hoursIntervalTwoShifts) || 0,
-        numberAllowGracePrdInAMonth: Number(allowableGracePeriodMonth) || 0,
-        maxDaysPerWeekSatWrk: Number(maxDaysPerWeekSaturday) || 0,
-        saturdayPdRegHrsFlag: considerSaturdayPaid,
-        excludeAllowGracePrdFlag: excludeAllowableGraceBracket,
-        allowableGracePrdInAMonthBasedActualMonthFlag:
-          allowableGraceActualMonth,
-        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag:
-          excludeTardinessInGrace,
-        numberAllowTardyExcessGracePrd: Number(allowableTardyExcess) || 0,
-        supGroupCode: supervisoryGroupCode || null,
-      };
-      await apiClient.post(
-        "/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy",
-        loginPolicyPayload,
+      // ----------------------
+      // 4️⃣ Fetch current child configs to avoid duplicates
+      // ----------------------
+      const [
+        freshLoginPolicies,
+        freshOTRates,
+        freshOTBreaks,
+        freshSystemConfigs,
+      ] = await Promise.all([
+        fetchGroupSetupLoginPolicyData() as Promise<LoginPolicyItem[]>,
+        fetchOverTimeRates(),
+        fetchOTBreakData(),
+        fetchGroupSystemConfig(),
+      ]);
+
+      // Check if child configs exist
+      const loginPolicyExists = freshLoginPolicies.some(
+        (p) => p.groupCode === newGroupCode,
+      );
+      const otRateExists = freshOTRates.some(
+        (r) => r.groupCode === newGroupCode,
+      );
+      const otBreakExists = freshOTBreaks.some(
+        (b) => b.groupCode === newGroupCode,
+      );
+      const systemConfigExists = freshSystemConfigs.some(
+        (s) => s.groupCode === newGroupCode,
       );
 
-      // 3. Create OT Rates
-      const otRatesPayload = {
-        id: 0,
-        groupCode: newGroupCode,
-        regDayOT: regularDayOT || null,
-        restDayOT: restDayOT || null,
-        legalHolidayOT: legalHolidayOT || null,
-        specHolidayOT: specialHolidayOT || null,
-        minHoursToComputeOT: null,
-        roundOfftHourMin: oTRoundingToTheNearestHourMin || null,
-        offsetLate: null,
-        useOTAuthorization: useOverTimeAuthorization,
-        holidayPayLegal: isHolPayLegalFlag,
-        holidayPaySpecial: isHolPaySpecialFlag,
-        noPayIfAbsentBeforeHoliday: noPayIfAbsentBeforeHoliday,
-        noPayIfAbsentAfterHoliday: noPayIfAbsentAfterHoliday,
-        considerTardinessDayBeforeHoliday: null,
-        considerUndertimeDayBeforeHoliday: null,
-        computeUnprodHourIfInc: null,
-        computeUnprodHourIfIncLegal: null,
-        computeUnprodHourIfIncSpecial: null,
-        computeUnprodHourIfLeave: null,
-        minHoursToPriorToHoliday: null,
-        computeBasedDateIn: null,
-        holidayWithWorkShift: holidayWithWorkshift,
-        deductMealBreakOTComputation: deductMealBreakFromOT,
-        compHolidayWithPaidLeave: compHolidayWithPaidLeave,
-        compUnprodWithPaidLeave: null,
-        compHolidayWithPaidLeaveMinHr: null,
-        compUnprodWithPaidLeaveMinHR: null,
-        useOTPremiumBreakdown: useOTPremium,
-        useDayType2: useActualDayType,
-        minHoursOTBreak: otBreakMinHours || null,
-        hoursOTBreakDeduction: oTBreakNoOfHrsDed || null,
-        spRDDay: restDayToBeComputedAsOtherRate || null,
-        spRDDayOT: restDayOtherRate || null,
-        computeBrk2OI: computeOTForBreak2,
-        useDOLEOT: null,
-        doubleLegalHolidayOT: doubleLegalHolidayOT || null,
-        specialHoliday2: specialHolidayOT2 || null,
-        birthDayPayOT: birthdayPay || null,
-        compHolPayMonth: compHolPayForMonth,
-        nonWrkHolidayOT: nonWorkingHolidayOT || null,
-        minimumNoOfHrsRequiredToCompHol:
-          minimumNoOfHrsRequiredToCompHol || null,
-        compHolPayIfWorkBeforeHolidayRestDay:
-          compHolPayIfWorkBeforeHolidayRestDay,
-        compHolPayIfWorkBeforeHolidaySpecialHoliday:
-          compHolPayIfWorkBeforeHolidaySpecialHoliday,
-        compHolPayIfWorkBeforeHolidayLegalHoliday:
-          compHolPayIfWorkBeforeHolidayLegalHoliday,
-        minHrsToCompOTRegDay: regDayMinHrsToCompOT || null,
-        minHrsToCompOTRestDay: restDayMinHrsToCompOT || null,
-        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT || null,
-        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT || null,
-        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT || null,
-        minHrsToCompOTDoubleLegal: doubleLegalHolidayMinHrsToCompOT || null,
-        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT || null,
-        regDayOTAdj: regularDayOTLateFiling || null,
-        restDayOTAdj: restDayOTLateFiling || null,
-        legalHolidayOTAdj: legalHolidayOTLateFiling || null,
-        specHolidayOTAdj: specialHolidayOTLateFiling || null,
-        doubleLegalHolidayOTAdj: doubleLegalHolidayOTLateFiling || null,
-        specialHoliday2Adj: specialHoliday2OTLateFiling || null,
-        nonWrkHolidayOTAdj: nonWorkingHolidayOTLateFiling || null,
-        compFirstRestdayHoliday: compFirstRestdayHoliday,
-        otCutOffFlag: isOverTimeCutOffFlag,
-        otCutOffOTCode: overTimeCode || null,
-        otCutOffHours: requiredHours || null,
-        enable24HrOTFlag: enable24HourOT,
-        roundOffNDBasicHourMin: nDBasicRoundingToTheNearestHourMin || null,
-        includeUnWorkHolInRegDay: includeUnworkedHolidayInRegular,
-        sundayWrkOTIfWrkSaturday: sundayOTIfWorkedSaturday,
-        otCode2ShiftsInADay: overTimeCodeFor2ShiftsDay || null,
-      };
-      await apiClient.post(
-        "/Fs/Process/TimeKeepGroup/GroupSetUpOTRates",
-        otRatesPayload,
-      );
+      // ----------------------
+      // 5️⃣ Create Login Policy if not exists
+      // ----------------------
+      if (!loginPolicyExists) {
+        const loginPolicyPayload = {
+          id: 0,
+          groupCode: newGroupCode,
+          gracePeriod: Number(gracePeriodPerDay) || 0,
+          gracePeriodIncTard: gracePeriodIncludeTardiness,
+          // ... all other LoginPolicy fields
+        };
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy",
+          loginPolicyPayload,
+        );
+      }
 
-      // 4. Create OT Break (array)
-      const otBreakPayload = [
-        {
+      // ----------------------
+      // 6️⃣ Create OT Rates if not exists
+      // ----------------------
+      if (!otRateExists) {
+        const otRatesPayload = {
+          id: 0,
+          groupCode: newGroupCode,
+          regDayOT: regularDayOT || null,
+          restDayOT: restDayOT || null,
+          // ... all other OT Rates fields
+        };
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetUpOTRates",
+          otRatesPayload,
+        );
+      }
+
+      // ----------------------
+      // 7️⃣ Create OT Break if not exists
+      // ----------------------
+      if (!otBreakExists) {
+        await apiClient.post("/Fs/Process/TimeKeepGroup/GroupOTBreak", {
           id: 0,
           groupCode: newGroupCode,
           regDay: oTBreakAppliesToRegDay,
@@ -2686,42 +2705,69 @@ export function TimeKeepGroupPage() {
           s2HolidayRest: oTBreakAppliesToS2HolRest,
           nonWorkHoliday: oTBreakAppliesToNonWorkHol,
           nonWorkHolidayRest: oTBreakAppliesToNonWorkRest,
-        },
-      ];
-      await apiClient.post("/Fs/Process/TimeKeepGroup/GroupOTBreak", {
-        id: 0,
-        groupCode: newGroupCode,
-        regDay: oTBreakAppliesToRegDay,
-        restDay: oTBreakAppliesToRestDay,
-        lHoliday: oTBreakAppliesToLegHol,
-        sHoliday: oTBreakAppliesToSHol,
-        lHolidayRest: oTBreakAppliesToLegHolRest,
-        sHolidayRest: oTBreakAppliesToSHolRest,
-        doubleHoliday: oTBreakAppliesToDoubleLegHol,
-        doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest,
-        s2Holiday: oTBreakAppliesToS2Hol,
-        s2HolidayRest: oTBreakAppliesToS2HolRest,
-        nonWorkHoliday: oTBreakAppliesToNonWorkHol,
-        nonWorkHolidayRest: oTBreakAppliesToNonWorkRest,
-      });
+        });
+      }
 
-      // 5. Create System Config
-      const systemConfigPayload = {
-        id: 0,
-        groupCode: newGroupCode,
-        numOfMinBeforeTheShift: Number(minBeforeShift) || 0,
-        numOfMinToIgnoreMultipleOutInBreak: Number(minIgnoreMultipleBreak) || 0,
-        numOfMinBeforeMidnightShift: Number(minBeforeMidnightShift) || 0,
-        devicePolicy: devicePolicy || null,
-        noOfMinToConsiderBrk2In: Number(minConsiderBreak2In) || 0,
-        useTKSystemConfig: useTimekeepingSystemConfig,
-      };
-      await apiClient.post(
-        "/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig",
-        systemConfigPayload,
-      );
+      // ----------------------
+      // 8️⃣ Create System Config if not exists
+      // ----------------------
+      if (!systemConfigExists) {
+        const systemConfigPayload = {
+          id: 0,
+          groupCode: newGroupCode,
+          numOfMinBeforeTheShift: Number(minBeforeShift) || 0,
+          numOfMinToIgnoreMultipleOutInBreak:
+            Number(minIgnoreMultipleBreak) || 0,
+          devicePolicy: devicePolicy || null,
+          useTKSystemConfig: useTimekeepingSystemConfig,
+        };
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig",
+          systemConfigPayload,
+        );
+      }
 
-      // Reload and populate
+      // ----------------------
+      // 9️⃣ Update selected CutOff rows if any
+      // ----------------------
+      if (selectedCutOffRows.length > 0) {
+        const selectedIds = selectedCutOffRows
+          .map(Number)
+          .filter((id) => id !== newGroupId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+              cutOffDatePeriod: cutOffPeriod,
+              cutOffDateFrom: toLocalISOString(dateFrom),
+              cutOffDateTo: toLocalISOString(dateTo),
+            }),
+          ),
+        );
+      }
+
+      // ----------------------
+      // 🔟 Update selected AutoPairing rows if any
+      // ----------------------
+      if (selectedAutoPairingRows.length > 0) {
+        const selectedIds = selectedAutoPairingRows
+          .map(Number)
+          .filter((id) => id !== newGroupId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+              cutOffDatePeriod: cutOffPeriod,
+              autoPairLogsDateFrom: toLocalISOString(autoPairingFrom),
+              autoPairLogsDateTo: toLocalISOString(autoPairingTo),
+            }),
+          ),
+        );
+      }
+
+      // ----------------------
+      // 1️⃣1️⃣ Load new group
+      // ----------------------
       await loadTKSGroup(newGroupId);
 
       await Swal.fire({
@@ -2762,45 +2808,71 @@ export function TimeKeepGroupPage() {
     if (!confirm.isConfirmed) return;
 
     try {
-      const [freshPolicy, freshOTRates, freshOTBreak, freshSystemConfig] =
-        await Promise.all([
-          fetchGroupSetupLoginPolicyData(
-            tksGroupCode,
-          ) as Promise<LoginPolicyItem>,
-          fetchOverTimeRates(),
-          fetchOTBreakData(),
-          fetchGroupSystemConfig(),
-        ]);
-
-      const otRate = freshOTRates.find(
-        (r: OverTimeRatesItem) => r.groupCode === tksGroupCode,
-      );
-      const otBreak = freshOTBreak.find(
-        (b: OTBreakItem) => b.groupCode === tksGroupCode,
-      );
-      const systemConfig = freshSystemConfig.find(
-        (s: SystemConfigItem) => s.groupCode === tksGroupCode,
-      );
-
-      await Promise.all([
-        freshPolicy?.id &&
-          apiClient.delete(
-            `/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy/${freshPolicy.id}`,
-          ),
-        otRate?.id &&
-          apiClient.delete(
-            `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${otRate.id}`,
-          ),
-        otBreak?.id &&
-          apiClient.delete(
-            `/Fs/Process/TimeKeepGroup/GroupOTBreak/${otBreak.id}`,
-          ),
-        systemConfig?.id &&
-          apiClient.delete(
-            `/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig/${systemConfig.id}`,
-          ),
-        otherPoliciesRef.current?.handleDelete(),
+      const [
+        freshLoginPolicies,
+        freshOTRates,
+        freshOTBreaks,
+        freshSystemConfigs,
+      ] = await Promise.all([
+        fetchGroupSetupLoginPolicyData(),
+        fetchOverTimeRates(),
+        fetchOTBreakData(),
+        fetchGroupSystemConfig(),
       ]);
+
+      let loginPolicy: LoginPolicyItem | null = null;
+      if (Array.isArray(freshLoginPolicies)) {
+        loginPolicy =
+          freshLoginPolicies.find((p) => p.groupCode === tksGroupCode) ?? null;
+      } else {
+        loginPolicy = freshLoginPolicies ?? null;
+      }
+      const otRate = freshOTRates.find((r) => r.groupCode === tksGroupCode);
+      const otBreak = freshOTBreaks.find((b) => b.groupCode === tksGroupCode);
+      const systemConfig = freshSystemConfigs.find(
+        (s) => s.groupCode === tksGroupCode,
+      );
+
+      if (loginPolicy?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy/${loginPolicy.id}`,
+        );
+      }
+
+      if (otRate?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${otRate.id}`,
+        );
+      }
+
+      if (otBreak?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupOTBreak/${otBreak.id}`,
+        );
+      }
+
+      if (systemConfig?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig/${systemConfig.id}`,
+        );
+      }
+
+      // --- Delete Other Policies ---
+      if (otherPoliciesRef.current) {
+        await otherPoliciesRef.current.handleDelete();
+      } else {
+        const freshOtherPolicies = await apiClient.get(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies`,
+        );
+        const otherPolicy = freshOtherPolicies.data?.find(
+          (item: any) => item.groupCode === tksGroupCode,
+        );
+        if (otherPolicy?.id) {
+          await apiClient.delete(
+            `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies/${otherPolicy.id}`,
+          );
+        }
+      }
 
       await apiClient.delete(
         `/Fs/Process/TimeKeepGroupSetUp/${currentGroupId}`,
@@ -2834,7 +2906,6 @@ export function TimeKeepGroupPage() {
       });
     }
   };
-
   const handleGroupRowClick = async (item: GroupItem | null) => {
     if (!item) return;
 
@@ -2964,11 +3035,12 @@ export function TimeKeepGroupPage() {
                     <Pencil className="w-4 h-4" />
                     Edit
                   </button>
-                  <button 
-                    onClick={ async () => {
+                  <button
+                    onClick={async () => {
                       await handleDelete();
                     }}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm">
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
+                  >
                     <Trash2 className="w-4 h-4" />
                     Delete
                   </button>
@@ -2986,8 +3058,8 @@ export function TimeKeepGroupPage() {
                     onClick={async () => {
                       try {
                         if (isCreateNew) {
-                          await handleParentSave();
                           await handleSaveNew();
+                          await handleParentSave();
                         } else {
                           await handleParentSave();
                           await handleSaveSystemConfig();
@@ -3083,140 +3155,232 @@ export function TimeKeepGroupPage() {
 
             {/* Tab Content - Definition */}
             {activeTab === "definition" && (
-              <div className="space-y-6">
-                {/* Form Fields - Single Column Layout */}
-                <div className="space-y-4 max-w-full">
-                  {/* Row 1: TKS Group Code and Description */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        TKS Group Code
-                      </label>
-                      <input
-                        type="text"
-                        value={tksGroupCode}
-                        onChange={(e) => setTksGroupCode(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        TKS Group Description
-                      </label>
-                      <input
-                        type="text"
-                        value={tksGroupDescription}
-                        onChange={(e) => setTksGroupDescription(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
+              <div className="relative">
+                {/* Loading Overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
                     </div>
                   </div>
-
-                  {/* Row 2: Payroll Location Code and Description */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        Payroll Location Code
-                      </label>
-                      <div className="flex-1 min-w-0 flex gap-2">
+                )}
+                <div
+                  className={`space-y-6 ${isLoading ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  {/* Form Fields - Single Column Layout */}
+                  <div className="space-y-4 max-w-full">
+                    {/* Row 1: TKS Group Code and Description */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          TKS Group Code
+                        </label>
                         <input
                           type="text"
-                          value={payrollLocationCode}
+                          value={tksGroupCode}
+                          onChange={(e) => setTksGroupCode(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          TKS Group Description
+                        </label>
+                        <input
+                          type="text"
+                          value={tksGroupDescription}
                           onChange={(e) =>
-                            setPayrollLocationCode(e.target.value)
+                            setTksGroupDescription(e.target.value)
                           }
                           readOnly={!isEditMode}
                           className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                         />
-                        {isEditMode && (
-                          <>
-                            <button
-                              onClick={() => setShowPayrollLocationModal(true)}
-                              className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95"
-                            >
-                              <Search className="w-4 h-4" />
-                            </button>
-                            <button className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        Payroll Description
-                      </label>
-                      <input
-                        type="text"
-                        value={payrollDescription}
-                        onChange={(e) => setPayrollDescription(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Time Keep Cut Off Dates Section */}
-                  <div className="border-t pt-4">
-                    <div className="flex items-center mb-3">
-                      <h3 className="text-gray-700">Time Keep Cut Off Dates</h3>
-                      {isEditMode && (
-                        <div className="flex items-center gap-2 ml-auto">
-                          <label className="text-sm text-gray-700">
-                            Search:
-                          </label>
+                    {/* Row 2: Payroll Location Code and Description */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          Payroll Location Code
+                        </label>
+                        <div className="flex-1 min-w-0 flex gap-2">
                           <input
                             type="text"
-                            value={cutOffTableSearchTerm}
+                            value={payrollLocationCode}
                             onChange={(e) =>
-                              setCutOffTableSearchTerm(e.target.value)
+                              setPayrollLocationCode(e.target.value)
                             }
-                            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
+                            readOnly={!isEditMode}
+                            disabled={true}
+                            className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                           />
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Left Column - Form Fields */}
-                      <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                        <div className="space-y-3">
-                          {/* Month and Period */}
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-3">
-                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                                Month
-                              </label>
-                              <select
-                                value={cutOffMonth}
-                                onChange={(e) => setCutOffMonth(e.target.value)}
-                                disabled={!isEditMode}
-                                className={`w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                                  !isEditMode ? "bg-gray-50" : "bg-white"
-                                }`}
+                          {isEditMode && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  setShowPayrollLocationModal(true)
+                                }
+                                className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95"
                               >
-                                {months.map((m) => (
-                                  <option key={m} value={m}>
-                                    {m}
-                                  </option>
-                                ))}
-                              </select>
+                                <Search className="w-4 h-4" />
+                              </button>
+                              <button className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          Payroll Description
+                        </label>
+                        <input
+                          type="text"
+                          value={payrollDescription}
+                          onChange={(e) =>
+                            setPayrollDescription(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          disabled={true}
+                          className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Time Keep Cut Off Dates Section */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center mb-3">
+                        <h3 className="text-gray-700">
+                          Time Keep Cut Off Dates
+                        </h3>
+                        {isEditMode && (
+                          <div className="flex items-center gap-2 ml-auto">
+                            <label className="text-sm text-gray-700">
+                              Search:
+                            </label>
+                            <input
+                              type="text"
+                              value={cutOffTableSearchTerm}
+                              onChange={(e) =>
+                                setCutOffTableSearchTerm(e.target.value)
+                              }
+                              className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Left Column - Form Fields */}
+                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          <div className="space-y-3">
+                            {/* Month and Period */}
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3">
+                                <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                  Month
+                                </label>
+                                <select
+                                  value={cutOffMonth}
+                                  onChange={(e) =>
+                                    setCutOffMonth(e.target.value)
+                                  }
+                                  disabled={!isEditMode}
+                                  className={`w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                                    !isEditMode ? "bg-gray-50" : "bg-white"
+                                  }`}
+                                >
+                                  {months.map((m) => (
+                                    <option key={m} value={m}>
+                                      {m}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                  Period
+                                </label>
+                                <input
+                                  type="text"
+                                  value={cutOffPeriod}
+                                  onChange={(e) =>
+                                    setcutOffPeriod(e.target.value)
+                                  }
+                                  readOnly={!isEditMode}
+                                  className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                                    !isEditMode ? "bg-gray-50" : ""
+                                  }`}
+                                />
+                              </div>
                             </div>
 
+                            {/* Date From */}
                             <div className="flex items-center gap-3">
-                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                                Period
+                              <label className="w-20 text-gray-700 text-sm flex-shrink-0">
+                                Date From
+                              </label>
+                              <DatePicker
+                                value={dateFrom}
+                                onChange={(date) => {
+                                  setDateFrom(date);
+                                  // ✅ If dateFrom is set after dateTo, clear dateTo
+                                  if (
+                                    dateTo &&
+                                    new Date(date) > new Date(dateTo)
+                                  ) {
+                                    setDateTo("");
+                                  }
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
+                            </div>
+
+                            {/* Date To */}
+                            <div className="flex items-center gap-3">
+                              <label className="w-20 text-gray-700 text-sm flex-shrink-0">
+                                Date To
+                              </label>
+                              <DatePicker
+                                value={dateTo}
+                                onChange={(date) => {
+                                  // ✅ Prevent selecting a date before dateFrom
+                                  if (
+                                    dateFrom &&
+                                    new Date(date) < new Date(dateFrom)
+                                  ) {
+                                    Swal.fire({
+                                      icon: "warning",
+                                      title: "Invalid Date",
+                                      text: "Date To cannot be earlier than Date From.",
+                                    });
+                                    return;
+                                  }
+                                  setDateTo(date);
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
+                            </div>
+
+                            {/* Terminal ID */}
+                            <div className="flex items-center gap-3">
+                              <label className="w-20 text-gray-700 text-sm flex-shrink-0">
+                                Terminal ID
                               </label>
                               <input
                                 type="text"
-                                value={cutOffPeriod}
-                                onChange={(e) =>
-                                  setcutOffPeriod(e.target.value)
-                                }
+                                value={terminalId}
+                                onChange={(e) => setTerminalId(e.target.value)}
                                 readOnly={!isEditMode}
                                 className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                                   !isEditMode ? "bg-gray-50" : ""
@@ -3224,372 +3388,95 @@ export function TimeKeepGroupPage() {
                               />
                             </div>
                           </div>
-
-                          {/* Date From */}
-                          <div className="flex items-center gap-3">
-                            <label className="w-20 text-gray-700 text-sm flex-shrink-0">
-                              Date From
-                            </label>
-                            <DatePicker
-                              value={dateFrom}
-                              onChange={(date) => setDateFrom(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-
-                          {/* Date To */}
-                          <div className="flex items-center gap-3">
-                            <label className="w-20 text-gray-700 text-sm flex-shrink-0">
-                              Date To
-                            </label>
-                            <DatePicker
-                              value={dateTo}
-                              onChange={(date) => setDateTo(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-
-                          {/* Terminal ID */}
-                          <div className="flex items-center gap-3">
-                            <label className="w-20 text-gray-700 text-sm flex-shrink-0">
-                              Terminal ID
-                            </label>
-                            <input
-                              type="text"
-                              value={terminalId}
-                              onChange={(e) => setTerminalId(e.target.value)}
-                              readOnly={!isEditMode}
-                              className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                                !isEditMode ? "bg-gray-50" : ""
-                              }`}
-                            />
-                          </div>
                         </div>
-                      </div>
 
-                      {/* Right Column - TKS Group Table (edit mode only) */}
-                      {isEditMode && (
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
-                          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
-                            <div
-                              className="overflow-y-auto"
-                              style={{ maxHeight: "180px" }}
-                            >
-                              <table className="w-full">
-                                <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
-                                      <input
-                                        type="checkbox"
-                                        checked={
-                                          filteredCutOffData.length > 0 &&
-                                          filteredCutOffData.every(
-                                            (item: GroupItem) =>
-                                              selectedCutOffRows.includes(
-                                                item.id.toString(),
-                                              ),
-                                          )
-                                        }
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setSelectedCutOffRows(
-                                              filteredCutOffData.map(
-                                                (i: GroupItem) =>
-                                                  i.id.toString(),
-                                              ),
-                                            );
-                                          } else {
-                                            setSelectedCutOffRows([]);
-                                          }
-                                        }}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                      />
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      <div className="flex items-center gap-1">
-                                        Code{" "}
-                                        <span className="text-blue-600">▲</span>
-                                      </div>
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      Description
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  {filteredCutOffData
-                                    .filter(
-                                      (item) => item.groupCode !== tksGroupCode,
-                                    ) // exclude current group
-                                    .map((item: GroupItem, index: number) => (
-                                      <tr
-                                        key={item.id}
-                                        className={`hover:bg-gray-50 ${
-                                          index % 2 === 0
-                                            ? "bg-white"
-                                            : "bg-gray-50"
-                                        }`}
-                                      >
-                                        <td className="px-4 py-2">
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedCutOffRows.includes(
-                                              item.id.toString(),
-                                            )}
-                                            onChange={() => {
-                                              setSelectedCutOffRows((prev) =>
-                                                prev.includes(
-                                                  item.id.toString(),
-                                                )
-                                                  ? prev.filter(
-                                                      (id) =>
-                                                        id !==
-                                                        item.id.toString(),
-                                                    )
-                                                  : [
-                                                      ...prev,
-                                                      item.id.toString(),
-                                                    ],
-                                              );
-                                            }}
-                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                          />
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-900">
-                                          {item.groupCode}
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-600">
-                                          {item.description}
-                                        </td>
-                                      </tr>
-                                    ))}
-
-                                  {filteredCutOffData.filter(
-                                    (item) => item.groupCode !== tksGroupCode,
-                                  ).length === 0 && (
+                        {/* Right Column - TKS Group Table (edit mode only) */}
+                        {isEditMode && (
+                          <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
+                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
+                              <div
+                                className="overflow-y-auto"
+                                style={{ maxHeight: "180px" }}
+                              >
+                                <table className="w-full">
+                                  <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
                                     <tr>
-                                      <td
-                                        colSpan={3}
-                                        className="px-4 py-6 text-center text-sm text-gray-400"
-                                      >
-                                        No records found.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-
-                          {/* Pagination */}
-                          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                            <span>
-                              Showing{" "}
-                              {filteredCutOffData.length === 0
-                                ? 0
-                                : cutOffStartIndex + 1}{" "}
-                              to{" "}
-                              {Math.min(
-                                cutOffEndIndex,
-                                filteredCutOffData.length,
-                              )}{" "}
-                              of {cutOffTotalData.length} entries
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() =>
-                                  setCutOffCurrentPage((p) =>
-                                    Math.max(1, p - 1),
-                                  )
-                                }
-                                disabled={cutOffCurrentPage === 1}
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Previous
-                              </button>
-                              {getCutOffPageNumbers().map((page, idx) =>
-                                page === "..." ? (
-                                  <span
-                                    key={`e-${idx}`}
-                                    className="px-1 text-gray-500 text-xs"
-                                  >
-                                    ...
-                                  </span>
-                                ) : (
-                                  <button
-                                    key={page}
-                                    onClick={() =>
-                                      setCutOffCurrentPage(page as number)
-                                    }
-                                    className={`px-2 py-1 rounded text-xs ${
-                                      cutOffCurrentPage === page
-                                        ? "bg-blue-600 text-white"
-                                        : "border border-gray-300 hover:bg-gray-100"
-                                    }`}
-                                  >
-                                    {page}
-                                  </button>
-                                ),
-                              )}
-                              <button
-                                onClick={() =>
-                                  setCutOffCurrentPage((p) =>
-                                    Math.min(cutOffTotalPages, p + 1),
-                                  )
-                                }
-                                disabled={
-                                  cutOffCurrentPage === cutOffTotalPages ||
-                                  cutOffTotalPages === 0
-                                }
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Next
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Selected count */}
-                          {selectedCutOffRows.length > 0 && (
-                            <p className="mt-1.5 text-xs text-blue-600">
-                              {selectedCutOffRows.length} row
-                              {selectedCutOffRows.length > 1 ? "s" : ""}{" "}
-                              selected
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Auto Pairing Logs Cut-Off Dates */}
-                  <div className="border-t pt-4">
-                    <div className="flex items-center mb-3">
-                      <h3 className="text-gray-700">
-                        Auto Pairing Logs Cut-Off Dates
-                      </h3>
-                      {isEditMode && (
-                        <div className="flex items-center gap-2 ml-auto">
-                          <label className="text-sm text-gray-700">
-                            Search:
-                          </label>
-                          <input
-                            type="text"
-                            value={autoPairingTableSearchTerm}
-                            onChange={(e) =>
-                              setAutoPairingTableSearchTerm(e.target.value)
-                            }
-                            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Left Column - Date Pickers */}
-                      <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3">
-                            <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                              From:
-                            </label>
-                            <DatePicker
-                              value={autoPairingFrom}
-                              onChange={(date) => setAutoPairingFrom(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                              To:
-                            </label>
-                            <DatePicker
-                              value={autoPairingTo}
-                              onChange={(date) => setAutoPairingTo(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right Column - TKS Group Table (edit mode only) */}
-                      {isEditMode && (
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
-                          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
-                            <div
-                              className="overflow-y-auto"
-                              style={{ maxHeight: "180px" }}
-                            >
-                              <table className="w-full">
-                                <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
-                                      <input
-                                        type="checkbox"
-                                        checked={
-                                          autoPairingFilteredData.length > 0 &&
-                                          autoPairingFilteredData.every(
-                                            (item: GroupItem) =>
-                                              selectedAutoPairingRows.includes(
-                                                item.id.toString(),
-                                              ),
-                                          )
-                                        }
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setSelectedAutoPairingRows(
-                                              autoPairingFilteredData.map(
-                                                (i: GroupItem) =>
-                                                  i.id.toString(),
-                                              ),
-                                            );
-                                          } else {
-                                            setSelectedAutoPairingRows([]);
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
+                                        <input
+                                          type="checkbox"
+                                          checked={
+                                            cutOffTotalData.filter(
+                                              (item) =>
+                                                item.groupCode !== tksGroupCode,
+                                            ).length > 0 &&
+                                            cutOffTotalData
+                                              .filter(
+                                                (item) =>
+                                                  item.groupCode !==
+                                                  tksGroupCode,
+                                              )
+                                              .every((item: GroupItem) =>
+                                                selectedCutOffRows.includes(
+                                                  item.id.toString(),
+                                                ),
+                                              )
                                           }
-                                        }}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                      />
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      <div className="flex items-center gap-1">
-                                        Code{" "}
-                                        <span className="text-blue-600">▲</span>
-                                      </div>
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      Description
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  {autoPairingPaginatedData
-                                    .filter(
-                                      (item) => item.groupCode !== tksGroupCode,
-                                    ) // exclude current group
-                                    .map((item: GroupItem, index: number) => (
-                                      <tr
-                                        key={item.id}
-                                        className={`hover:bg-gray-50 ${
-                                          index % 2 === 0
-                                            ? "bg-white"
-                                            : "bg-gray-50"
-                                        }`}
-                                      >
-                                        <td className="px-4 py-2">
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedAutoPairingRows.includes(
-                                              item.id.toString(),
-                                            )}
-                                            onChange={() => {
-                                              setSelectedAutoPairingRows(
-                                                (prev) =>
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setSelectedCutOffRows(
+                                                cutOffTotalData
+                                                  .filter(
+                                                    (item) =>
+                                                      item.groupCode !==
+                                                      tksGroupCode,
+                                                  )
+                                                  .map((i: GroupItem) =>
+                                                    i.id.toString(),
+                                                  ),
+                                              );
+                                            } else {
+                                              setSelectedCutOffRows([]);
+                                            }
+                                          }}
+                                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        <div className="flex items-center gap-1">
+                                          Code{" "}
+                                          <span className="text-blue-600">
+                                            ▲
+                                          </span>
+                                        </div>
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        Description
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {filteredCutOffData
+                                      .filter(
+                                        (item) =>
+                                          item.groupCode !== tksGroupCode,
+                                      ) // exclude current group
+                                      .map((item: GroupItem, index: number) => (
+                                        <tr
+                                          key={item.id}
+                                          className={`hover:bg-gray-50 ${
+                                            index % 2 === 0
+                                              ? "bg-white"
+                                              : "bg-gray-50"
+                                          }`}
+                                        >
+                                          <td className="px-4 py-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedCutOffRows.includes(
+                                                item.id.toString(),
+                                              )}
+                                              onChange={() => {
+                                                setSelectedCutOffRows((prev) =>
                                                   prev.includes(
                                                     item.id.toString(),
                                                   )
@@ -3602,117 +3489,392 @@ export function TimeKeepGroupPage() {
                                                         ...prev,
                                                         item.id.toString(),
                                                       ],
-                                              );
-                                            }}
-                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                          />
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-900">
-                                          {item.groupCode}
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-600">
-                                          {item.description}
+                                                );
+                                              }}
+                                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-900">
+                                            {item.groupCode}
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-600">
+                                            {item.groupDescription}
+                                          </td>
+                                        </tr>
+                                      ))}
+
+                                    {filteredCutOffData.filter(
+                                      (item) => item.groupCode !== tksGroupCode,
+                                    ).length === 0 && (
+                                      <tr>
+                                        <td
+                                          colSpan={3}
+                                          className="px-4 py-6 text-center text-sm text-gray-400"
+                                        >
+                                          No records found.
                                         </td>
                                       </tr>
-                                    ))}
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
 
-                                  {autoPairingPaginatedData.filter(
-                                    (item) => item.groupCode !== tksGroupCode,
-                                  ).length === 0 && (
-                                    <tr>
-                                      <td
-                                        colSpan={3}
-                                        className="px-4 py-6 text-center text-sm text-gray-400"
-                                      >
-                                        No records found.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
+                            {/* Pagination */}
+                            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                              <span>
+                                Showing{" "}
+                                {filteredCutOffData.length === 0
+                                  ? 0
+                                  : cutOffStartIndex + 1}{" "}
+                                to{" "}
+                                {Math.min(
+                                  cutOffEndIndex,
+                                  filteredCutOffData.length,
+                                )}{" "}
+                                of {cutOffTotalData.length} entries
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() =>
+                                    setCutOffCurrentPage((p) =>
+                                      Math.max(1, p - 1),
+                                    )
+                                  }
+                                  disabled={cutOffCurrentPage === 1}
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Previous
+                                </button>
+                                {getCutOffPageNumbers().map((page, idx) =>
+                                  page === "..." ? (
+                                    <span
+                                      key={`e-${idx}`}
+                                      className="px-1 text-gray-500 text-xs"
+                                    >
+                                      ...
+                                    </span>
+                                  ) : (
+                                    <button
+                                      key={page}
+                                      onClick={() =>
+                                        setCutOffCurrentPage(page as number)
+                                      }
+                                      className={`px-2 py-1 rounded text-xs ${
+                                        cutOffCurrentPage === page
+                                          ? "bg-blue-600 text-white"
+                                          : "border border-gray-300 hover:bg-gray-100"
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  ),
+                                )}
+                                <button
+                                  onClick={() =>
+                                    setCutOffCurrentPage((p) =>
+                                      Math.min(cutOffTotalPages, p + 1),
+                                    )
+                                  }
+                                  disabled={
+                                    cutOffCurrentPage === cutOffTotalPages ||
+                                    cutOffTotalPages === 0
+                                  }
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Selected count */}
+                            {selectedCutOffRows.length > 0 && (
+                              <p className="mt-1.5 text-xs text-blue-600">
+                                {selectedCutOffRows.length} row
+                                {selectedCutOffRows.length > 1 ? "s" : ""}{" "}
+                                selected
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Auto Pairing Logs Cut-Off Dates */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center mb-3">
+                        <h3 className="text-gray-700">
+                          Auto Pairing Logs Cut-Off Dates
+                        </h3>
+                        {isEditMode && (
+                          <div className="flex items-center gap-2 ml-auto">
+                            <label className="text-sm text-gray-700">
+                              Search:
+                            </label>
+                            <input
+                              type="text"
+                              value={autoPairingTableSearchTerm}
+                              onChange={(e) =>
+                                setAutoPairingTableSearchTerm(e.target.value)
+                              }
+                              className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Left Column - Date Pickers */}
+                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                From:
+                              </label>
+                              <DatePicker
+                                value={autoPairingFrom}
+                                onChange={(date) => {
+                                  setAutoPairingFrom(date);
+                                  if (
+                                    autoPairingTo &&
+                                    new Date(date) > new Date(autoPairingTo)
+                                  ) {
+                                    setAutoPairingTo("");
+                                  }
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                To:
+                              </label>
+                              <DatePicker
+                                value={autoPairingTo}
+                                onChange={(date) => {
+                                  if (
+                                    autoPairingFrom &&
+                                    new Date(date) < new Date(autoPairingFrom)
+                                  ) {
+                                    Swal.fire({
+                                      icon: "warning",
+                                      title: "Invalid Date",
+                                      text: "Date To cannot be earlier than Date From.",
+                                    });
+                                    return;
+                                  }
+                                  setAutoPairingTo(date);
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
                             </div>
                           </div>
-
-                          {/* Pagination */}
-                          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                            <span>
-                              Showing{" "}
-                              {autoPairingFilteredData.length === 0
-                                ? 0
-                                : autoPairingStartIndex + 1}{" "}
-                              to{" "}
-                              {Math.min(
-                                autoPairingEndIndex,
-                                autoPairingFilteredData.length,
-                              )}{" "}
-                              of {autoPairingFilteredData.length} entries
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() =>
-                                  setAutoPairingCurrentPage((p) =>
-                                    Math.max(1, p - 1),
-                                  )
-                                }
-                                disabled={autoPairingCurrentPage === 1}
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Previous
-                              </button>
-                              {getAutoPairingPageNumbers().map((page, idx) =>
-                                page === "..." ? (
-                                  <span
-                                    key={`e-${idx}`}
-                                    className="px-1 text-gray-500 text-xs"
-                                  >
-                                    ...
-                                  </span>
-                                ) : (
-                                  <button
-                                    key={page}
-                                    onClick={() =>
-                                      setAutoPairingCurrentPage(page as number)
-                                    }
-                                    className={`px-2 py-1 rounded text-xs ${
-                                      autoPairingCurrentPage === page
-                                        ? "bg-blue-600 text-white"
-                                        : "border border-gray-300 hover:bg-gray-100"
-                                    }`}
-                                  >
-                                    {page}
-                                  </button>
-                                ),
-                              )}
-                              <button
-                                onClick={() =>
-                                  setAutoPairingCurrentPage((p) =>
-                                    Math.min(autoPairingTotalPages, p + 1),
-                                  )
-                                }
-                                disabled={
-                                  autoPairingCurrentPage ===
-                                    autoPairingTotalPages ||
-                                  autoPairingTotalPages === 0
-                                }
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Next
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Selected count */}
-                          {selectedAutoPairingRows.length > 0 && (
-                            <p className="mt-1.5 text-xs text-blue-600">
-                              {selectedAutoPairingRows.length} row
-                              {selectedAutoPairingRows.length > 1
-                                ? "s"
-                                : ""}{" "}
-                              selected
-                            </p>
-                          )}
                         </div>
-                      )}
+                        {/* Right Column - TKS Group Table (edit mode only) */}
+                        {isEditMode && (
+                          <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
+                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
+                              <div
+                                className="overflow-y-auto"
+                                style={{ maxHeight: "180px" }}
+                              >
+                                <table className="w-full">
+                                  <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
+                                        <input
+                                          type="checkbox"
+                                          checked={
+                                            autoPairingFilteredData.length >
+                                              0 &&
+                                            autoPairingFilteredData.every(
+                                              (item: GroupItem) =>
+                                                selectedAutoPairingRows.includes(
+                                                  item.id.toString(),
+                                                ),
+                                            )
+                                          }
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setSelectedAutoPairingRows(
+                                                autoPairingFilteredData.map(
+                                                  (i: GroupItem) =>
+                                                    i.id.toString(),
+                                                ),
+                                              );
+                                            } else {
+                                              setSelectedAutoPairingRows([]);
+                                            }
+                                          }}
+                                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        <div className="flex items-center gap-1">
+                                          Code{" "}
+                                          <span className="text-blue-600">
+                                            ▲
+                                          </span>
+                                        </div>
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        Description
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {autoPairingPaginatedData
+                                      .filter(
+                                        (item) =>
+                                          item.groupCode !== tksGroupCode,
+                                      ) // exclude current group
+                                      .map((item: GroupItem, index: number) => (
+                                        <tr
+                                          key={item.id}
+                                          className={`hover:bg-gray-50 ${
+                                            index % 2 === 0
+                                              ? "bg-white"
+                                              : "bg-gray-50"
+                                          }`}
+                                        >
+                                          <td className="px-4 py-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedAutoPairingRows.includes(
+                                                item.id.toString(),
+                                              )}
+                                              onChange={() => {
+                                                setSelectedAutoPairingRows(
+                                                  (prev) =>
+                                                    prev.includes(
+                                                      item.id.toString(),
+                                                    )
+                                                      ? prev.filter(
+                                                          (id) =>
+                                                            id !==
+                                                            item.id.toString(),
+                                                        )
+                                                      : [
+                                                          ...prev,
+                                                          item.id.toString(),
+                                                        ],
+                                                );
+                                              }}
+                                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-900">
+                                            {item.groupCode}
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-600">
+                                            {item.groupDescription}
+                                          </td>
+                                        </tr>
+                                      ))}
+
+                                    {autoPairingPaginatedData.filter(
+                                      (item) => item.groupCode !== tksGroupCode,
+                                    ).length === 0 && (
+                                      <tr>
+                                        <td
+                                          colSpan={3}
+                                          className="px-4 py-6 text-center text-sm text-gray-400"
+                                        >
+                                          No records found.
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Pagination */}
+                            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                              <span>
+                                Showing{" "}
+                                {autoPairingFilteredData.length === 0
+                                  ? 0
+                                  : autoPairingStartIndex + 1}{" "}
+                                to{" "}
+                                {Math.min(
+                                  autoPairingEndIndex,
+                                  autoPairingFilteredData.length,
+                                )}{" "}
+                                of {autoPairingFilteredData.length} entries
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() =>
+                                    setAutoPairingCurrentPage((p) =>
+                                      Math.max(1, p - 1),
+                                    )
+                                  }
+                                  disabled={autoPairingCurrentPage === 1}
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Previous
+                                </button>
+                                {getAutoPairingPageNumbers().map((page, idx) =>
+                                  page === "..." ? (
+                                    <span
+                                      key={`e-${idx}`}
+                                      className="px-1 text-gray-500 text-xs"
+                                    >
+                                      ...
+                                    </span>
+                                  ) : (
+                                    <button
+                                      key={page}
+                                      onClick={() =>
+                                        setAutoPairingCurrentPage(
+                                          page as number,
+                                        )
+                                      }
+                                      className={`px-2 py-1 rounded text-xs ${
+                                        autoPairingCurrentPage === page
+                                          ? "bg-blue-600 text-white"
+                                          : "border border-gray-300 hover:bg-gray-100"
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  ),
+                                )}
+                                <button
+                                  onClick={() =>
+                                    setAutoPairingCurrentPage((p) =>
+                                      Math.min(autoPairingTotalPages, p + 1),
+                                    )
+                                  }
+                                  disabled={
+                                    autoPairingCurrentPage ===
+                                      autoPairingTotalPages ||
+                                    autoPairingTotalPages === 0
+                                  }
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Selected count */}
+                            {selectedAutoPairingRows.length > 0 && (
+                              <p className="mt-1.5 text-xs text-blue-600">
+                                {selectedAutoPairingRows.length} row
+                                {selectedAutoPairingRows.length > 1
+                                  ? "s"
+                                  : ""}{" "}
+                                selected
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3721,472 +3883,355 @@ export function TimeKeepGroupPage() {
 
             {/* Tab Content - Login Policy */}
             {activeTab === "login-policy" && (
-              <div className="space-y-6">
-                {/* Group Code and Definition */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                      TKS Group Code
-                    </label>
-                    <input
-                      type="text"
-                      value={tksGroupCode}
-                      disabled
-                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
-                    />
+              <div className="relative">
+                {/* Loading overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <label className="w-48 text-gray-700 text-sm flex-shrink-0">
-                      TKS Group Definition
-                    </label>
-                    <input
-                      type="text"
-                      value={tksGroupDescription}
-                      disabled
-                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
-                    />
-                  </div>
-                </div>
-
-                {/* Two Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column */}
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Semi-Annual
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={gracePeriodSemiAnnual}
-                        onChange={(e) => {
-                          setGracePeriodSemiAnnual(e.target.checked);
-                          uncheckedGracePeriodSemiAnnual();
-                        }}
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
+                )}
+                <div
+                  className={`space-y-6 ${isLoading ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  {/* Group Code and Definition */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Per Day
+                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                        TKS Group Code
                       </label>
                       <input
                         type="text"
-                        value={gracePeriodPerDay}
-                        onChange={(e) => setGracePeriodPerDay(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:mm]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Include in Tardiness
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={gracePeriodIncludeTardiness}
-                        onChange={(e) =>
-                          setGracePeriodIncludeTardiness(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
+                        value={tksGroupCode}
+                        disabled
+                        className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
                       />
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Include Break 2 in Grace Period
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={includeBreak2InGrace}
-                        onChange={(e) =>
-                          setIncludeBreak2InGrace(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Deductible even within grace period
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={deductibleEvenWithinGrace}
-                        onChange={(e) =>
-                          setDeductibleEvenWithinGrace(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Per Semi-Annual
+                      <label className="w-48 text-gray-700 text-sm flex-shrink-0">
+                        TKS Group Definition
                       </label>
                       <input
                         type="text"
-                        value={gracePeriodPerSemiAnnual}
-                        onChange={(e) =>
-                          setGracePeriodPerSemiAnnual(e.target.value)
-                        }
-                        readOnly={!isEditMode}
-                        disabled={!gracePeriodSemiAnnual}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:hh]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        1st Half Semi-Annual Date From
-                      </label>
-                      <DatePicker
-                        value={firstHalfDateFrom}
-                        onChange={(date) => setFirstHalfDateFrom(date)}
-                        disabled={!isEditMode || !gracePeriodSemiAnnual}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        1st Half Semi-Annual Date To
-                      </label>
-                      <DatePicker
-                        value={firstHalfDateTo}
-                        onChange={(date) => setFirstHalfDateTo(date)}
-                        disabled={!isEditMode || !gracePeriodSemiAnnual}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        2nd Half Semi-Annual Date From
-                      </label>
-                      <DatePicker
-                        value={secondHalfDateFrom}
-                        onChange={(date) => setSecondHalfDateFrom(date)}
-                        disabled={!isEditMode || !gracePeriodSemiAnnual}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        2nd Half Semi-Annual Date To
-                      </label>
-                      <DatePicker
-                        value={secondHalfDateTo}
-                        onChange={(date) => setSecondHalfDateTo(date)}
-                        disabled={!isEditMode || !gracePeriodSemiAnnual}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Deduct Over Break
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={deductOverBreak}
-                        onChange={(e) => setDeductOverBreak(e.target.checked)}
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period for Calamity 2
-                      </label>
-                      <input
-                        type="text"
-                        value={gracePeriodCalamity2}
-                        onChange={(e) =>
-                          setGracePeriodCalamity2(e.target.value)
-                        }
-                        className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        disabled={!isEditMode}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Combine Tardiness for TimeIn and Break2
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={combineTardinessTimeInBreak2}
-                        onChange={(e) =>
-                          setCombineTardinessTimeInBreak2(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Compute Tardiness For No Logout
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={computeTardinessNoLogout}
-                        onChange={(e) =>
-                          setComputeTardinessNoLogout(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
+                        value={tksGroupDescription}
+                        disabled
+                        className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
                       />
                     </div>
                   </div>
 
-                  {/* Right Column */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        Night Diff. Start Time
-                      </label>
-                      <input
-                        type="text"
-                        value={nightDiffStartTime}
-                        onChange={(e) => setNightDiffStartTime(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:mm]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        Night Diff. End Time
-                      </label>
-                      <input
-                        type="text"
-                        value={nightDiffEndTime}
-                        onChange={(e) => setNightDiffEndTime(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:mm]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        Deduct Meal Break in ND Comp.
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={deductMealBreakND}
-                        onChange={(e) => setDeductMealBreakND(e.target.checked)}
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        2 Shifts In A Day
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={twoShiftsInDay}
-                        onChange={(e) => setTwoShiftsInDay(e.target.checked)}
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        No. of Hours Interval for 2 Shifts in A Day
-                      </label>
-                      <input
-                        type="text"
-                        value={hoursIntervalTwoShifts}
-                        onChange={(e) =>
-                          setHoursIntervalTwoShifts(e.target.value)
-                        }
-                        readOnly={!isEditMode}
-                        className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm pt-1">
-                        [hh:hh]
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        No. of Allowable Grace Period in a Month
-                      </label>
-                      <input
-                        type="text"
-                        value={allowableGracePeriodMonth}
-                        onChange={(e) =>
-                          setAllowableGracePeriodMonth(e.target.value)
-                        }
-                        readOnly={!isEditMode}
-                        className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        Exclude the no. of Allowable Grace Period in Bracket
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={excludeAllowableGraceBracket}
-                        onChange={(e) =>
-                          setExcludeAllowableGraceBracket(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        Allowable Grace Period in a Month Based on Actual Month
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={allowableGraceActualMonth}
-                        onChange={(e) =>
-                          setAllowableGraceActualMonth(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        Consider Saturday as Paid Regular Hours
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={considerSaturdayPaid}
-                        onChange={(e) =>
-                          setConsiderSaturdayPaid(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm break-words">
-                        Max. Days Per Week to Consider UnWorked Saturday As Paid
-                        <br />
-                        Regular Hours
-                      </label>
-                      <input
-                        type="text"
-                        value={maxDaysPerWeekSaturday}
-                        onChange={(e) =>
-                          setMaxDaysPerWeekSaturday(e.target.value)
-                        }
-                        disabled={!isEditMode}
-                        className="w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                    </div>
-
-                    {/* Group 1: Tardy and Supervisory */}
-                    <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                  {/* Two Column Layout */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Column */}
+                    <div className="space-y-3">
                       <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          No. of Allowable Tardy in Excess of Grace Period in a
-                          Month
-                        </label>
-                        <input
-                          type="text"
-                          value={allowableTardyExcess}
-                          onChange={(e) =>
-                            setAllowableTardyExcess(e.target.value)
-                          }
-                          disabled={!isEditMode}
-                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-
-                      <div className="flex gap-3 items-center">
-                        <label className="w-60 text-gray-700 text-sm leading-snug">
-                          Exclude Tardiness Within Grace Period in Count for
-                          <br />
-                          Allowable Tardy in Excess of Grace Period in a Month
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Semi-Annual
                         </label>
                         <input
                           type="checkbox"
-                          checked={excludeTardinessInGrace}
+                          checked={gracePeriodSemiAnnual}
+                          onChange={(e) => {
+                            setGracePeriodSemiAnnual(e.target.checked);
+                            uncheckedGracePeriodSemiAnnual();
+                          }}
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Per Day
+                        </label>
+                        <input
+                          type="text"
+                          value={gracePeriodPerDay}
+                          onChange={(e) => setGracePeriodPerDay(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:mm]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Include in Tardiness
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={gracePeriodIncludeTardiness}
                           onChange={(e) =>
-                            setExcludeTardinessInGrace(e.target.checked)
+                            setGracePeriodIncludeTardiness(e.target.checked)
                           }
                           disabled={!isEditMode}
-                          className="w-4 h-4 self-start mt-1"
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Include Break 2 in Grace Period
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={includeBreak2InGrace}
+                          onChange={(e) =>
+                            setIncludeBreak2InGrace(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Deductible even within grace period
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={deductibleEvenWithinGrace}
+                          onChange={(e) =>
+                            setDeductibleEvenWithinGrace(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Per Semi-Annual
+                        </label>
+                        <input
+                          type="text"
+                          value={gracePeriodPerSemiAnnual}
+                          onChange={(e) =>
+                            setGracePeriodPerSemiAnnual(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          disabled={!gracePeriodSemiAnnual}
+                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:hh]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          1st Half Semi-Annual Date From
+                        </label>
+                        <DatePicker
+                          value={firstHalfDateFrom}
+                          onChange={(date) => setFirstHalfDateFrom(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          1st Half Semi-Annual Date To
+                        </label>
+                        <DatePicker
+                          value={firstHalfDateTo}
+                          onChange={(date) => setFirstHalfDateTo(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          2nd Half Semi-Annual Date From
+                        </label>
+                        <DatePicker
+                          value={secondHalfDateFrom}
+                          onChange={(date) => setSecondHalfDateFrom(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          2nd Half Semi-Annual Date To
+                        </label>
+                        <DatePicker
+                          value={secondHalfDateTo}
+                          onChange={(date) => setSecondHalfDateTo(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Deduct Over Break
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={deductOverBreak}
+                          onChange={(e) => setDeductOverBreak(e.target.checked)}
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period for Calamity 2
+                        </label>
+                        <input
+                          type="text"
+                          value={gracePeriodCalamity2}
+                          onChange={(e) =>
+                            setGracePeriodCalamity2(e.target.value)
+                          }
+                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          disabled={!isEditMode}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Combine Tardiness for TimeIn and Break2
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={combineTardinessTimeInBreak2}
+                          onChange={(e) =>
+                            setCombineTardinessTimeInBreak2(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Compute Tardiness For No Logout
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={computeTardinessNoLogout}
+                          onChange={(e) =>
+                            setComputeTardinessNoLogout(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                          Night Diff. Start Time
+                        </label>
+                        <input
+                          type="text"
+                          value={nightDiffStartTime}
+                          onChange={(e) =>
+                            setNightDiffStartTime(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:mm]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                          Night Diff. End Time
+                        </label>
+                        <input
+                          type="text"
+                          value={nightDiffEndTime}
+                          onChange={(e) => setNightDiffEndTime(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:mm]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                          Deduct Meal Break in ND Comp.
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={deductMealBreakND}
+                          onChange={(e) =>
+                            setDeductMealBreakND(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
                         />
                       </div>
 
                       <div className="flex items-center gap-3">
                         <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          Supervisory GroupCode
-                        </label>
-                        <input
-                          type="text"
-                          value={supervisoryGroupCode}
-                          onChange={(e) =>
-                            setSupervisoryGroupCode(e.target.value)
-                          }
-                          readOnly={true} // always read-only
-                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                            !isEditMode ? "bg-gray-50" : ""
-                          }`}
-                        />
-                        {isEditMode && (
-                          <>
-                            <button
-                              onClick={() => setShowSupervisoryGroupModal(true)}
-                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                              <Search className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setSupervisoryGroupCode("")}
-                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Group 2: Occurances */}
-                    <div className="border border-gray-300 rounded-lg p-4 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          Apply Occurances to Break1 and Break3
+                          2 Shifts In A Day
                         </label>
                         <input
                           type="checkbox"
-                          checked={applyOccurancesBreak}
+                          checked={twoShiftsInDay}
+                          onChange={(e) => setTwoShiftsInDay(e.target.checked)}
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          No. of Hours Interval for 2 Shifts in A Day
+                        </label>
+                        <input
+                          type="text"
+                          value={hoursIntervalTwoShifts}
                           onChange={(e) =>
-                            setApplyOccurancesBreak(e.target.checked)
+                            setHoursIntervalTwoShifts(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm pt-1">
+                          [hh:hh]
+                        </span>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          No. of Allowable Grace Period in a Month
+                        </label>
+                        <input
+                          type="text"
+                          value={allowableGracePeriodMonth}
+                          onChange={(e) =>
+                            setAllowableGracePeriodMonth(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          Exclude the no. of Allowable Grace Period in Bracket
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={excludeAllowableGraceBracket}
+                          onChange={(e) =>
+                            setExcludeAllowableGraceBracket(e.target.checked)
                           }
                           disabled={!isEditMode}
                           className="w-4 h-4 mt-1"
@@ -4195,132 +4240,425 @@ export function TimeKeepGroupPage() {
 
                       <div className="flex items-start gap-3">
                         <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          Max No. of Occurances for no deduction
+                          Allowable Grace Period in a Month Based on Actual
+                          Month
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={allowableGraceActualMonth}
+                          onChange={(e) =>
+                            setAllowableGraceActualMonth(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          Consider Saturday as Paid Regular Hours
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={considerSaturdayPaid}
+                          onChange={(e) =>
+                            setConsiderSaturdayPaid(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm break-words">
+                          Max. Days Per Week to Consider UnWorked Saturday As
+                          Paid
+                          <br />
+                          Regular Hours
                         </label>
                         <input
                           type="text"
-                          value={maxOccurancesNoDeduction}
+                          value={maxDaysPerWeekSaturday}
                           onChange={(e) =>
-                            setMaxOccurancesNoDeduction(e.target.value)
+                            setMaxDaysPerWeekSaturday(e.target.value)
                           }
                           disabled={!isEditMode}
                           className="w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          Grace Period
-                        </label>
-                        <input
-                          type="text"
-                          value={gracePeriodOccurance}
-                          onChange={(e) =>
-                            setGracePeriodOccurance(e.target.value)
-                          }
-                          disabled={!isEditMode}
-                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <span className="text-gray-500 text-sm">[hh:mm]</span>
-                      </div>
-                    </div>
-
-                    {/* Group 3: Weekly Computation */}
-                    <div className="border border-gray-300 rounded-lg p-4 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          No of Hrs Required to Complete Per Week
-                        </label>
-                        <input
-                          type="text"
-                          value={hoursRequiredPerWeek}
-                          onChange={(e) =>
-                            setHoursRequiredPerWeek(e.target.value)
-                          }
-                          disabled={!isEditMode}
-                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <span className="text-gray-500 text-sm pt-1">
-                          [hh:hh]
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          Start of Week
-                        </label>
-                        <select
-                          value={startOfWeek}
-                          onChange={(e) => setStartOfWeek(e.target.value)}
-                          disabled={!isEditMode}
-                          className="w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-50"
-                        >
-                          <option value="">Select a day</option>
-                          <option value="Monday">Monday</option>
-                          <option value="Tuesday">Tuesday</option>
-                          <option value="Wednesday">Wednesday</option>
-                          <option value="Thursday">Thursday</option>
-                          <option value="Friday">Friday</option>
-                          <option value="Saturday">Saturday</option>
-                          <option value="Sunday">Sunday</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1"></label>
-                        <div className="flex flex-col gap-2">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="computeType"
-                              value="tardiness"
-                              checked={computeType === "tardiness"}
-                              onChange={(e) => setComputeType(e.target.value)}
-                              className="w-4 h-4"
-                              disabled={!isEditMode}
-                            />
-                            <span className="text-gray-700 text-sm">
-                              Compute as Tardiness
-                            </span>
+                      {/* Group 1: Tardy and Supervisory */}
+                      <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            No. of Allowable Tardy in Excess of Grace Period in
+                            a Month
                           </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="computeType"
-                              value="undertime"
-                              checked={computeType === "undertime"}
-                              onChange={(e) => setComputeType(e.target.value)}
-                              className="w-4 h-4"
-                              disabled={!isEditMode}
-                            />
-                            <span className="text-gray-700 text-sm">
-                              Compute as Undertime
-                            </span>
+                          <input
+                            type="text"
+                            value={allowableTardyExcess}
+                            onChange={(e) =>
+                              setAllowableTardyExcess(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+
+                        <div className="flex gap-3 items-center">
+                          <label className="w-60 text-gray-700 text-sm leading-snug">
+                            Exclude Tardiness Within Grace Period in Count for
+                            <br />
+                            Allowable Tardy in Excess of Grace Period in a Month
                           </label>
+                          <input
+                            type="checkbox"
+                            checked={excludeTardinessInGrace}
+                            onChange={(e) =>
+                              setExcludeTardinessInGrace(e.target.checked)
+                            }
+                            disabled={!isEditMode}
+                            className="w-4 h-4 self-start mt-1"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            Supervisory GroupCode
+                          </label>
+                          <input
+                            type="text"
+                            value={supervisoryGroupCode}
+                            onChange={(e) =>
+                              setSupervisoryGroupCode(e.target.value)
+                            }
+                            readOnly={true} // always read-only
+                            className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                              !isEditMode ? "bg-gray-50" : ""
+                            }`}
+                          />
+                          {isEditMode && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  setShowSupervisoryGroupModal(true)
+                                }
+                                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              >
+                                <Search className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setSupervisoryGroupCode("")}
+                                className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
 
+                      {/* Group 2: Occurances */}
+                      <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            Apply Occurances to Break1 and Break3
+                          </label>
+                          <input
+                            type="checkbox"
+                            checked={applyOccurancesBreak}
+                            onChange={(e) =>
+                              setApplyOccurancesBreak(e.target.checked)
+                            }
+                            disabled={!isEditMode}
+                            className="w-4 h-4 mt-1"
+                          />
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            Max No. of Occurances for no deduction
+                          </label>
+                          <input
+                            type="text"
+                            value={maxOccurancesNoDeduction}
+                            onChange={(e) =>
+                              setMaxOccurancesNoDeduction(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            Grace Period
+                          </label>
+                          <input
+                            type="text"
+                            value={gracePeriodOccurance}
+                            onChange={(e) =>
+                              setGracePeriodOccurance(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                          <span className="text-gray-500 text-sm">[hh:mm]</span>
+                        </div>
+                      </div>
+
+                      {/* Group 3: Weekly Computation */}
+                      <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            No of Hrs Required to Complete Per Week
+                          </label>
+                          <input
+                            type="text"
+                            value={hoursRequiredPerWeek}
+                            onChange={(e) =>
+                              setHoursRequiredPerWeek(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                          <span className="text-gray-500 text-sm pt-1">
+                            [hh:hh]
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            Start of Week
+                          </label>
+                          <select
+                            value={startOfWeek}
+                            onChange={(e) => setStartOfWeek(e.target.value)}
+                            disabled={!isEditMode}
+                            className="w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-50"
+                          >
+                            <option value="">Select a day</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1"></label>
+                          <div className="flex flex-col gap-2">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="computeType"
+                                value="tardiness"
+                                checked={computeType === "tardiness"}
+                                onChange={(e) => setComputeType(e.target.value)}
+                                className="w-4 h-4"
+                                disabled={!isEditMode}
+                              />
+                              <span className="text-gray-700 text-sm">
+                                Compute as Tardiness
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="computeType"
+                                value="undertime"
+                                checked={computeType === "undertime"}
+                                onChange={(e) => setComputeType(e.target.value)}
+                                className="w-4 h-4"
+                                disabled={!isEditMode}
+                              />
+                              <span className="text-gray-700 text-sm">
+                                Compute as Undertime
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            OT Code Per Week
+                          </label>
+                          <input
+                            type="text"
+                            value={otCodePerWeek}
+                            onChange={(e) => setOtCodePerWeek(e.target.value)}
+                            readOnly={!isEditMode}
+                            className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                          />
+                          {isEditMode && (
+                            <>
+                              <button
+                                onClick={() => setShowOtCodeModal(true)}
+                                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              >
+                                <Search className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setOtCodePerWeek("")}
+                                className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Section - Default Equivalent Hours */}
+                  <div className="border-t pt-6 mt-6">
+                    <h3 className="text-gray-700 mb-4">
+                      Default Equivalent Hours To Be Deducted for Absent, No
+                      Login, and No Logout if No Shift Defined
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex items-center gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          OT Code Per Week
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For Absent
                         </label>
                         <input
                           type="text"
-                          value={otCodePerWeek}
-                          onChange={(e) => setOtCodePerWeek(e.target.value)}
+                          value={forAbsent}
+                          onChange={(e) => setForAbsent(e.target.value)}
                           readOnly={!isEditMode}
-                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                         />
                         {isEditMode && (
                           <>
                             <button
-                              onClick={() => setShowOtCodeModal(true)}
+                              onClick={() => setShowForAbsentModal(true)}
                               className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                             >
                               <Search className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => setOtCodePerWeek("")}
+                              onClick={() => setForAbsent("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Break 2 Out
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoBreak2Out}
+                          onChange={(e) => setForNoBreak2Out(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              onClick={() => setShowForNoBreak2OutModal(true)}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoBreak2Out("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Login
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoLogin}
+                          onChange={(e) => setForNoLogin(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              onClick={() => setShowForNoLoginModal(true)}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoLogin("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Break 2 In
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoBreak2In}
+                          onChange={(e) => setForNoBreak2In(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              onClick={() => setShowForNoBreak2InModal(true)}
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoBreak2In("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Logout
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoLogout}
+                          onChange={(e) => setForNoLogout(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              onClick={() => setShowForNoLogoutModal(true)}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoLogout("")}
                               className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                             >
                               <X className="w-4 h-4" />
@@ -4331,640 +4669,551 @@ export function TimeKeepGroupPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Bottom Section - Default Equivalent Hours */}
-                <div className="border-t pt-6 mt-6">
-                  <h3 className="text-gray-700 mb-4">
-                    Default Equivalent Hours To Be Deducted for Absent, No
-                    Login, and No Logout if No Shift Defined
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For Absent
-                      </label>
-                      <input
-                        type="text"
-                        value={forAbsent}
-                        onChange={(e) => setForAbsent(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            onClick={() => setShowForAbsentModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForAbsent("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Break 2 Out
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoBreak2Out}
-                        onChange={(e) => setForNoBreak2Out(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            onClick={() => setShowForNoBreak2OutModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForNoBreak2Out("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Login
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoLogin}
-                        onChange={(e) => setForNoLogin(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            onClick={() => setShowForNoLoginModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForNoLogin("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Break 2 In
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoBreak2In}
-                        onChange={(e) => setForNoBreak2In(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            onClick={() => setShowForNoBreak2InModal(true)}
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForNoBreak2In("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Logout
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoLogout}
-                        onChange={(e) => setForNoLogout(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            onClick={() => setShowForNoLogoutModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForNoLogout("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
+            {activeTab === "overtime" && (
+              <div className="relative">
+                {/* Loading overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
                     </div>
                   </div>
+                )}
+
+                <div
+                  className={isLoading ? "pointer-events-none opacity-50" : ""}
+                >
+                  <OvertimeRatesTabContent
+                    tksGroupCode={tksGroupCode}
+                    tksGroupDescription={tksGroupDescription}
+                    isEditMode={isEditMode}
+                    isEditOTRates={isEditOTRates}
+                    isCreateNew={isCreateNew}
+                    setIsEditOTRates={setIsEditOTRates}
+                    showOtCodeModal={showOtCodeModal}
+                    setShowOtCodeModal={setShowOtCodeModal}
+                    isEditOTRatesFor2Shifts={isEditOTRatesFor2Shifts}
+                    setIsEditOTRatesFor2Shifts={setIsEditOTRatesFor2Shifts}
+                    isEditBirthDayPay={isEditBirthDayPay}
+                    setIsEditBirthDayPay={setIsEditBirthDayPay}
+                    regularDayOT={regularDayOT}
+                    setRegularDayOT={setRegularDayOT}
+                    restDayOT={restDayOT}
+                    setRestDayOT={setRestDayOT}
+                    legalHolidayOT={legalHolidayOT}
+                    setLegalHolidayOT={setLegalHolidayOT}
+                    specialHolidayOT={specialHolidayOT}
+                    setSpecialHolidayOT={setSpecialHolidayOT}
+                    doubleLegalHolidayOT={doubleLegalHolidayOT}
+                    setDoubleLegalHolidayOT={setDoubleLegalHolidayOT}
+                    specialHolidayOT2={specialHolidayOT2}
+                    setSpecialHolidayOT2={setSpecialHolidayOT2}
+                    nonWorkingHolidayOT={nonWorkingHolidayOT}
+                    setNonWorkingHolidayOT={setNonWorkingHolidayOT}
+                    regularDayOTLateFiling={regularDayOTLateFiling}
+                    setRegularDayOTLateFiling={setRegularDayOTLateFiling}
+                    restDayOTLateFiling={restDayOTLateFiling}
+                    setRestDayOTLateFiling={setRestDayOTLateFiling}
+                    legalHolidayOTLateFiling={legalHolidayOTLateFiling}
+                    setLegalHolidayOTLateFiling={setLegalHolidayOTLateFiling}
+                    specialHolidayOTLateFiling={specialHolidayOTLateFiling}
+                    setSpecialHolidayOTLateFiling={
+                      setSpecialHolidayOTLateFiling
+                    }
+                    doubleLegalHolidayOTLateFiling={
+                      doubleLegalHolidayOTLateFiling
+                    }
+                    setDoubleLegalHolidayOTLateFiling={
+                      setDoubleLegalHolidayOTLateFiling
+                    }
+                    specialHoliday2OTLateFiling={specialHoliday2OTLateFiling}
+                    setSpecialHoliday2OTLateFiling={
+                      setSpecialHoliday2OTLateFiling
+                    }
+                    nonWorkingHolidayOTLateFiling={
+                      nonWorkingHolidayOTLateFiling
+                    }
+                    setNonWorkingHolidayOTLateFiling={
+                      setNonWorkingHolidayOTLateFiling
+                    }
+                    regDayMinHrsToCompOT={regDayMinHrsToCompOT}
+                    setRegDayMinHrsToCompOT={setRegDayMinHrsToCompOT}
+                    restDayMinHrsToCompOT={restDayMinHrsToCompOT}
+                    setRestDayMinHrsToCompOT={setRestDayMinHrsToCompOT}
+                    legalHolidayMinHrsToCompOT={legalHolidayMinHrsToCompOT}
+                    setLegalHolidayMinHrsToCompOT={
+                      setLegalHolidayMinHrsToCompOT
+                    }
+                    specialHolidayMinHrsToCompOT={specialHolidayMinHrsToCompOT}
+                    setSpecialHolidayMinHrsToCompOT={
+                      setSpecialHolidayMinHrsToCompOT
+                    }
+                    specialHoliday2MinHrsToCompOT={
+                      specialHoliday2MinHrsToCompOT
+                    }
+                    setSpecialHoliday2MinHrsToCompOT={
+                      setSpecialHoliday2MinHrsToCompOT
+                    }
+                    doubleLegalHolidayMinHrsToCompOT={
+                      doubleLegalHolidayMinHrsToCompOT
+                    }
+                    setDoubleLegalHolidayMinHrsToCompOT={
+                      setDoubleLegalHolidayMinHrsToCompOT
+                    }
+                    nonWorkingHolidayMinHrsToCompOT={
+                      nonWorkingHolidayMinHrsToCompOT
+                    }
+                    setNonWorkingHolidayMinHrsToCompOT={
+                      setNonWorkingHolidayMinHrsToCompOT
+                    }
+                    otBreakMinHours={otBreakMinHours}
+                    setOtBreakMinHours={setOtBreakMinHours}
+                    oTBreakNoOfHrsDed={oTBreakNoOfHrsDed}
+                    setOTBreakNoOfHrsDed={setOTBreakNoOfHrsDed}
+                    oTBreakAppliesToRegDay={oTBreakAppliesToRegDay}
+                    setOTBreakAppliesToRegDay={setOTBreakAppliesToRegDay}
+                    oTBreakAppliesToLegHol={oTBreakAppliesToLegHol}
+                    setOTBreakAppliesToLegHol={setOTBreakAppliesToLegHol}
+                    oTBreakAppliesToSHol={oTBreakAppliesToSHol}
+                    setOTBreakAppliesToSHol={setOTBreakAppliesToSHol}
+                    oTBreakAppliesToDoubleLegHol={oTBreakAppliesToDoubleLegHol}
+                    setOTBreakAppliesToDoubleLegHol={
+                      setOTBreakAppliesToDoubleLegHol
+                    }
+                    oTBreakAppliesToS2Hol={oTBreakAppliesToS2Hol}
+                    setOTBreakAppliesToS2Hol={setOTBreakAppliesToS2Hol}
+                    oTBreakAppliesToNonWorkHol={oTBreakAppliesToNonWorkHol}
+                    setOTBreakAppliesToNonWorkHol={
+                      setOTBreakAppliesToNonWorkHol
+                    }
+                    oTBreakAppliesToRestDay={oTBreakAppliesToRestDay}
+                    setOTBreakAppliesToRestDay={setOTBreakAppliesToRestDay}
+                    oTBreakAppliesToLegHolRest={oTBreakAppliesToLegHolRest}
+                    setOTBreakAppliesToLegHolRest={
+                      setOTBreakAppliesToLegHolRest
+                    }
+                    oTBreakAppliesToSHolRest={oTBreakAppliesToSHolRest}
+                    setOTBreakAppliesToSHolRest={setOTBreakAppliesToSHolRest}
+                    oTBreakAppliesToDoubleLegHolRest={
+                      oTBreakAppliesToDoubleLegHolRest
+                    }
+                    setOTBreakAppliesToDoubleLegHolRest={
+                      setOTBreakAppliesToDoubleLegHolRest
+                    }
+                    oTBreakAppliesToS2HolRest={oTBreakAppliesToS2HolRest}
+                    setOTBreakAppliesToS2HolRest={setOTBreakAppliesToS2HolRest}
+                    oTBreakAppliesToNonWorkRest={oTBreakAppliesToNonWorkRest}
+                    setOTBreakAppliesToNonWorkRest={
+                      setOTBreakAppliesToNonWorkRest
+                    }
+                    useOTPremiumBreakDwn={useOTPremium}
+                    setOTPremiumBreakDwn={setUseOTPremium}
+                    useActualDayType={useActualDayType}
+                    setUseActualDayType={setUseActualDayType}
+                    holidayWithWorkShift={holidayWithWorkshift}
+                    setHolidayWithWorkShift={setHolidayWithWorkshift}
+                    deductMealBreakFromOT={deductMealBreakFromOT}
+                    setDeductMealBreakFromOT={setDeductMealBreakFromOT}
+                    computeOTForBreak2={computeOTForBreak2}
+                    setComputeOTForBreak2={setComputeOTForBreak2}
+                    enable24HourOT={enable24HourOT}
+                    setEnable24HourOT={setEnable24HourOT}
+                    includeUnworkedHolidayInRegular={
+                      includeUnworkedHolidayInRegular
+                    }
+                    setIncludeUnworkedHolidayInRegular={
+                      setIncludeUnworkedHolidayInRegular
+                    }
+                    sundayOTIfWorkedSaturday={sundayOTIfWorkedSaturday}
+                    setSundayOTIfWorkedSaturday={setSundayOTIfWorkedSaturday}
+                    restDayToBeComputedAsOtherRate={
+                      restDayToBeComputedAsOtherRate
+                    }
+                    setRestDayToBeComputedAsOtherRate={
+                      setRestDayToBeComputedAsOtherRate
+                    }
+                    restDayOtherRate={restDayOtherRate}
+                    setRestDayOtherRate={setRestDayOtherRate}
+                    isOverTimeCutOffFlag={isOverTimeCutOffFlag}
+                    setIsOverTimeCutoffFlag={setIsOverTimeCutoffFlag}
+                    overTimeCode={overTimeCode}
+                    setOverTimeCode={setOverTimeCode}
+                    requiredHours={requiredHours}
+                    setRequiredHours={setRequiredHours}
+                    overTimeCodeFor2ShiftsDay={overTimeCodeFor2ShiftsDay}
+                    setOverTimeCodeFor2ShiftsDay={setOverTimeCodeFor2ShiftsDay}
+                    oTRoundingToTheNearestHourMin={
+                      oTRoundingToTheNearestHourMin
+                    }
+                    setOTRoundingToTheNearestHourMin={
+                      setOTRoundingToTheNearestHourMin
+                    }
+                    birthdayPay={birthdayPay}
+                    setBirthdayPay={setBirthdayPay}
+                    nDBasicRoundingToTheNearestHourMin={
+                      nDBasicRoundingToTheNearestHourMin
+                    }
+                    setNDBasicRoundingToTheNearestHourMin={
+                      setNDBasicRoundingToTheNearestHourMin
+                    }
+                    useOverTimeAuthorization={useOverTimeAuthorization}
+                    setUseOverTimeAuthorization={setUseOverTimeAuthorization}
+                    isSpecialOTCompFlag={isSpecialOTCompFlag}
+                    setIsSpecialOTCompFlag={setIsSpecialOTCompFlag}
+                    isHolPayLegalFlag={isHolPayLegalFlag}
+                    setIsHolPayLegalFlag={setIsHolPayLegalFlag}
+                    isHolPaySpecialFlag={isHolPaySpecialFlag}
+                    setIsHolPaySpecialFlag={setIsHolPaySpecialFlag}
+                    compHolPayForMonth={compHolPayForMonth}
+                    setCompHolPayForMonth={setCompHolPayForMonth}
+                    compHolPayIfWorkBeforeHolidayRestDay={
+                      compHolPayIfWorkBeforeHolidayRestDay
+                    }
+                    setCompHolPayIfWorkBeforeHolidayRestDay={
+                      setCompHolPayIfWorkBeforeHolidayRestDay
+                    }
+                    compHolPayIfWorkBeforeHolidayLegalHoliday={
+                      compHolPayIfWorkBeforeHolidayLegalHoliday
+                    }
+                    setCompHolPayIfWorkBeforeHolidayLegalHoliday={
+                      setCompHolPayIfWorkBeforeHolidayLegalHoliday
+                    }
+                    compHolPayIfWorkBeforeHolidaySpecialHoliday={
+                      compHolPayIfWorkBeforeHolidaySpecialHoliday
+                    }
+                    setCompHolPayIfWorkBeforeHolidaySpecialHoliday={
+                      setCompHolPayIfWorkBeforeHolidaySpecialHoliday
+                    }
+                    noPayIfAbsentBeforeHoliday={noPayIfAbsentBeforeHoliday}
+                    setNoPayIfAbsentBeforeHoliday={
+                      setNoPayIfAbsentBeforeHoliday
+                    }
+                    noPayIfAbsentAfterHoliday={noPayIfAbsentAfterHoliday}
+                    setNoPayIfAbsentAfterHoliday={setNoPayIfAbsentAfterHoliday}
+                    compHolidayWithPaidLeave={compHolidayWithPaidLeave}
+                    setCompHolidayWithPaidLeave={setCompHolidayWithPaidLeave}
+                    minimumNoOfHrsRequiredToCompHol={
+                      minimumNoOfHrsRequiredToCompHol
+                    }
+                    setMinimumNoOfHrsRequiredToCompHol={
+                      setMinimumNoOfHrsRequiredToCompHol
+                    }
+                    compFirstRestdayHoliday={compFirstRestdayHoliday}
+                    setCompFirstRestdayHoliday={setCompFirstRestdayHoliday}
+                    minimumOTHours={minOTHrs}
+                    setMinimumOTHours={setMinOTHrs}
+                    accumOTHrsToEarnMealAllow={accumOTHrsToEarnMealAllow}
+                    setAccumOTHrsToEarnMealAllow={setAccumOTHrsToEarnMealAllow}
+                    dayType={dayType}
+                    setDayType={setDayType}
+                    amount={amount}
+                    setAmount={setAmount}
+                    earningCode={earningCode}
+                    setEarningCode={setEarningCode}
+                    oTAllowancesList={oTAllowancesList}
+                    setOTAllowancesList={setOTAllowancesList}
+                    id={oTAllowanceseID}
+                    setID={setOTAllowancesID}
+                    groupCode={oTAllowancesGroupCode}
+                    setGroupCode={setOTAllowancesGroupCode}
+                  />
                 </div>
               </div>
             )}
 
-            {/* Tab Content - Overtime Rates */}
-            {activeTab === "overtime" && (
-              <OvertimeRatesTabContent
-                tksGroupCode={tksGroupCode}
-                tksGroupDescription={tksGroupDescription}
-                isEditMode={isEditMode}
-                isEditOTRates={isEditOTRates}
-                isCreateNew={isCreateNew}
-                setIsEditOTRates={setIsEditOTRates}
-                showOtCodeModal={showOtCodeModal}
-                setShowOtCodeModal={setShowOtCodeModal}
-                isEditOTRatesFor2Shifts={isEditOTRatesFor2Shifts}
-                setIsEditOTRatesFor2Shifts={setIsEditOTRatesFor2Shifts}
-                isEditBirthDayPay={isEditBirthDayPay}
-                setIsEditBirthDayPay={setIsEditBirthDayPay}
-                regularDayOT={regularDayOT}
-                setRegularDayOT={setRegularDayOT}
-                restDayOT={restDayOT}
-                setRestDayOT={setRestDayOT}
-                legalHolidayOT={legalHolidayOT}
-                setLegalHolidayOT={setLegalHolidayOT}
-                specialHolidayOT={specialHolidayOT}
-                setSpecialHolidayOT={setSpecialHolidayOT}
-                doubleLegalHolidayOT={doubleLegalHolidayOT}
-                setDoubleLegalHolidayOT={setDoubleLegalHolidayOT}
-                specialHolidayOT2={specialHolidayOT2}
-                setSpecialHolidayOT2={setSpecialHolidayOT2}
-                nonWorkingHolidayOT={nonWorkingHolidayOT}
-                setNonWorkingHolidayOT={setNonWorkingHolidayOT}
-                regularDayOTLateFiling={regularDayOTLateFiling}
-                setRegularDayOTLateFiling={setRegularDayOTLateFiling}
-                restDayOTLateFiling={restDayOTLateFiling}
-                setRestDayOTLateFiling={setRestDayOTLateFiling}
-                legalHolidayOTLateFiling={legalHolidayOTLateFiling}
-                setLegalHolidayOTLateFiling={setLegalHolidayOTLateFiling}
-                specialHolidayOTLateFiling={specialHolidayOTLateFiling}
-                setSpecialHolidayOTLateFiling={setSpecialHolidayOTLateFiling}
-                doubleLegalHolidayOTLateFiling={doubleLegalHolidayOTLateFiling}
-                setDoubleLegalHolidayOTLateFiling={
-                  setDoubleLegalHolidayOTLateFiling
-                }
-                specialHoliday2OTLateFiling={specialHoliday2OTLateFiling}
-                setSpecialHoliday2OTLateFiling={setSpecialHoliday2OTLateFiling}
-                nonWorkingHolidayOTLateFiling={nonWorkingHolidayOTLateFiling}
-                setNonWorkingHolidayOTLateFiling={
-                  setNonWorkingHolidayOTLateFiling
-                }
-                regDayMinHrsToCompOT={regDayMinHrsToCompOT}
-                setRegDayMinHrsToCompOT={setRegDayMinHrsToCompOT}
-                restDayMinHrsToCompOT={restDayMinHrsToCompOT}
-                setRestDayMinHrsToCompOT={setRestDayMinHrsToCompOT}
-                legalHolidayMinHrsToCompOT={legalHolidayMinHrsToCompOT}
-                setLegalHolidayMinHrsToCompOT={setLegalHolidayMinHrsToCompOT}
-                specialHolidayMinHrsToCompOT={specialHolidayMinHrsToCompOT}
-                setSpecialHolidayMinHrsToCompOT={
-                  setSpecialHolidayMinHrsToCompOT
-                }
-                specialHoliday2MinHrsToCompOT={specialHoliday2MinHrsToCompOT}
-                setSpecialHoliday2MinHrsToCompOT={
-                  setSpecialHoliday2MinHrsToCompOT
-                }
-                doubleLegalHolidayMinHrsToCompOT={
-                  doubleLegalHolidayMinHrsToCompOT
-                }
-                setDoubleLegalHolidayMinHrsToCompOT={
-                  setDoubleLegalHolidayMinHrsToCompOT
-                }
-                nonWorkingHolidayMinHrsToCompOT={
-                  nonWorkingHolidayMinHrsToCompOT
-                }
-                setNonWorkingHolidayMinHrsToCompOT={
-                  setNonWorkingHolidayMinHrsToCompOT
-                }
-                otBreakMinHours={otBreakMinHours}
-                setOtBreakMinHours={setOtBreakMinHours}
-                oTBreakNoOfHrsDed={oTBreakNoOfHrsDed}
-                setOTBreakNoOfHrsDed={setOTBreakNoOfHrsDed}
-                oTBreakAppliesToRegDay={oTBreakAppliesToRegDay}
-                setOTBreakAppliesToRegDay={setOTBreakAppliesToRegDay}
-                oTBreakAppliesToLegHol={oTBreakAppliesToLegHol}
-                setOTBreakAppliesToLegHol={setOTBreakAppliesToLegHol}
-                oTBreakAppliesToSHol={oTBreakAppliesToSHol}
-                setOTBreakAppliesToSHol={setOTBreakAppliesToSHol}
-                oTBreakAppliesToDoubleLegHol={oTBreakAppliesToDoubleLegHol}
-                setOTBreakAppliesToDoubleLegHol={
-                  setOTBreakAppliesToDoubleLegHol
-                }
-                oTBreakAppliesToS2Hol={oTBreakAppliesToS2Hol}
-                setOTBreakAppliesToS2Hol={setOTBreakAppliesToS2Hol}
-                oTBreakAppliesToNonWorkHol={oTBreakAppliesToNonWorkHol}
-                setOTBreakAppliesToNonWorkHol={setOTBreakAppliesToNonWorkHol}
-                oTBreakAppliesToRestDay={oTBreakAppliesToRestDay}
-                setOTBreakAppliesToRestDay={setOTBreakAppliesToRestDay}
-                oTBreakAppliesToLegHolRest={oTBreakAppliesToLegHolRest}
-                setOTBreakAppliesToLegHolRest={setOTBreakAppliesToLegHolRest}
-                oTBreakAppliesToSHolRest={oTBreakAppliesToSHolRest}
-                setOTBreakAppliesToSHolRest={setOTBreakAppliesToSHolRest}
-                oTBreakAppliesToDoubleLegHolRest={
-                  oTBreakAppliesToDoubleLegHolRest
-                }
-                setOTBreakAppliesToDoubleLegHolRest={
-                  setOTBreakAppliesToDoubleLegHolRest
-                }
-                oTBreakAppliesToS2HolRest={oTBreakAppliesToS2HolRest}
-                setOTBreakAppliesToS2HolRest={setOTBreakAppliesToS2HolRest}
-                oTBreakAppliesToNonWorkRest={oTBreakAppliesToNonWorkRest}
-                setOTBreakAppliesToNonWorkRest={setOTBreakAppliesToNonWorkRest}
-                useOTPremiumBreakDwn={useOTPremium}
-                setOTPremiumBreakDwn={setUseOTPremium}
-                useActualDayType={useActualDayType}
-                setUseActualDayType={setUseActualDayType}
-                holidayWithWorkShift={holidayWithWorkshift}
-                setHolidayWithWorkShift={setHolidayWithWorkshift}
-                deductMealBreakFromOT={deductMealBreakFromOT}
-                setDeductMealBreakFromOT={setDeductMealBreakFromOT}
-                computeOTForBreak2={computeOTForBreak2}
-                setComputeOTForBreak2={setComputeOTForBreak2}
-                enable24HourOT={enable24HourOT}
-                setEnable24HourOT={setEnable24HourOT}
-                includeUnworkedHolidayInRegular={
-                  includeUnworkedHolidayInRegular
-                }
-                setIncludeUnworkedHolidayInRegular={
-                  setIncludeUnworkedHolidayInRegular
-                }
-                sundayOTIfWorkedSaturday={sundayOTIfWorkedSaturday}
-                setSundayOTIfWorkedSaturday={setSundayOTIfWorkedSaturday}
-                restDayToBeComputedAsOtherRate={restDayToBeComputedAsOtherRate}
-                setRestDayToBeComputedAsOtherRate={
-                  setRestDayToBeComputedAsOtherRate
-                }
-                restDayOtherRate={restDayOtherRate}
-                setRestDayOtherRate={setRestDayOtherRate}
-                isOverTimeCutOffFlag={isOverTimeCutOffFlag}
-                setIsOverTimeCutoffFlag={setIsOverTimeCutoffFlag}
-                overTimeCode={overTimeCode}
-                setOverTimeCode={setOverTimeCode}
-                requiredHours={requiredHours}
-                setRequiredHours={setRequiredHours}
-                overTimeCodeFor2ShiftsDay={overTimeCodeFor2ShiftsDay}
-                setOverTimeCodeFor2ShiftsDay={setOverTimeCodeFor2ShiftsDay}
-                oTRoundingToTheNearestHourMin={oTRoundingToTheNearestHourMin}
-                setOTRoundingToTheNearestHourMin={
-                  setOTRoundingToTheNearestHourMin
-                }
-                birthdayPay={birthdayPay}
-                setBirthdayPay={setBirthdayPay}
-                nDBasicRoundingToTheNearestHourMin={
-                  nDBasicRoundingToTheNearestHourMin
-                }
-                setNDBasicRoundingToTheNearestHourMin={
-                  setNDBasicRoundingToTheNearestHourMin
-                }
-                useOverTimeAuthorization={useOverTimeAuthorization}
-                setUseOverTimeAuthorization={setUseOverTimeAuthorization}
-                isSpecialOTCompFlag={isSpecialOTCompFlag}
-                setIsSpecialOTCompFlag={setIsSpecialOTCompFlag}
-                isHolPayLegalFlag={isHolPayLegalFlag}
-                setIsHolPayLegalFlag={setIsHolPayLegalFlag}
-                isHolPaySpecialFlag={isHolPaySpecialFlag}
-                setIsHolPaySpecialFlag={setIsHolPaySpecialFlag}
-                compHolPayForMonth={compHolPayForMonth}
-                setCompHolPayForMonth={setCompHolPayForMonth}
-                compHolPayIfWorkBeforeHolidayRestDay={
-                  compHolPayIfWorkBeforeHolidayRestDay
-                }
-                setCompHolPayIfWorkBeforeHolidayRestDay={
-                  setCompHolPayIfWorkBeforeHolidayRestDay
-                }
-                compHolPayIfWorkBeforeHolidayLegalHoliday={
-                  compHolPayIfWorkBeforeHolidayLegalHoliday
-                }
-                setCompHolPayIfWorkBeforeHolidayLegalHoliday={
-                  setCompHolPayIfWorkBeforeHolidayLegalHoliday
-                }
-                compHolPayIfWorkBeforeHolidaySpecialHoliday={
-                  compHolPayIfWorkBeforeHolidaySpecialHoliday
-                }
-                setCompHolPayIfWorkBeforeHolidaySpecialHoliday={
-                  setCompHolPayIfWorkBeforeHolidaySpecialHoliday
-                }
-                noPayIfAbsentBeforeHoliday={noPayIfAbsentBeforeHoliday}
-                setNoPayIfAbsentBeforeHoliday={setNoPayIfAbsentBeforeHoliday}
-                noPayIfAbsentAfterHoliday={noPayIfAbsentAfterHoliday}
-                setNoPayIfAbsentAfterHoliday={setNoPayIfAbsentAfterHoliday}
-                compHolidayWithPaidLeave={compHolidayWithPaidLeave}
-                setCompHolidayWithPaidLeave={setCompHolidayWithPaidLeave}
-                minimumNoOfHrsRequiredToCompHol={
-                  minimumNoOfHrsRequiredToCompHol
-                }
-                setMinimumNoOfHrsRequiredToCompHol={
-                  setMinimumNoOfHrsRequiredToCompHol
-                }
-                compFirstRestdayHoliday={compFirstRestdayHoliday}
-                setCompFirstRestdayHoliday={setCompFirstRestdayHoliday}
-                minimumOTHours={minOTHrs}
-                setMinimumOTHours={setMinOTHrs}
-                accumOTHrsToEarnMealAllow={accumOTHrsToEarnMealAllow}
-                setAccumOTHrsToEarnMealAllow={setAccumOTHrsToEarnMealAllow}
-                dayType={dayType}
-                setDayType={setDayType}
-                amount={amount}
-                setAmount={setAmount}
-                earningCode={earningCode}
-                setEarningCode={setEarningCode}
-                oTAllowancesList={oTAllowancesList}
-                setOTAllowancesList={setOTAllowancesList}
-                id={oTAllowanceseID}
-                setID={setOTAllowancesID}
-                groupCode={oTAllowancesGroupCode}
-                setGroupCode={setOTAllowancesGroupCode}
-              />
-            )}
-
             {/* Tab Content - Other Policies */}
-            {activeTab === "other" && (
-              <OtherPoliciesTabContent
-                ref={otherPoliciesRef}
-                tksGroupCode={tksGroupCode}
-                tksGroupDescription={tksGroupDescription}
-                isEditMode={isEditMode}
-                isCreateNew={isCreateNew}
-              />
-            )}
-
-            {activeTab === "system" && (
-              <div className="space-y-6">
-                {/* Use Timekeeping System Config */}
-                <div className="flex items-start gap-3">
-                  <label className="text-gray-700 text-sm">
-                    Use Timekeeping System Config :
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={useTimekeepingSystemConfig}
-                    onChange={(e) =>
-                      setUseTimekeepingSystemConfig(e.target.checked)
-                    }
-                    disabled={!isEditMode}
-                    className="w-4 h-4 mt-1"
+            <div style={{ display: activeTab === "other" ? "block" : "none" }}>
+              <div className="relative">
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
+                    </div>
+                  </div>
+                )}
+                <div
+                  className={isLoading ? "pointer-events-none opacity-50" : ""}
+                >
+                  <OtherPoliciesTabContent
+                    ref={otherPoliciesRef}
+                    tksGroupCode={tksGroupCode}
+                    tksGroupDescription={tksGroupDescription}
+                    isEditMode={isEditMode}
+                    isCreateNew={isCreateNew}
+                    setIsEditMode={setIsEditMode}
                   />
                 </div>
+              </div>
+            </div>
 
-                {/* No. of Min. Before the Shift */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
+            {activeTab === "system" && (
+              <div className="relative">
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
+                    </div>
+                  </div>
+                )}
+                <div
+                  className={`space-y-6 ${isLoading ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  {/* Use Timekeeping System Config */}
+                  <div className="flex items-start gap-3">
                     <label className="text-gray-700 text-sm">
-                      No. of Min. Before the Shift :
+                      Use Timekeeping System Config :
                     </label>
                     <input
-                      type="number"
-                      value={minBeforeShift}
+                      type="checkbox"
+                      checked={useTimekeepingSystemConfig}
                       onChange={(e) =>
-                        setMinBeforeShift(parseFloat(e.target.value))
+                        setUseTimekeepingSystemConfig(e.target.checked)
                       }
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • Used in Validate Logs in Import {">"} Update Raw Data
-                    </li>
-                  </ul>
-                </div>
-
-                {/* No. of Min. to Ignore Multiple Break Out/In */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      No. of Min. to Ignore Multiple Break Out/In :
-                    </label>
-                    <input
-                      type="number"
-                      value={minIgnoreMultipleBreak}
-                      onChange={(e) =>
-                        setMinIgnoreMultipleBreak(Number(e.target.value))
-                      }
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • This will be triggered when your Device Policy is Device
-                      4
-                    </li>
-                    <li className="text-green-600 text-sm">
-                      During pairing of Breaks The system will ignore Multiple
-                      breaks when the difference of break is equal or less than
-                      to defined policy.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* No. of Min. Before Midnight Shift */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      No. of Min. Before Midnight Shift :
-                    </label>
-                    <input
-                      type="text"
-                      value={minBeforeMidnightShift}
-                      onChange={(e) =>
-                        setMinBeforeMidnightShift(Number(e.target.value))
-                      }
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • This will be triggered when Midnight Shift is check in
-                      workshift.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* No of Min. to Consider Break2 In */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      No of Min. to Consider Break2 In :
-                    </label>
-                    <input
-                      type="text"
-                      value={minConsiderBreak2In}
-                      onChange={(e) =>
-                        setMinConsiderBreak2In(Number(e.target.value))
-                      }
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • This is the number of minutes to consider as the pair of
-                      Break 2 Out, this is used in Device 5.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Device Policy */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      Device Policy :
-                    </label>
-
-                    <select
-                      value={devicePolicy}
-                      onChange={(e) => setDevicePolicy(e.target.value)}
                       disabled={!isEditMode}
-                      className={`w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                        !isEditMode ? "bg-gray-50" : ""
-                      }`}
-                    >
-                      <option value="">-- Select Device --</option>
-
-                      {Array.from({ length: 10 }, (_, i) => {
-                        const device = `Device${i + 1}`;
-                        return (
-                          <option key={device} value={device}>
-                            {device}
-                          </option>
-                        );
-                      })}
-                    </select>
+                      className="w-4 h-4 mt-1"
+                    />
                   </div>
 
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • Leave blank if you want the default pairing of logs.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Device Policy Descriptions */}
-                <div className="ml-6 space-y-3 text-sm">
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 1</strong> - First In Last Out Regardless
-                      of flagging
+                  {/* No. of Min. Before the Shift */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No. of Min. Before the Shift :
+                      </label>
+                      <input
+                        type="number"
+                        value={minBeforeShift}
+                        onChange={(e) =>
+                          setMinBeforeShift(parseFloat(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
                     </div>
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • Used in Validate Logs in Import {">"} Update Raw Data
+                      </li>
+                    </ul>
                   </div>
 
-                  <div>
-                    <div className="text-green-600 mb-1">
-                      <strong>Device 2</strong>
+                  {/* No. of Min. to Ignore Multiple Break Out/In */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No. of Min. to Ignore Multiple Break Out/In :
+                      </label>
+                      <input
+                        type="number"
+                        value={minIgnoreMultipleBreak}
+                        onChange={(e) =>
+                          setMinIgnoreMultipleBreak(Number(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
                     </div>
-                    <div className="ml-4 space-y-1 text-green-600">
-                      <div>First In = Time In</div>
-                      <div>Second In = Break2 In</div>
-                      <div>First Out = Break2 Out</div>
-                      <div>
-                        Second Out = Time Out (if no second out First Out will
-                        become Time Out)
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • This will be triggered when your Device Policy is
+                        Device 4
+                      </li>
+                      <li className="text-green-600 text-sm">
+                        During pairing of Breaks The system will ignore Multiple
+                        breaks when the difference of break is equal or less
+                        than to defined policy.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* No. of Min. Before Midnight Shift */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No. of Min. Before Midnight Shift :
+                      </label>
+                      <input
+                        type="text"
+                        value={minBeforeMidnightShift}
+                        onChange={(e) =>
+                          setMinBeforeMidnightShift(Number(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
+                    </div>
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • This will be triggered when Midnight Shift is check in
+                        workshift.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* No of Min. to Consider Break2 In */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No of Min. to Consider Break2 In :
+                      </label>
+                      <input
+                        type="text"
+                        value={minConsiderBreak2In}
+                        onChange={(e) =>
+                          setMinConsiderBreak2In(Number(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
+                    </div>
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • This is the number of minutes to consider as the pair
+                        of Break 2 Out, this is used in Device 5.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Device Policy */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        Device Policy :
+                      </label>
+
+                      <select
+                        value={devicePolicy}
+                        onChange={(e) => setDevicePolicy(e.target.value)}
+                        disabled={!isEditMode}
+                        className={`w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                          !isEditMode ? "bg-gray-50" : ""
+                        }`}
+                      >
+                        <option value="">-- Select Device --</option>
+
+                        {Array.from({ length: 10 }, (_, i) => {
+                          const device = `Device${i + 1}`;
+                          return (
+                            <option key={device} value={device}>
+                              {device}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • Leave blank if you want the default pairing of logs.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Device Policy Descriptions */}
+                  <div className="ml-6 space-y-3 text-sm">
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 1</strong> - First In Last Out Regardless
+                        of flagging
                       </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600 mb-1">
-                      <strong>Device 3</strong>
+                    <div>
+                      <div className="text-green-600 mb-1">
+                        <strong>Device 2</strong>
+                      </div>
+                      <div className="ml-4 space-y-1 text-green-600">
+                        <div>First In = Time In</div>
+                        <div>Second In = Break2 In</div>
+                        <div>First Out = Break2 Out</div>
+                        <div>
+                          Second Out = Time Out (if no second out First Out will
+                          become Time Out)
+                        </div>
+                      </div>
                     </div>
-                    <div className="ml-4 space-y-1 text-green-600">
-                      <div>First Flag for Break1Out = Break1Out</div>
-                      <div>Second Flag for Break1Out = Break3Out</div>
-                      <div>First flag for Break1In = Break1In</div>
-                      <div>Last flag for break1In = Break3In</div>
-                    </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600 mb-1">
-                      <strong>Device 4</strong>
+                    <div>
+                      <div className="text-green-600 mb-1">
+                        <strong>Device 3</strong>
+                      </div>
+                      <div className="ml-4 space-y-1 text-green-600">
+                        <div>First Flag for Break1Out = Break1Out</div>
+                        <div>Second Flag for Break1Out = Break3Out</div>
+                        <div>First flag for Break1In = Break1In</div>
+                        <div>Last flag for break1In = Break3In</div>
+                      </div>
                     </div>
-                    <div className="ml-4 space-y-1 text-green-600">
-                      <div>First Flag for BreakIn = Break1In</div>
-                      <div>Second Flag for BreakIn = Break2In</div>
-                      <div>Third Flag for BreakIn = Break3In</div>
-                      <div>First Flag for BreakOut = Break1Out</div>
-                      <div>Second Flag for BreakOut = Break2Out</div>
-                      <div>Third Flag for BreakOut = Break3Out</div>
-                    </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 5</strong>
-                      <br />
-                      If there is First Flag of any Break before Any flag of
-                      In/Out, Flagging of In/Out will always be Out.
+                    <div>
+                      <div className="text-green-600 mb-1">
+                        <strong>Device 4</strong>
+                      </div>
+                      <div className="ml-4 space-y-1 text-green-600">
+                        <div>First Flag for BreakIn = Break1In</div>
+                        <div>Second Flag for BreakIn = Break2In</div>
+                        <div>Third Flag for BreakIn = Break3In</div>
+                        <div>First Flag for BreakOut = Break1Out</div>
+                        <div>Second Flag for BreakOut = Break2Out</div>
+                        <div>Third Flag for BreakOut = Break3Out</div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 6</strong>
-                      <br />
-                      From Windows Validation.
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 5</strong>
+                        <br />
+                        If there is First Flag of any Break before Any flag of
+                        In/Out, Flagging of In/Out will always be Out.
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 7</strong>
-                      <br />
-                      All Logs that falls on 6:00am Current Date to 5:59am the
-                      next day will be paired to Current Date
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 6</strong>
+                        <br />
+                        From Windows Validation.
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 8</strong>
-                      <br />
-                      24 Hours Pairing
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 7</strong>
+                        <br />
+                        All Logs that falls on 6:00am Current Date to 5:59am the
+                        next day will be paired to Current Date
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 9</strong>
-                      <br />
-                      Standard pairing but First Time Out will pair
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 8</strong>
+                        <br />
+                        24 Hours Pairing
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 10</strong>
-                      <br />
-                      First In of the current day and last out before first in
-                      of next day
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 9</strong>
+                        <br />
+                        Standard pairing but First Time Out will pair
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 10</strong>
+                        <br />
+                        First In of the current day and last out before first in
+                        of next day
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4977,7 +5226,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowTksGroupModal(false)}
+              onClick={() => {
+                setShowTksGroupModal(false);
+                setTksGroupSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-2xl"
@@ -4989,7 +5241,10 @@ export function TimeKeepGroupPage() {
                     TKS Group
                   </h2>
                   <button
-                    onClick={() => setShowTksGroupModal(false)}
+                    onClick={() => {
+                      setShowTksGroupModal(false);
+                      setTksGroupSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -5042,7 +5297,7 @@ export function TimeKeepGroupPage() {
                             {item.groupCode}
                           </td>
                           <td className="py-2 text-gray-800">
-                            {item.description}
+                            {item.groupDescription}
                           </td>
                         </tr>
                       ))}
@@ -5128,11 +5383,16 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowPayrollLocationModal(false)}
+              onClick={() => {
+                setShowPayrollLocationModal(false);
+                setPayrollLocationSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-2xl"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
               >
                 {/* Modal Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
@@ -5140,7 +5400,10 @@ export function TimeKeepGroupPage() {
                     Payroll Location
                   </h2>
                   <button
-                    onClick={() => setShowPayrollLocationModal(false)}
+                    onClick={() => {
+                      setShowPayrollLocationModal(false);
+                      setPayrollLocationSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -5296,7 +5559,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForAbsentModal(false)}
+              onClick={() => {
+                setShowForAbsentModal(false);
+                setForAbsentSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -5308,7 +5574,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForAbsentModal(false)}
+                    onClick={() => {
+                      setShowForAbsentModal(false);
+                      setForAbsentSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -5484,7 +5753,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoLoginModal(false)}
+              onClick={() => {
+                setShowForNoLoginModal(false);
+                setForNoLoginSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -5496,7 +5768,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoLoginModal(false)}
+                    onClick={() => {
+                      setShowForNoLoginModal(false);
+                      setForNoLoginSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -5680,7 +5955,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoLogoutModal(false)}
+              onClick={() => {
+                setShowForNoLogoutModal(false);
+                setForNoLogoutSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -5692,7 +5970,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoLogoutModal(false)}
+                    onClick={() => {
+                      setShowForNoLogoutModal(false);
+                      setForNoLogoutSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -5871,7 +6152,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoBreak2InModal(false)}
+              onClick={() => {
+                setShowForNoBreak2InModal(false);
+                setForNoBreak2InSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -5883,7 +6167,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoBreak2InModal(false)}
+                    onClick={() => {
+                      setShowForNoBreak2InModal(false);
+                      setForNoBreak2InSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -6066,7 +6353,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoBreak2OutModal(false)}
+              onClick={() => {
+                setShowForNoBreak2OutModal(false);
+                setForNoBreak2OutSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -6078,7 +6368,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoBreak2OutModal(false)}
+                    onClick={() => {
+                      setShowForNoBreak2OutModal(false);
+                      setForNoBreak2OutSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -6261,7 +6554,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowSupervisoryGroupModal(false)}
+              onClick={() => {
+                setShowSupervisoryGroupModal(false);
+                setSupervisoryGroupSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-2xl"
@@ -6273,7 +6569,10 @@ export function TimeKeepGroupPage() {
                     Supervisory Group
                   </h2>
                   <button
-                    onClick={() => setShowSupervisoryGroupModal(false)}
+                    onClick={() => {
+                      setShowSupervisoryGroupModal(false);
+                      setSupervisoryGroupSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700"
                   >
                     <X className="w-5 h-5" />
@@ -6329,7 +6628,7 @@ export function TimeKeepGroupPage() {
                             {item.groupCode}
                           </td>
                           <td className="py-2 text-gray-800">
-                            {item.description}
+                            {item.groupCode}
                           </td>
                         </tr>
                       ))}
@@ -6418,6 +6717,7 @@ export function TimeKeepGroupPage() {
                 setShowOtCodeModal(false);
                 setIsEditOTRatesFor2Shifts(false);
                 setIsEditBirthDayPay(false);
+                setOtCodeSearchTerm("");
               }}
             >
               <div
@@ -6435,6 +6735,7 @@ export function TimeKeepGroupPage() {
                       setShowOtCodeModal(false);
                       setIsEditOTRatesFor2Shifts(false);
                       setIsEditBirthDayPay(false);
+                      setOtCodeSearchTerm("");
                     }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >

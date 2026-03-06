@@ -1,7 +1,8 @@
-import { X, Search, Trash2 } from "lucide-react";
+import { X, Search, Trash2, Pencil, Save } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTablePagination } from "../hooks/useTablePagination";
 import apiClient from "../services/apiClient";
+import Swal from "sweetalert2";
 
 interface OvertimeRatesTabContentProps {
   tksGroupCode: string;
@@ -466,6 +467,16 @@ export function OvertimeRatesTabContent({
   const [isLateFiling, setLateFiling] = useState(false);
   const [isCompOtherRate, setIsCompOtherRate] = useState(false);
 
+  //OT Allowances Edit
+  const [editingAllowanceIndex, setEditingAllowanceIndex] = useState<
+    number | null
+  >(null);
+  const [editMinimumOTHours, setEditMinimumOTHours] = useState("");
+  const [editAccumOTHrsToEarnMealAllow, setEditAccumOTHrsToEarnMealAllow] =
+    useState("");
+  const [editEarningCode, setEditEarningCode] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+
   const [regularOTRatesList, setRegularOTRatesList] = useState<
     RegularOTRatesItem[]
   >([]);
@@ -829,8 +840,22 @@ export function OvertimeRatesTabContent({
     };
   }, [showEarningCodeModal]);
 
-  const handleAddAllowance = () => {
-    const finalDayType = dayType || "Any"; // the value that will actually be saved
+  const handleAddAllowance = async () => {
+    const finalDayType = dayType || "Any";
+
+    if (
+      !minimumOTHours &&
+      !accumOTHrsToEarnMealAllow &&
+      !earningCode &&
+      !amount
+    ) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Missing Fields",
+        text: "Please fill in at least the input boxes adding.",
+      });
+      return;
+    }
 
     const exists = oTAllowancesList.some(
       (item) =>
@@ -839,7 +864,11 @@ export function OvertimeRatesTabContent({
     );
 
     if (exists) {
-      alert("Only one Overtime allowance is allowed.");
+      await Swal.fire({
+        icon: "warning",
+        title: "Duplicate Entry",
+        text: "Only one Overtime allowance is allowed.",
+      });
       return;
     }
 
@@ -855,11 +884,45 @@ export function OvertimeRatesTabContent({
 
     setOTAllowancesList((prev) => [...prev, newItem]);
 
-    // Clear fields
     setMinimumOTHours("");
     setAccumOTHrsToEarnMealAllow("");
     setEarningCode("");
     setAmount("");
+  };
+
+  const handleEditAllowance = (index: number) => {
+    const item = oTAllowancesList[index];
+    setEditMinimumOTHours(String(item.minimumOTHours ?? ""));
+    setEditAccumOTHrsToEarnMealAllow(
+      String(item.accumOTHrsToEarnMealAllow ?? ""),
+    );
+    setEditEarningCode(item.earningCode ?? "");
+    setEditAmount(String(item.amount ?? ""));
+    setEditingAllowanceIndex(index);
+  };
+
+  const handleUpdateAllowance = () => {
+    if (editingAllowanceIndex === null) return;
+
+    setOTAllowancesList((prev) =>
+      prev.map((item, i) =>
+        i === editingAllowanceIndex
+          ? {
+              ...item,
+              minimumOTHours: editMinimumOTHours,
+              accumOTHrsToEarnMealAllow: editAccumOTHrsToEarnMealAllow,
+              earningCode: editEarningCode,
+              amount: editAmount,
+            }
+          : item,
+      ),
+    );
+
+    setEditingAllowanceIndex(null);
+    setEditMinimumOTHours("");
+    setEditAccumOTHrsToEarnMealAllow("");
+    setEditEarningCode("");
+    setEditAmount("");
   };
 
   // Handle earning code selection from modal
@@ -2343,27 +2406,122 @@ export function OvertimeRatesTabContent({
                   </tr>
                 ) : (
                   oTAllowancesList.map((allowance, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="p-3 text-gray-700">
-                        {allowance.minimumOTHours}
-                      </td>
-                      <td className="p-3 text-gray-700">
-                        {allowance.accumOTHrsToEarnMealAllow}
-                      </td>
-                      <td className="p-3 text-gray-700">
-                        {allowance.earningCode}
-                      </td>
-                      <td className="p-3 text-gray-700">{allowance.amount}</td>
-                      {isEditMode && (
-                        <td className="p-3">
-                          <button
-                            onClick={() => handleDeleteAllowance(index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
+                    <tr
+                      key={index}
+                      className={`hover:bg-gray-50 ${editingAllowanceIndex === index ? "bg-blue-50" : ""}`}
+                    >
+                      {editingAllowanceIndex === index ? (
+                        <>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              value={editMinimumOTHours}
+                              onChange={(e) =>
+                                setEditMinimumOTHours(e.target.value)
+                              }
+                              className="w-full px-2 py-1 border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              value={editAccumOTHrsToEarnMealAllow}
+                              onChange={(e) =>
+                                setEditAccumOTHrsToEarnMealAllow(e.target.value)
+                              }
+                              className="w-full px-2 py-1 border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-1">
+                              <input
+                                type="text"
+                                value={editEarningCode}
+                                readOnly
+                                className="w-full px-2 py-1 border border-blue-400 rounded text-sm bg-white"
+                              />
+                              <button
+                                onClick={() => setShowEarningCodeModal(true)}
+                                className={searchButtonClass}
+                              >
+                                <Search className="w-4 h-4" />
+                              </button>
+                              <button
+                                className={clearButtonClass}
+                                onClick={() => setEditEarningCode("")}
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              value={editAmount}
+                              onChange={(e) => setEditAmount(e.target.value)}
+                              className="w-full px-2 py-1 border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleUpdateAllowance}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Save"
+                              >
+                                <Save className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingAllowanceIndex(null);
+                                  setEditMinimumOTHours("");
+                                  setEditAccumOTHrsToEarnMealAllow("");
+                                  setEditEarningCode("");
+                                  setEditAmount("");
+                                }}
+                                className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                title="Cancel"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-3 text-gray-700">
+                            {allowance.minimumOTHours}
+                          </td>
+                          <td className="p-3 text-gray-700">
+                            {allowance.accumOTHrsToEarnMealAllow}
+                          </td>
+                          <td className="p-3 text-gray-700">
+                            {allowance.earningCode}
+                          </td>
+                          <td className="p-3 text-gray-700">
+                            {allowance.amount}
+                          </td>
+                          {isEditMode && (
+                            <td className="p-3">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditAllowance(index)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteAllowance(index)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </>
                       )}
                     </tr>
                   ))
@@ -2436,7 +2594,11 @@ export function OvertimeRatesTabContent({
                         index % 2 === 0 ? "bg-white" : "bg-gray-50"
                       }`}
                       onClick={() => {
-                        setEarningCode(item.earnCode);
+                        if (editingAllowanceIndex !== null) {
+                          setEditEarningCode(item.earnCode);
+                        } else {
+                          setEarningCode(item.earnCode);
+                        }
                         setShowEarningCodeModal(false);
                       }}
                     >
