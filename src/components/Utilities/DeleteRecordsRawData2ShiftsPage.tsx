@@ -1,519 +1,272 @@
-import { useState, useEffect } from 'react';
-import { Users, Building2, Briefcase, Network, CalendarClock, Wallet, Trash2 } from 'lucide-react';
-import { Footer } from '../Footer/Footer';
+import { useState, useEffect, useCallback } from 'react';
+import { Trash2, Check, Users, Building2, Briefcase, Network, CalendarClock, Wallet } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
+import { Footer } from '../Footer/Footer';
+import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
-import Swal from 'sweetalert2';
-
-interface GroupItem {
-  id: number;
-  code: string;
-  description: string;
-}
-
-interface EmployeeItem {
-  id: number;
-  code: string;
-  name: string;
-}
+interface GroupItem { id: number; code: string; description: string; }
+interface EmployeeItem { id: number; code: string; name: string; }
 
 type TabName = 'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House';
-
-export function DeleteRecordsRawData2ShiftsPage() {
- const formName = 'Delete Records In Raw Data 2 Shifts In A Day';
-
-  // Tab state
-  const [activeTab, setActiveTab] = useState<TabName>('TK Group');
-
-  // Group data per tab
-  const [tkGroupItems, setTKGroupItems] = useState<GroupItem[]>([]);
-  const [branchItems, setBranchItems] = useState<GroupItem[]>([]);
-  const [departmentItems, setDepartmentItems] = useState<GroupItem[]>([]);
-  const [divisionItems, setDivisionItems] = useState<GroupItem[]>([]);
-  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
-  const [payHouseItems, setPayHouseItems] = useState<GroupItem[]>([]);
-
-  // Employee data
-  const [employeeItems, setEmployeeItems] = useState<EmployeeItem[]>([]);
-
-  // Selection state
-  const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
-
-  // Search state
-  const [groupSearch, setGroupSearch] = useState('');
-  const [employeeSearch, setEmployeeSearch] = useState('');
-
-  // Pagination
-  const [currentGroupPage, setCurrentGroupPage] = useState(1);
-  const [currentEmpPage, setCurrentEmpPage] = useState(1);
+const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
+  { name: 'TK Group', icon: Users }, { name: 'Branch', icon: Building2 },
+  { name: 'Department', icon: Briefcase }, { name: 'Division', icon: Network },
+  { name: 'Group Schedule', icon: CalendarClock }, { name: 'Pay House', icon: Wallet },
+];
+const EMPTY_SELECTION: Record<TabName, number[]> = {
+  'TK Group': [], 'Branch': [], 'Department': [], 'Division': [], 'Group Schedule': [], 'Pay House': [],
+};
+export function DeleteRecordsRawData2ShiftsPage() {  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
+  const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
+  const [dateFrom,           setDateFrom]           = useState('');
+  const [dateTo,             setDateTo]             = useState('');
+  const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [isUpdating,         setIsUpdating]         = useState(false);
   const itemsPerPage = 10;
+  const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
+  const selectedGroups = selectedGroupsMap[activeTab] ?? [];
+  const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) =>
+    setSelectedGroupsMap(prev => ({ ...prev, [activeTab]: typeof updater === 'function' ? updater(prev[activeTab]) : updater }));
 
-  // Date range
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+  const [currentGroupPage,  setCurrentGroupPage]  = useState(1);
+  const [currentEmpPage,    setCurrentEmpPage]    = useState(1);
 
-  // Status filter
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+  const [tkGroupItems,       setTKSGroupItems]      = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [divisionItems,      setDivisionItems]      = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [employeeItems,      setEmployeeItems]      = useState<EmployeeItem[]>([]);
+  const [loadingEmployees,   setLoadingEmployees]   = useState(false);
+  useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
 
-  // Reset group page when tab changes
   useEffect(() => {
-    setCurrentGroupPage(1);
-    setGroupSearch('');
-  }, [activeTab]);
-
-  // --- Data Fetching ---
-  useEffect(() => {
-    apiClient.get('/Fs/Process/TimeKeepGroupSetUp').then(res =>
-      setTKGroupItems(res.data.map((item: any) => ({
-        id: item.ID || item.id,
-        code: item.groupCode || item.code,
-        description: item.groupDescription || item.description,
-      })))
-    ).catch(console.error);
+    const load = async () => {
+      try {
+        const [tks, bra, dep, div, grp, pay] = await Promise.all([
+          apiClient.get('/Fs/Process/TimeKeepGroupSetUp'), apiClient.get('/Fs/Employment/BranchSetUp'),
+          apiClient.get('/Fs/Employment/DepartmentSetUp'), apiClient.get('/Fs/Employment/DivisionSetUp'),
+          apiClient.get('/Fs/Employment/GroupSetUp'),      apiClient.get('/Fs/Employment/PayHouseSetUp'),
+        ]);
+        const map = (data: any[], idK: string, cK: string, dK: string): GroupItem[] =>
+          (Array.isArray(data) ? data : []).map(i => ({ id: i[idK] ?? i.ID ?? i.id ?? 0, code: i[cK] ?? i.code ?? '', description: i[dK] ?? i.description ?? '' }));
+        setTKSGroupItems(map(tks.data,'ID','groupCode','groupDescription'));
+        setBranchItems(map(bra.data,'braID','braCode','braDesc'));
+        setDepartmentItems(map(dep.data,'depID','depCode','depDesc'));
+        setDivisionItems(map(div.data,'divID','divCode','divDesc'));
+        setGroupScheduleItems(map(grp.data,'grpSchID','grpCode','grpDesc'));
+        setPayHouseItems(map(pay.data,'lineID','lineCode','lineDesc'));
+      } catch (err) { console.error('Failed to load group lists:', err); }
+    };
+    load();
   }, []);
-
-  useEffect(() => {
-    apiClient.get('/Fs/Employment/BranchSetUp').then(res =>
-      setBranchItems(res.data.map((item: any) => ({
-        id: item.braID || item.ID,
-        code: item.braCode || item.code,
-        description: item.braDesc || item.description,
-      })))
-    ).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    apiClient.get('/Fs/Employment/DepartmentSetUp').then(res =>
-      setDepartmentItems(res.data.map((item: any) => ({
-        id: item.depID || item.ID,
-        code: item.depCode || item.code,
-        description: item.depDesc || item.description,
-      })))
-    ).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    apiClient.get('/Fs/Employment/DivisionSetUp').then(res =>
-      setDivisionItems(res.data.map((item: any) => ({
-        id: item.divID || item.ID,
-        code: item.divCode || item.code,
-        description: item.divDesc || item.description,
-      })))
-    ).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    apiClient.get('/Fs/Employment/GroupSetUp').then(res => {
-      const list = Array.isArray(res.data) ? res.data : [];
-      setGroupScheduleItems(list.map((item: any) => ({
-        id: item.grpSchID || item.id || item.ID,
-        code: item.grpCode || item.code,
-        description: item.grpDesc || item.description,
-      })));
-    }).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    apiClient.get('/Fs/Employment/PayHouseSetUp').then(res => {
-      const list = Array.isArray(res.data) ? res.data : [];
-      setPayHouseItems(list.map((item: any) => ({
-        id: item.lineID ?? item.ID ?? item.id,
-        code: item.lineCode ?? item.code,
-        description: item.lineDesc ?? item.Description ?? item.description,
-      })));
-    }).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    apiClient.get('/Maintenance/EmployeeMasterFile').then(res => {
-      const list = Array.isArray(res.data) ? res.data : [];
-      setEmployeeItems(list.map((item: any) => ({
-        id: item.empID ?? item.ID ?? item.id,
-        code: item.empCode || item.code || '',
-        name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
-      })));
-    }).catch(console.error);
-  }, []);
-
-  // --- Current tab data ---
-  const getCurrentData = (): GroupItem[] => {
+  const getCurrentData = useCallback((): GroupItem[] => {
     switch (activeTab) {
-      case 'Branch': return branchItems;
-      case 'Department': return departmentItems;
-      case 'Division': return divisionItems;
-      case 'Group Schedule': return groupScheduleItems;
-      case 'Pay House': return payHouseItems;
-      default: return tkGroupItems;
+      case 'Branch': return branchItems; case 'Department': return departmentItems;
+      case 'Division': return divisionItems; case 'Group Schedule': return groupScheduleItems;
+      case 'Pay House': return payHouseItems; default: return tkGroupItems;
     }
-  };
+  }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems, groupScheduleItems, payHouseItems]);
 
-  const currentItems = getCurrentData();
+  const buildSpParams = useCallback((tab: TabName, ids: number[], items: GroupItem[], status: string) => {
+    const codes = items.filter(i => ids.includes(i.id)).map(i => i.code).join(',');
+    return {
+      Transaction: status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
+      GroupCodes: tab === 'TK Group' ? codes : '', Branches: tab === 'Branch' ? codes : '',
+      Divisions: tab === 'Division' ? codes : '', Departments: tab === 'Department' ? codes : '',
+      Sections: '', Units: '', Lines: '', Areas: '', Locations: '',
+      GroupSchedules: tab === 'Group Schedule' ? codes : '',
+    };
+  }, []);
+  const fetchFilteredEmployees = useCallback(async (tab: TabName, ids: number[], items: GroupItem[], status: string) => {
+    setLoadingEmployees(true); setCurrentEmpPage(1);
+    try {
+      if (ids.length === 0) {
+        const res = await apiClient.get('/Maintenance/EmployeeMasterFile');
+        setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((e: any): EmployeeItem => ({
+          id: e.empID ?? e.ID ?? e.id ?? 0, code: e.empCode ?? e.code ?? '',
+          name: `${e.lName ?? ''}, ${e.fName ?? ''} ${e.mName ?? ''}`.trim(),
+        })));
+      } else {
+        const res = await apiClient.post('/Utilities/GetFilteredEmployees', buildSpParams(tab, ids, items, status));
+        setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((e: any): EmployeeItem => ({
+          id: e.empID ?? e.ID ?? e.id ?? 0, code: e.empCode ?? e.EmpCode ?? e.code ?? '',
+          name: `${e.lName ?? e.LName ?? ''}, ${e.fName ?? e.FName ?? ''} ${e.mName ?? e.MName ?? ''}`.trim(),
+        })));
+      }
+    } catch { setEmployeeItems([]); } finally { setLoadingEmployees(false); }
+  }, [buildSpParams]);
 
-  const filteredGroups = currentItems.filter(item =>
-    item.code.toLowerCase().includes(groupSearch.toLowerCase()) ||
-    item.description.toLowerCase().includes(groupSearch.toLowerCase())
-  );
-
-  const filteredEmployees = employeeItems.filter(emp =>
-    emp.code.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-    emp.name.toLowerCase().includes(employeeSearch.toLowerCase())
-  );
-
-  // Group pagination
+  useEffect(() => {
+    fetchFilteredEmployees(activeTab, selectedGroups, getCurrentData(), statusFilter);
+    setSelectedEmployees([]);
+  }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
+  const currentItems    = getCurrentData();
+  const filteredGroups  = currentItems.filter(i => i.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) || i.description.toLowerCase().includes(groupSearchTerm.toLowerCase()));
   const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
   const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
-  const endGroupIndex = startGroupIndex + itemsPerPage;
-  const paginatedGroups = filteredGroups.slice(startGroupIndex, endGroupIndex);
+  const paginatedGroups = filteredGroups.slice(startGroupIndex, startGroupIndex + itemsPerPage);
 
-  // Employee pagination
-  const totalEmpPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-  const startEmpIndex = (currentEmpPage - 1) * itemsPerPage;
-  const endEmpIndex = startEmpIndex + itemsPerPage;
-  const paginatedEmployees = filteredEmployees.slice(startEmpIndex, endEmpIndex);
-
-  // Page number helpers
+  const filteredEmployees  = employeeItems.filter(e => e.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()));
+  const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const startEmpIndex      = (currentEmpPage - 1) * itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startEmpIndex, startEmpIndex + itemsPerPage);
   const getPageNumbers = (current: number, total: number) => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: (number | string)[] = [];
-    if (total <= 7) {
-      for (let i = 1; i <= total; i++) pages.push(i);
-    } else {
-      if (current <= 4) {
-        for (let i = 1; i <= 5; i++) pages.push(i);
-        pages.push('...');
-        pages.push(total);
-      } else if (current >= total - 3) {
-        pages.push(1);
-        pages.push('...');
-        for (let i = total - 4; i <= total; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push('...');
-        for (let i = current - 1; i <= current + 1; i++) pages.push(i);
-        pages.push('...');
-        pages.push(total);
-      }
-    }
+    if (current <= 4) { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(total); }
+    else if (current >= total - 3) { pages.push(1); pages.push('...'); for (let i = total - 4; i <= total; i++) pages.push(i); }
+    else { pages.push(1); pages.push('...'); for (let i = current - 1; i <= current + 1; i++) pages.push(i); pages.push('...'); pages.push(total); }
     return pages;
   };
 
-  // Selection handlers
-  const handleGroupToggle = (id: number) =>
-    setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleGroupToggle        = (id: number) => setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleEmployeeToggle     = (id: number) => setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleSelectAllGroups    = () => setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
+  const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
-  const handleEmpToggle = (id: number) =>
-    setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-
-  const handleSelectAllGroups = () =>
-    setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
-
-  const handleSelectAllEmployees = () =>
-    setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
-
-  // Delete handler
-  const handleDelete = async () => {
-    if (!selectedEmployees.length) {
-      await Swal.fire({ icon: 'error', title: 'Error', text: 'Please select employee(s) to delete.', timer: 2000, showConfirmButton: true });
-      return;
-    }
-    if (!dateFrom || !dateTo) {
-      await Swal.fire({ icon: 'error', title: 'Error', text: 'Please select Date From and Date To.', timer: 2000, showConfirmButton: true });
-      return;
-    }
-
-    const confirm = await Swal.fire({
-      icon: 'warning',
-      title: 'Confirm Delete',
-      text: 'Are you sure you want to delete the selected records? This action cannot be undone.',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-    });
-
-    if (!confirm.isConfirmed) return;
-
+  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); };
+  const handleAction = async () => {
+    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to delete.'); return; }
+    if (!dateFrom || !dateTo)      { await showErrorModal('Please select Date From and Date To.'); return; }
+    const confirmed = await ApiService.showDeleteConfirmDialog();
+    if (!confirmed) return;
     try {
-      await Swal.fire({ icon: 'success', title: 'Deleted', text: 'Records successfully deleted.', timer: 2000, showConfirmButton: false });
-      setSelectedGroups([]);
-      setSelectedEmployees([]);
-      setDateFrom('');
-      setDateTo('');
-    } catch (error) {
-      console.error(error);
-      alert('Failed to delete records.');
-    }
+      setIsUpdating(true);
+      const payload = {
+        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        dateFrom: new Date(dateFrom).toISOString(),
+        dateTo:   new Date(dateTo).toISOString(),
+      };
+      const res = await apiClient.post('/Utilities/DeleteRecordsRawData2Shifts', payload);
+      if (ApiService.isApiSuccess(res)) { await showSuccessModal('Records in raw data successfully deleted.'); resetForm(); }
+    } catch { await showErrorModal('Failed to delete records.'); }
+    finally { setIsUpdating(false); }
   };
 
-  // Pagination renderer
-  const renderPagination = (
-    current: number,
-    total: number,
-    setPage: (p: number) => void,
-    startIdx: number,
-    endIdx: number,
-    filteredCount: number
-  ) => (
+  const renderPagination = (current: number, total: number, setPage: (p: number) => void, startIdx: number, totalCount: number) => (
     <div className="flex items-center justify-between mt-3">
-      <div className="text-gray-600 text-xs">
-        Showing {filteredCount === 0 ? 0 : startIdx + 1} to {Math.min(endIdx, filteredCount)} of {filteredCount} entries
-      </div>
-      <div className="flex gap-1">
-        <button
-          onClick={() => setPage(Math.max(current - 1, 1))}
-          disabled={current === 1}
-          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Previous
-        </button>
+      <span className="text-xs text-gray-500">Showing {totalCount === 0 ? 0 : startIdx + 1} to {Math.min(startIdx + itemsPerPage, totalCount)} of {totalCount} entries</span>
+      <div className="flex items-center gap-1">
+        <button onClick={() => setPage(Math.max(1, current - 1))} disabled={current === 1} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
         {getPageNumbers(current, total).map((page, idx) =>
-          page === '...' ? (
-            <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs self-center">...</span>
-          ) : (
-            <button
-              key={page}
-              onClick={() => setPage(page as number)}
-              className={`px-2 py-1 rounded text-xs ${current === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}
-            >
-              {page}
-            </button>
-          )
+          page === '...' ? <span key={`e-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+          : <button key={page} onClick={() => setPage(page as number)} className={`px-2 py-1 rounded text-xs ${current === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>{page}</button>
         )}
-        <button
-          onClick={() => setPage(Math.min(current + 1, total))}
-          disabled={current === total || total === 0}
-          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
+        <button onClick={() => setPage(Math.min(total, current + 1))} disabled={current === total || total === 0} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
       </div>
     </div>
   );
-
-  const tabs: { name: TabName; icon: React.ElementType }[] = [
-    { name: 'TK Group', icon: Users },
-    { name: 'Branch', icon: Building2 },
-    { name: 'Department', icon: Briefcase },
-    { name: 'Division', icon: Network },
-    { name: 'Group Schedule', icon: CalendarClock },
-    { name: 'Pay House', icon: Wallet },
-  ];
-
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <div className="flex-1 p-6 relative z-0">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
-            <h1 className="text-white">{formName}</h1>
+            <h1 className="text-white">Delete Records In Raw Data 2 Shifts In A Day</h1>
           </div>
-
-          {/* Content */}
-          <div className="bg-white rounded-b-lg shadow-lg p-6 relative z-10">
-
-            {/* Tabs */}
+          <div className="bg-white rounded-b-lg shadow-lg p-6">
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center"><Trash2 className="w-5 h-5 text-white" /></div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-3">Select employee groups and individuals to process. Filter by status and apply changes.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    {['Select groups','Filter by status','Set date range','Apply changes'].map(t => (
+                      <div key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /><span className="text-gray-600">{t}</span></div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
-              {tabs.map(tab => (
-                <button
-                  key={tab.name}
-                  onClick={() => setActiveTab(tab.name)}
-                  className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg transition-colors ${
-                    activeTab === tab.name
-                      ? 'font-medium bg-blue-600 text-white -mb-px'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.name}
+              {TABS.map(tab => (
+                <button key={tab.name} onClick={() => setActiveTab(tab.name)}
+                  className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg transition-colors ${activeTab === tab.name ? 'font-medium bg-blue-600 text-white -mb-px' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  <tab.icon className="w-4 h-4" />{tab.name}
                 </button>
               ))}
             </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left — Group Table */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
-                  <input
-                    type="text"
-                    value={groupSearch}
-                    onChange={e => { setGroupSearch(e.target.value); setCurrentGroupPage(1); }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
+                  <input type="text" value={groupSearchTerm} onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                 </div>
-
-                <div className="bg-white border border-gray-200 rounded-lg overflow-auto">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full">
-                    <thead className="bg-gray-100 border-b border-gray-200">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600">
-                          <input
-                            type="checkbox"
-                            checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0}
-                            onChange={handleSelectAllGroups}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
-                      </tr>
-                    </thead>
+                    <thead className="bg-gray-100 border-b border-gray-200"><tr>
+                      <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={handleSelectAllGroups} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></th>
+                      <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
+                      <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
+                    </tr></thead>
                     <tbody className="divide-y divide-gray-100">
                       {paginatedGroups.map(item => (
-                        <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleGroupToggle(item.id)}>
-                          <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={selectedGroups.includes(item.id)}
-                              onChange={() => handleGroupToggle(item.id)}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                            />
-                          </td>
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2"><input type="checkbox" checked={selectedGroups.includes(item.id)} onChange={() => handleGroupToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
                         </tr>
                       ))}
-                      {paginatedGroups.length === 0 && (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">No records found</td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
-
-                {renderPagination(currentGroupPage, totalGroupPages, setCurrentGroupPage, startGroupIndex, endGroupIndex, filteredGroups.length)}
+                {renderPagination(currentGroupPage, totalGroupPages, setCurrentGroupPage, startGroupIndex, filteredGroups.length)}
               </div>
-
-              {/* Right — Employee Table + Date Range */}
               <div className="space-y-6">
-                {/* Employee Table */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
-                    <input
-                      type="text"
-                      value={employeeSearch}
-                      onChange={e => { setEmployeeSearch(e.target.value); setCurrentEmpPage(1); }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
+                    <input type="text" value={employeeSearchTerm} onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                   </div>
-
-                  <div className="bg-white border border-gray-200 rounded-lg overflow-auto">
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full">
-                      <thead className="bg-gray-100 border-b border-gray-200">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs text-gray-600">
-                            <input
-                              type="checkbox"
-                              checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
-                              onChange={handleSelectAllEmployees}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
-                          <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
-                        </tr>
-                      </thead>
+                      <thead className="bg-gray-100 border-b border-gray-200"><tr>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0} onChange={handleSelectAllEmployees} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
+                      </tr></thead>
                       <tbody className="divide-y divide-gray-100">
-                        {paginatedEmployees.map(emp => (
-                          <tr key={emp.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleEmpToggle(emp.id)}>
-                            <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={selectedEmployees.includes(emp.id)}
-                                onChange={() => handleEmpToggle(emp.id)}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                              />
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-900">{emp.code}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{emp.name}</td>
+                        {loadingEmployees ? (<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td></tr>)
+                        : paginatedEmployees.length === 0 ? (<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td></tr>)
+                        : paginatedEmployees.map(item => (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2"><input type="checkbox" checked={selectedEmployees.includes(item.id)} onChange={() => handleEmployeeToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></td>
+                            <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
                           </tr>
                         ))}
-                        {paginatedEmployees.length === 0 && (
-                          <tr>
-                            <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">No records found</td>
-                          </tr>
-                        )}
                       </tbody>
                     </table>
                   </div>
-
-                  {renderPagination(currentEmpPage, totalEmpPages, setCurrentEmpPage, startEmpIndex, endEmpIndex, filteredEmployees.length)}
-
-                  {/* Status Filter */}
+                  {renderPagination(currentEmpPage, totalEmployeePages, setCurrentEmpPage, startEmpIndex, filteredEmployees.length)}
                   <div className="mt-4 flex items-center gap-6">
-                    {(['active', 'inactive', 'all'] as const).map(val => (
-                      <label key={val} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="statusFilter"
-                          value={val}
-                          checked={statusFilter === val}
-                          onChange={() => setStatusFilter(val)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700 capitalize">
-                          {val === 'inactive' ? 'In Active' : val.charAt(0).toUpperCase() + val.slice(1)}
-                        </span>
+                    {(['active','inactive','all'] as const).map(s => (
+                      <label key={s} className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="statusFilter" value={s} checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                        <span className="text-sm text-gray-700">{s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}</span>
                       </label>
                     ))}
                   </div>
-                </div>
-
-                {/* Date Range */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <h2 className="text-gray-700 mb-4">Date Range</h2>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 whitespace-nowrap">From:</label>
-                      <input
-                        placeholder="MM/DD/YY"
-                        type="text"
-                        value={dateFrom}
-                        onChange={e => setDateFrom(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
-                      />
-                      <CalendarPopover date={dateFrom} onChange={setDateFrom} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 whitespace-nowrap">To:</label>
-                      <input
-                        placeholder="MM/DD/YY"
-                        type="text"
-                        value={dateTo}
-                        onChange={e => setDateTo(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
-                      />
-                      <CalendarPopover date={dateTo} onChange={setDateTo} />
-                    </div>
+                </div>                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-700 w-20">Date From:</label>
+                    <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                    <CalendarPopover date={dateFrom} onChange={setDateFrom} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-700 w-20">Date To:</label>
+                    <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                    <CalendarPopover date={dateTo} onChange={setDateTo} />
                   </div>
 
-                  <div className="pt-4 border-t border-gray-200 mt-4 space-y-3">
-                    {/* Warning Note */}
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                      <span className="text-red-500 flex-shrink-0 mt-0.5">⚠️</span>
-                      <div>
-                        <p className="text-xs font-semibold text-red-700 mb-1">Note</p>
-                        <p className="text-xs text-red-600 leading-relaxed">
-                          This process assumes that you really don't need the data in{' '}
-                          <strong>RAW DATA</strong>. You will <strong>not</strong> be able to{' '}
-                          <strong>UNDO</strong> the deletion after doing this process. You should
-                          re-import again the DTR files.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <button
-                        className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm flex items-center gap-2"
-                        onClick={handleDelete}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
-                      </button>
-                    </div>
+                  <div className="flex justify-end pt-4 border-t border-gray-200">
+                    <button onClick={handleAction} disabled={isUpdating}
+                      className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Trash2 className="w-4 h-4" />{isUpdating ? 'Deleting…' : 'Delete'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -521,7 +274,6 @@ export function DeleteRecordsRawData2ShiftsPage() {
           </div>
         </div>
       </div>
-
       <Footer />
     </div>
   );

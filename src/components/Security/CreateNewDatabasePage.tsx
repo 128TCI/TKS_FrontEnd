@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Database, Check, AlertCircle } from 'lucide-react';
-import { Footer } from './Footer/Footer';
+import { Footer } from '../Footer/Footer';
 
 export function CreateNewDatabasePage() {
   const [serverName, setServerName] = useState('128PC-85\\SQL2022');
