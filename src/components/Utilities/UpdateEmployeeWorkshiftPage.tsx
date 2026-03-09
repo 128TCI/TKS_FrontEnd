@@ -188,6 +188,9 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedItems.length} selected</span>
+                </div>                      
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm} onChange={e=>{setGroupSearchTerm(e.target.value);setCurrentGroupPage(1);}} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>

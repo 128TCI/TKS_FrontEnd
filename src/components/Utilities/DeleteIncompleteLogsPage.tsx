@@ -165,6 +165,20 @@ export function DeleteIncompleteLogsPage() {
     setSelectedEmployees([]);
   }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
 
+  const getSelectionTitle = () => {
+    switch (activeTab) {
+      case 'TK Group': return 'TK Group Selection';
+      case 'Branch': return 'Branch Selection';
+      case 'Department': return 'Department Selection';
+      case 'Division': return 'Division Selection';
+      case 'Group Schedule': return 'Group Schedule Selection';
+      case 'Pay House': return 'Pay House Selection';
+      case 'Section': return 'Section Selection';
+      case 'Unit': return 'Unit Selection';
+      default: return 'Selection';
+    }
+  };
+    
   const currentItems    = getCurrentData();
   const filteredGroups  = currentItems.filter(item =>
     item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
@@ -286,6 +300,10 @@ export function DeleteIncompleteLogsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left — Group list */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">{getSelectionTitle()}</h3>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
+                </div> 
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm} onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }}
@@ -320,6 +338,10 @@ export function DeleteIncompleteLogsPage() {
               {/* Right */}
               <div className="space-y-6">
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-gray-900">Employees</h3>
+                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
+                  </div>                  
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input type="text" value={employeeSearchTerm} onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }}

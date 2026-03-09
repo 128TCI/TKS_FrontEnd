@@ -85,6 +85,20 @@ export function ProcessOvertime24HoursPage() {  const [activeTab,          setAc
     }
   }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems, groupScheduleItems, payHouseItems, sectionItems, unitItems]);
 
+  const getSelectionTitle = () => {
+    switch (activeTab) {
+      case 'TK Group': return 'TK Group Selection';
+      case 'Branch': return 'Branch Selection';
+      case 'Department': return 'Department Selection';
+      case 'Division': return 'Division Selection';
+      case 'Group Schedule': return 'Group Schedule Selection';
+      case 'Pay House': return 'Pay House Selection';
+      case 'Section': return 'Section Selection';
+      case 'Unit': return 'Unit Selection';
+      default: return 'Selection';
+    }
+  };
+    
   const buildSpParams = useCallback((tab: TabName, ids: number[], items: GroupItem[], status: string) => {
     const codes = items.filter(i => ids.includes(i.id)).map(i => i.code).join(',');
     return {
@@ -206,6 +220,10 @@ export function ProcessOvertime24HoursPage() {  const [activeTab,          setAc
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">{getSelectionTitle()}</h3>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
+                </div>                 
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm} onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
@@ -232,6 +250,10 @@ export function ProcessOvertime24HoursPage() {  const [activeTab,          setAc
               </div>
               <div className="space-y-6">
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-gray-900">Employees</h3>
+                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
+                  </div>                   
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input type="text" value={employeeSearchTerm} onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
@@ -265,7 +287,8 @@ export function ProcessOvertime24HoursPage() {  const [activeTab,          setAc
                       </label>
                     ))}
                   </div>
-                </div>                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
+                </div>                
+                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700 w-20">Year:</label>

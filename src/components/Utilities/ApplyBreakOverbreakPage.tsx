@@ -5,6 +5,7 @@ import { Footer } from '../Footer/Footer';
 import { EmployeeSearchModal } from './../Modals/EmployeeSearchModal';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { group } from 'console';
 
 interface GroupItem {
   id: number;
@@ -39,7 +40,7 @@ export function ApplyBreakOverbreakPage() {
   const [EmployeeError,    setEmployeeError]    = useState('');
 
   // Reset currentPage when search or data changes
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, tkGroupItems]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, tkGroupItems]); 
 
   // Load TK Group list
   useEffect(() => {
@@ -197,6 +198,9 @@ export function ApplyBreakOverbreakPage() {
 
               {/* Left — TK Group list */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedItems.length} selected</span>
+                </div>                  
                 <div className="mb-4 flex items-center gap-3">
                   <Search className="w-4 h-4 text-gray-500" />
                   <input type="text" placeholder="Search..." value={searchTerm}

@@ -58,6 +58,8 @@ interface CompanyData {
   enableAutoPairingLogsFlag: boolean;
   enableAppOTRawDataFlag: boolean;
   enable2ndShiftRawDataFlag: boolean;
+  registeredDatabase: string
+
 }
 
 export function CompanyInformation({ onBack }: CompanyInformationProps) {
@@ -869,7 +871,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <input
                             type="text"
                             defaultValue="TIMEKEEP128_VERSION910_Test"
-                            className="w-32 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-50 px-3 py-1 text-s border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             readOnly={!isEditing}
                           />
                         </div>
@@ -880,7 +882,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <input
                             type="text"
                             defaultValue="Unlimited"
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             readOnly={!isEditing}
                           />
                         </div>
@@ -891,7 +893,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <input
                             type="text"
                             defaultValue="Unlimited"
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             readOnly={!isEditing}
                           />
                         </div>
@@ -902,16 +904,10 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
-                              defaultValue="TIMEKEEP128"
-                              className="w-32 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={formData?.registeredDatabase || ""}  
+                              className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                               readOnly={!isEditing}
                             />
-                            <button
-                              className="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded transition-colors"
-                              disabled={!isEditing}
-                            >
-                              ▶
-                            </button>
                           </div>
                         </div>
                       </div>
