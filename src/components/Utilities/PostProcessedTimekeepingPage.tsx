@@ -197,16 +197,37 @@ export function PostProcessedTimekeepingPage() {
     try {
       setIsUpdating(true);
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        dateFrom: new Date(dateFrom).toISOString(),
-        dateTo:   new Date(dateTo).toISOString(),
-        year, month, noOfTardiness, gracePeriod,
-        updateOptions: options,
+        empCodes:      selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        dateFrom:      new Date(dateFrom).toISOString(),
+        dateTo:        new Date(dateTo).toISOString(),
+        year,
+        month,
+        noOfTardiness,
+        gracePeriod,
+        updateOptions: {
+          tardiness:        options.tardiness,
+          otherEarnings:    options.otherEarnings,
+          noOfDaysWork:     options.noOfDaysWork,
+          selectAll:        options.selectAll,
+          undertime:        options.undertime,
+          overtime:         options.overtime,
+          leaveAndAbsences: options.leaveAndAbsences,
+          lateFiling:       options.lateFiling,
+        },
       };
       const res = await apiClient.post('/Utilities/PostProcessedTimekeeping', payload);
-      if (ApiService.isApiSuccess(res)) { await showSuccessModal('Successfully posted processed timekeeping.'); resetForm(); }
-    } catch { await showErrorModal('Failed to update records'); }
-    finally { setIsUpdating(false); }
+      if (res.data?.success) {
+        await showSuccessModal(res.data.message ?? 'Successfully posted processed timekeeping.');
+        resetForm();
+      } else {
+        await showErrorModal(res.data?.message ?? 'Failed to update records.');
+      }
+    } catch (err: any) {
+      const message = err?.response?.data?.message ?? 'Failed to update records.';
+      await showErrorModal(message);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const renderPagination = (current: number, total: number, setPage: (p: number) => void, startIdx: number, totalCount: number) => (
@@ -337,43 +358,33 @@ export function PostProcessedTimekeepingPage() {
                   </div>
                 </div>
 
-                {/* Period fields */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                {/* Date fields */}
+                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                  <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Year:</label>
-                      <input type="text" value={year} onChange={e => setYear(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <label className="text-sm text-gray-700 w-24">Date From:</label>
+                      <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Month:</label>
-                      <select value={month} onChange={e => setMonth(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
+                      <label className="text-sm text-gray-700 w-24">Date To:</label>
+                      <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <CalendarPopover date={dateTo} onChange={setDateTo} />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20 whitespace-nowrap">No. Of Tardiness:</label>
-                      <input type="text" value={noOfTardiness} onChange={e => setNoOfTardiness(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Grace Period:</label>
-                      <input type="text" value={gracePeriod} onChange={e => setGracePeriod(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-20">Date From:</label>
-                    <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                    <CalendarPopover date={dateFrom} onChange={setDateFrom} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-20">Date To:</label>
-                    <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                    <CalendarPopover date={dateTo} onChange={setDateTo} />
                   </div>
                 </div>
 
                 {/* Options */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <h2 className="text-gray-700 mb-4">Option</h2>
+                  <label className="flex items-center gap-2 cursor-pointer mb-3 pb-3 border-b border-blue-200">
+                    <input type="checkbox" checked={options.selectAll} onChange={() => handleOptionChange('selectAll')}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                  <span className="text-sm text-gray-900">Select All</span>
+                </label>                  
                   <div className="grid grid-cols-2 gap-y-3 gap-x-8">
                     {OPTIONS_LIST.map(({ key, label }) => (
                       <label key={key} className="flex items-center gap-2 cursor-pointer">

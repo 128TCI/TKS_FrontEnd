@@ -752,7 +752,10 @@ const parseDateToISO = (dateStr: string): string => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Group Selection */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                <h3 className="text-gray-900 mb-4">{getSelectionTitle()}</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">{getSelectionTitle()}</h3>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
+                </div> 
                 <div className="relative mb-4">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input

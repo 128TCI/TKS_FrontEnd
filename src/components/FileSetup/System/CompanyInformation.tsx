@@ -871,7 +871,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <input
                             type="text"
                             defaultValue="TIMEKEEP128_VERSION910_Test"
-                            className="w-50 px-3 py-1 text-s border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             readOnly={!isEditing}
                           />
                         </div>

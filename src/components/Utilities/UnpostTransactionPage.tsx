@@ -266,6 +266,15 @@ export function UnpostTransactionPage() {
     setOptions({ ...EMPTY_OPTIONS });
   };
 
+  const OPTIONS_LIST: { key: keyof typeof EMPTY_OPTIONS; label: string }[] = [
+    { key: 'tardiness',       label: 'Tardiness'         },
+    { key: 'leaveAndAbsences',label: 'Leave and Absences'},
+    { key: 'lateFiling',      label: 'Late Filing'       },
+    { key: 'undertime',       label: 'Undertime'         },
+    { key: 'noOfDaysWork',    label: 'No. Of Days Work'  },
+    { key: 'overtime',        label: 'Overtime'          },
+  ];
+
   const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
     if (!dateFrom || !dateTo)      { await showErrorModal('Please select Date From and Date To.'); return; }
@@ -274,18 +283,30 @@ export function UnpostTransactionPage() {
       setIsUpdating(true);
       const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
-        dateFrom:      toISO(dateFrom),
-        dateTo:        toISO(dateTo),
-        empCodes:      selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        updateOptions: options,
+        dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
+        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        updateOptions: {
+          tardiness:        options.tardiness,
+          otherEarnings:    options.otherEarnings,
+          noOfDaysWork:     options.noOfDaysWork,
+          selectAll:        options.selectAll,
+          undertime:        options.undertime,
+          overtime:         options.overtime,
+          leaveAndAbsences: options.leaveAndAbsences,
+          lateFiling:       options.lateFiling,
+        },
       };
       const res = await apiClient.post('/Utilities/UnpostTransaction_RawDataUnpost', payload);
-      if (ApiService.isApiSuccess(res)) {
-        await showSuccessModal('Successfully Unpost Transactions.');
+      if (res.data?.success) {
+        await showSuccessModal(res.data.message ?? 'Successfully Unpost Transactions.');
         resetForm();
+      } else {
+        await showErrorModal(res.data?.message ?? 'Failed to update records.');
       }
-    } catch {
-      await showErrorModal('Failed to update records.');
+    } catch (err: any) {
+      const message = err?.response?.data?.message ?? 'Failed to update records.';
+      await showErrorModal(message);
     } finally {
       setIsUpdating(false);
     }
@@ -362,7 +383,7 @@ export function UnpostTransactionPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
               {/* Left — Group list */}
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">      
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
@@ -492,29 +513,19 @@ export function UnpostTransactionPage() {
                 {/* Options */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <h2 className="text-gray-700 mb-4">Option</h2>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      {(['tardiness', 'otherEarnings', 'noOfDaysWork', 'selectAll'] as const).map(opt => (
-                        <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={options[opt]} onChange={() => handleOptionChange(opt)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                          <span className="text-sm text-gray-700">
-                            {opt === 'otherEarnings' ? 'Other Earnings' : opt === 'noOfDaysWork' ? 'No. Of Days Work' : opt === 'selectAll' ? 'Select All' : 'Tardiness'}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="space-y-3">
-                      {(['undertime', 'overtime', 'leaveAndAbsences', 'lateFiling'] as const).map(opt => (
-                        <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={options[opt]} onChange={() => handleOptionChange(opt)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                          <span className="text-sm text-gray-700">
-                            {opt === 'leaveAndAbsences' ? 'Leave and Absences' : opt === 'lateFiling' ? 'Late Filing' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                  <label className="flex items-center gap-2 cursor-pointer mb-3 pb-3 border-b border-blue-200">
+                    <input type="checkbox" checked={options.selectAll} onChange={() => handleOptionChange('selectAll')}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                    <span className="text-sm text-gray-900">Select All</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-8">
+                    {OPTIONS_LIST.map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={options[key]} onChange={() => handleOptionChange(key)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        <span className="text-sm text-gray-700">{label}</span>
+                      </label>
+                    ))}
                   </div>
                   <div className="flex justify-end pt-4 border-t border-gray-200 mt-4">
                     <button onClick={handleUpdate} disabled={isUpdating}
