@@ -916,6 +916,38 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
      finally {
      }
     }
+    else if(reportType === "Count Of Employee Per Workshift"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/CountEmployeePerShift/PrintCountEmployeePerShift?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "CountEmployeePerShiftReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
     else if(reportType === "Attendance Ratio"){
       try{      
         const query = useToQueryParams<ReportFilter>(filter);
