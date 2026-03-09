@@ -42,6 +42,22 @@ interface ReportFilter {
   includeWithPay: boolean
   includeWithoutPay: boolean
   otCode: string []
+  workShiftCode: string 
+}
+
+interface TardinessFilter {
+  empCode: string
+  year: number
+  month: number
+  cutOffDateFrom: string
+  cutOffDateTo: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  designation: string []
+  section: string []
+  activeInActiveAll: string
 }
 
 interface ExemptionReportFilter {
@@ -135,8 +151,11 @@ export function DailyTimeRecordMonitoringPage() {
   const [empName, setEmpName] = useState('');
   const [groupName, setGroupName] = useState('');
   const [groupDesc, setGroupDesc] = useState('');
+  const [workShiftCode, setWorkshiftCode] = useState('');
+  const [workShiftDesc, setWorkshiftDesc] = useState('');
   const [searchModalTerm, setSearchModalTerm] = useState('');
   const [searchGroupModalTerm, setSearchGroupModalTerm] = useState('');
+  const [searchWorkshiftModalTerm, setSearchWorkshiftModalTerm] = useState('');
   const [sortAlphabetically, setSortAlphabetically] = useState(false);
   //const [status, setStatus] = useState<StatusType>('active');
   const [employeeCode, setEmployeeCode] = useState('');
@@ -158,9 +177,11 @@ export function DailyTimeRecordMonitoringPage() {
   const [currentEmpPage, setCurrentEmpPage] = useState(1);
   const [currentOTPage, setCurrentOTPage] = useState(1);
   const [currentUserGroupPage, setCurrentUserGroupPage] = useState(1);
+  const [currentWorkshiftPage, setCurrentWorkshiftPage] = useState(1);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [userGroupSearchTerm, setUserGroupSearchTerm] = useState('');
+  const [workShiftSearchTerm, setWorkshiftSearchTerm] = useState('');
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState('');
   const [reportType, setReportType] = useState('Accumulation');
   const [toExcelFile, setToExcelFile] = useState(false);
@@ -172,14 +193,17 @@ export function DailyTimeRecordMonitoringPage() {
   const [showReport, setShowReport] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showGroupSearchModal, setShowGroupSearchModal] = useState(false);
+  const [showShiftSearchModal, setShowShiftSearchModal] = useState(false);
   const [showOvertimeSearchModal, setShowOvertimeSearchModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
   const [empStatus, setEmpStatus] = useState<'Active' |'InActive'| 'All'>('Active');
   const [status, setStatus] = useState<'Active' |'InActive'| 'All'>('All');
   const [mode, setMode] = useState<'Absences' |'Leave'| 'All'>('All');
   const [hrsOptions, setHrsOptions] = useState<'Per Employee' | 'Summary'>('Per Employee');
+  const [tardyOptions, setTardyOptions] = useState<'Month' | 'Per Department' | 'Annual'>('Month');
   const [otOptions, setOTOptions] = useState<'Listing' | 'Summary'>('Listing');
   const [utOptions, setUTOptions] = useState<'Policy' | 'ActualTime'>('Policy');
+  const [empShiftOptions, setEmpShiftOptions] = useState<'Count' | 'Listing'>('Count');
   const [noShiftOptions, setNoShiftOptions] = useState<number>(1);
   const [include, setInclude] = useState(false);
   const [dataMode, setDataMode] = useState('CompleteLogs');
@@ -190,6 +214,8 @@ export function DailyTimeRecordMonitoringPage() {
   const [minutes, setMinutes] = useState('');
   const [weekName, setWeekName] = useState('');
   const [noOfFilter, setNoOfFilter] = useState('');
+  const [month, setMonth] = useState('');
+  const [year, setYear] = useState('');
   const itemsPerPage = 10;
   const [selectedLeaveType, setSelectedLeaveType] = useState('');
   const [processOptions, setProcessOptions] = useState({
@@ -228,6 +254,11 @@ export function DailyTimeRecordMonitoringPage() {
     groupID: number; 
     groupName: string; 
     groupDesc: string;
+  }>>([]);
+  const [getWorkShift, setGetWorkShift] = useState<Array<{ 
+    workShiftID: number; 
+    workShiftCode: string; 
+    workShiftDesc: string;
   }>>([]);
   const [tkGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
   const [branchItems, setBranchItems] = useState<GroupItem[]>([]);
@@ -503,6 +534,31 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         fetchUserGroup();
       }, []);
   
+  const fetchWorkShift = async () => {
+        //setLoading(true);
+        //error;
+          try {
+          const response = await apiClient.get('/CountEmployeePerShift/GetTKWorkShift');
+          if (response.data) {
+            const mappedData = response.data.map((getWorkShift: any) => ({
+              workShiftID: getWorkShift.workShiftID || getWorkShift.WorkShiftID || '',
+              workShiftCode: getWorkShift.workShiftCode || getWorkShift.WorkShiftCode || '',
+              workShiftDesc: getWorkShift.workShiftDesc || getWorkShift.WorkShiftDesc || ''
+            }));
+            setGetWorkShift(mappedData);
+          }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load WorkShift';
+              //setError(errorMsg);
+              console.error('Error fetching Workshift', error);
+            } finally {
+              //loading;
+            }
+      };
+    useEffect(() => {
+        fetchWorkShift();
+      }, []);
+  
   const handleEmployeeSelect = (empCodeValue: string, empNameValue: string) => {
     setEmpCode(empCodeValue);
     setEmpName(empNameValue);
@@ -515,6 +571,14 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     setGroupDesc(groupDescValue);
     setShowGroupSearchModal(false);
     setSearchGroupModalTerm('');
+  };
+
+  const handleWorkshiftSelect = (workShiftCodeValue: string, workShiftDescValue: string) => {
+    setWorkshiftCode(workShiftCodeValue);
+    setWorkshiftDesc(workShiftDescValue);
+    
+    setShowShiftSearchModal(false);
+    setSearchWorkshiftModalTerm('');
   };
 
 
@@ -582,9 +646,23 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     userGroup: groupName,
     includeWithPay: includeWPay,
     includeWithoutPay: includeWOutPay,
-    otCode: selectedOTItems.length === 0 ? [] : selectedOTItems.toLocaleString().split(",")
+    otCode: selectedOTItems.length === 0 ? [] : selectedOTItems.toLocaleString().split(","),
+    workShiftCode: workShiftCode
   };
-  console.log(selectedDepItems, selectedDivItems, selectedBranchItems, selectedDesItems, selectedSecItems)
+  const tardyFilter: TardinessFilter = {
+    empCode: empCode,
+    year: Number(year),
+    month: Number(month),
+    cutOffDateFrom: dateFrom ? new Date(dateFrom).toLocaleDateString() : '-',
+    cutOffDateTo: dateTo ? new Date(dateTo).toLocaleDateString() : '-',
+    groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
+    departments: selectedDepItems.length === 0 ? [] : selectedDepItems.toLocaleString().split(","),
+    divisions: selectedDivItems.length === 0 ? [] : selectedDivItems.toLocaleString().split(","),
+    branch: selectedBranchItems.length === 0 ? [] : selectedBranchItems.toLocaleString().split(","),
+    designation: selectedDesItems.length === 0 ? [] : selectedDesItems.toLocaleString().split(","),
+    section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
+    activeInActiveAll: empStatus,
+  };
   const exempFilter: ExemptionReportFilter = {
     empCode: empCode,
     groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
@@ -916,7 +994,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
      finally {
      }
     }
-    else if(reportType === "Count Of Employee Per Workshift"){
+    else if(reportType === "Count Of Employee Per Workshift" && empShiftOptions === "Count"){
       try{      
         const query = useToQueryParams<ReportFilter>(filter);
         Swal.fire({
@@ -930,6 +1008,38 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
           }
         });
         const response = await apiClient.get(`/CountEmployeePerShift/PrintCountEmployeePerShift?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "CountEmployeePerShiftReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Count Of Employee Per Workshift" && empShiftOptions === "Listing"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/CountEmployeePerShift/PrintListEmployeePerShift?${query}`, {
           responseType: 'blob'
         });
         console.log(response.headers);
@@ -1756,6 +1866,102 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
      finally {
      }
     }
+    else if(reportType === "Tardiness Penalty" && tardyOptions === "Month"){
+      try{      
+        const query = useToQueryParams<TardinessFilter>(tardyFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessPenalty/PrintTardinessPenaltyPerMonth?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessPenaltyPerMonth.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness Penalty" && tardyOptions === "Per Department"){
+      try{      
+        const query = useToQueryParams<TardinessFilter>(tardyFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessPenalty/PrintTardinessPenaltyPercentage?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessPenaltyPercentage.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness Penalty" && tardyOptions === "Annual"){
+      try{      
+        const query = useToQueryParams<TardinessFilter>(tardyFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessPenalty/PrintTardinessPenaltyAnnual?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "AnnualTardinessReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
     else if(reportType === "Timesheet"){
       try{      
         const query = useToQueryParams<ReportFilter>(filter);
@@ -2023,6 +2229,11 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
   const filteredUserGroup = getUserGroup.filter(group =>
     group.groupName?.toLowerCase().includes(userGroupSearchTerm.toLowerCase()) ||
     group.groupDesc?.toLowerCase().includes(userGroupSearchTerm.toLowerCase())
+  );
+
+  const filteredWorkshift = getWorkShift.filter(item =>
+    item.workShiftCode?.toLowerCase().includes(workShiftSearchTerm.toLowerCase()) ||
+    item.workShiftDesc?.toLowerCase().includes(workShiftSearchTerm.toLowerCase())
   );
 
   const filteredOvertime = overtimeItems.filter(item =>
@@ -2298,6 +2509,32 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         for (let i = start; i <= end; i++) pages.push(i);
         if (currentUserGroupPage < totalUserGroupPages - 2) pages.push('...');
         pages.push(totalUserGroupPages);
+        return pages;
+    };
+
+    // Workshift Pagination logic
+    const totalWorkshiftPages = Math.ceil(filteredWorkshift.length / itemsPerPage);
+    const startWorkshiftIndex = (currentWorkshiftPage - 1) * itemsPerPage;
+    const endWorkshiftIndex = startWorkshiftIndex + itemsPerPage;
+
+    const paginatedWorkshift = filteredWorkshift.slice(
+        (currentWorkshiftPage - 1) * itemsPerPage,
+        currentWorkshiftPage * itemsPerPage
+    );
+    // Get visible page numbers
+    const getWorkshiftPageNumbers = () => {
+        const pages = [];
+        const maxVisible = 5;
+        if (totalWorkshiftPages <= maxVisible) {
+            return Array.from({ length: totalWorkshiftPages }, (_, i) => i + 1);
+        }
+        pages.push(1);
+        if (currentWorkshiftPage > 3) pages.push('...');
+        const start = Math.max(2, currentWorkshiftPage - 1);
+        const end = Math.min(totalWorkshiftPages - 1, currentWorkshiftPage + 1);
+        for (let i = start; i <= end; i++) pages.push(i);
+        if (currentWorkshiftPage < totalWorkshiftPages - 2) pages.push('...');
+        pages.push(totalWorkshiftPages);
         return pages;
     };
 
@@ -3083,6 +3320,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             <span className="text-gray-700">Include Without Pay</span>
                           </label>
                         </div>)}
+                        {/*Restday Options*/}
                         {reportType == "Restday in a Week" &&(<div>
                           <div className="flex items-center space-x-3 mb-4">
                             <label className="text-gray-700 text-sm">Number of Restday:</label>
@@ -3113,6 +3351,81 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               <option value="Friday">Friday</option>
                               <option value="Saturday">Saturday</option>
                               <option value="Sunday">Sunday</option>
+                            </select>
+                          </div>
+                        </div>)}
+                        {/*Tardiness Options*/}
+                        {reportType == "Tardiness Penalty" &&(<div>
+                          <span>Options</span>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="tardyOption"
+                                value="Month"
+                                checked={tardyOptions === 'Month'}
+                                onChange={(e) => setTardyOptions(e.target.value as 'Month' | 'Per Department' | 'Annual')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Tardiness Penalty Per Month</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="tardyOption"
+                                value="Per Department"
+                                checked={tardyOptions === 'Per Department'}
+                                onChange={(e) => setTardyOptions(e.target.value as 'Month' | 'Per Department' | 'Annual')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Tardiness Penalty Per Department</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="tardyOption"
+                                value="Annual"
+                                checked={tardyOptions === 'Annual'}
+                                onChange={(e) => setTardyOptions(e.target.value as 'Month' | 'Per Department' | 'Annual')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Tardiness Penalty Annual</span>
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-3 mb-4">
+                            <label className="text-gray-700 text-sm">Year:</label>
+                            <input
+                              type="text"
+                              value={year}
+                              maxLength={5}
+                              inputMode="numeric"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "").slice(0, 5);
+                                setYear(value);
+                              }}
+                              className="w-16 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex items-center space-x-3 mb-4">
+                            <label className="text-gray-700 text-sm">Month:</label>
+                              <select
+                              value={month}
+                              onChange={(e) => setMonth(e.target.value)}
+                              className="w-28 px-2 py-2 bg-gray border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            >
+                              <option></option>
+                              <option value="1">January</option>
+                              <option value="2">February</option>
+                              <option value="3">March</option>
+                              <option value="4">April</option>
+                              <option value="5">May</option>
+                              <option value="6">June</option>
+                              <option value="7">July</option>
+                              <option value="8">August</option>
+                              <option value="9">September</option>
+                              <option value="10">October</option>
+                              <option value="11">November</option>
+                              <option value="12">December</option>
                             </select>
                           </div>
                         </div>)}
@@ -3333,6 +3646,180 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           <option value="CompleteLogs">Complete Logs</option>
                           <option value="IncompleteLogs">Incomplete Logs</option>
                         </select>
+                        </div>)}
+                        {/*Count Employee Per Shift Options*/}
+                        {reportType == "Count Of Employee Per Workshift" &&(<div>
+                        <span>Options</span>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="empShiftOption"
+                                value="Count"
+                                checked={empShiftOptions === 'Count'}
+                                onChange={(e) => setEmpShiftOptions(e.target.value as 'Count' | 'Listing')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Count</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="empShiftOption"
+                                value="Listing"
+                                checked={empShiftOptions === 'Listing'}
+                                onChange={(e) => setEmpShiftOptions(e.target.value as 'Count' | 'Listing')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">List</span>
+                            </label>
+                          </div>
+                          {/* <button
+                            onClick={() => setShowOvertimeSearchModal(true)}
+                            className="px-4 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all duration-200 shadow-md"
+                          >
+                            Filter Overtime Code
+                          </button> */}
+                          
+                        </div>)}
+                        {/* Count Employees Per Shift - Workshift */}
+                        {reportType == "Count Of Employee Per Workshift" && (<div className="mb-6">
+                          <label className="block text-gray-700 mb-2">Workshift Code</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={workShiftCode}
+                              onChange={(e) => setWorkshiftCode(e.target.value)}
+                              className="flex-grow min-w-0 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                              placeholder="Select Workshift"
+                              readOnly
+                            />
+
+                            <button
+                              onClick={() => setShowShiftSearchModal(true)}
+                              className="flex-shrink-0 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-5 h-5" />
+                            </button>
+
+                            <button
+                              onClick={() => { setWorkshiftCode(""); setWorkshiftDesc(""); }}
+                              className="flex-shrink-0 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>)}
+                        {/* Workshift Section */}
+                          {showShiftSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+                            {/* Search Modal */}
+                        
+                          <>
+                            {/* Modal Backdrop */}
+                            <div 
+                              className="fixed inset-0 bg-black/30 z-30"
+                              onClick={() => setShowShiftSearchModal(false)}
+                            ></div>
+                  
+                            {/* Modal Dialog */}
+                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                              <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                                {/* Modal Header */}
+                                <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                                  <h2 className="text-gray-800 text-sm">Search</h2>
+                                  <button 
+                                    onClick={() => setShowShiftSearchModal(false)}
+                                    className="text-gray-600 hover:text-gray-800"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                  
+                                {/* Modal Content */}
+                                <div className="p-3">
+                                  <h3 className="text-blue-600 mb-2 text-sm">Select Workshift</h3>
+                  
+                                  {/* Search Input */}
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <label className="text-gray-700 text-sm">Search:</label>
+                                    <input
+                                      type="text"
+                                      value={workShiftSearchTerm}
+                                      onChange={(e) => setWorkshiftSearchTerm(e.target.value)}
+                                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    />
+                                  </div>
+                  
+                                  {/* Employee Table */}
+                                  <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    <table className="w-full border-collapse text-sm">
+                                      <thead className="sticky top-0 bg-white">
+                                        <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                          <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Code</th>
+                                          <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Description</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {filteredWorkshift.map((emp, index) => (
+                                          <tr 
+                                            key={emp.workShiftCode}
+                                            className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                            onClick={() => handleWorkshiftSelect(emp.workShiftCode, emp.workShiftDesc)}
+                                          >
+                                            <td className="px-3 py-1.5">{emp.workShiftCode}</td>
+                                            <td className="px-3 py-1.5">{emp.workShiftDesc}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                  
+                                  {/* Pagination */}
+                                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                  <span>
+                                    Showing {startWorkshiftIndex + 1} to {Math.min(endWorkshiftIndex, filteredWorkshift.length)} of {filteredWorkshift.length} entries
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => setCurrentWorkshiftPage(p => Math.max(1, p - 1))}
+                                      disabled={currentWorkshiftPage === 1}
+                                      className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      Previous
+                                    </button>
+                                    {getWorkshiftPageNumbers().map((page, index) => (
+                                      typeof page === 'number' ? (
+                                        <button
+                                          key={index}
+                                          onClick={() => setCurrentWorkshiftPage(page)}
+                                          className={`px-2 py-1 rounded text-xs ${
+                                            currentWorkshiftPage === page
+                                              ? 'bg-blue-500 text-white'
+                                              : 'border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                        >
+                                          {page}
+                                        </button>
+                                      ) : (
+                                        <span key={index} className="px-2">
+                                          {page}
+                                        </span>
+                                      )
+                                    ))}
+                                    <button
+                                      onClick={() => setCurrentWorkshiftPage(p => Math.min(totalWorkshiftPages, p + 1))}
+                                      disabled={currentWorkshiftPage === totalWorkshiftPages}
+                                      className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      Next
+                                    </button>
+                                  </div>
+                                </div>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        
                         </div>)}
                         {/*Overtime Options*/}
                         {reportType == "Overtime" &&(<div>
