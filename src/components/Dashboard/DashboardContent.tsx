@@ -27,9 +27,9 @@ import { RawdataOtGapPage } from '../Maintenance/RawdataOtGapPage';
 import { RawdataOnStraightDutyPage } from '../Maintenance/RawdataOnStraightDutyPage';
 import { TwoShiftsRawDataPage } from '../Maintenance/TwoShiftsRawDataPage';
 import { TwoShiftsEmployeeTimekeepConfigPage } from '../Maintenance/TwoShiftsEmployeeTimekeepConfigPage';
-import { OvertimeApplication2ShiftsPage } from '../OvertimeApplication2ShiftsPage';
-import { WorkshiftVariable2ShiftsPage } from '../WorkshiftVariable2ShiftsPage';
-import { ImportLogsFromDevice2ShiftsPage } from '../ImportLogsFromDevice2ShiftsPage';
+import { OvertimeApplication2ShiftsPage } from '../Import/2Shifts/OvertimeApplication2ShiftsPage';
+import { WorkshiftVariable2ShiftsPage } from '../Import/2Shifts/WorkshiftVariable2ShiftsPage';
+import { ImportLogsFromDevice2ShiftsPage } from '../Import/2Shifts/ImportLogsFromDevice2ShiftsPage';
 
 //Maintenance Sub-menu
 import { ProcessedDataPage } from '../Maintenance/ProcessedDataPage';

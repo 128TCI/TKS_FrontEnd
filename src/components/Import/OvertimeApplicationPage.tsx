@@ -48,7 +48,7 @@ type ResponseResultDto<T> = {
 export function OvertimeApplicationPage() {
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
-  const [selectedSheet, setSelectedSheet] = useState<string>("");
+  const [selectedSheet, setSelectedSheet] = useState<string>("s");
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -165,6 +165,7 @@ export function OvertimeApplicationPage() {
       //console.log(data);
       //setForm(data);
   };
+  
   useEffect(() => {
     console.log("sheetData updated:", sheetData);
   }, [sheetData]);

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Upload, Download, Check, Eye } from 'lucide-react';
-import { DatePickerWithButton } from './DateSetup/DatePickerWithButton';
-import { Footer } from './Footer/Footer';
-import { TKSGroupTable } from './TKSGroupTable';
-import { tksGroupData } from '../data/tksGroupData';
+import { DatePickerWithButton } from '../../DateSetup/DatePickerWithButton';
+import { Footer } from '../../Footer/Footer';
+import { TKSGroupTable } from '../../TKSGroupTable';
+import { tksGroupData } from '../../../data/tksGroupData';
 
 export function ImportLogsFromDevice2ShiftsPage() {
   const [selectedCodes, setSelectedCodes] = useState<number[]>([2, 3, 4, 5, 6, 7, 8, 9, 10]);
