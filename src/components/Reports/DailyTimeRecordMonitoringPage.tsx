@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import React from 'react';
 import { Calendar, Search, X, FileText, Printer, Check, Clock, Users, Building2, Briefcase, Award, Network, Grid } from 'lucide-react';
 import { CalendarPopover } from '../CalendarPopover';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername} from '../../services/apiClient';
 //import { Footer } from './Footer';
 import { Footer } from '../Footer/Footer';
 import Swal from 'sweetalert2';
@@ -32,6 +32,53 @@ interface ReportFilter {
   activeInActiveAll: string
   include: boolean
   option: number
+  consecutiveAbsences: number
+  yearsOfService: number
+  minutes: number
+  weekName: string
+  dayType: string
+  noOfFilter: number
+  userGroup: string
+  includeWithPay: boolean
+  includeWithoutPay: boolean
+  otCode: string []
+}
+
+interface ExemptionReportFilter {
+  empCode: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  designation: string []
+  section: string []
+  tardiness: boolean
+  undertime: boolean
+  nightDiffBasic: boolean
+  overtime: boolean
+  absences: boolean
+  otherEarnAllow: boolean
+  holidayPay: boolean
+  activeInActiveAll: string
+}
+
+interface IncompleteLogsFilter {
+  empCode: string
+  dateFr: string
+  dateTo: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  company: string 
+  address: string
+  designation: string []
+  section: string []
+  logs: boolean
+  break1: boolean
+  break2: boolean
+  break3: boolean
+  activeInActiveAll: string
 }
 
 interface LeaveAbsencesFilter {
@@ -82,22 +129,26 @@ interface EmployeeReport {
 }
 
 export function DailyTimeRecordMonitoringPage() {
-  const [dateFrom, setDateFrom] = useState('05/24/2021');
-  const [dateTo, setDateTo] = useState('05/24/2021');
+  const [dateFrom, setDateFrom] = useState('05/15/2021');
+  const [dateTo, setDateTo] = useState('05/31/2021');
   const [empCode, setEmpCode] = useState('');
   const [empName, setEmpName] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [groupDesc, setGroupDesc] = useState('');
   const [searchModalTerm, setSearchModalTerm] = useState('');
+  const [searchGroupModalTerm, setSearchGroupModalTerm] = useState('');
   const [sortAlphabetically, setSortAlphabetically] = useState(false);
   //const [status, setStatus] = useState<StatusType>('active');
   const [employeeCode, setEmployeeCode] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('tk-group');
   //const [searchTerm, setSearchTerm] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedBranchItems, setSelectedBranchItems] = useState<number[]>([]);
-  const [selectedDepItems, setSelectedDepItems] = useState<number[]>([]);
-  const [selectedDesItems, setSelectedDesItems] = useState<number[]>([]);
-  const [selectedDivItems, setSelectedDivItems] = useState<number[]>([]);
-  const [selectedSecItems, setSelectedSecItems] = useState<number[]>([]);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [selectedBranchItems, setSelectedBranchItems] = useState<string[]>([]);
+  const [selectedDepItems, setSelectedDepItems] = useState<string[]>([]);
+  const [selectedDesItems, setSelectedDesItems] = useState<string[]>([]);
+  const [selectedDivItems, setSelectedDivItems] = useState<string[]>([]);
+  const [selectedSecItems, setSelectedSecItems] = useState<string[]>([]);
+  const [selectedOTItems, setSelectedOTItems] = useState<string[]>([]);
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
   const [currentBranchPage, setCurrentBranchPage] = useState(1);
   const [currentDepPage, setCurrentDepPage] = useState(1);
@@ -105,25 +156,61 @@ export function DailyTimeRecordMonitoringPage() {
   const [currentDivPage, setCurrentDivPage] = useState(1);
   const [currentSecPage, setCurrentSecPage] = useState(1);
   const [currentEmpPage, setCurrentEmpPage] = useState(1);
+  const [currentOTPage, setCurrentOTPage] = useState(1);
+  const [currentUserGroupPage, setCurrentUserGroupPage] = useState(1);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [userGroupSearchTerm, setUserGroupSearchTerm] = useState('');
+  const [overtimeSearchTerm, setOvertimeSearchTerm] = useState('');
   const [reportType, setReportType] = useState('Accumulation');
   const [toExcelFile, setToExcelFile] = useState(false);
   const [convertToHHMM, setConvertToHHMM] = useState(false);
+  const [includeWPay, setIncludeWPay] = useState(false);
+  const [includeWOutPay, setIncludeWOutPay] = useState(false);
+  const [utRawData, setUTRawData] = useState(false);
   const [includeLeaveAdj, setIncludeLeaveAdj] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showGroupSearchModal, setShowGroupSearchModal] = useState(false);
+  const [showOvertimeSearchModal, setShowOvertimeSearchModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
   const [empStatus, setEmpStatus] = useState<'Active' |'InActive'| 'All'>('Active');
   const [status, setStatus] = useState<'Active' |'InActive'| 'All'>('All');
   const [mode, setMode] = useState<'Absences' |'Leave'| 'All'>('All');
   const [hrsOptions, setHrsOptions] = useState<'Per Employee' | 'Summary'>('Per Employee');
+  const [otOptions, setOTOptions] = useState<'Listing' | 'Summary'>('Listing');
+  const [utOptions, setUTOptions] = useState<'Policy' | 'ActualTime'>('Policy');
   const [noShiftOptions, setNoShiftOptions] = useState<number>(1);
   const [include, setInclude] = useState(false);
   const [dataMode, setDataMode] = useState('CompleteLogs');
+  const [appMode, setAppMode] = useState('OvertimeApplication');
   const [withOrWOutPay, setWithOrWOutPay] = useState<'WithPay' |'WithOutPay'| 'All'>('All');
+  const [yearsOfService, setYearsOfService] = useState('');
+  const [noOfConsecutiveAbsences, setNoOfConsecutiveAbsences] = useState('');
+  const [minutes, setMinutes] = useState('');
+  const [weekName, setWeekName] = useState('');
+  const [noOfFilter, setNoOfFilter] = useState('');
   const itemsPerPage = 10;
   const [selectedLeaveType, setSelectedLeaveType] = useState('');
+  const [processOptions, setProcessOptions] = useState({
+    tardiness: false,
+    undertime: false,
+    nightDiffBasic: false,
+    overtime: false,
+    absences: false,
+    selectAll: false,
+    otherEarnAllowances: false,
+    holidayPay: false
+  });
+
+  const [logsOptions, setLogsOptions] = useState({
+    incompleteLogs: false,
+    logs: false,
+    break1: false,
+    break2: false,
+    break3: false
+  });
+
   const [getLeaveType, setGetLeaveType] = useState<Array<{
     leaveID: number;
     leaveCode: string;
@@ -137,12 +224,64 @@ export function DailyTimeRecordMonitoringPage() {
     mName: string;
     suffix: string;
   }>>([]); 
+  const [getUserGroup, setGetUserGroup] = useState<Array<{ 
+    groupID: number; 
+    groupName: string; 
+    groupDesc: string;
+  }>>([]);
   const [tkGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
   const [branchItems, setBranchItems] = useState<GroupItem[]>([]);
   const [departmentItems, setDepartmentItems] = useState<GroupItem[]>([]);
   const [designationItems, setDesignationItems] = useState<GroupItem[]>([]);
   const [divisionItems, setDivisionItems] = useState<GroupItem[]>([]);
   const [sectionItems, setSectionItems] = useState<GroupItem[]>([]);
+  const [overtimeItems, setOvertimeItems] = useState<GroupItem[]>([]);
+
+  const handleOptionChange = (option: keyof typeof processOptions) => {
+    if (option === 'selectAll') {
+      const newValue = !processOptions.selectAll;
+      setProcessOptions({
+        tardiness: newValue,
+        undertime: newValue,
+        nightDiffBasic: newValue,
+        overtime: newValue,
+        absences: newValue,
+        selectAll: newValue,
+        otherEarnAllowances: newValue,
+        holidayPay: newValue
+      });
+    } else {
+      setProcessOptions(prev => ({ ...prev, [option]: !prev[option] }));
+    }
+  };
+  const handleLogsChange = (option: keyof typeof logsOptions) => {
+  if (option === 'incompleteLogs') {
+    const newValue = !logsOptions.logs;
+
+    if (!newValue) {
+      // Only when logs becomes unchecked
+      setLogsOptions({
+        incompleteLogs: false,
+        logs: false,
+        break1: false,
+        break2: false,
+        break3: false,
+      });
+    } else {
+      // Just toggle logs to true (leave others unchanged)
+      setLogsOptions(prev => ({
+        ...prev,
+        incompleteLogs: true,
+      }));
+    }
+  } else {
+    setLogsOptions(prev => ({
+      ...prev,
+      [option]: !prev[option],
+    }));
+  }
+  
+};
 
 useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -150,17 +289,23 @@ useEffect(() => {
         if (showSearchModal) {
           setShowSearchModal(false);
         } 
+        if (showGroupSearchModal) {
+          setShowGroupSearchModal(false);
+        }
       }
     };
 
     if (showSearchModal) {
       document.addEventListener('keydown', handleEscKey);
     }
+    if (showGroupSearchModal) {
+      document.addEventListener('keydown', handleEscKey);
+    }
 
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-}, [showSearchModal]);
+}, [showSearchModal, showGroupSearchModal]);
 
 
 const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
@@ -284,6 +429,26 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         loadSections();
     }, []
     );
+    const fetchOvertimeData = async (): Promise<GroupItem[]> => {
+        const response = await apiClient.get('/Fs/Process/Overtime/OverTimeFileSetUp');
+
+        return response.data.map((item: any) => ({
+            id: item.otfid || item.OTFID || '',
+            code: item.otfCode || item.OTFCode,
+            description: item.description || item.Description,
+        }));
+
+    };
+
+    useEffect(() => {
+        const loadOvertime = async () => {
+            const items = await fetchOvertimeData();
+            setOvertimeItems(items);
+        };
+
+        loadOvertime();
+    }, []
+    );
 
     const fetchEmployee = async () => {
         //setLoading(true);
@@ -312,12 +477,44 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     useEffect(() => {
         fetchEmployee();
       }, [filterStatus]);
+
+  const fetchUserGroup = async () => {
+        //setLoading(true);
+        //error;
+          try {
+          const response = await apiClient.get('/UserGroupAccessReport/GetTKUserGroup');
+          if (response.data) {
+            const mappedData = response.data.map((getUserGroup: any) => ({
+              groupID: getUserGroup.groupID || getUserGroup.GroupID || '',
+              groupName: getUserGroup.groupName || getUserGroup.GroupName || '',
+              groupDesc: getUserGroup.groupDesc || getUserGroup.GroupDesc || ''
+            }));
+            setGetUserGroup(mappedData);
+          }
+          } catch (error: any) {
+              const errorMsg = error.response?.data?.message || error.message || 'Failed to load User Group';
+              //setError(errorMsg);
+              console.error('Error fetching user group', error);
+            } finally {
+              //loading;
+            }
+      };
+    useEffect(() => {
+        fetchUserGroup();
+      }, []);
   
   const handleEmployeeSelect = (empCodeValue: string, empNameValue: string) => {
     setEmpCode(empCodeValue);
     setEmpName(empNameValue);
     setShowSearchModal(false);
     setSearchModalTerm('');
+  };
+
+  const handleGroupSelect = (groupNameValue: string, groupDescValue: string) => {
+    setGroupName(groupNameValue);
+    setGroupDesc(groupDescValue);
+    setShowGroupSearchModal(false);
+    setSearchGroupModalTerm('');
   };
 
 
@@ -371,18 +568,64 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
     company: "",
     address: "",
-    userName: "128TCI",
+    userName: getLoggedInUsername(),
     mode: dataMode,
     activeInActiveAll: empStatus,
     include: include,
-    option: noShiftOptions
+    option: noShiftOptions,
+    consecutiveAbsences: Number(noOfConsecutiveAbsences),
+    yearsOfService: Number(yearsOfService),
+    minutes: Number(minutes),
+    weekName: weekName,
+    dayType: "",
+    noOfFilter: Number(noOfFilter),
+    userGroup: groupName,
+    includeWithPay: includeWPay,
+    includeWithoutPay: includeWOutPay,
+    otCode: selectedOTItems.length === 0 ? [] : selectedOTItems.toLocaleString().split(",")
+  };
+  console.log(selectedDepItems, selectedDivItems, selectedBranchItems, selectedDesItems, selectedSecItems)
+  const exempFilter: ExemptionReportFilter = {
+    empCode: empCode,
+    groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
+    departments: selectedDepItems.length === 0 ? [] : selectedDepItems.toLocaleString().split(","),
+    divisions: selectedDivItems.length === 0 ? [] : selectedDivItems.toLocaleString().split(","),
+    branch: selectedBranchItems.length === 0 ? [] : selectedBranchItems.toLocaleString().split(","),
+    designation: selectedDesItems.length === 0 ? [] : selectedDesItems.toLocaleString().split(","),
+    section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
+    tardiness: processOptions.tardiness,
+    undertime: processOptions.undertime,
+    nightDiffBasic: processOptions.nightDiffBasic,
+    overtime: processOptions.overtime,
+    absences: processOptions.absences,
+    otherEarnAllow: processOptions.otherEarnAllowances,
+    holidayPay: processOptions.holidayPay,
+    activeInActiveAll: empStatus,
+  };
+
+  const incLogsFilter: IncompleteLogsFilter = {
+    empCode: empCode,
+    dateFr: dateFrom ? new Date(dateFrom).toLocaleDateString() : '-',
+    dateTo: dateTo ? new Date(dateTo).toLocaleDateString() : '-',
+    groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
+    departments: selectedDepItems.length === 0 ? [] : selectedDepItems.toLocaleString().split(","),
+    divisions: selectedDivItems.length === 0 ? [] : selectedDivItems.toLocaleString().split(","),
+    branch: selectedBranchItems.length === 0 ? [] : selectedBranchItems.toLocaleString().split(","),
+    company: "",
+    address: "",
+    designation: selectedDesItems.length === 0 ? [] : selectedDesItems.toLocaleString().split(","),
+    section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
+    logs: logsOptions.logs,
+    break1: logsOptions.break1,
+    break2: logsOptions.break2,
+    break3: logsOptions.break3,
+    activeInActiveAll: empStatus,
   };
 
   const leaveAbsenceFilter: LeaveAbsencesFilter = {
     empCode: empCode,
     dateFr: dateFrom ? new Date(dateFrom).toLocaleDateString() : '-',
     dateTo: dateTo ? new Date(dateTo).toLocaleDateString() : '-',
-    //groups: selectedItems.toLocaleString().split(","),
     groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
     departments: selectedDepItems.length === 0 ? [] : selectedDepItems.toLocaleString().split(","),
     divisions: selectedDivItems.length === 0 ? [] : selectedDivItems.toLocaleString().split(","),
@@ -417,7 +660,199 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
 }
 
   const printReport = async () => {
-    if(reportType === "Attendance Summary"){
+    if(reportType === "Accumulation"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/AccumulationReport/PrintAccumulationReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "AccumulationReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Adjustment"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/AdjustmentReport/PrintAdjustment?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "AdjustmentReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Allowance"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/AllowanceReport/PrintAllowanceReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "AllowanceReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Application Report" && appMode === "OvertimeApplication"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ApplicationReport/PrintOTApplicationReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "OvertimeApplicationReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Application Report" && appMode === "LeaveApplication"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ApplicationReport/PrintLeaveApplicationReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "LeaveApplicationReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Assumed Days"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/AssumedDaysReport/PrintAssumedDays?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "AssumedDaysReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Attendance Summary"){
       try{      
         const query = useToQueryParams<ReportFilter>(filter);
         Swal.fire({
@@ -435,6 +870,70 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         });
         console.log(response.headers);
         const fileName = "AttendanceSummaryReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Consecutive Absences"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ConsecutiveAbsencesReport/PrintConsecutiveAbsencesReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "ConsecutiveAbsencesReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Attendance Ratio"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/AttendanceRatio/PrintAttendanceRatio?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "AttendanceRatioReport.xlsx";
         const mimeType = response.headers['content-type']
         const blob = new Blob([response.data], { type: mimeType });
         fileLinkCreate(blob, fileName)
@@ -801,6 +1300,654 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
      finally {
      }
     }
+    else if(reportType === "Exemption Report"){
+      try{      
+        const query = useToQueryParams<ExemptionReportFilter>(exempFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ExemptionReport/PrintExemptionReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "ExemptionReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Man Hours By Division-Branch-Category-Dept-Section"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ManHoursReport/PrintManHours?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "ManHoursDivBraCatDepSec.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "No In And Out" && logsOptions.incompleteLogs == false){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/NoInAndOut/PrintNoInAndOut?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "NoInAndOutReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "No In And Out" && (logsOptions.incompleteLogs == true && logsOptions.logs == false)){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/NoInAndOut/PrintIncompleteLogs?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "IncompleteLogsReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "No In And Out" && (logsOptions.incompleteLogs == true && logsOptions.logs == true) ){
+      try{      
+        const query = useToQueryParams<IncompleteLogsFilter>(incLogsFilter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/NoInAndOut/PrintIncompleteLogs?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "IncompleteLogs-NoInOutReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Overtime" && otOptions === "Listing" ){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/OvertimeReport/PrintOvertimeReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "OvertimeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Overtime" && otOptions === "Summary" ){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/OvertimeReport/PrintOvertimeSummaryReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "OvertimeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Perfect Attendance"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/PerfectAttendanceReport/PrintPerfectAttendance?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "PerfectAttendanceReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Questionable Entries"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/QuestEntriesReport/PrintQuestEntriesReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "QuestionableEntriesReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Questionable Workshifts"){
+      if (!minutes || minutes.trim() === "") {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Invalid Max Minutes',
+          text: 'Please enter valid Max Minutes before generating the report.'
+        });
+        return;
+      }
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/QuestShiftReport/PrintQuestShiftReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "QuestionableWorkshiftReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Restday in a Week"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/RestDayWeekReport/PrintRestDayWeekReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "RestDayInAWeekReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness/ Overbreak/ Undertime Violation"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/ViolationReport/PrintViolationReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardyOverbreakUndertimeViolationReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness And Undertime Report"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardyUTReport/PrintTardyUTReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessAndUndertimeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Timesheet"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TimeSheetReport/PrintTimeSheetReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TimeSheetReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Unauthorized Absences"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/UnauthorizedAbsences/PrintUnauthorizedAbsences?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "UnauthorizedAbsencesReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Undertime" && utRawData == false){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/UndertimeReport/PrintUndertime?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "UndertimeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Undertime" && utOptions === "Policy"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/UndertimeReport/PrintUndertimeByPolicy?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "UndertimeByPolicyReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Undertime" && utOptions === "ActualTime"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/UndertimeReport/PrintUndertimeByActual?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "UndertimeByActualTimeReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "User Group Access"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/UserGroupAccessReport/PrintUserGroupAccess?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "UserGroupAccessReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "User TK Group Access"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/UserTKGroupAccessReport/PrintUserTKGroupAccess?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "UserTKGroupAccessReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
     else{
       Swal.fire({
           icon: 'error',
@@ -841,6 +1988,16 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     emp.suffix?.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
 
+  const filteredUserGroup = getUserGroup.filter(group =>
+    group.groupName?.toLowerCase().includes(userGroupSearchTerm.toLowerCase()) ||
+    group.groupDesc?.toLowerCase().includes(userGroupSearchTerm.toLowerCase())
+  );
+
+  const filteredOvertime = overtimeItems.filter(item =>
+    item.code.toLowerCase().includes(overtimeSearchTerm.toLowerCase()) ||
+    item.description.toLowerCase().includes(overtimeSearchTerm.toLowerCase())
+  );
+
   const filteredGroups = tkGroupItems.filter(item =>
     item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
@@ -872,6 +2029,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     const totalDesPages = Math.ceil(filteredDes.length / itemsPerPage);
     const totalDivPages = Math.ceil(filteredDiv.length / itemsPerPage);
     const totalSecPages = Math.ceil(filteredSec.length / itemsPerPage);
+    const totalOvertimePages = Math.ceil(filteredOvertime.length / itemsPerPage);
 
     const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
     const endGroupIndex = startGroupIndex + itemsPerPage;
@@ -891,12 +2049,16 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     const startSecIndex = (currentSecPage - 1) * itemsPerPage;
     const endSecIndex = startSecIndex + itemsPerPage;
 
+    const startOTIndex = (currentOTPage - 1) * itemsPerPage;
+    const endOTIndex = startOTIndex + itemsPerPage;
+
     const paginatedGroups = filteredGroups.slice(startGroupIndex, endGroupIndex);
     const paginatedBranch = filteredBranch.slice(startBranchIndex, endBranchIndex);
     const paginatedDep = filteredDep.slice(startDepIndex, endDepIndex);
     const paginatedDes = filteredDes.slice(startDesIndex, endDesIndex);
     const paginatedDiv = filteredDiv.slice(startDivIndex, endDivIndex);
     const paginatedSec = filteredSec.slice(startSecIndex, endSecIndex);
+    const paginatedOT = filteredOvertime.slice(startOTIndex, endOTIndex);
     // Get visible page numbers
     // TKSgroup page number
     const getGroupPageNumbers = () => {
@@ -1054,8 +2216,60 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         }
         return pages;
     };
+    //Overtime
+    const getOTPageNumbers = () => {
+        const pages = [];
+        if (totalOvertimePages <= 7) {
+            for (let i = 1; i <= totalOvertimePages; i++) {
+                pages.push(i);
+            }
+        } else {
+            if (currentOTPage <= 4) {
+                for (let i = 1; i <= 5; i++) pages.push(i);
+                pages.push('...');
+                pages.push(totalOvertimePages);
+            } else if (currentOTPage >= totalOvertimePages - 3) {
+                pages.push(1);
+                pages.push('...');
+                for (let i = totalOvertimePages - 4; i <= totalOvertimePages; i++) pages.push(i);
+            } else {
+                pages.push(1);
+                pages.push('...');
+                for (let i = currentOTPage - 1; i <= currentOTPage + 1; i++) pages.push(i);
+                pages.push('...');
+                pages.push(totalOvertimePages);
+            }
+        }
+        return pages;
+    };
 
-  // Employee Pagination logic
+  // User Group Pagination logic
+    const totalUserGroupPages = Math.ceil(filteredUserGroup.length / itemsPerPage);
+    const startUserGroupIndex = (currentUserGroupPage - 1) * itemsPerPage;
+    const endUserGroupIndex = startUserGroupIndex + itemsPerPage;
+
+    const paginatedUserGroup = filteredUserGroup.slice(
+        (currentUserGroupPage - 1) * itemsPerPage,
+        currentUserGroupPage * itemsPerPage
+    );
+    // Get visible page numbers
+    const getUserGroupPageNumbers = () => {
+        const pages = [];
+        const maxVisible = 5;
+        if (totalUserGroupPages <= maxVisible) {
+            return Array.from({ length: totalUserGroupPages }, (_, i) => i + 1);
+        }
+        pages.push(1);
+        if (currentUserGroupPage > 3) pages.push('...');
+        const start = Math.max(2, currentUserGroupPage - 1);
+        const end = Math.min(totalUserGroupPages - 1, currentUserGroupPage + 1);
+        for (let i = start; i <= end; i++) pages.push(i);
+        if (currentUserGroupPage < totalUserGroupPages - 2) pages.push('...');
+        pages.push(totalUserGroupPages);
+        return pages;
+    };
+
+    // Employee Pagination logic
     const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
     const startEmployeeIndex = (currentEmpPage - 1) * itemsPerPage;
     const endEmployeeIndex = startEmployeeIndex + itemsPerPage;
@@ -1081,66 +2295,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         return pages;
     };
 
-  const reportData: EmployeeReport[] = [
-    {
-      seqNo: 1,
-      empCode: 'V067',
-      fullName: 'ABAD, JULIE ROSE RAMOS',
-      dailyRecords: [
-        { date: '1-Mar-2020', day: 'Sun', restDay: true, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '2-Mar-2020', day: 'Mon', restDay: false, timeIn: '7:07:00AM', timeOut: '5:33:00PM', workShift: '730 AM 6PM', noOfHrs: '9.05', tardiness: '0.00', undertime: '0.45', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '3-Mar-2020', day: 'Tue', restDay: false, timeIn: '7:11:00AM', timeOut: '5:47:00PM', workShift: '730 AM 6PM', noOfHrs: '9.28', tardiness: '0.00', undertime: '0.22', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '4-Mar-2020', day: 'Wed', restDay: false, timeIn: '', timeOut: '', workShift: 'RegDay', noOfHrs: '8.00', tardiness: '0.00', undertime: '0.00', absences: '1.50', leaveWithPay: '8.00' },
-        { date: '5-Mar-2020', day: 'Thu', restDay: false, timeIn: '', timeOut: '', workShift: 'RegDay', noOfHrs: '8.00', tardiness: '0.00', undertime: '0.00', absences: '1.50', leaveWithPay: '8.00' },
-        { date: '6-Mar-2020', day: 'Fri', restDay: false, timeIn: '', timeOut: '', workShift: '', noOfHrs: '9.50', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '9.50' },
-        { date: '7-Mar-2020', day: 'Sat', restDay: false, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '8-Mar-2020', day: 'Sun', restDay: true, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '9-Mar-2020', day: 'Mon', restDay: false, timeIn: '7:12:00AM', timeOut: '5:30:00PM', workShift: '730 AM 6PM', noOfHrs: '9.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '10-Mar-2020', day: 'Tue', restDay: false, timeIn: '7:04:00AM', timeOut: '5:32:00PM', workShift: '730 AM 6PM', noOfHrs: '9.03', tardiness: '0.00', undertime: '0.47', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '11-Mar-2020', day: 'Wed', restDay: false, timeIn: '6:45:00AM', timeOut: '7:30:00PM', workShift: '730 AM 6PM', noOfHrs: '9.50', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '12-Mar-2020', day: 'Thu', restDay: false, timeIn: '7:30:00AM', timeOut: '6:00:00PM', workShift: '730 AM 6PM', noOfHrs: '9.50', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '13-Mar-2020', day: 'Fri', restDay: false, timeIn: '7:30:00AM', timeOut: '6:00:00PM', workShift: '730 AM 6PM', noOfHrs: '9.50', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '14-Mar-2020', day: 'Sat', restDay: false, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '15-Mar-2020', day: 'Sun', restDay: true, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' }
-      ],
-      subtotal: {
-        noOfHrs: '90.36',
-        tardiness: '0.00',
-        undertime: '1.14',
-        absences: '3.00',
-        leaveWithPay: '25.50'
-      }
-    },
-    {
-      seqNo: 2,
-      empCode: 'D002',
-      fullName: 'BALETE, LORENZO MAGADDON',
-      dailyRecords: [
-        { date: '1-Mar-2020', day: 'Sun', restDay: true, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '2-Mar-2020', day: 'Mon', restDay: false, timeIn: '9:34:00AM', timeOut: '6:49:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.07', undertime: '0.68', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '3-Mar-2020', day: 'Tue', restDay: false, timeIn: '9:32:00AM', timeOut: '7:44:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.03', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '4-Mar-2020', day: 'Wed', restDay: false, timeIn: '9:41:00AM', timeOut: '6:47:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.18', undertime: '0.72', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '5-Mar-2020', day: 'Thu', restDay: false, timeIn: '9:34:00AM', timeOut: '6:00:00PM', workShift: '930AM730PM', noOfHrs: '7.50', tardiness: '0.07', undertime: '1.50', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '6-Mar-2020', day: 'Fri', restDay: false, timeIn: '9:30:00AM', timeOut: '8:00:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '7-Mar-2020', day: 'Sat', restDay: false, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '8-Mar-2020', day: 'Sun', restDay: true, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '9-Mar-2020', day: 'Mon', restDay: false, timeIn: '9:30:00AM', timeOut: '7:30:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '10-Mar-2020', day: 'Tue', restDay: false, timeIn: '8:57:00AM', timeOut: '6:57:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.00', undertime: '0.55', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '11-Mar-2020', day: 'Wed', restDay: false, timeIn: '9:30:00AM', timeOut: '7:30:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '12-Mar-2020', day: 'Thu', restDay: false, timeIn: '7:30:00AM', timeOut: '6:00:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.00', undertime: '1.50', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '13-Mar-2020', day: 'Fri', restDay: false, timeIn: '7:30:00AM', timeOut: '6:00:00PM', workShift: '930AM730PM', noOfHrs: '9.00', tardiness: '0.00', undertime: '1.50', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '14-Mar-2020', day: 'Sat', restDay: false, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' },
-        { date: '15-Mar-2020', day: 'Sun', restDay: true, timeIn: '', timeOut: '', workShift: 'RestDay', noOfHrs: '0.00', tardiness: '0.00', undertime: '0.00', absences: '0.00', leaveWithPay: '0.00' }
-      ],
-      subtotal: {
-        noOfHrs: '88.50',
-        tardiness: '0.35',
-        undertime: '6.45',
-        absences: '0.00',
-        leaveWithPay: '0.00'
-      }
-    }
-  ];
+  
 
   const tabs = [
     { id: 'tk-group', label: 'TK Group', icon: Users },
@@ -1156,45 +2311,52 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
   //     prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
   //   );
   // };
-  const handleItemToggle = (id: number) => {
+  const handleItemToggle = (code: string) => {
     if (activeTab == 'tk-group')
     {
       setSelectedItems(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        prev.includes(code) ? prev.filter(i => i !== code) : [...prev, code]
       );
     }
     if (activeTab == 'branch')
     {
       setSelectedBranchItems(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        prev.includes(code) ? prev.filter(i => i !== code) : [...prev, code]
       );
     }
     if (activeTab == 'department')
     {
       setSelectedDepItems(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        prev.includes(code) ? prev.filter(i => i !== code) : [...prev, code]
       );
     }
     if (activeTab == 'designation')
     {
       setSelectedDesItems(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        prev.includes(code) ? prev.filter(i => i !== code) : [...prev, code]
       );
     }
     if (activeTab == 'division')
     {
       setSelectedDivItems(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        prev.includes(code) ? prev.filter(i => i !== code) : [...prev, code]
       );
     }
     if (activeTab == 'section')
     {
       setSelectedSecItems(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        prev.includes(code) ? prev.filter(i => i !== code) : [...prev, code]
       );
     }
   };
 
+  const handleOTItemToggle = (code: string) => {
+    
+    setSelectedOTItems(prev =>
+      prev.includes(code) ? prev.filter(i => i !== code) : [...prev, code]
+    );
+    
+  }
   // const handleSelectAll = () => {
   //   if (selectedItems.length === records.length) {
   //     setSelectedItems([]);
@@ -1209,42 +2371,42 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
       if(selectedItems.length === tkGroupItems.length){
         setSelectedItems([]);
       } else {
-        setSelectedItems(tkGroupItems.map(r =>r.id));
+        setSelectedItems(tkGroupItems.map(r =>r.code));
       }
     }
     else if(activeTab == 'branch'){
       if(selectedBranchItems.length === branchItems.length){
         setSelectedBranchItems([]);
       } else {
-        setSelectedBranchItems(branchItems.map(r => r.id));
+        setSelectedBranchItems(branchItems.map(r => r.code));
       }
     }
     else if(activeTab == 'department'){
       if(selectedDepItems.length === departmentItems.length){
         setSelectedDepItems([]);
       } else {
-        setSelectedDepItems(departmentItems.map(r => r.id));
+        setSelectedDepItems(departmentItems.map(r => r.code));
       }
     }
     else if(activeTab == 'designation'){
       if(selectedDesItems.length === designationItems.length){
         setSelectedDesItems([]);
       } else {
-        setSelectedDesItems(designationItems.map(r => r.id));
+        setSelectedDesItems(designationItems.map(r => r.code));
       }
     }
     else if(activeTab == 'division'){
       if(selectedDivItems.length === divisionItems.length){
         setSelectedDivItems([]);
       } else {
-        setSelectedDivItems(divisionItems.map(r => r.id));
+        setSelectedDivItems(divisionItems.map(r => r.code));
       }
     }
     else if(activeTab == 'section'){
       if(selectedSecItems.length === sectionItems.length){
         setSelectedSecItems([]);
       } else {
-        setSelectedSecItems(sectionItems.map(r => r.id));
+        setSelectedSecItems(sectionItems.map(r => r.code));
       }
     }
     else {
@@ -1254,6 +2416,14 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
       setSelectedDesItems([]);
       setSelectedDivItems([]);
       setSelectedSecItems([]);
+    }
+  }
+  const handleSelectOTAll = () => {
+    
+    if(selectedOTItems.length === overtimeItems.length){
+      setSelectedOTItems([]);
+    } else{
+      setSelectedOTItems(overtimeItems.map(r =>r.code));
     }
   }
 
@@ -1297,7 +2467,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
             </div>
 
             {/* Report Content */}
-            <div className="bg-white shadow-sm border border-gray-200 p-8">
+            {/*<div className="bg-white shadow-sm border border-gray-200 p-8">
               <div className="text-center mb-6">
                 <h1 className="text-gray-900 mb-2">Daily Time Report</h1>
                 <p className="text-gray-600">Period From Mar 01, 2020 to Mar 15, 2020</p>
@@ -1359,7 +2529,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>*/}
           </div>
         </div>
 
@@ -1518,144 +2688,143 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                       {/* Employee Code */}
                       <div className="mb-6">
                         <label className="block text-gray-700 mb-2">Employee Code</label>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center gap-2">
                           <input
                             type="text"
                             value={empCode}
                             onChange={(e) => setEmpCode(e.target.value)}
-                            className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            placeholder="Enter employee code"
+                            className="flex-grow min-w-0 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Select Employee"
                             readOnly
                           />
+
                           <button
-                            //onClick={handleSearch}
                             onClick={() => setShowSearchModal(true)}
-                            className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            className="flex-shrink-0 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                           >
                             <Search className="w-5 h-5" />
                           </button>
+
                           <button
-                            // onClick={handleClearEmployeeCode}
-                            onClick={() => {setEmpCode(""), setEmpName("")}}
-                            className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            onClick={() => { setEmpCode(""); setEmpName(""); }}
+                            className="flex-shrink-0 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                           >
                             <X className="w-5 h-5" />
                           </button>
                         </div>
-                        {empCode &&(<label className="block mt-2 ml-100">Employee Name: {empName}</label>)}
+                        {empCode &&(<label className="block mt-2">Employee Name: {empName}</label>)}
                       </div>
                       {/* Employee List Section */}
-            {showSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
-              {/* Search Modal */}
-           
-             <>
-               {/* Modal Backdrop */}
-               <div 
-                 className="fixed inset-0 bg-black/30 z-30"
-                 onClick={() => setShowSearchModal(false)}
-               ></div>
-     
-               {/* Modal Dialog */}
-               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                 <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
-                   {/* Modal Header */}
-                   <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                     <h2 className="text-gray-800 text-sm">Search</h2>
-                     <button 
-                       onClick={() => setShowSearchModal(false)}
-                       className="text-gray-600 hover:text-gray-800"
-                     >
-                       <X className="w-4 h-4" />
-                     </button>
-                   </div>
-     
-                   {/* Modal Content */}
-                   <div className="p-3">
-                     <h3 className="text-blue-600 mb-2 text-sm">Select Employee</h3>
-     
-                     {/* Search Input */}
-                     <div className="flex items-center gap-2 mb-3">
-                       <label className="text-gray-700 text-sm">Search:</label>
-                       <input
-                         type="text"
-                         value={employeeSearchTerm}
-                         onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                       />
-                     </div>
-     
-                     {/* Employee Table */}
-                     <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                       <table className="w-full border-collapse text-sm">
-                         <thead className="sticky top-0 bg-white">
-                           <tr className="bg-gray-100 border-b-2 border-gray-300">
-                             <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode</th>
-                             <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
-                           </tr>
-                         </thead>
-                         <tbody>
-                           {filteredEmployees.map((emp, index) => (
-                             <tr 
-                               key={emp.empCode}
-                               className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                               onClick={() => handleEmployeeSelect(emp.empCode, emp.lName + ", " + emp.fName + " " + emp.mName)}
-                             >
-                               <td className="px-3 py-1.5">{emp.empCode}</td>
-                               <td className="px-3 py-1.5">{emp.lName}, {emp.fName} {emp.mName}</td>
-                             </tr>
-                           ))}
-                         </tbody>
-                       </table>
-                     </div>
-     
-                     {/* Pagination */}
-                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
-                        disabled={currentEmpPage === 1}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
-                      {getEmployeePageNumbers().map((page, index) => (
-                        typeof page === 'number' ? (
-                          <button
-                            key={index}
-                            onClick={() => setCurrentEmpPage(page)}
-                            className={`px-2 py-1 rounded text-xs ${
-                              currentEmpPage === page
-                                ? 'bg-blue-500 text-white'
-                                : 'border border-gray-300 hover:bg-gray-100'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ) : (
-                          <span key={index} className="px-2">
-                            {page}
-                          </span>
-                        )
-                      ))}
-                      <button
-                        onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
-                        disabled={currentEmpPage === totalEmployeePages}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                   </div>
-                 </div>
-               </div>
-             </>
-           
-          </div>)}
-
+                        {showSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          {/* Search Modal */}
+                      
+                        <>
+                          {/* Modal Backdrop */}
+                          <div 
+                            className="fixed inset-0 bg-black/30 z-30"
+                            onClick={() => setShowSearchModal(false)}
+                          ></div>
+                
+                          {/* Modal Dialog */}
+                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                              {/* Modal Header */}
+                              <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                                <h2 className="text-gray-800 text-sm">Search</h2>
+                                <button 
+                                  onClick={() => setShowSearchModal(false)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                
+                              {/* Modal Content */}
+                              <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm">Select Employee</h3>
+                
+                                {/* Search Input */}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <label className="text-gray-700 text-sm">Search:</label>
+                                  <input
+                                    type="text"
+                                    value={employeeSearchTerm}
+                                    onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  />
+                                </div>
+                
+                                {/* Employee Table */}
+                                <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                  <table className="w-full border-collapse text-sm">
+                                    <thead className="sticky top-0 bg-white">
+                                      <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode</th>
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {filteredEmployees.map((emp, index) => (
+                                        <tr 
+                                          key={emp.empCode}
+                                          className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                          onClick={() => handleEmployeeSelect(emp.empCode, emp.lName + ", " + emp.fName + " " + emp.mName)}
+                                        >
+                                          <td className="px-3 py-1.5">{emp.empCode}</td>
+                                          <td className="px-3 py-1.5">{emp.lName}, {emp.fName} {emp.mName}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                
+                                {/* Pagination */}
+                                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                <span>
+                                  Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
+                                    disabled={currentEmpPage === 1}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Previous
+                                  </button>
+                                  {getEmployeePageNumbers().map((page, index) => (
+                                    typeof page === 'number' ? (
+                                      <button
+                                        key={index}
+                                        onClick={() => setCurrentEmpPage(page)}
+                                        className={`px-2 py-1 rounded text-xs ${
+                                          currentEmpPage === page
+                                            ? 'bg-blue-500 text-white'
+                                            : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {page}
+                                      </button>
+                                    ) : (
+                                      <span key={index} className="px-2">
+                                        {page}
+                                      </span>
+                                    )
+                                  ))}
+                                  <button
+                                    onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
+                                    disabled={currentEmpPage === totalEmployeePages}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      
+                      </div>)}
                       {/* Report Type Dropdown */}
                       <div className="mb-6">
                         <select
@@ -1699,6 +2868,145 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           <option value="User TK Group Access">User TK Group Access</option>
                         </select>
                       </div>
+                      {/* User Group */}
+                      {reportType == "User Group Access" && (<div className="mb-6">
+                        <label className="block text-gray-700 mb-2">User Group</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={groupName}
+                            onChange={(e) => setGroupName(e.target.value)}
+                            className="flex-grow min-w-0 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Select User Group"
+                            readOnly
+                          />
+
+                          <button
+                            onClick={() => setShowGroupSearchModal(true)}
+                            className="flex-shrink-0 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            <Search className="w-5 h-5" />
+                          </button>
+
+                          <button
+                            onClick={() => { setGroupName(""); setGroupDesc(""); }}
+                            className="flex-shrink-0 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>)}
+                      {/* User Group List Section */}
+                        {showGroupSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          {/* Search Modal */}
+                      
+                        <>
+                          {/* Modal Backdrop */}
+                          <div 
+                            className="fixed inset-0 bg-black/30 z-30"
+                            onClick={() => setShowGroupSearchModal(false)}
+                          ></div>
+                
+                          {/* Modal Dialog */}
+                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                              {/* Modal Header */}
+                              <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                                <h2 className="text-gray-800 text-sm">Search</h2>
+                                <button 
+                                  onClick={() => setShowGroupSearchModal(false)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                
+                              {/* Modal Content */}
+                              <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm">Select User Group</h3>
+                
+                                {/* Search Input */}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <label className="text-gray-700 text-sm">Search:</label>
+                                  <input
+                                    type="text"
+                                    value={userGroupSearchTerm}
+                                    onChange={(e) => setUserGroupSearchTerm(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  />
+                                </div>
+                
+                                {/* Employee Table */}
+                                <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                  <table className="w-full border-collapse text-sm">
+                                    <thead className="sticky top-0 bg-white">
+                                      <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Group Name</th>
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Group Description</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {filteredUserGroup.map((emp, index) => (
+                                        <tr 
+                                          key={emp.groupName}
+                                          className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                          onClick={() => handleGroupSelect(emp.groupName, groupDesc)}
+                                        >
+                                          <td className="px-3 py-1.5">{emp.groupName}</td>
+                                          <td className="px-3 py-1.5">{emp.groupDesc}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                
+                                {/* Pagination */}
+                                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                <span>
+                                  Showing {startUserGroupIndex + 1} to {Math.min(endUserGroupIndex, filteredUserGroup.length)} of {filteredUserGroup.length} entries
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setCurrentUserGroupPage(p => Math.max(1, p - 1))}
+                                    disabled={currentUserGroupPage === 1}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Previous
+                                  </button>
+                                  {getUserGroupPageNumbers().map((page, index) => (
+                                    typeof page === 'number' ? (
+                                      <button
+                                        key={index}
+                                        onClick={() => setCurrentUserGroupPage(page)}
+                                        className={`px-2 py-1 rounded text-xs ${
+                                          currentUserGroupPage === page
+                                            ? 'bg-blue-500 text-white'
+                                            : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {page}
+                                      </button>
+                                    ) : (
+                                      <span key={index} className="px-2">
+                                        {page}
+                                      </span>
+                                    )
+                                  ))}
+                                  <button
+                                    onClick={() => setCurrentUserGroupPage(p => Math.min(totalUserGroupPages, p + 1))}
+                                    disabled={currentUserGroupPage === totalUserGroupPages}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      
+                      </div>)}
 
                       {/* Checkboxes */}
                       <div className="mb-6 space-y-2">
@@ -1723,6 +3031,172 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           />
                           <span className="text-gray-700">Convert To HH:MM</span>
                         </label>)}
+                        {reportType == "Perfect Attendance" && (<div>
+                          <label className="mb-3 flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={includeWPay}
+                              onChange={(e) => setIncludeWPay(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">Include With Pay</span>
+                          </label>
+                          <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={includeWOutPay}
+                              onChange={(e) => setIncludeWOutPay(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">Include Without Pay</span>
+                          </label>
+                        </div>)}
+                        {reportType == "Restday in a Week" &&(<div>
+                          <div className="flex items-center space-x-3 mb-4">
+                            <label className="text-gray-700 text-sm">Number of Restday:</label>
+                            <input
+                              type="text"
+                              value={noOfFilter}
+                              maxLength={3}
+                              inputMode="numeric"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                setNoOfFilter(value);
+                              }}
+                              className="w-16 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex items-center space-x-3 mb-4">
+                            <label className="text-gray-700 text-sm">Start of Week:</label>
+                              <select
+                              value={weekName}
+                              onChange={(e) => setWeekName(e.target.value)}
+                              className="w-28 px-2 py-2 bg-gray border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            >
+                              <option></option>
+                              <option value="Monday">Monday</option>
+                              <option value="Tuesday">Tuesday</option>
+                              <option value="Wednesday">Wednesday</option>
+                              <option value="Thursday">Thursday</option>
+                              <option value="Friday">Friday</option>
+                              <option value="Saturday">Saturday</option>
+                              <option value="Sunday">Sunday</option>
+                            </select>
+                          </div>
+                        </div>)}
+                        {/*Consecutive Absences*/}
+                        {reportType == "Consecutive Absences" && (<div className="mb-6">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <label className="text-gray-700">Years of Service</label>
+                            <input
+                              type="text"
+                              value={yearsOfService}
+                              maxLength={3}
+                              inputMode="numeric"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                setYearsOfService(value);
+                              }}
+                              className="w-16 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center space-x-3">
+                            <label className="text-gray-700">Consecutive Absences</label>
+                            <input
+                              type="text"
+                              value={noOfConsecutiveAbsences}
+                              maxLength={3}
+                              inputMode="numeric"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                setNoOfConsecutiveAbsences(value);
+                              }}
+                              className="w-16 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>)}
+                        {/*Consecutive Absences*/}
+                        {reportType == "Questionable Workshifts" && (<div className="mb-6">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <label className="text-gray-700">Max Minutes:</label>
+                            <input
+                              type="text"
+                              value={minutes}
+                              maxLength={20}
+                              inputMode="numeric"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "").slice(0, 20);
+                                setMinutes(value);
+                              }}
+                              className="w-16 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>)}
+                        {/*Undertime Checkbox */}
+                        {reportType == "Undertime" && (<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={utRawData}
+                            onChange={(e) => setUTRawData(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700">From Raw Data</span>
+                        </label>)}
+                        {/* Process Type Checkboxes */}
+                        {reportType == "Exemption Report" &&(<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <label className="flex items-center gap-2 cursor-pointer mb-3 pb-3 border-b border-blue-200">
+                            <input type="checkbox" checked={processOptions.selectAll} onChange={() => handleOptionChange('selectAll')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-900">Select All</span>
+                          </label>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {([
+                              ['tardiness', 'Tardiness'],
+                              ['undertime', 'Undertime'],
+                              ['nightDiffBasic', 'Night Diff Basic'],
+                              ['overtime', 'Overtime'],
+                              ['absences', 'Absences'],
+                              ['otherEarnAllowances', 'Other Earn Allowances'],
+                              ['holidayPay', 'Holiday Pay'],
+                            ] as [keyof typeof processOptions, string][]).map(([key, label]) => (
+                              <label key={key} className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={processOptions[key] as boolean} onChange={() => handleOptionChange(key)}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>)}
+                        {/*Incomplete Logs*/}
+                        {reportType == "No In And Out" &&(<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <label className="flex items-center gap-2 cursor-pointer mb-3 pb-3 border-b border-blue-200">
+                            <input type="checkbox" checked={logsOptions.incompleteLogs} onChange={() => handleLogsChange('incompleteLogs')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-900">Incomplete Logs</span>
+                          </label>
+                          <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
+                            {([
+                              ['logs', 'Time In and Time Out'],
+                              ['break1', 'Break 1 In and Break 1 Out'],
+                              ['break2', 'Break 2 In and Break 2 Out'],
+                              ['break3', 'Break 3 In and Break 3 Out'],
+                            ] as [keyof typeof logsOptions, string][]).map(([key, label]) => (
+                              <label key={key} className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" 
+                                  checked={logsOptions[key] as boolean}
+                                  disabled={!logsOptions.incompleteLogs} 
+                                  onChange={() => handleLogsChange(key)}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>)}
                         {/*Employee No Workshift Options*/}
                         {reportType == "Employees With No Workshift" &&(<div>
                         <span>Options</span>
@@ -1759,6 +3233,34 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             />
                             <span className="text-gray-700">Include Transaction with Shift</span>
                           </label>
+                        </div>)}
+                        {/*Undertime Raw Data Options*/}
+                        {utRawData == true &&(<div>
+                        <span>Options</span>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="utOption"
+                                value="Policy"
+                                checked={utOptions === 'Policy'}
+                                onChange={(e) => setUTOptions(e.target.value as 'Policy' | 'ActualTime')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Based on Policy</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="utOption"
+                                value="ActualTime"
+                                checked={utOptions === 'ActualTime'}
+                                onChange={(e) => setUTOptions(e.target.value as 'Policy' | 'ActualTime')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Based on Actual Time</span>
+                            </label>
+                          </div>
                         </div>)}
                         {/*Man Hours Options*/}
                         {reportType == "Man Hours" &&(<div>
@@ -1798,6 +3300,188 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           
                           <option value="CompleteLogs">Complete Logs</option>
                           <option value="IncompleteLogs">Incomplete Logs</option>
+                        </select>
+                        </div>)}
+                        {/*Overtime Options*/}
+                        {reportType == "Overtime" &&(<div>
+                        <span>Options</span>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="otOption"
+                                value="Listing"
+                                checked={otOptions === 'Listing'}
+                                onChange={(e) => setOTOptions(e.target.value as 'Listing' | 'Summary')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Listing</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="otOption"
+                                value="Summary"
+                                checked={otOptions === 'Summary'}
+                                onChange={(e) => setOTOptions(e.target.value as 'Listing' | 'Summary')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Summary</span>
+                            </label>
+                          </div>
+                          <button
+                            onClick={() => setShowOvertimeSearchModal(true)}
+                            className="px-4 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all duration-200 shadow-md"
+                          >
+                            Filter Overtime Code
+                          </button>
+                        </div>)}
+                        {/* Overtime Section */}
+                        {showOvertimeSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          {/* Search Modal */}
+                      
+                        <>
+                          {/* Modal Backdrop */}
+                          <div 
+                            className="fixed inset-0 bg-black/30 z-30"
+                            onClick={() => setShowOvertimeSearchModal(false)}
+                          ></div>
+                
+                          {/* Modal Dialog */}
+                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                              {/* Modal Header */}
+                              <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                                <h2 className="text-gray-800 text-sm">Search</h2>
+                                <button 
+                                  onClick={() => setShowOvertimeSearchModal(false)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                
+                              {/* Modal Content */}
+                              <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm">Select Overtime</h3>
+                
+                                {/* Search Input */}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <label className="text-gray-700 text-sm">Search:</label>
+                                  <input
+                                    type="text"
+                                    value={overtimeSearchTerm}
+                                    onChange={(e) => setOvertimeSearchTerm(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  />
+                                </div>
+                
+                                {/* Overtime Table */}
+                                <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                  <table className="w-full">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                      <tr>
+                                        <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                                          <input
+                                            type="checkbox"
+                                            // checked={selectedItems.length === records.length}
+                                            checked={selectedOTItems.length === filteredOvertime.length && filteredOvertime.length > 0}
+                                            onChange={handleSelectOTAll}
+                                            className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                          />
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                                        <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                                          </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {paginatedOT.map((item) => (
+                                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                          <td className="px-4 py-3 text-center">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedOTItems.includes(item.code)}
+                                              onChange={() => handleOTItemToggle(item.code)}
+                                              className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                                          <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                
+                                {/* Pagination */}
+                                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                <span>
+                                  Showing {startOTIndex + 1} to {Math.min(endOTIndex, filteredOvertime.length)} of {filteredOvertime.length} entries
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setCurrentOTPage(p => Math.max(1, p - 1))}
+                                    disabled={currentOTPage === 1}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Previous
+                                  </button>
+                                  {getOTPageNumbers().map((page, index) => (
+                                    typeof page === 'number' ? (
+                                      <button
+                                        key={index}
+                                        onClick={() => setCurrentOTPage(page)}
+                                        className={`px-2 py-1 rounded text-xs ${
+                                          currentOTPage === page
+                                            ? 'bg-blue-500 text-white'
+                                            : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {page}
+                                      </button>
+                                    ) : (
+                                      <span key={index} className="px-2">
+                                        {page}
+                                      </span>
+                                    )
+                                  ))}
+                                  <button
+                                    onClick={() => setCurrentOTPage(p => Math.min(totalOvertimePages, p + 1))}
+                                    disabled={currentOTPage === totalOvertimePages}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      
+                      </div>)}
+                        {reportType == "Employees Raw Data Report" &&(<div>
+                          <label className="block text-gray-700 text-sm mb-2">Raw Data Type:</label>
+                          <select
+                          value={dataMode}
+                          onChange={(e) => setDataMode(e.target.value)}
+                          className="mb-4 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          
+                          <option value="CompleteLogs">Complete Logs</option>
+                          <option value="IncompleteLogs">Incomplete Logs</option>
+                        </select>
+                        </div>)}
+                        {reportType == "Application Report" &&(<div>
+                          <label className="block text-gray-700 text-sm mb-2">Application Type:</label>
+                          <select
+                          value={appMode}
+                          onChange={(e) => setAppMode(e.target.value)}
+                          className="mb-4 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          
+                          <option value="OvertimeApplication">Overtime Application</option>
+                          <option value="LeaveAppplication">Leave Application</option>
                         </select>
                         </div>)}
                         {reportType == "Leave And Absences" &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
@@ -2015,8 +3699,8 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               <td className="px-4 py-3 text-center">
                                 <input
                                   type="checkbox"
-                                  checked={selectedItems.includes(item.id)}
-                                  onChange={() => handleItemToggle(item.id)}
+                                  checked={selectedItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
                                   className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 />
                               </td>
@@ -2051,8 +3735,8 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               <td className="px-4 py-3 text-center">
                                 <input
                                   type="checkbox"
-                                  checked={selectedBranchItems.includes(item.id)}
-                                  onChange={() => handleItemToggle(item.id)}
+                                  checked={selectedBranchItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
                                   className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 />
                               </td>
@@ -2087,8 +3771,8 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               <td className="px-4 py-3 text-center">
                                 <input
                                   type="checkbox"
-                                  checked={selectedDepItems.includes(item.id)}
-                                  onChange={() => handleItemToggle(item.id)}
+                                  checked={selectedDepItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
                                   className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 />
                               </td>
@@ -2123,8 +3807,8 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               <td className="px-4 py-3 text-center">
                                 <input
                                   type="checkbox"
-                                  checked={selectedDesItems.includes(item.id)}
-                                  onChange={() => handleItemToggle(item.id)}
+                                  checked={selectedDesItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
                                   className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 />
                               </td>
@@ -2159,8 +3843,8 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               <td className="px-4 py-3 text-center">
                                 <input
                                   type="checkbox"
-                                  checked={selectedDivItems.includes(item.id)}
-                                  onChange={() => handleItemToggle(item.id)}
+                                  checked={selectedDivItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
                                   className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 />
                               </td>
@@ -2195,8 +3879,8 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               <td className="px-4 py-3 text-center">
                                 <input
                                   type="checkbox"
-                                  checked={selectedSecItems.includes(item.id)}
-                                  onChange={() => handleItemToggle(item.id)}
+                                  checked={selectedSecItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
                                   className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 />
                               </td>
