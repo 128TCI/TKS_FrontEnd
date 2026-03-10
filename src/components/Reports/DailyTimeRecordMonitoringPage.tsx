@@ -632,7 +632,7 @@ export function DailyTimeRecordMonitoringPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>*/}
           </div>
         </div>
         <Footer />
