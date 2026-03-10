@@ -406,6 +406,9 @@ export function UpdateStatusPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Section - Status List */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedItems.length} selected</span>
+                </div>                                
                 <div className="mb-4 flex items-center gap-3">
                   <Search className="w-4 h-4 text-gray-500" />
                   <input

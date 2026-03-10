@@ -3,12 +3,12 @@ import { useState, useEffect } from "react";
 import { useTablePagination } from "../hooks/useTablePagination";
 import apiClient from "../services/apiClient";
 
-
 interface OvertimeRatesTabContentProps {
   tksGroupCode: string;
   tksGroupDescription: string;
   isEditMode: boolean;
   isEditOTRates: boolean;
+  isCreateNew: boolean;
   setIsEditOTRates: (value: boolean) => void;
   showOtCodeModal: boolean;
   setShowOtCodeModal: (value: boolean) => void;
@@ -169,7 +169,7 @@ interface OvertimeRatesTabContentProps {
   setID: (value: number) => void;
   groupCode: string;
   setGroupCode: (value: string) => void;
-} 
+}
 
 interface RegularOTRatesItem {
   id: number;
@@ -207,6 +207,14 @@ interface OTAllowancesItem {
   amount: string;
 }
 
+interface EarningCodeItem {
+  earnID: number;
+  earnCode: string;
+  earnDesc: string;
+  earnType: string;
+  sysID: string;
+}
+
 export interface HolidayOTRatesItem {
   id: number;
   code: string;
@@ -241,6 +249,7 @@ export function OvertimeRatesTabContent({
   tksGroupDescription,
   isEditMode,
   isEditOTRates,
+  isCreateNew,
   setIsEditOTRates,
   showOtCodeModal,
   setShowOtCodeModal,
@@ -391,7 +400,7 @@ export function OvertimeRatesTabContent({
   setGroupCode,
   minimumOTHours,
   setMinimumOTHours,
-  accumOTHrsToEarnMealAllow, 
+  accumOTHrsToEarnMealAllow,
   setAccumOTHrsToEarnMealAllow,
   dayType,
   setDayType,
@@ -400,8 +409,7 @@ export function OvertimeRatesTabContent({
   earningCode,
   setEarningCode,
   oTAllowancesList,
-  setOTAllowancesList
-
+  setOTAllowancesList,
 }: OvertimeRatesTabContentProps) {
   const checkboxClass =
     "w-4 h-4 appearance-none border-2 border-gray-400 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
@@ -411,6 +419,9 @@ export function OvertimeRatesTabContent({
     "px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors";
 
   const [showEarningCodeModal, setShowEarningCodeModal] = useState(false);
+  const [earningCodeList, setEarningCodesetList] = useState<EarningCodeItem[]>(
+    [],
+  );
   const [earningCodeSearchTerm, setEarningCodeSearchTerm] = useState("");
 
   // Overtime Rates Modals
@@ -475,25 +486,9 @@ export function OvertimeRatesTabContent({
   const [nonWorkingHolidayOTRatesList, setNonWorkingHolidayOTRatesList] =
     useState<HolidayOTRatesItem[]>([]);
 
-  // Mock earning codes data
-  const earningCodes = [
-    { code: "E01", description: "Regular Pay" },
-    { code: "E02", description: "Overtime" },
-    { code: "E03", description: "Charge SL/VL" },
-    { code: "E04", description: "Absences" },
-    { code: "E05", description: "UT/Tardiness" },
-    { code: "E06", description: "13th Month Pay NonTax" },
-    { code: "E07", description: "COLA" },
-    {
-      code: "E08",
-      description: "Transportation Expense Reimbursement Allowance",
-    },
-    { code: "E09", description: "Onsite Rollform Allowance" },
-    { code: "E10", description: "Overwithheld" },
-  ];
-
   // Regular Overtime Rates Search and Pagination
   const {
+    filteredData: regOTRateTotalData,
     paginatedData: filteredRegOTRateList,
     totalPages: regOTRateTotalPages,
     currentPage: currentRegOTRatePage,
@@ -513,6 +508,7 @@ export function OvertimeRatesTabContent({
 
   // Regular Overtime Rates Search and Pagination
   const {
+    filteredData: restDayOTRateTotalData,
     paginatedData: filteredRestDayOTRateList,
     totalPages: restDayOTRateTotalPages,
     currentPage: currentRestDayOTRatePage,
@@ -532,6 +528,7 @@ export function OvertimeRatesTabContent({
 
   // Legal Holiday Overtime Rates Search and Pagination
   const {
+    filteredData: legalHolidayOTRateTotalData,
     paginatedData: filteredLegalHolidayOTRateList,
     totalPages: legalHolidayOTRateTotalPages,
     currentPage: currentLegalHolidayOTRatePage,
@@ -553,6 +550,7 @@ export function OvertimeRatesTabContent({
 
   // Special Holiday Overtime Rates Search and Pagination
   const {
+    filteredData: specialHolidayOTTotalData,
     paginatedData: filteredSpecialHolidayOTRateList,
     totalPages: specialHolidayOTRateTotalPages,
     currentPage: currentSpecialHolidayOTRatePage,
@@ -574,6 +572,7 @@ export function OvertimeRatesTabContent({
 
   // Double Legal Holiday Overtime Rates Search and Pagination
   const {
+    filteredData: doubleLegalHolidayOTRateTotalData,
     paginatedData: filteredDoubleLegalHolidayOTRateList,
     totalPages: doubleLegalHolidayOTRateTotalPages,
     currentPage: currentDoubleLegalHolidayOTRatePage,
@@ -595,6 +594,7 @@ export function OvertimeRatesTabContent({
 
   // Special Holiday 2 Overtime Rates Search and Pagination
   const {
+    filteredData: specialHoliday2OTRateTotalData,
     paginatedData: filteredSpecialHoliday2OTRateList,
     totalPages: specialHoliday2OTRateTotalPages,
     currentPage: currentSpecialHoliday2OTRatePage,
@@ -616,6 +616,7 @@ export function OvertimeRatesTabContent({
 
   // Non-Working Overtime Rates Search and Pagination
   const {
+    filteredData: nonWorkingOTRateTotalData,
     paginatedData: filteredNonWorkingOTRateList,
     totalPages: nonWorkingOTRateTotalPages,
     currentPage: currentNonWorkingOTRatePage,
@@ -633,6 +634,30 @@ export function OvertimeRatesTabContent({
   const nonWorkingOTRateStartIndex =
     (currentNonWorkingOTRatePage - 1) * itemsPerPage;
   const nonWorkingOTRateEndIndex = nonWorkingOTRateStartIndex + itemsPerPage;
+
+  // Earning Code Pagination and Search
+  const {
+    filteredData: earningCodeTotalData,
+    paginatedData: filteredEarningCodeData,
+    totalPages: earningCodeTotalPages,
+    currentPage: earningCodeCurrentPage,
+    setCurrentPage: setEarningCodeCurrentPage,
+    getPageNumbers: getEarningCodePageNumbers,
+  } = useTablePagination(
+    earningCodeList,
+    earningCodeSearchTerm,
+    (item, search) =>
+      item.earnCode?.toLowerCase().includes(search) ||
+      item.earnDesc?.toLowerCase().includes(search),
+    itemsPerPage,
+  );
+
+  const earningCodeStartIndex = (earningCodeCurrentPage - 1) * itemsPerPage;
+  const earningCodeEndIndex = earningCodeStartIndex + itemsPerPage;
+
+  useEffect(() => {
+    setEarningCodeCurrentPage(1);
+  }, [earningCodeSearchTerm]);
 
   // Fetch RegularDayOTRateSetUp
   const fetchRegularDayOTRateSetUp = async (): Promise<
@@ -652,6 +677,21 @@ export function OvertimeRatesTabContent({
       oTPremiumAfterTheShift: item.otPremiumAfterTheShift,
       oTPremiumWithinTheShift: item.otPremiumWithinTheShift,
       doleRegDay: item.doleRegDay,
+    }));
+  };
+
+  // Fetch EarningCodeSetUp
+  const fetchEarningCodeSetUp = async (): Promise<EarningCodeItem[]> => {
+    const response = await apiClient.get(
+      "/Fs/Process/AllowanceAndEarnings/EarningsSetUp",
+    );
+
+    return response.data.map((item: any) => ({
+      earnID: item.earnID,
+      earnCode: item.earnCode,
+      earnDesc: item.earnDesc,
+      earnType: item.earnType,
+      sysID: item.sysId,
     }));
   };
 
@@ -759,6 +799,11 @@ export function OvertimeRatesTabContent({
       setNonWorkingHolidayOTRatesList(filtered);
     };
 
+    const loadEarningCodeSetUp = async () => {
+      const items = await fetchEarningCodeSetUp();
+      setEarningCodesetList(items);
+    };
+
     loadOvertimeFileSetup();
     loadRestDayOTRateSetUp();
     loadLegalHolidayOTRateSetUp();
@@ -766,6 +811,7 @@ export function OvertimeRatesTabContent({
     loadDoubleLegalHolidayOTRateSetUp();
     loadSpecialHoliday2OTRateSetUp();
     loadNonWorkingHolidayOTRateSetUp();
+    loadEarningCodeSetUp();
   }, []);
 
   // Handle ESC key to close modal
@@ -774,11 +820,9 @@ export function OvertimeRatesTabContent({
       if (event.key === "Escape") {
         if (showEarningCodeModal) {
           setShowEarningCodeModal(false);
-        } 
+        }
       }
     };
-
-
 
     return () => {
       document.removeEventListener("keydown", handleEscKey);
@@ -790,7 +834,12 @@ export function OvertimeRatesTabContent({
     if (!isEditMode) return;
 
     // Validate that all fields have values
-    if (!minimumOTHours || !accumOTHrsToEarnMealAllow || !amount || !earningCode) {
+    if (
+      !minimumOTHours ||
+      !accumOTHrsToEarnMealAllow ||
+      !amount ||
+      !earningCode
+    ) {
       alert("Please fill in all fields before adding.");
       return;
     }
@@ -805,12 +854,12 @@ export function OvertimeRatesTabContent({
         accumOTHrsToEarnMealAllow,
         dayType,
         earningCode,
-        amount
+        amount,
       },
     ]);
 
     // Clear input fields
-    setMinimumOTHours(""); 
+    setMinimumOTHours("");
     setAccumOTHrsToEarnMealAllow("");
     setAmount("");
     setEarningCode("");
@@ -832,6 +881,20 @@ export function OvertimeRatesTabContent({
     if (!isEditMode) return;
     setOTAllowancesList(oTAllowancesList.filter((_, i) => i !== index));
   };
+
+  const HandleCreateNew = () => {
+    if (isCreateNew) {
+      setMinimumOTHours('');
+      setAccumOTHrsToEarnMealAllow('');
+      setAmount('');
+      setEarningCode('');
+      setOTAllowancesList([]);
+    }
+  }
+
+  useEffect(() => {
+    HandleCreateNew();
+  },[isCreateNew]); 
 
   return (
     <div className="space-y-6">
@@ -1778,10 +1841,10 @@ export function OvertimeRatesTabContent({
                   readOnly
                   className={`flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
                 />
-                {isEditMode && ( 
+                {isEditMode && (
                   <>
                     <button
-                      onClick={ () => {
+                      onClick={() => {
                         setIsCompOtherRate(true);
                         setShowRestDayOvertimeRatesModal(true);
                       }}
@@ -1872,12 +1935,13 @@ export function OvertimeRatesTabContent({
                 />
                 {isEditMode && (
                   <>
-                    <button 
+                    <button
                       onClick={() => {
                         setIsEditOTRatesFor2Shifts(true);
                         setShowOtCodeModal(true);
                       }}
-                      className={searchButtonClass}>
+                      className={searchButtonClass}
+                    >
                       <Search className="w-4 h-4" />
                     </button>
                     <button
@@ -2224,8 +2288,7 @@ export function OvertimeRatesTabContent({
               <input
                 type="text"
                 value={earningCode}
-                onChange={(e) => setEarningCode(e.target.value)}
-                readOnly={!isEditMode}
+                readOnly
                 className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
               />
               {isEditMode && (
@@ -2290,9 +2353,9 @@ export function OvertimeRatesTabContent({
                       <td className="p-3 text-gray-700">
                         {allowance.accumOTHrsToEarnMealAllow}
                       </td>
-                      <td className="p-3 text-gray-700">{allowance.amount}</td>
+                      <td className="p-3 text-gray-700">{allowance.earningCode}</td>
                       <td className="p-3 text-gray-700">
-                        {allowance.earningCode}
+                        {allowance.amount}
                       </td>
                       {isEditMode && (
                         <td className="p-3">
@@ -2316,8 +2379,12 @@ export function OvertimeRatesTabContent({
 
       {/* Earning Code Search Modal */}
       {showEarningCodeModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          onClick={() => setShowEarningCodeModal(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-medium">Search Earning Code</h3>
@@ -2344,81 +2411,102 @@ export function OvertimeRatesTabContent({
             </div>
 
             {/* Table */}
-            <div className="flex-1 overflow-auto">
+            <div
+              className="px-6 py-4"
+              style={{ maxHeight: "400px", overflowY: "auto" }}
+            >
               <table className="w-full">
-                <thead className="bg-gray-100 sticky top-0">
+                <thead className="border-b-2 border-gray-300">
                   <tr>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                      Earning Code ▲
+                    <th className="text-left py-2 text-gray-700 font-semibold">
+                      <div className="flex items-center gap-1">
+                        Earning Code
+                        <span className="text-blue-600">▲</span>
+                      </div>
                     </th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                    <th className="text-left py-2 text-gray-700 font-semibold">
                       Description
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {earningCodes
-                    .filter(
-                      (item) =>
-                        item.code
-                          .toLowerCase()
-                          .includes(earningCodeSearchTerm.toLowerCase()) ||
-                        item.description
-                          .toLowerCase()
-                          .includes(earningCodeSearchTerm.toLowerCase()),
-                    )
-                    .map((item, index) => (
-                      <tr
-                        key={item.code}
-                        className={`hover:bg-gray-50 cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
-                        onClick={() => {
-                          // Handle selection
-                          handleEarningCodeSelect(item.code);
-                        }}
-                      >
-                        <td className="px-4 py-2 text-sm border-b">
-                          {item.code}
-                        </td>
-                        <td className="px-4 py-2 text-sm border-b">
-                          {item.description}
-                        </td>
-                      </tr>
-                    ))}
+                  {filteredEarningCodeData.map((item, index) => (
+                    <tr
+                      key={`${item.earnID}-${index}`}
+                      className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => {
+                        setEarningCode(item.earnCode);
+                        setShowEarningCodeModal(false);
+                      }}
+                    >
+                      <td className="py-2 text-gray-800">{item.earnCode}</td>
+                      <td className="py-2 text-gray-800">{item.earnDesc}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Pagination and Close Button */}
-            <div className="flex items-center justify-between p-4 border-t">
-              <button
-                onClick={() => setShowEarningCodeModal(false)}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm"
-              >
-                Close
-              </button>
-              <div className="flex items-center gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-sm">
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-3 px-6 pb-4">
+              <div className="text-gray-600 text-xs">
+                Showing{" "}
+                {filteredEarningCodeData.length === 0
+                  ? 0
+                  : earningCodeStartIndex + 1}{" "}
+                to{" "}
+                {Math.min(earningCodeEndIndex, filteredEarningCodeData.length)}{" "}
+                of {earningCodeTotalData.length} entries
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() =>
+                    setEarningCodeCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={earningCodeCurrentPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Previous
                 </button>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-sm">
-                  2
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-sm">
-                  3
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-sm">
-                  4
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-sm">
-                  5
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-sm">
-                  6
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-sm">
+
+                {getEarningCodePageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-gray-500 text-xs"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setEarningCodeCurrentPage(page)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        earningCodeCurrentPage === page
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setEarningCodeCurrentPage((prev) =>
+                      Math.min(prev + 1, earningCodeTotalPages),
+                    )
+                  }
+                  disabled={
+                    earningCodeCurrentPage === earningCodeTotalPages ||
+                    earningCodeTotalPages === 0
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Next
                 </button>
               </div>
@@ -2427,7 +2515,6 @@ export function OvertimeRatesTabContent({
         </div>
       )}
 
-  
       {/* Regular OT Rate Search Modal */}
       {showRegDayOvertimeRatesModal && (
         <div
@@ -2494,10 +2581,12 @@ export function OvertimeRatesTabContent({
                         index % 2 === 0 ? "bg-white" : "bg-gray-50"
                       }`}
                       onClick={() => {
-                       (isLateFiling) ?  setRegularDayOTLateFiling(item.code) : setRegularDayOT(item.code);
-                        setShowRegDayOvertimeRatesModal(false)
+                        isLateFiling
+                          ? setRegularDayOTLateFiling(item.code)
+                          : setRegularDayOT(item.code);
+                        setShowRegDayOvertimeRatesModal(false);
                       }}
-                       >
+                    >
                       <td className="py-2 text-gray-800">{item.code}</td>
                       <td className="py-2 text-gray-800">{item.description}</td>
                     </tr>
@@ -2514,7 +2603,7 @@ export function OvertimeRatesTabContent({
                   ? 0
                   : regOTRateStartIndex + 1}{" "}
                 to {Math.min(regOTRateEndIndex, filteredRegOTRateList.length)}{" "}
-                of {filteredRegOTRateList.length} entries
+                of {regOTRateTotalData.length} entries
               </div>
 
               <div className="flex gap-1">
@@ -2663,7 +2752,7 @@ export function OvertimeRatesTabContent({
                   legalHolidayOTRateEndIndex,
                   filteredLegalHolidayOTRateList.length,
                 )}{" "}
-                of {filteredLegalHolidayOTRateList.length} entries
+                of {legalHolidayOTRateTotalData.length} entries
               </div>
 
               <div className="flex gap-1">
@@ -2815,7 +2904,7 @@ export function OvertimeRatesTabContent({
                   specialHolidayOTRateEndIndex,
                   filteredSpecialHolidayOTRateList.length,
                 )}{" "}
-                of {filteredSpecialHolidayOTRateList.length} entries
+                of {specialHolidayOTTotalData.length} entries
               </div>
 
               <div className="flex gap-1">
@@ -2969,7 +3058,7 @@ export function OvertimeRatesTabContent({
                   doubleLegalHolidayOTRateEndIndex,
                   filteredDoubleLegalHolidayOTRateList.length,
                 )}{" "}
-                of {filteredDoubleLegalHolidayOTRateList.length} entries
+                of {doubleLegalHolidayOTRateTotalData.length} entries
               </div>
 
               <div className="flex gap-1">
@@ -3123,7 +3212,7 @@ export function OvertimeRatesTabContent({
                   specialHoliday2OTRateEndIndex,
                   filteredSpecialHoliday2OTRateList.length,
                 )}{" "}
-                of {filteredSpecialHoliday2OTRateList.length} entries
+                of {specialHoliday2OTRateTotalData.length} entries
               </div>
 
               <div className="flex gap-1">
@@ -3277,7 +3366,7 @@ export function OvertimeRatesTabContent({
                   nonWorkingOTRateEndIndex,
                   filteredNonWorkingOTRateList.length,
                 )}{" "}
-                of {filteredNonWorkingOTRateList.length} entries
+                of {nonWorkingOTRateTotalData.length} entries
               </div>
 
               <div className="flex gap-1">
@@ -3342,8 +3431,8 @@ export function OvertimeRatesTabContent({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-          onClick={() => 
-            {setShowRestDayOvertimeRatesModal(false);
+          onClick={() => {
+            setShowRestDayOvertimeRatesModal(false);
             setLateFiling(false);
             setIsCompOtherRate(false);
           }}
@@ -3356,11 +3445,11 @@ export function OvertimeRatesTabContent({
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
               <h2 className="text-lg font-semibold text-gray-800">Search</h2>
               <button
-                 onClick={() => 
-                    {setShowRestDayOvertimeRatesModal(false);
-                    setLateFiling(false);
-                    setIsCompOtherRate(false);
-                  }}
+                onClick={() => {
+                  setShowRestDayOvertimeRatesModal(false);
+                  setLateFiling(false);
+                  setIsCompOtherRate(false);
+                }}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -3411,7 +3500,7 @@ export function OvertimeRatesTabContent({
                         index % 2 === 0 ? "bg-white" : "bg-gray-50"
                       }`}
                       onClick={() => {
-                        if(isLateFiling) {
+                        if (isLateFiling) {
                           setRestDayOTLateFiling(item.code);
                         } else if (isCompOtherRate) {
                           setRestDayOtherRate(item.code);
@@ -3442,7 +3531,7 @@ export function OvertimeRatesTabContent({
                   restDayOTRateEndIndex,
                   filteredRestDayOTRateList.length,
                 )}{" "}
-                of {filteredRestDayOTRateList.length} entries
+                of {restDayOTRateTotalData.length} entries
               </div>
 
               <div className="flex gap-1">

@@ -4,12 +4,13 @@ import apiClient from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
 import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
 import CryptoJS from 'crypto-js';
+import { decryptData } from '../services/encryptionService';
 
 // ─── Encryption Helpers ────────────────────────────────────────────────────────
 
 const SECRET_KEY = "128bl3$$1ng$";
 const SALT       = "bl3$$1ng$128";
-
+const KeySize    = 256 / 8; 
 let cached: { key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray } | null = null;
 
 function getKeyAndIV() {
@@ -18,7 +19,7 @@ function getKeyAndIV() {
   const saltBytes = CryptoJS.enc.Utf16LE.parse(SALT);
 
   const derived = CryptoJS.PBKDF2(SECRET_KEY, saltBytes, {
-    keySize:    12,
+    keySize:    KeySize,
     iterations: 1000,
     hasher:     CryptoJS.algo.SHA1,
   });
@@ -72,7 +73,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await apiClient.get('Security/DatabaseConfiguration/databases');
+        const response = await apiClient.get('/Security/DatabaseConfiguration/databases');
         console.log("API response:", response);
         
         // Convert response to boolean
@@ -115,7 +116,8 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
         company:     encryptedCompany,
         windowsAuth,
       }, );
-
+      const decryptedUsername = decryptData(response.data.user?.username) || username;
+      
       if (response.status === 200) {
         if (response.data.token) {
           localStorage.setItem('authToken',      response.data.token);
@@ -128,6 +130,17 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
 
         if (response.data.user) {
           localStorage.setItem('userData', JSON.stringify(response.data.user));
+        }
+
+        try {
+          await auditTrail.log({
+            trans:      `Employee ${decryptedUsername} logged in.`,
+            messages:   `Employee ${decryptedUsername} logged in.`,
+            formName:   'LogIn',
+            accessType: 'LogIn',
+          });
+        } catch (err) {
+          console.error('Audit trail login failed:', err);
         }
 
         await showSuccessModal('Login Successful');
@@ -200,8 +213,9 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="text"
+                  type="text" 
                   value={username}
+                  autoComplete='username'
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Username"
@@ -218,6 +232,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                 <input
                   type="password"
                   value={password}
+                  autoComplete='new-password'
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Password"

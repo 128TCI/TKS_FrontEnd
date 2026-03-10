@@ -48,6 +48,7 @@ export const securityService = {
       suspended:        u.isSuspended       ?? u.suspended        ?? false,
       isWindowsAuth:    u.isWindowsAuthenticate                   ?? false,
       windowsLoginName: u.windowsLoginName                        ?? '',
+      emailAddress:     u.emailAddress                            ?? '',
     }));
 
     // Client-side pagination when API returns all records at once
@@ -59,29 +60,31 @@ export const securityService = {
     return { data: paged, totalCount: total, page, pageSize };
   },
 
-  async createUser(data: CreateUserRequest): Promise<User> {
+async createUser(data: CreateUserRequest): Promise<User> {
     const res = await apiClient.post(`${BASE}/SecurityManager/users`, {
-      Username:              data.username,
-      Password:              data.password,
-      Expiration:            data.expiration || null,
-      MachineName:           data.machineName,
-      Suspended:             data.suspended,
-      IsWindowsAuthenticate: data.isWindowsAuthenticate,
-      WindowsLoginName:      data.windowsLoginName,
+        Username:              data.username,
+        Password:              data.password,
+        Expiration:            data.expiration      ?? null,
+        MachineName:           data.machineName     ?? null,
+        Suspended:             data.suspended,
+        IsWindowsAuthenticate: data.isWindowsAuthenticate,
+        WindowsLoginName:      data.windowsLoginName ?? null,
+        EmailAddress:          data.emailAddress    ?? null,  // ← ADD
     });
     return res.data;
-  },
+},
 
-  async updateUser(username: string, data: UpdateUserRequest): Promise<User> {
+async updateUser(username: string, data: UpdateUserRequest): Promise<User> {
     const res = await apiClient.put(`${BASE}/SecurityManager/users/${username}`, {
-      Expiration:            data.expiration || null,
-      MachineName:           data.machineName,
-      Suspended:             data.suspended,
-      IsWindowsAuthenticate: data.isWindowsAuthenticate,
-      WindowsLoginName:      data.windowsLoginName,
+        Expiration:            data.expiration      ?? null,
+        MachineName:           data.machineName     ?? null,
+        Suspended:             data.suspended,
+        IsWindowsAuthenticate: data.isWindowsAuthenticate,
+        WindowsLoginName:      data.windowsLoginName ?? null,
+        EmailAddress:          data.emailAddress    ?? null,  // ← ADD
     });
     return res.data;
-  },
+},
 
   async changePassword(username: string, data: ChangePasswordRequest): Promise<ApiResult> {
     const res = await apiClient.put(
@@ -91,9 +94,10 @@ export const securityService = {
     return res.data;
   },
 
-  async resetPassword(username: string): Promise<ApiResult> {
+  async resetPassword(username: string, newPassword: { newPassword: string }): Promise<ApiResult> {
     const res = await apiClient.put(
-      `${BASE}/SecurityManager/users/${username}/reset-password`, {}
+      `${BASE}/SecurityManager/users/${username}/reset-password`,
+      { NewPassword: newPassword.newPassword }  // ← PascalCase to match ResetPasswordDto
     );
     return res.data;
   },
@@ -141,6 +145,23 @@ export const securityService = {
     return res.data;
   },
 
+  async addMembers(groupName: string, usernames: string[]): Promise<ApiResult> {
+    const res = await apiClient.post(`${BASE}/GroupMember/add`, {
+      GroupName: groupName, Usernames: usernames,
+    });
+    return res.data;
+  },
+
+  async removeMembers(groupName: string, usernames: string[]): Promise<ApiResult> {
+    const res = await apiClient.post(`${BASE}/GroupMember/delete`, {
+      GroupName: groupName, Usernames: usernames,
+    });
+    return res.data;
+  },
+
+
+
+
   // ── Security Control — Access Types (from tk_FormAccessType) ───────────────
 
   /**
@@ -180,6 +201,7 @@ export const securityService = {
     return res.data.map((a: any) => ({
       id:          a.id,
       formName:    a.formName,
+      formDescription: a.formDescription ?? a.formDesc ?? '',
       accessFlags: a.accessFlags ?? {},   // already { CanView: bool, CanAdd: bool, ... }
     }));
   },
@@ -198,8 +220,8 @@ export const securityService = {
   // All TKS groups (for the TKS Group table)
   async getTksGroups(): Promise<TKSGroup[]> {
     const res = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
-    return res.data.map((item: any) => ({
-      id:          item.ID          ?? item.id   ?? 0,
+    return res.data.map((item: any, index: number) => ({
+      id:          item.ID || item.id || (index + 1),
       code:        item.groupCode   ?? item.code ?? '',
       description: item.groupDescription ?? item.description ?? '',
     }));
@@ -208,8 +230,8 @@ export const securityService = {
   async getAvailableTksGroups(groupName: string): Promise<TKSGroup[]> {
     const res = await apiClient.get(`${BASE}/SecurityControl/tks-groups/${groupName}`);
     console.log('API response:', res);
-    return res.data.map((item: any) => ({
-      id:          0,
+    return res.data.map((item: any, index: number) => ({
+      id:          item.ID || item.id || (index + 1),
       code:        item.tksGroupName ?? item.groupCode ?? item.code ?? '',
       description: item.description  ?? item.groupDescription       ?? '',
     }));
@@ -227,19 +249,24 @@ export const securityService = {
     }));
   },
 
-  async saveTksGroupAccess(tksGroupName: string, groupName: string[], createdBy: string): Promise<ApiResult> {
+  async saveTksGroupAccess(tksGroupName: string, tksGroupCodes: string[], createdBy?: string): Promise<ApiResult> {
     const res = await apiClient.post(`${BASE}/SecurityControl/tks-group-access`, {
-      TksGroupName: tksGroupName, GroupName: groupName, CreatedBy: createdBy
+      TksGroupName: tksGroupName, TksGroupCodes: tksGroupCodes, CreatedBy: createdBy ?? null,
     });
     console.log('API response: ', res);
     return res.data;
   },
 
-  async removeTksGroupAccess(id: number): Promise<ApiResult> {
-    const res = await apiClient.delete(`${BASE}/SecurityControl/tks-group-access/${id}`);
-    return res.data;
+  // Body: { groupName, tksGroupCodes: ["1","10"] }
+  async removeTksGroupAccess(tksGroupName: string, tksGroupCodes: string[]): Promise<ApiResult> {
+    const res = await apiClient.delete(`${BASE}/SecurityControl/tks-group-access`, {
+       data: { tksGroupName, tksGroupCodes }
+    });
+    console.log('API response: ', res);
+    return { success: res.data?.success ?? true, message: res.data?.message ?? 'Removed.' };
   },
 
+  /*
 
   // Remove multiple rows from tk_UserGroupTKSGroupAccess by IDs (bulk)
   async removeTksGroupAccessBulk(ids: number[]): Promise<ApiResult> {
@@ -248,5 +275,6 @@ export const securityService = {
     });
     return { success: res.data?.success ?? true, message: res.data?.message ?? 'Removed.' };
   },
+  */
 
 };
