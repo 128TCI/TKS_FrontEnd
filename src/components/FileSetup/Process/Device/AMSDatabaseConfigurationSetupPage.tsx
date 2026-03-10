@@ -297,6 +297,12 @@ export function AMSDatabaseConfigurationSetupPage() {
                 deviceNameCol: formData.deviceNameColumn
             };
             await apiClient.post('/Fs/Process/Device/AMSDbConfigSetUp', payload);
+            await auditTrail.log({
+            accessType: 'Create',
+            trans: `Database configuration "${formData.description}" created.`,
+            messages: `Database configuration "${formData.description}" created.`,
+            formName: formName,
+            });
             await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration created successfully.', timer: 2000, showConfirmButton: false });
             await fetchAMSDatabases();
             setShowCreateModal(false);
@@ -344,6 +350,12 @@ export function AMSDatabaseConfigurationSetupPage() {
                 deviceNameCol: formData.deviceNameColumn
             };
             await apiClient.put(`/Fs/Process/Device/AMSDbConfigSetUp/${editingItem.id}`, payload);
+            await auditTrail.log({
+            accessType: 'Update',
+            trans: `Database configuration "${formData.description}" updated.`,
+            messages: `Database configuration "${formData.description}" updated.`,
+            formName: formName,
+            });
             await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration updated successfully.', timer: 2000, showConfirmButton: false });
             await fetchAMSDatabases();
             setShowEditModal(false);

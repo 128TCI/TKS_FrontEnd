@@ -1,46 +1,59 @@
 import { useState, useEffect } from 'react';
-import { HomePage } from './components/HomePage';
-import { LoginPage } from './components/LoginPage';
-import { ForgotPasswordPage } from './components/ForgotPasswordPage';
+import { useNavigate } from 'react-router-dom';
+import { AppRoutes } from './routes/AppRoutes';
+import { decryptData } from './services/encryptionService';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
-  // Check if user has a valid token on app load
-useEffect(() => {
-  const token = localStorage.getItem('authToken');
-  if (token) {
-    setIsLoggedIn(true);  // Token exists → show HomePage
-  }
-  // If no token, isLoggedIn stays false → show LoginPage
-  setIsLoading(false);
-}, []);
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    const rawPayload = localStorage.getItem('loginPayload');
 
-  // Show loading state while checking token
+    if (token) {
+      setIsLoggedIn(true);
+    }
+
+    setIsLoading(false);
+  }, []);
+
+  const handleLogin = () => {
+    setIsLoggedIn(true);
+    navigate('/home', { replace: true });
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    navigate('/login', { replace: true });
+  };
+
+  const handleForgotPassword = () => {
+    navigate('/forgot-password');
+  };
+
+  const handleBackToLogin = () => {
+    navigate('/login');
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-lime-200 via-green-400 to-lime-200 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4" />
           <p className="text-gray-700">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!isLoggedIn) {
-    if (showForgotPassword) {
-      return <ForgotPasswordPage onBack={() => setShowForgotPassword(false)} />;
-    }
-    return (
-      <LoginPage 
-        onLogin={() => setIsLoggedIn(true)} 
-        onForgotPassword={() => setShowForgotPassword(true)}
-      />
-    );
-  }
-
-  return <HomePage onLogout={() => setIsLoggedIn(false)} />;
+  return (
+    <AppRoutes
+      onLogin={handleLogin}
+      onLogout={handleLogout}
+      onForgotPassword={handleForgotPassword}
+      onBackToLogin={handleBackToLogin}
+    />
+  );
 }
