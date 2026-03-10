@@ -43,6 +43,10 @@ interface ReportFilter {
   includeWithoutPay: boolean
   otCode: string []
   workShiftCode: string 
+  instance: number
+  instanceCount: number
+  instanceMinutes: number
+  optionTardy: number
 }
 
 interface TardinessFilter {
@@ -186,6 +190,7 @@ export function DailyTimeRecordMonitoringPage() {
   const [reportType, setReportType] = useState('Accumulation');
   const [toExcelFile, setToExcelFile] = useState(false);
   const [convertToHHMM, setConvertToHHMM] = useState(false);
+  const [convertToRawData, setConvertToRawData] = useState(false);
   const [includeWPay, setIncludeWPay] = useState(false);
   const [includeWOutPay, setIncludeWOutPay] = useState(false);
   const [utRawData, setUTRawData] = useState(false);
@@ -201,6 +206,10 @@ export function DailyTimeRecordMonitoringPage() {
   const [mode, setMode] = useState<'Absences' |'Leave'| 'All'>('All');
   const [hrsOptions, setHrsOptions] = useState<'Per Employee' | 'Summary'>('Per Employee');
   const [tardyOptions, setTardyOptions] = useState<'Month' | 'Per Department' | 'Annual'>('Month');
+  const [tardinessOptions, setTardinessOptions] = useState<'Listing' | 'Periodic'>('Listing');
+  const [rawDataOptions, setRawDataOptions] = useState<'Actual' | 'Policy'>('Actual');
+  const [periodOptions, setPeriodOptions] = useState<number>(1);
+  const [instanceOptions, setInstanceOptions] = useState<number>(0);
   const [otOptions, setOTOptions] = useState<'Listing' | 'Summary'>('Listing');
   const [utOptions, setUTOptions] = useState<'Policy' | 'ActualTime'>('Policy');
   const [empShiftOptions, setEmpShiftOptions] = useState<'Count' | 'Listing'>('Count');
@@ -216,6 +225,10 @@ export function DailyTimeRecordMonitoringPage() {
   const [noOfFilter, setNoOfFilter] = useState('');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
+
+  const [instanceNum, setInstanceNum] = useState('');
+  const [minutesNum, setMinutesNum] = useState('');
+
   const itemsPerPage = 10;
   const [selectedLeaveType, setSelectedLeaveType] = useState('');
   const [processOptions, setProcessOptions] = useState({
@@ -647,7 +660,11 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     includeWithPay: includeWPay,
     includeWithoutPay: includeWOutPay,
     otCode: selectedOTItems.length === 0 ? [] : selectedOTItems.toLocaleString().split(","),
-    workShiftCode: workShiftCode
+    workShiftCode: workShiftCode,
+    instance: instanceOptions,
+    instanceCount: Number(instanceNum),
+    instanceMinutes: Number(minutesNum),
+    optionTardy: periodOptions
   };
   const tardyFilter: TardinessFilter = {
     empCode: empCode,
@@ -1948,6 +1965,198 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         });
         console.log(response.headers);
         const fileName = "AnnualTardinessReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness" && tardinessOptions === "Listing" && periodOptions === 0 && convertToRawData === false){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessReport/PrintTardinessReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness" && tardinessOptions === "Listing" && periodOptions === 1 && convertToRawData === false){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessReport/PrintTardinessAfterGPeriod?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness" && tardinessOptions === "Listing" && periodOptions === 2 && convertToRawData === false){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessReport/PrintTardinessWithinGPeriod?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness" && tardinessOptions === "Periodic" && convertToRawData === false){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessReport/PrintTardinessPeriodic?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessPeriodicReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness" && convertToRawData === true && rawDataOptions === "Actual"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessReport/PrintTardinessRawDataActual?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessRawDataReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Tardiness" && convertToRawData === true && rawDataOptions === "Policy"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/TardinessReport/PrintTardinessRawDataReport?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "TardinessRawDataReport.xlsx";
         const mimeType = response.headers['content-type']
         const blob = new Blob([response.data], { type: mimeType });
         fileLinkCreate(blob, fileName)
@@ -3354,7 +3563,161 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             </select>
                           </div>
                         </div>)}
-                        {/*Tardiness Options*/}
+                        {/*Tardiness Report Options*/}
+                        {reportType == "Tardiness" &&(<div>
+                          <span>Options</span>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="tardinessReportOption"
+                                value="Listing"
+                                disabled={convertToRawData}
+                                checked={tardinessOptions === 'Listing'}
+                                onChange={(e) => setTardinessOptions(e.target.value as 'Listing' | 'Periodic')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className={`text-sm ${convertToRawData ? "text-gray-400" : "text-gray-700"}`}>
+                                Listing
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="tardinessReportOption"
+                                value="Periodic"
+                                disabled={convertToRawData}
+                                checked={tardinessOptions === 'Periodic'}
+                                onChange={(e) => setTardinessOptions(e.target.value as 'Listing' | 'Periodic')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className={`text-sm ${convertToRawData ? "text-gray-400" : "text-gray-700"}`}>
+                                Periodic Tardiness
+                              </span>
+                            </label>
+                          </div>
+                          {tardinessOptions == "Periodic" && (<div className="flex items-center space-x-3 mb-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="instancesOption"
+                                value={0}
+                                disabled={convertToRawData}
+                                checked={instanceOptions === 0}
+                                onChange={(e) => setInstanceOptions(Number(e.target.value))}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                            </label>
+                            <label className={`text-sm ${convertToRawData ? "text-gray-400" : "text-gray-700 text-sm"}`}>Instance:</label>
+                            <input
+                              type="text"
+                              value={instanceNum}
+                              maxLength={20}
+                              inputMode="numeric"
+                              disabled={convertToRawData}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "").slice(0, 20);
+                                setInstanceNum(value);
+                              }}
+                              className="w-16 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="instancesOption"
+                                value={1}
+                                disabled={convertToRawData}
+                                checked={instanceOptions === 1}
+                                onChange={(e) => setInstanceOptions(Number(e.target.value))}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                            </label>
+                            <label className={`text-sm ${convertToRawData ? "text-gray-400" : "text-gray-700 text-sm"}`}>No. of Minutes</label>
+                            <input
+                              type="text"
+                              value={minutesNum}
+                              maxLength={20}
+                              inputMode="numeric"
+                              disabled={convertToRawData}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "").slice(0, 20);
+                                setMinutesNum(value);
+                              }}
+                              className="w-16 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>)}
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="gPeriodOption"
+                                value={0}
+                                checked={periodOptions === 0}
+                                onChange={(e) => setPeriodOptions(Number(e.target.value))}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">All</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="gPeriodOption"
+                                value={1}
+                                checked={periodOptions === 1}
+                                onChange={(e) => setPeriodOptions(Number(e.target.value))}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">After Grace Period</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="gPeriodOption"
+                                value={2}
+                                checked={periodOptions === 2}
+                                onChange={(e) => setPeriodOptions(Number(e.target.value))}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Within Grace Period</span>
+                            </label>
+                          </div>
+                          <div className="mb-6 space-y-2">
+                            <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={convertToRawData}
+                                onChange={(e) => setConvertToRawData(e.target.checked)}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                              />
+                            <span className="text-gray-700">From Raw Data</span>
+                            </label>
+                          </div>
+                          <div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="rawDataOption"
+                                value="Actual"
+                                checked={rawDataOptions === 'Actual'}
+                                onChange={(e) => setRawDataOptions(e.target.value as 'Actual' | 'Policy')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Based on Actual Time</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="rawDataOption"
+                                value="Policy"
+                                checked={rawDataOptions === 'Policy'}
+                                onChange={(e) => setRawDataOptions(e.target.value as 'Actual' | 'Policy')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Based on Policy</span>
+                            </label>
+                          </div>
+                        </div>)}
+                        {/*Tardiness Penalty Options*/}
                         {reportType == "Tardiness Penalty" &&(<div>
                           <span>Options</span>
                           <div className="mt-4 mb-4 flex items-center gap-4">
