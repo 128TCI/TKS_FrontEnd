@@ -168,11 +168,19 @@ interface AppRoutesProps {
 }
 
 export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }: AppRoutesProps) {
+    const token = localStorage.getItem('authToken');
+
   return (
     <Routes>
       {/* ── Public Routes ─────────────────────────────────────────── */}
-      <Route path="/login" element={<LoginPage onLogin={onLogin} onForgotPassword={onForgotPassword} />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage onBack={onBackToLogin} />} />
+      <Route
+        path="/login"
+        element={token ? <Navigate to="/home" replace /> : <LoginPage onLogin={onLogin} onForgotPassword={onForgotPassword} />}
+      />
+      <Route
+        path="/forgot-password"
+        element={token ? <Navigate to="/home" replace /> : <ForgotPasswordPage onBack={onBackToLogin} />}
+      />
 
       {/* ── Protected Routes (all share Navigation + Footer layout) ── */}
       <Route element={<ProtectedLayout onLogout={onLogout} />}>

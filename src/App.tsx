@@ -10,8 +10,6 @@ export default function App() {
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
-    const rawPayload = localStorage.getItem('loginPayload');
-
     if (token) {
       setIsLoggedIn(true);
     }
