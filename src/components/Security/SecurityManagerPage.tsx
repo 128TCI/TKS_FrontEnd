@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Check, UserPlus, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft,
-  Search, Users, Settings, Plus, Trash2, Save, X, Key,
+  Search, Users, Settings, Plus, Trash2, Save, X, Key, Calendar
 } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -9,6 +9,11 @@ import apiClient from '../../services/apiClient';
 import { securityService } from '../../services/securityService';
 import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../Types/security';
 import { ACCESS_TYPE_LABELS, ACCESS_TYPE_ORDER } from '../Types/security';
+import Swal from 'sweetalert2';
+import { CalendarPopup } from '../CalendarPopup';
+import { createPortal } from 'react-dom';
+import { decryptData } from '../../services/encryptionService';
+import auditTrail from '../../services/auditTrail';
 
 export function SecurityManagerPage() {
   const [activeTab, setActiveTab] = useState<'security-manager' | 'group-member' | 'security-control'>('security-manager');
@@ -31,7 +36,8 @@ export function SecurityManagerPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentAccessPage, setCurrentAccessPage] = useState(1);
-
+  const [showExpirationCalendar, setShowExpirationCalendar] = useState(false);
+  const [expirationCalendarPos, setExpirationCalendarPos] = useState({ top: 0, left: 0 });
   // User form state
   const [userForm, setUserForm] = useState({
     username: '',
@@ -41,7 +47,8 @@ export function SecurityManagerPage() {
     machineName: '',
     suspended: false,
     isWindowsAuth: false,
-    windowsLoginName: ''
+    windowsLoginName: '',
+    emailAddress:     '',
   });
 
   // User Group form state
@@ -406,37 +413,81 @@ export function SecurityManagerPage() {
 
   // ── User CRUD handlers ─────────────────────────────────────────────────────
 
-  const handleAddUser = () => {
-    setIsEditMode(false);
-    setSelectedUser(null);
-    setUserForm({ username: '', password: '', confirmPassword: '', expiration: '', machineName: '', suspended: false, isWindowsAuth: false, windowsLoginName: '' });
-    setShowUserModal(true);
-  };
+const handleAddUser = () => {
+  setIsEditMode(false);
+  setSelectedUser(null);
+  setUserForm({ username: '', password: '', confirmPassword: '', expiration: '', machineName: '', suspended: false, isWindowsAuth: false, windowsLoginName: '', emailAddress: '' });
+  setShowUserModal(true);
+};
 
-  const handleEditUser = (user: User) => {
-    setIsEditMode(true);
-    setSelectedUser(user);
-    setUserForm({ username: user.username, password: '', confirmPassword: '', expiration: user.expiration, machineName: user.machineName, suspended: user.suspended, isWindowsAuth: user.isWindowsAuth, windowsLoginName: user.windowsLoginName });
-    setShowUserModal(true);
+const handleEditUser = (user: User) => {
+  setIsEditMode(true);
+  setSelectedUser(user);
+  setUserForm({ username: user.username, password: '', confirmPassword: '', expiration: user.expiration, machineName: user.machineName, suspended: user.suspended, isWindowsAuth: user.isWindowsAuth, windowsLoginName: user.windowsLoginName, emailAddress: user.emailAddress ?? '' }); // ← FIX
+  setShowUserModal(true);
+};
+  // Parse MM/DD/YYYY manually, no timezone shift:
+  const toISOOrNull = (val: string | undefined): string | undefined => {
+    if (!val || val.trim() === '') return undefined;
+    
+    const parts = val.split('/');
+    if (parts.length === 3) {
+      const [mm, dd, yyyy] = parts;
+      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00`;
+    }
+
+    // fallback for other formats
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? undefined : d.toISOString();
   };
 
   // Original signature: handleRemoveUser(userId: number)
   // We look up the username from usersList to call the API
   const handleRemoveUser = async (userId: number) => {
-    const confirmed = await ApiService.showDeleteUserConfirmDialog();
-    if (!confirmed) return;
     const user = usersList.find(u => u.id === userId);
     if (!user) return;
+
+    const { isConfirmed } = await Swal.fire({
+      title: 'Delete User Account?',
+      html: `
+        <p>You are about to permanently delete:</p>
+        <strong style="color:#d33;">${user.username}</strong>
+        <br/><br/>
+        <small>Are you sure you want to delete this account?</small>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, delete it',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    });
+
+    if (!isConfirmed) return;
+
     try {
       const res = await securityService.removeUser(user.username);
+
       if (res.success) {
-        showSuccessModal(res.message);
+        await auditTrail.log({
+          accessType: 'Delete',
+          trans: `Deleted account record for user '${user.username}'`,
+          messages: `Security Manager - Users deleted: ${user.username}`,
+          formName: 'Security Manager - Users',
+        });
+        await Swal.fire({
+          title: 'Deleted!',
+          text: res.message,
+          icon: 'success',
+          confirmButtonColor: '#3085d6'
+        });
         fetchUsers(usersPage);
       } else {
-        showErrorModal(res.message);
+        Swal.fire('Error', res.message, 'error');
       }
     } catch {
-      showErrorModal('Failed to remove user.');
+      Swal.fire('Error', 'Failed to remove user.', 'error');
     }
   };
 
@@ -445,27 +496,47 @@ export function SecurityManagerPage() {
     if (!isEditMode && !userForm.password.trim()) { showErrorModal('Please enter a password.'); return; }
     if (!isEditMode && userForm.password !== userForm.confirmPassword) { showErrorModal('Passwords do not match.'); return; }
 
+    // ── Resolve the currently logged-in username ──
+    const raw = localStorage.getItem('userData');
+    const stored = raw ? JSON.parse(raw) : null;
+    const currentUser = stored?.userName ? decryptData(stored.userName) : '';
+    console.log(currentUser);
     try {
       if (isEditMode && selectedUser) {
-        const res = await securityService.updateUser(selectedUser.username, {
-          username: userForm.username,
-          expiration: userForm.expiration || undefined,
-          machineName: userForm.machineName,
-          suspended: userForm.suspended,
+        await securityService.updateUser(selectedUser.username, {
+          expiration:            toISOOrNull(userForm.expiration),
+          machineName:           userForm.machineName     || undefined,
+          suspended:             userForm.suspended,
           isWindowsAuthenticate: userForm.isWindowsAuth,
-          windowsLoginName: userForm.windowsLoginName,
+          windowsLoginName:      userForm.windowsLoginName || undefined,
+          emailAddress:          userForm.emailAddress    || undefined, 
+          editedBy:              currentUser,                            
+        });
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Updated record for ${selectedUser.username}`,
+          messages: `Security Manager - Users update record: ${selectedUser.username}`,
+          formName: 'Security Manager - Users',
         });
         console.log("API response:", res);
         showSuccessModal('User updated successfully.');
       } else {
         await securityService.createUser({
-          username: userForm.username,
-          password: userForm.password,
-          expiration: userForm.expiration || undefined,
-          machineName: userForm.machineName,
-          suspended: userForm.suspended,
+          username:              userForm.username,
+          password:              userForm.password,
+          expiration:            toISOOrNull(userForm.expiration),
+          machineName:           userForm.machineName     || undefined,
+          suspended:             userForm.suspended,
           isWindowsAuthenticate: userForm.isWindowsAuth,
-          windowsLoginName: userForm.windowsLoginName,
+          windowsLoginName:      userForm.windowsLoginName || undefined,
+          emailAddress:          userForm.emailAddress    || undefined,  
+          createdBy:             currentUser,                            
+        });
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Created new account '${userForm.username}'`,
+          messages: `Security Manager - Users new record: ${userForm.username}`,
+          formName: 'Security Manager - Users',
         });
         showSuccessModal('User created successfully.');
       }
@@ -493,7 +564,14 @@ export function SecurityManagerPage() {
         oldPassword: passwordForm.oldPassword,
         newPassword: passwordForm.newPassword,
       });
-      if (res.success) { showSuccessModal(res.message); setShowChangePasswordModal(false); }
+      if (res.success) { 
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Changed Password for account '${selectedUser!.username}'`,
+          messages: `Security Manager - Users update record: ${selectedUser!.username}`,
+          formName: 'Security Manager - Users',
+        });
+        showSuccessModal(res.message); setShowChangePasswordModal(false); }
       else showErrorModal(res.message);
     } catch {
       showErrorModal('Failed to change password.');
@@ -509,10 +587,19 @@ export function SecurityManagerPage() {
   const handleSaveResetPassword = async () => {
     if (!passwordForm.newPassword.trim()) { showErrorModal('Please enter a new password.'); return; }
     if (passwordForm.newPassword !== passwordForm.confirmNewPassword) { showErrorModal('Passwords do not match.'); return; }
+
     try {
-      const res = await securityService.resetPassword(selectedUser!.username, { newPassword: passwordForm.newPassword });
-      if (res.success) { showSuccessModal(res.message); setShowResetPasswordModal(false); }
-      else showErrorModal(res.message);
+      await securityService.resetPassword(selectedUser!.username, {
+        newPassword: passwordForm.newPassword,  
+      });
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Reset Password for account ${selectedUser!.username}`,
+        messages: `Security Manager - Users update record: ${selectedUser!.username}`,
+        formName: 'Security Manager - Users',
+      });
+      showSuccessModal('Password reset successfully.');
+      setShowResetPasswordModal(false);
     } catch {
       showErrorModal('Failed to reset password.');
     }
@@ -1362,76 +1449,171 @@ export function SecurityManagerPage() {
         </div>
       </div>
 
-      {/* ── Add/Edit User Modal (original structure) ───────────────────── */}
+      {/* ── Add/Edit User Modal ───────────────────────────────────────── */}
       {showUserModal && (
         <>
           <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowUserModal(false)} />
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
-                <h2 className="text-gray-800">{isEditMode ? 'Edit Users' : 'Create New'}</h2>
-                <button onClick={() => setShowUserModal(false)} className="text-gray-600 hover:text-gray-800"><X className="w-5 h-5" /></button>
+                <h2 className="text-gray-800">{isEditMode ? 'Edit User' : 'Create New User'}</h2>
+                <button onClick={() => setShowUserModal(false)} className="text-gray-600 hover:text-gray-800">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="p-6">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm text-gray-700 mb-1">Username *</label>
-                      <input type="text" value={userForm.username} onChange={e => setUserForm({ ...userForm, username: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <input
+                        type="text"
+                        value={userForm.username}
+                        onChange={e => setUserForm({ ...userForm, username: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
                     </div>
+
+                    {/* ── Expiration Date ── */}
                     <div>
                       <label className="block text-sm text-gray-700 mb-1">Expiration Date</label>
-                      <input type="text" value={userForm.expiration} onChange={e => setUserForm({ ...userForm, expiration: e.target.value })}
-                        placeholder="MM/DD/YYYY" className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={userForm.expiration}
+                          onChange={e => setUserForm({ ...userForm, expiration: e.target.value })}
+                          placeholder="MM/DD/YYYY"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setExpirationCalendarPos({
+                              top:  rect.bottom + window.scrollY + 4,
+                              left: rect.left  + window.scrollX,
+                            });
+                            setShowExpirationCalendar(v => !v);
+                          }}
+                          className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          <Calendar className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUserForm({ ...userForm, expiration: '' })}
+                          className="p-2 bg-red-600 text-white rounded hover:bg-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={userForm.emailAddress}
+                      onChange={e => setUserForm({ ...userForm, emailAddress: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="user@company.com"
+                    />
                   </div>
                   {!isEditMode && (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm text-gray-700 mb-1">Password *</label>
-                        <input type="password" value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                        <input
+                          type="password"
+                          value={userForm.password}
+                          onChange={e => setUserForm({ ...userForm, password: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
                       </div>
                       <div>
                         <label className="block text-sm text-gray-700 mb-1">Confirm Password *</label>
-                        <input type="password" value={userForm.confirmPassword} onChange={e => setUserForm({ ...userForm, confirmPassword: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                        <input
+                          type="password"
+                          value={userForm.confirmPassword}
+                          onChange={e => setUserForm({ ...userForm, confirmPassword: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
                       </div>
                     </div>
                   )}
+
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Machine Name</label>
-                    <input type="text" value={userForm.machineName} onChange={e => setUserForm({ ...userForm, machineName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <input
+                      type="text"
+                      value={userForm.machineName}
+                      onChange={e => setUserForm({ ...userForm, machineName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
                   </div>
+
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Windows Login Name</label>
-                    <input type="text" value={userForm.windowsLoginName} onChange={e => setUserForm({ ...userForm, windowsLoginName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <input
+                      type="text"
+                      value={userForm.windowsLoginName}
+                      onChange={e => setUserForm({ ...userForm, windowsLoginName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
                   </div>
+
                   <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={userForm.suspended} onChange={e => setUserForm({ ...userForm, suspended: e.target.checked })}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                      <input
+                        type="checkbox"
+                        checked={userForm.suspended}
+                        onChange={e => setUserForm({ ...userForm, suspended: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
                       <span className="text-sm text-gray-700">Suspended</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={userForm.isWindowsAuth} onChange={e => setUserForm({ ...userForm, isWindowsAuth: e.target.checked })}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                      <input
+                        type="checkbox"
+                        checked={userForm.isWindowsAuth}
+                        onChange={e => setUserForm({ ...userForm, isWindowsAuth: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
                       <span className="text-sm text-gray-700">Windows Authentication</span>
                     </label>
                   </div>
                 </div>
+
                 <div className="flex gap-3 mt-6">
                   <button onClick={handleSaveUser} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2">
                     <Save className="w-4 h-4" /> Save
                   </button>
-                  <button onClick={() => setShowUserModal(false)} className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm">Cancel</button>
+                  <button onClick={() => setShowUserModal(false)} className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm">
+                    Cancel
+                  </button>
                 </div>
               </div>
             </div>
           </div>
+          {showExpirationCalendar && createPortal(
+            <div
+              style={{
+                position: 'absolute',
+                top:  expirationCalendarPos.top,
+                left: expirationCalendarPos.left,
+                zIndex: 9999,
+              }}
+            >
+              <CalendarPopup
+                onDateSelect={(date) => {
+                  setUserForm(prev => ({ ...prev, expiration: date }));
+                  setShowExpirationCalendar(false);
+                }}
+                onClose={() => setShowExpirationCalendar(false)}
+              />
+            </div>,
+            document.body
+          )}
         </>
       )}
 

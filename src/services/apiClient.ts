@@ -71,7 +71,7 @@ apiClient.interceptors.response.use(
 
     // Skip redirect for auth endpoints to prevent infinite loops
     const isAuthEndpoint =
-      originalRequest?.url?.includes('/Login') ||
+      originalRequest?.url?.includes('/128_TKS/Login') ||
       originalRequest?.url?.includes('/Auth/refresh-token');
 
     // ── 401 Unauthorized — attempt token refresh ──────────────────────────────
@@ -124,8 +124,8 @@ apiClient.interceptors.response.use(
 
 function redirectToLogin() {
   tokenStorage.clear();
-  if (window.location.pathname !== '/Login') {
-    window.location.href = '/Login';
+  if (window.location.pathname !== '/128_TKS/Login') {
+    window.location.href = '/128_TKS/Login';
   }
 }
 
