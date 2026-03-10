@@ -168,7 +168,7 @@ export function ProcessedDataPage() {
     const [employeeGroupCode, setEmployeeGroupCode] = useState('');
 
     const [dateFrom,     setDateFrom]       = useState('01/01/2015');
-    const [dateTo,       setDateTo]         = useState('12/31/2025');
+    const [dateTo,       setDateTo]         = useState('12/31/2026');
     const [subTab,       setSubTab]         = useState('No Of Hrs Per Day');
 
     // ── Calendar popup state ──────────────────────────────────────────────────
@@ -355,150 +355,187 @@ export function ProcessedDataPage() {
     };
 
     // ── Submit (create / update) ──────────────────────────────────────────────
-    const handleNoOfHoursSubmit = async () => {
+const handleNoOfHoursSubmit = async () => {
 
-        const parsedDateIn  = parseToISO(noOfHoursDateIn);
-        const parsedDateOut = parseToISO(noOfHoursDateOut);
+    const parsedDateIn  = parseToISO(noOfHoursDateIn);
+    const parsedDateOut = parseToISO(noOfHoursDateOut);
 
-        if (!parsedDateIn || !parsedDateOut) {
-            await Swal.fire({
-                icon: 'error',
-                title: 'Invalid Date',
-                text: 'Invalid Date In or Date Out. Please use MM/DD/YYYY HH:MM AM format.'
-            });
-            return;
-        }
+    if (!parsedDateIn || !parsedDateOut) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Invalid Date',
+            text: 'Invalid Date In or Date Out. Please use MM/DD/YYYY HH:MM AM format.'
+        });
+        return;
+    }
 
-        const parsedNoOfHours = noOfHoursNoOfHours ? parseFloat(noOfHoursNoOfHours) : null;
+    // Validate: Date In must not be greater than Date Out
+    const dtIn  = new Date(parsedDateIn);
+    const dtOut = new Date(parsedDateOut);
+    if (dtIn > dtOut) {
+        await Swal.fire({
+            icon:  'error',
+            title: 'Invalid Date/Time',
+            text:  "Invalid DateTime 'In' and DateTime 'Out'. Date In must not be later than Date Out."
+        });
+        return;
+    }
 
-        const payload = {
-            empCode:       noOfHoursEmpCode,
-            workshiftCode: noOfHoursWorkshiftCode || null,
-            dateIn:        parsedDateIn,
-            dateOut:       parsedDateOut,
-            noOfHours:     parsedNoOfHours,
-            noOfHoursHHMM: parsedNoOfHours,
-            groupCode:     noOfHoursGroupCode || null,
-            glCode:        null,
-        };
+    // Validate: Duplicate Date In (same empCode + same date)
+    const dateInDateOnly = parsedDateIn.slice(0, 10);
+    const duplicate = noOfHoursData.find((r, idx) => {
+        if (isEditMode && editingIndex !== null && idx === editingIndex) return false;
+        const existingDate = r.dateIn ? new Date(r.dateIn).toISOString().slice(0, 10) : '';
+        return r.empCode === noOfHoursEmpCode && existingDate === dateInDateOnly;
+    });
+    if (duplicate) {
+        await Swal.fire({
+            icon:  'error',
+            title: 'Duplicate Entry',
+            text:  'Date In already exists for this employee.'
+        });
+        return;
+    }
 
-        const recordLabel = `${formatDateTime(payload.dateIn)} → ${formatDateTime(payload.dateOut)}`;
+    const parsedNoOfHours = noOfHoursNoOfHours ? parseFloat(noOfHoursNoOfHours) : null;
 
-        try {
-            if (isEditMode && editingIndex !== null) {
-
-                const confirm = await Swal.fire({
-                    icon: 'question',
-                    title: 'Confirm Update',
-                    text: `Are you sure you want to update the record for ${recordLabel}?`,
-                    showCancelButton: true,
-                    confirmButtonColor: '#2563eb',
-                    cancelButtonColor: '#6b7280',
-                    confirmButtonText: 'Yes',
-                    cancelButtonText: 'Cancel'
-                });
-
-                if (!confirm.isConfirmed) return;
-
-                const id = noOfHoursData[editingIndex].id;
-
-                await apiClient.put(
-                    `/Maintenance/ProcessedData/PDNumberHoursPerDay/${id}`,
-                    payload
-                );
-                await auditTrail.log({
-                    accessType: 'Edit',
-                    trans: `Updated record for ${recordLabel}`,
-                    messages: `${formName} update record: ${recordLabel}`,
-                    formName: formName,
-                });
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'Updated successfully',
-                    text: `Record for ${recordLabel} updated.`,
-                    timer: 1500,
-                    showConfirmButton: false
-                });
-            }
-            else {
-                await apiClient.post(
-                    '/Maintenance/ProcessedData/PDNumberHoursPerDay',
-                    payload
-                );
-                await auditTrail.log({
-                    accessType: 'Add',
-                    trans: `Created new record for ${recordLabel}`,
-                    messages: `${formName} new record: ${recordLabel}`,
-                    formName: formName,
-                });
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'Created successfully',
-                    text: `Record for ${recordLabel} created.`,
-                    timer: 1500,
-                    showConfirmButton: false
-                });
-            }
-            await fetchNoOfHours();
-        } catch (err: any) {
-            await Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: err.response?.data?.message || err.message || 'Failed to save record'
-            });
-        } finally {
-            setShowNoOfHoursModal(false);
-            setIsEditMode(false);
-            setEditingIndex(null);
-        }
+    const payload = {
+        empCode:       noOfHoursEmpCode,
+        workshiftCode: noOfHoursWorkshiftCode || null,
+        dateIn:        parsedDateIn,
+        dateOut:       parsedDateOut,
+        noOfHours:     parsedNoOfHours,
+        noOfHoursHHMM: parsedNoOfHours,
+        groupCode:     noOfHoursGroupCode || null,
+        glCode:        null,
     };
 
-    // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteNoOfHours = async (index: number) => {
+    const recordLabel = `${formatDateTime(payload.dateIn)} → ${formatDateTime(payload.dateOut)}`;
 
-        const record = noOfHoursData[index];
+    try {
+        if (isEditMode && editingIndex !== null) {
 
-        const recordLabel = `${record.dateIn} → ${record.dateOut}`;
+            // Null check — verify record still exists
+            if (!noOfHoursData[editingIndex]) {
+                await Swal.fire({
+                    icon:  'error',
+                    title: 'Error',
+                    text:  'Something is wrong with your transaction. Please refresh the page and try again.'
+                });
+                return;
+            }
 
-        const confirm = await Swal.fire({
-            icon: 'warning',
-            title: 'Confirm Delete',
-            text: `Are you sure you want to delete the record for ${recordLabel}?`,
-            showCancelButton: true,
-            confirmButtonColor: '#dc2626',
-            cancelButtonColor: '#6b7280',
-            confirmButtonText: 'Delete',
-            cancelButtonText: 'Cancel'
-        });
+            const confirm = await Swal.fire({
+                icon: 'question',
+                title: 'Confirm Update',
+                text: `Are you sure you want to update the record for ${recordLabel}?`,
+                showCancelButton: true,
+                confirmButtonColor: '#2563eb',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes',
+                cancelButtonText: 'Cancel'
+            });
+            if (!confirm.isConfirmed) return;
 
-        if (!confirm.isConfirmed) return;
-        try {
-            await apiClient.delete(
-                `/Maintenance/ProcessedData/PDNumberHoursPerDay/${record.id}`
-            );
+            const id = noOfHoursData[editingIndex].id;
+            await apiClient.put(`/Maintenance/ProcessedData/PDNumberHoursPerDay/${id}`, payload);
             await auditTrail.log({
-                accessType: 'Delete',
-                trans: `Deleted record for ${recordLabel}`,
-                messages: `${formName} deleted: ${recordLabel}`,
+                accessType: 'Edit',
+                trans: `Updated record for ${recordLabel}`,
+                messages: `${formName} update record: ${recordLabel}`,
                 formName: formName,
             });
-            await fetchNoOfHours();
             await Swal.fire({
                 icon: 'success',
-                title: 'Deleted successfully',
-                text: `Record for ${recordLabel} deleted.`,
+                title: 'Updated successfully',
+                text: `Record for ${recordLabel} updated.`,
                 timer: 1500,
                 showConfirmButton: false
             });
-        } catch (err: any) {
 
+        } else {
+
+            await apiClient.post('/Maintenance/ProcessedData/PDNumberHoursPerDay', payload);
+            await auditTrail.log({
+                accessType: 'Add',
+                trans: `Created new record for ${recordLabel}`,
+                messages: `${formName} new record: ${recordLabel}`,
+                formName: formName,
+            });
             await Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: err.response?.data?.message || err.message || 'Failed to delete record'
+                icon: 'success',
+                title: 'Created successfully',
+                text: `Record for ${recordLabel} created.`,
+                timer: 1500,
+                showConfirmButton: false
             });
         }
-    };
+        await fetchNoOfHours();
+    } catch (err: any) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: err.response?.data?.message || err.message || 'Failed to save record'
+        });
+    } finally {
+        setShowNoOfHoursModal(false);
+        setIsEditMode(false);
+        setEditingIndex(null);
+    }
+};
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+  const handleDeleteNoOfHours = async (index: number) => {
+
+    // Null check
+    if (!noOfHoursData[index]) {
+        await Swal.fire({
+            icon:  'error',
+            title: 'Error',
+            text:  'Something is wrong with your transaction. Please refresh the page and try again.'
+        });
+        return;
+    }
+
+    const record = noOfHoursData[index];
+    const recordLabel = `${record.dateIn} → ${record.dateOut}`;
+
+    const confirm = await Swal.fire({
+        icon: 'warning',
+        title: 'Confirm Delete',
+        text: `Are you sure you want to delete the record for ${recordLabel}?`,
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel'
+    });
+    if (!confirm.isConfirmed) return;
+
+    try {
+        await apiClient.delete(`/Maintenance/ProcessedData/PDNumberHoursPerDay/${record.id}`);
+        await auditTrail.log({
+            accessType: 'Delete',
+            trans: `Deleted record for ${recordLabel}`,
+            messages: `${formName} deleted: ${recordLabel}`,
+            formName: formName,
+        });
+        await fetchNoOfHours();
+        await Swal.fire({
+            icon: 'success',
+            title: 'Deleted successfully',
+            text: `Record for ${recordLabel} deleted.`,
+            timer: 1500,
+            showConfirmButton: false
+        });
+    } catch (err: any) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: err.response?.data?.message || err.message || 'Failed to delete record'
+        });
+    }
+};
 
     // ──  TARDINESS ───────────────────────────────────────────────────────────
     interface TardinessRecord {
@@ -659,201 +696,133 @@ export function ProcessedDataPage() {
     };
 
     // ── Submit (create / update) ──────────────────────────────────────────────
-    const handleTardinessSubmit = async () => {
-        const parsedDateFrom = parseDate(tardinessDateFrom)
-            ? `${parseDate(tardinessDateFrom)}T00:00:00`
-            : null;
+  const handleTardinessSubmit = async () => {
+    const parsedDateFrom = parseDate(tardinessDateFrom)
+        ? `${parseDate(tardinessDateFrom)}T00:00:00`
+        : null;
+    const parsedDateTo = parseDate(tardinessDateTo)
+        ? `${parseDate(tardinessDateTo)}T00:00:00`
+        : null;
 
-        const parsedDateTo = parseDate(tardinessDateTo)
-            ? `${parseDate(tardinessDateTo)}T00:00:00`
-            : null;
+    if (!parsedDateFrom || !parsedDateTo) {
+        await Swal.fire({ icon: 'error', title: 'Invalid Date', text: 'Invalid Date From or Date To. Please use MM/DD/YYYY format.' });
+        return;
+    }
 
-        if (!parsedDateFrom || !parsedDateTo) {
-            await Swal.fire({
-                icon:  'error',
-                title: 'Invalid Date',
-                text:  'Invalid Date From or Date To. Please use MM/DD/YYYY format.',
-            });
-            return;
-        }
-        // ── Time-only fields (timeIn / timeOut) ───────────────────────────────
-        const parseTimeOnly = (raw: string): string | null => {
-            if (!raw?.trim()) return null;
+    const parseTimeOnly = (raw: string): string | null => {
+        if (!raw?.trim()) return null;
+        const match = raw.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+        if (!match) return null;
+        let hours = parseInt(match[1]);
+        const mins = parseInt(match[2]);
+        const period = match[3]?.toUpperCase();
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        return `1900-01-01T${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:00`;
+    };
 
-            const match = raw.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
-            if (!match) return null;
+    const parsedTimeIn  = tardinessTimeIn.trim()  ? parseTimeOnly(tardinessTimeIn)  : null;
+    const parsedTimeOut = tardinessTimeOut.trim()  ? parseTimeOnly(tardinessTimeOut) : null;
 
-            let hours   = parseInt(match[1]);
-            const mins  = parseInt(match[2]);
-            const period = match[3]?.toUpperCase();
+    if (tardinessTimeIn.trim() && !parsedTimeIn) {
+        await Swal.fire({ icon: 'error', title: 'Invalid Time', text: 'Invalid Time In. Please use HH:MM AM/PM format (e.g. 8:30 AM).' });
+        return;
+    }
+    if (tardinessTimeOut.trim() && !parsedTimeOut) {
+        await Swal.fire({ icon: 'error', title: 'Invalid Time', text: 'Invalid Time Out. Please use HH:MM AM/PM format (e.g. 5:00 PM).' });
+        return;
+    }
 
-            if (period === 'PM' && hours !== 12) hours += 12;
-            if (period === 'AM' && hours === 12)  hours  = 0;
-            return `1900-01-01T${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:00`;
-        };
+    const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
+    const payload = {
+        empCode:                        tardinessEmpCode,
+        dateFrom:                       parsedDateFrom,
+        dateTo:                         parsedDateTo,
+        timeIn:                         parsedTimeIn,
+        timeOut:                        parsedTimeOut,
+        workShiftCode:                  tardinessWorkShiftCode                  || null,
+        tardiness:                      toDecimal(tardinessTardiness),
+        tardinessHHMM:                  toDecimal(tardinessTardinessHHMM),
+        tardinessWithinGracePeriod:     toDecimal(tardinessTardinessWithinGracePeriod),
+        tardinessWithinGracePeriodHHMM: toDecimal(tardinessTardinessWithinGracePeriodHHMM),
+        actualTardiness:                toDecimal(tardinessActualTardiness),
+        actualTardinessHHMM:            toDecimal(tardinessActualTardinessHHMM),
+        remarks:                        tardinessRemarks  || null,
+        groupCode:                      tardinessGroupCode || null,
+        offSetOTFlag:                   tardinessOffSetOTFlag,
+        exemptionRpt:                   tardinessExemptionRpt || null,
+        glCode:                         tardinessGLCode   || null,
+    };
 
-        const parsedTimeIn  = tardinessTimeIn.trim()  ? parseTimeOnly(tardinessTimeIn)  : null;
-        const parsedTimeOut = tardinessTimeOut.trim()  ? parseTimeOnly(tardinessTimeOut) : null;
+    const recordLabel = `${tardinessDateFrom} → ${tardinessDateTo}`;
 
-        if (tardinessTimeIn.trim() && !parsedTimeIn) {
-            await Swal.fire({
-                icon:  'error',
-                title: 'Invalid Time',
-                text:  'Invalid Time In. Please use HH:MM AM/PM format (e.g. 8:30 AM).',
-            });
-            return;
-        }
+    try {
+        if (isEditMode && editingIndex !== null) {
 
-        if (tardinessTimeOut.trim() && !parsedTimeOut) {
-            await Swal.fire({
-                icon:  'error',
-                title: 'Invalid Time',
-                text:  'Invalid Time Out. Please use HH:MM AM/PM format (e.g. 5:00 PM).',
-            });
-            return;
-        }
-
-        const toDecimal = (val: string) => val?.trim() ? parseFloat(val) : null;
-        const payload = {
-            empCode:                        tardinessEmpCode,
-            dateFrom:                       parsedDateFrom,
-            dateTo:                         parsedDateTo,
-            timeIn:                         parsedTimeIn,
-            timeOut:                        parsedTimeOut,
-            workShiftCode:                  tardinessWorkShiftCode                  || null,
-            tardiness:                      toDecimal(tardinessTardiness),
-            tardinessHHMM:                  toDecimal(tardinessTardinessHHMM),
-            tardinessWithinGracePeriod:     toDecimal(tardinessTardinessWithinGracePeriod),
-            tardinessWithinGracePeriodHHMM: toDecimal(tardinessTardinessWithinGracePeriodHHMM),
-            actualTardiness:                toDecimal(tardinessActualTardiness),
-            actualTardinessHHMM:            toDecimal(tardinessActualTardinessHHMM),
-            remarks:                        tardinessRemarks                        || null,
-            groupCode:                      tardinessGroupCode                      || null,
-            offSetOTFlag:                   tardinessOffSetOTFlag,
-            exemptionRpt:                   tardinessExemptionRpt                   || null,
-            glCode:                         tardinessGLCode                         || null,
-        };
-
-        const recordLabel = `${tardinessDateFrom} → ${tardinessDateTo}`;
-
-        try {
-            if (isEditMode && editingIndex !== null) {
-
-                const confirm = await Swal.fire({
-                    icon:               'question',
-                    title:              'Confirm Update',
-                    text:               `Are you sure you want to update the record for ${recordLabel}?`,
-                    showCancelButton:   true,
-                    confirmButtonColor: '#2563eb',
-                    cancelButtonColor:  '#6b7280',
-                    confirmButtonText:  'Yes',
-                    cancelButtonText:   'Cancel',
-                });
-                if (!confirm.isConfirmed) return;
-
-                const id = tardinessData[editingIndex].id;
-
-                const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
-
-                await apiClient.put(
-                    `/Maintenance/ProcessedData/PDTardiness/${id}`,
-                    updatePayload
-                );
-                await auditTrail.log({
-                    accessType: 'Edit',
-                    trans: `Updated record for ${recordLabel}`,
-                    messages: `${formName} update record: ${recordLabel}`,
-                    formName: formName,
-                });
-                await Swal.fire({
-                    icon:              'success',
-                    title:             'Updated successfully',
-                    text:              `Record for ${recordLabel} updated.`,
-                    timer:             1500,
-                    showConfirmButton: false,
-                });
-
-            } else {
-
-                await apiClient.post(
-                    '/Maintenance/ProcessedData/PDTardiness',
-                    payload
-                );
-                await auditTrail.log({
-                    accessType: 'Add',
-                    trans: `Created new record for ${recordLabel}`,
-                    messages: `${formName} new record: ${recordLabel}`,
-                    formName: formName,
-                });
-                await Swal.fire({
-                    icon:              'success',
-                    title:             'Created successfully',
-                    text:              `Record for ${recordLabel} created.`,
-                    timer:             1500,
-                    showConfirmButton: false,
-                });
+            // Null check
+            if (!tardinessData[editingIndex]) {
+                await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+                return;
             }
 
-            await fetchTardiness();
-
-        } catch (err: any) {
-            await Swal.fire({
-                icon:  'error',
-                title: 'Error',
-                text:  err.response?.data?.message || err.message || 'Failed to save record',
+            const confirm = await Swal.fire({
+                icon: 'question', title: 'Confirm Update',
+                text: `Are you sure you want to update the record for ${recordLabel}?`,
+                showCancelButton: true, confirmButtonColor: '#2563eb',
+                cancelButtonColor: '#6b7280', confirmButtonText: 'Yes', cancelButtonText: 'Cancel',
             });
-        } finally {
-            setShowTardinessModal(false);
-            setIsEditMode(false);
-            setEditingIndex(null);
+            if (!confirm.isConfirmed) return;
+
+            const id = tardinessData[editingIndex].id;
+            const { empCode: _emp, glCode: _gl, ...updatePayload } = payload;
+            await apiClient.put(`/Maintenance/ProcessedData/PDTardiness/${id}`, updatePayload);
+            await auditTrail.log({ accessType: 'Edit', trans: `Updated record for ${recordLabel}`, messages: `${formName} update record: ${recordLabel}`, formName });
+            await Swal.fire({ icon: 'success', title: 'Updated successfully', text: `Record for ${recordLabel} updated.`, timer: 1500, showConfirmButton: false });
+
+        } else {
+
+            await apiClient.post('/Maintenance/ProcessedData/PDTardiness', payload);
+            await auditTrail.log({ accessType: 'Add', trans: `Created new record for ${recordLabel}`, messages: `${formName} new record: ${recordLabel}`, formName });
+            await Swal.fire({ icon: 'success', title: 'Created successfully', text: `Record for ${recordLabel} created.`, timer: 1500, showConfirmButton: false });
         }
-    };
+        await fetchTardiness();
+    } catch (err: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.message || err.message || 'Failed to save record' });
+    } finally {
+        setShowTardinessModal(false);
+        setIsEditMode(false);
+        setEditingIndex(null);
+    }
+};
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    const handleDeleteTardiness = async (index: number) => {
+const handleDeleteTardiness = async (index: number) => {
 
-        const record = tardinessData[index];
-        const recordLabel = `${record.dateFrom} → ${record.dateTo}`;
+    if (!tardinessData[index]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
 
-        const confirm = await Swal.fire({
-            icon:               'warning',
-            title:              'Confirm Delete',
-            text:               `Are you sure you want to delete the record for ${recordLabel}?`,
-            showCancelButton:   true,
-            confirmButtonColor: '#dc2626',
-            cancelButtonColor:  '#6b7280',
-            confirmButtonText:  'Delete',
-            cancelButtonText:   'Cancel',
-        });
+    const record = tardinessData[index];
+    const recordLabel = `${record.dateFrom} → ${record.dateTo}`;
 
-        if (!confirm.isConfirmed) return;
+    const confirm = await Swal.fire({
+        icon: 'warning', title: 'Confirm Delete',
+        text: `Are you sure you want to delete the record for ${recordLabel}?`,
+        showCancelButton: true, confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280', confirmButtonText: 'Delete', cancelButtonText: 'Cancel',
+    });
+    if (!confirm.isConfirmed) return;
 
-        try {
-            await apiClient.delete(
-                `/Maintenance/ProcessedData/PDTardiness/${record.id}`
-            );
-            await auditTrail.log({
-                accessType: 'Delete',
-                trans: `Deleted record for ${recordLabel}`,
-                messages: `${formName} deleted: ${recordLabel}`,
-                formName: formName,
-            });
-            await fetchTardiness();
-            await Swal.fire({
-                icon:              'success',
-                title:             'Deleted successfully',
-                text:              `Record for ${recordLabel} deleted.`,
-                timer:             1500,
-                showConfirmButton: false,
-            });
-        } catch (err: any) {
-            await Swal.fire({
-                icon:  'error',
-                title: 'Error',
-                text:  err.response?.data?.message || err.message || 'Failed to delete record',
-            });
-        }
-    };
+    try {
+        await apiClient.delete(`/Maintenance/ProcessedData/PDTardiness/${record.id}`);
+        await auditTrail.log({ accessType: 'Delete', trans: `Deleted record for ${recordLabel}`, messages: `${formName} deleted: ${recordLabel}`, formName });
+        await fetchTardiness();
+        await Swal.fire({ icon: 'success', title: 'Deleted successfully', text: `Record for ${recordLabel} deleted.`, timer: 1500, showConfirmButton: false });
+    } catch (err: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.message || err.message || 'Failed to delete record' });
+    }
+};
 
     // ──  UNDERTIME ───────────────────────────────────────────────────────────
     // ── Types ─────────────────────────────────────────────────────────────────
@@ -1086,6 +1055,10 @@ export function ProcessedDataPage() {
 
         try {
             if (isEditMode && editingIndex !== null) {
+   if (!undertimeData[editingIndex]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
 
                 const confirm = await Swal.fire({
                     icon:               'question',
@@ -1158,6 +1131,11 @@ export function ProcessedDataPage() {
 
     // ── Delete ────────────────────────────────────────────────────────────────
     const handleDeleteUndertime = async (index: number) => {
+    // ← ADD HERE
+    if (!undertimeData[index]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
 
         const record      = undertimeData[index];
         const recordLabel = `${record.dateFrom} → ${record.dateTo}`;
@@ -1384,7 +1362,11 @@ export function ProcessedDataPage() {
 
         try {
             if (isEditMode && editingIndex !== null) {
-
+   // ← ADD HERE
+    if (!leaveData[editingIndex]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
                 const confirm = await Swal.fire({
                     icon:               'question',
                     title:              'Confirm Update',
@@ -1717,6 +1699,11 @@ export function ProcessedDataPage() {
         try {
             if (isEditMode && editingIndex !== null) {
 
+    // ← ADD HERE
+    if (!overtimeData[editingIndex]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
                 const confirm = await Swal.fire({
                     icon:               'question',
                     title:              'Confirm Update',
@@ -1986,7 +1973,11 @@ export function ProcessedDataPage() {
 
         try {
             if (isEditMode && editingIndex !== null) {
-
+   // ← ADD HERE
+    if (!otherEarningsData[editingIndex]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
                 const confirm = await Swal.fire({
                     icon:               'question',
                     title:              'Confirm Update',
@@ -2302,7 +2293,11 @@ export function ProcessedDataPage() {
 
         try {
             if (isEditMode && editingIndex !== null) {
-
+// ← ADD HERE
+    if (!adjustmentData[editingIndex]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
                 const confirm = await Swal.fire({
                     icon:               'question',
                     title:              'Confirm Update',
@@ -2566,7 +2561,11 @@ export function ProcessedDataPage() {
 
         try {
             if (isEditMode && editingIndex !== null) {
-
+// ← ADD HERE
+    if (!advancedData[editingIndex]) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: 'Something is wrong with your transaction. Please refresh the page and try again.' });
+        return;
+    }
                 const confirm = await Swal.fire({
                     icon:               'question',
                     title:              'Confirm Update',

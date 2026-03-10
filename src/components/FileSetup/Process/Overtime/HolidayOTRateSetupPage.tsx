@@ -263,6 +263,16 @@ export function HolidayOTRateSetupPage() {
     setIsEditing(true);
   };
 
+  // Mirrors C#: CheckCodeIfRegularExpression — no spaces allowed
+  const isValidCode = (value: string): boolean => {
+    return /^[a-zA-Z0-9_\-]+$/.test(value);
+  };
+
+  // Mirrors C#: CheckCodeIfRegularExpressionWithSpace — spaces allowed
+  const isValidDescWithSpace = (value: string): boolean => {
+    return /^[a-zA-Z0-9_\-\s]+$/.test(value);
+  };
+
   const handleSave = async () => {
     if (!formData.code.trim()) {
       await Swal.fire({
@@ -272,11 +282,65 @@ export function HolidayOTRateSetupPage() {
       });
       return;
     }
+
     if (!formData.desc.trim()) {
       await Swal.fire({
         icon: "warning",
         title: "Validation Error",
         text: "Description is required.",
+      });
+      return;
+    }
+
+    // Mirrors: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.code.trim())) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Invalid Character in Code.",
+      });
+      return;
+    }
+
+    // Mirrors: CheckCodeIfRegularExpressionWithSpace
+    if (!isValidDescWithSpace(formData.desc.trim())) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Invalid Character in Description.",
+      });
+      return;
+    }
+
+    const currentId =
+      selectedRow !== null ? existingRecords[selectedRow]?.id : null;
+
+    // Mirrors: db.tk_HolidayOTRatesSetUp.Any(i => i.Code == model.Code)
+    const duplicateCode = existingRecords.find(
+      (r) =>
+        r.code.trim().toUpperCase() === formData.code.trim().toUpperCase() &&
+        r.id !== currentId,
+    );
+    if (duplicateCode) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Code already exists.",
+      });
+      return;
+    }
+
+    // Mirrors: db.tk_HolidayOTRatesSetUp.Any(i => i.Desc == model.Desc)
+    const duplicateDesc = existingRecords.find(
+      (r) =>
+        r.desc.trim().toUpperCase() === formData.desc.trim().toUpperCase() &&
+        r.id !== currentId,
+    );
+    if (duplicateDesc) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Description already exists.",
       });
       return;
     }

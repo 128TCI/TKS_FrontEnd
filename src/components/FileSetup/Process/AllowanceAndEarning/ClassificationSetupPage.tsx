@@ -165,13 +165,34 @@ export function ClassificationSetupPage() {
     }
   };
 
-  const handleCodeChange = (value: string) => {
-    setFormData({ ...formData, code: value });
-    if (value.length > 10) {
-      setCodeError('Code maximum 10 characters');
-    } else {
-      setCodeError('');
+  // Mirrors C# regex: ^[a-zA-Z0-9%_ -ñÑ]*$
+  const checkCodeIfRegularExpressionWithSpace = (code: string): boolean => {
+    const regex = /^[a-zA-Z0-9%_ \-ñÑ]*$/;
+    return regex.test(code);
+  };
+
+  const validateCode = (value: string, isEdit = false, currentEditingItem: Classification | null = null): string => {
+    if (!value.trim()) return '';
+
+    if (value.length > 10) return 'Code maximum 10 characters';
+
+    if (!checkCodeIfRegularExpressionWithSpace(value)) {
+      return 'Code only allows letters, numbers, %, _, -, space, ñ/Ñ';
     }
+
+    const isDuplicate = classifications.some(
+      (c) =>
+        (isEdit ? c.id !== currentEditingItem?.id : true) &&
+        c.code.toLowerCase() === value.trim().toLowerCase()
+    );
+    if (isDuplicate) return 'This code already exists. Please use a different code.';
+
+    return '';
+  };
+
+  const handleCodeChange = (value: string, isEdit = false) => {
+    setFormData(prev => ({ ...prev, code: value }));
+    setCodeError(validateCode(value, isEdit, editingItem));
   };
 
   const handleSubmitCreate = async (e: React.FormEvent) => {
@@ -182,6 +203,15 @@ export function ClassificationSetupPage() {
         icon: 'warning',
         title: 'Validation Error',
         text: 'Code must be between 1 and 10 characters.',
+      });
+      return;
+    }
+
+    if (!checkCodeIfRegularExpressionWithSpace(formData.code)) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code only allows letters, numbers, %, _, -, space, ñ/Ñ.',
       });
       return;
     }
@@ -254,6 +284,15 @@ export function ClassificationSetupPage() {
         icon: 'warning',
         title: 'Validation Error',
         text: 'Code must be between 1 and 10 characters.',
+      });
+      return;
+    }
+
+    if (!checkCodeIfRegularExpressionWithSpace(formData.code)) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Code only allows letters, numbers, %, _, -, space, ñ/Ñ.',
       });
       return;
     }
@@ -544,15 +583,15 @@ export function ClassificationSetupPage() {
               <h3 className="text-blue-600 mb-6">Classification Setup</h3>
               
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
+                <div className="flex items-start gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-28 pt-2.5">
                     Code :
                   </label>
                   <div className="flex-1">
                     <input
                       type="text"
                       value={formData.code}
-                      onChange={(e) => handleCodeChange(e.target.value)}
+                      onChange={(e) => handleCodeChange(e.target.value, false)}
                       maxLength={10}
                       className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
                         codeError 
@@ -584,7 +623,7 @@ export function ClassificationSetupPage() {
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || !!codeError}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   {submitting ? 'Saving...' : 'Submit'}
@@ -620,15 +659,15 @@ export function ClassificationSetupPage() {
               <h3 className="text-blue-600 mb-6">Classification Setup</h3>
               
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
+                <div className="flex items-start gap-3">
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-28 pt-2.5">
                     Code :
                   </label>
                   <div className="flex-1">
                     <input
                       type="text"
                       value={formData.code}
-                      onChange={(e) => handleCodeChange(e.target.value)}
+                      onChange={(e) => handleCodeChange(e.target.value, true)}
                       maxLength={10}
                       className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
                         codeError 
@@ -660,7 +699,7 @@ export function ClassificationSetupPage() {
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || !!codeError}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   {submitting ? 'Updating...' : 'Update'}

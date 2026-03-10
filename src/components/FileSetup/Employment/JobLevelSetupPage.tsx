@@ -7,8 +7,10 @@ import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Job Level SetUp';
+
+// Form Name
+const formName = 'Job Level SetUp';
+
 export function JobLevelSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -54,7 +56,6 @@ export function JobLevelSetupPage() {
         (p) => decryptData(p.formName) === "JobLevelSetup",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -67,7 +68,6 @@ export function JobLevelSetupPage() {
     }
   };
 
-  // Fetch job level data from API
   useEffect(() => {
     fetchJobLevelData();
   }, []);
@@ -78,7 +78,6 @@ export function JobLevelSetupPage() {
     try {
       const response = await apiClient.get("/Fs/Employment/JobLevelSetUp");
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((joblevel: any) => ({
           id: joblevel.jobLevelID || "",
           code: joblevel.jobLevelCode || "",
@@ -97,7 +96,7 @@ export function JobLevelSetupPage() {
       setLoadingJobLevels(false);
     }
   };
-  // Handle ESC key to close create modal only
+
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -114,11 +113,66 @@ export function JobLevelSetupPage() {
     };
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedLevelIndex(null);
     setJobLevelId(null);
-    // Clear form
     setCode("");
     setCodeError("");
     setDescription("");
@@ -136,10 +190,15 @@ export function JobLevelSetupPage() {
   };
 
   const handleDelete = async (joblevel: any) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
-      text: `Are you sure you want to delete joblevel ${joblevel.code}?`,
+      text: `Are you sure you want to delete job level ${joblevel.code}?`,
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
@@ -147,38 +206,69 @@ export function JobLevelSetupPage() {
       cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(
-          `/Fs/Employment/JobLevelSetUp/${joblevel.divID}`,
-        );
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted job level ${joblevel.code}`,
-            messages: `Job Level deleted: ${joblevel.code} - ${joblevel.jobLevelDesc}`,
-            formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Job Level deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the job level list
-        await fetchJobLevelData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete job level";
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Check if job level is used in Designation Setup ───────────────
+    try {
+      const desResponse = await apiClient.get("/Fs/Employment/DesignationSetUp");
+      const designations: any[] = Array.isArray(desResponse.data)
+        ? desResponse.data
+        : [];
+
+      const isUsedInDesignation = designations.some(
+        (des: any) =>
+          (des.jobLevelCode ?? "").trim().toUpperCase() ===
+          (joblevel.code ?? "").trim().toUpperCase(),
+      );
+
+      if (isUsedInDesignation) {
         await Swal.fire({
           icon: "error",
-          title: "Error",
-          text: errorMsg,
+          title: "Cannot Delete",
+          text: "This setup is already used in Designation Setup.",
         });
-        console.error("Error deleting job level:", error);
+        return;
       }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate job level usage.",
+      });
+      return;
+    }
+
+    // ── 4. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/Employment/JobLevelSetUp/${joblevel.id}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted job level ${joblevel.code}`,
+        messages: `Job Level deleted: ${joblevel.code} - ${joblevel.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Job Level deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchJobLevelData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete job level";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting job level:", error);
     }
   };
 
@@ -192,7 +282,7 @@ export function JobLevelSetupPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate code - must not be empty and must be max 10 characters
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!code.trim() || code.length > 10) {
       await Swal.fire({
         icon: "warning",
@@ -201,23 +291,45 @@ export function JobLevelSetupPage() {
       });
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = levelList.some((level, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedLevelIndex === index) {
-        return false;
-      }
-      return level.code.toLowerCase() === code.trim().toLowerCase();
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
+    const isDuplicateCode = levelList.some((level, index) => {
+      if (isEditMode && selectedLevelIndex === index) return false;
+      return level.code.trim().toUpperCase() === code.trim().toUpperCase();
     });
 
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
         title: "Duplicate Code",
-        text: "This code is already in use. Please use a different code.",
+        text: "Code is already exist.",
       });
       return;
     }
+
+    // ── 4. Duplicate description check ──────────────────────────────────
+    const isDuplicateDesc = levelList.some((level, index) => {
+      if (isEditMode && selectedLevelIndex === index) return false;
+      return (
+        (level.description ?? "").trim().toUpperCase() ===
+        description.trim().toUpperCase()
+      );
+    });
+
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
+      return;
+    }
+
+    // ── 5. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -227,17 +339,16 @@ export function JobLevelSetupPage() {
       };
 
       if (isEditMode && jobLevelId) {
-        // Update existing record via PUT
         await apiClient.put(
           `/Fs/Employment/JobLevelSetUp/${jobLevelId}`,
           payload,
         );
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited job level ${payload.jobLevelCode}`,
-            messages: `Job Level updated: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
-            formName,
-        });       
+          accessType: 'Edit',
+          trans: `Edited job level ${payload.jobLevelCode}`,
+          messages: `Job Level updated: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
+          formName,
+        });
         await Swal.fire({
           icon: "success",
           title: "Success",
@@ -245,16 +356,14 @@ export function JobLevelSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the job level list
         await fetchJobLevelData();
       } else {
-        // Create new record via POST
         await apiClient.post("/Fs/Employment/JobLevelSetUp", payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added job level ${payload.jobLevelCode}`,
-            messages: `Job Level created: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added job level ${payload.jobLevelCode}`,
+          messages: `Job Level created: ${payload.jobLevelCode} - ${payload.jobLevelDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -263,11 +372,9 @@ export function JobLevelSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the job level list
         await fetchJobLevelData();
       }
 
-      // Close modal and reset form
       setShowCreateModal(false);
       setCode("");
       setCodeError("");
@@ -294,29 +401,26 @@ export function JobLevelSetupPage() {
       level.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       level.description.toLowerCase().includes(searchTerm.toLowerCase()),
   );
+
   // Pagination logic
   const totalPages = Math.ceil(filteredLevels.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedLevels = filteredLevels.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Job Level Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -445,13 +549,13 @@ export function JobLevelSetupPage() {
                                   <Edit className="w-4 h-4" />
                                 </button>
                               )}
-                              {(hasPermission("Edit") ||
-                                hasPermission("Delete")) && (
-                                <span className="text-gray-300">|</span>
-                              )}
+                              {hasPermission("Edit") &&
+                                hasPermission("Delete") && (
+                                  <span className="text-gray-300">|</span>
+                                )}
                               {hasPermission("Delete") && (
                                 <button
-                                  onClick={() => handleDelete(level.code)}
+                                  onClick={() => handleDelete(level)}
                                   className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                   title="Delete"
                                 >
@@ -521,16 +625,13 @@ export function JobLevelSetupPage() {
             {/* Create/Edit Modal */}
             {showCreateModal && (
               <>
-                {/* Modal Backdrop */}
                 <div
                   className="fixed inset-0 bg-black/30 z-10"
                   onClick={() => setShowCreateModal(false)}
                 ></div>
 
-                {/* Modal Dialog */}
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                    {/* Modal Header */}
                     <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
                       <h2 className="text-gray-800">
                         {isEditMode ? "Edit Job Level" : "Create New"}
@@ -543,11 +644,9 @@ export function JobLevelSetupPage() {
                       </button>
                     </div>
 
-                    {/* Modal Content */}
                     <div className="p-4">
                       <h3 className="text-blue-600 mb-3">Job Level Setup</h3>
 
-                      {/* Form Fields */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">
@@ -556,10 +655,20 @@ export function JobLevelSetupPage() {
                           <input
                             type="text"
                             value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            onChange={(e) => handleCodeChange(e.target.value)}
+                            maxLength={10}
+                            className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
+                              codeError
+                                ? "border-red-500 focus:ring-red-500"
+                                : "border-gray-300 focus:ring-blue-500"
+                            }`}
                           />
                         </div>
+                        {codeError && (
+                          <p className="ml-32 text-red-500 text-xs mt-1">
+                            {codeError}
+                          </p>
+                        )}
 
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">
@@ -574,17 +683,22 @@ export function JobLevelSetupPage() {
                         </div>
                       </div>
 
-                      {/* Modal Actions */}
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
-                          {isEditMode ? "Update" : "Submit"}
+                          {submitting
+                            ? "Saving..."
+                            : isEditMode
+                              ? "Update"
+                              : "Submit"}
                         </button>
                         <button
                           onClick={() => setShowCreateModal(false)}
-                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
                           Back to List
                         </button>
@@ -598,7 +712,6 @@ export function JobLevelSetupPage() {
         </div>
       </div>
 
-      {/* Footer */}
       <Footer />
     </div>
   );

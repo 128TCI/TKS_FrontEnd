@@ -347,6 +347,9 @@ export function UpdateWorkshiftRawdataPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Section - Group List */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedItems.length} selected</span>
+                </div>                      
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input

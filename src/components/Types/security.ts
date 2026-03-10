@@ -9,6 +9,7 @@ export interface User {
   suspended: boolean;
   isWindowsAuth: boolean;
   windowsLoginName: string;
+  emailAddress: string;
 }
 
 export interface UserGroup {
@@ -42,6 +43,7 @@ export interface Form {
 export interface FormAccess {
   id: number;
   formName: string;
+  formDescription: string;
   accessFlags: Record<string, boolean>;
 }
 
@@ -108,14 +110,19 @@ export interface CreateUserRequest {
   suspended: boolean;
   isWindowsAuthenticate: boolean;
   windowsLoginName?: string;
+  emailAddress?: string;
+  createdBy?: string;
 }
 
 export interface UpdateUserRequest {
+  username?: string;
   expiration?: string;
   machineName?: string;
   suspended: boolean;
   isWindowsAuthenticate: boolean;
   windowsLoginName?: string;
+  emailAddress?: string;
+  editedBy?: string;
 }
 
 export interface ChangePasswordRequest {

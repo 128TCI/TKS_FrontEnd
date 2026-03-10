@@ -7,6 +7,7 @@ import Swal from 'sweetalert2';
 import { decryptData } from '../../../../services/encryptionService';
 
 const formName = 'Earnings SetUp';
+
 interface Earning {
   id: string;
   code: string;
@@ -29,43 +30,40 @@ export function EarningSetupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const itemsPerPage = 100;
+  const itemsPerPage = 20;
 
   // Permissions
-    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-    const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
-    useEffect(() => {
-      getEarningSetupPermissions();
-    }, []);
-  
-    const getEarningSetupPermissions = () => {
-      const rawPayload = localStorage.getItem("loginPayload");
-      if (!rawPayload) return;
-  
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-        const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-        const branchEntries = encryptedArray.filter(
-          (p) => decryptData(p.formName) === "EarningSetUp"
-        );
-  
-        // Build a map: { Add: true, Edit: true, ... }
-        const permMap: Record<string, boolean> = {};
-        branchEntries.forEach((p) => {
-          const accessType = decryptData(p.accessTypeName);
-          if (accessType) permMap[accessType] = true;
-        });
-  
-        setPermissions(permMap);
-  
-      } catch (e) {
-        console.error("Error parsing or decrypting payload", e);
-      }
-    };
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
 
-  // Fetch earning data from API
+  useEffect(() => {
+    getEarningSetupPermissions();
+  }, []);
+
+  const getEarningSetupPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "EarningSetUp"
+      );
+
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
+
   useEffect(() => {
     fetchEarningData();
   }, []);
@@ -76,7 +74,6 @@ export function EarningSetupPage() {
     try {
       const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/EarningsSetUp');
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((earning: any) => ({
           id: earning.earnID?.toString() || earning.id || '',
           code: earning.earnCode || earning.code || '',
@@ -94,7 +91,7 @@ export function EarningSetupPage() {
       setLoading(false);
     }
   };
-  
+
   const filteredData = earnings.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -104,10 +101,65 @@ export function EarningSetupPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const handleCreateNew = () => {
     setFormData({ code: '', description: '' });
@@ -123,6 +175,11 @@ export function EarningSetupPage() {
   };
 
   const handleDelete = async (item: Earning) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: 'warning',
       title: 'Confirm Delete',
@@ -134,38 +191,33 @@ export function EarningSetupPage() {
       cancelButtonText: 'Cancel',
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${item.id}`);
-        try {
-          await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted earning ${item.code}`,
-            messages: `Deleted earning ID: ${item.id}, Code: ${item.code}`,
-            formName: formName,
-          });
-        } catch (err) {
-          console.error('Audit trail failed:', err);
-        }
+    if (!confirmed.isConfirmed) return;
 
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Earning deleted successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-
-        await fetchEarningData();
-      } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete earning';
-        await Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: errorMsg,
-        });
-        console.error('Error deleting earning:', error);
-      }
+    // ── 3. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${item.id}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted earning ${item.code}`,
+        messages: `Deleted earning ID: ${item.id}, Code: ${item.code}`,
+        formName: formName,
+      });
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Earning deleted successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchEarningData();
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete earning';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMsg,
+      });
+      console.error('Error deleting earning:', error);
     }
   };
 
@@ -181,6 +233,7 @@ export function EarningSetupPage() {
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!formData.code.trim() || formData.code.length > 10) {
       await Swal.fire({
         icon: 'warning',
@@ -190,6 +243,11 @@ export function EarningSetupPage() {
       return;
     }
 
+    // ── 2. HRIS / Payroll path check ─────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
     const isDuplicate = earnings.some(
       (earning) => earning.code.toLowerCase() === formData.code.trim().toLowerCase()
     );
@@ -203,6 +261,7 @@ export function EarningSetupPage() {
       return;
     }
 
+    // ── 4. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -214,17 +273,12 @@ export function EarningSetupPage() {
       };
 
       await apiClient.post('/Fs/Process/AllowanceAndEarnings/EarningsSetUp', payload);
-      try {
-        await auditTrail.log({
-          accessType: 'Add',
-          trans: `Created earning ${formData.code}`,
-          messages: `Created earning details: ${JSON.stringify(payload)}`,
-          formName: formName,
-        });
-      } catch (err) {
-        console.error('Audit trail failed:', err);
-      }
-
+      await auditTrail.log({
+        accessType: 'Add',
+        trans: `Created earning ${formData.code}`,
+        messages: `Created earning details: ${JSON.stringify(payload)}`,
+        formName: formName,
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -232,7 +286,6 @@ export function EarningSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-
       await fetchEarningData();
       setShowCreateModal(false);
       setFormData({ code: '', description: '' });
@@ -254,6 +307,7 @@ export function EarningSetupPage() {
     e.preventDefault();
     if (!editingItem) return;
 
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!formData.code.trim() || formData.code.length > 10) {
       await Swal.fire({
         icon: 'warning',
@@ -263,6 +317,11 @@ export function EarningSetupPage() {
       return;
     }
 
+    // ── 2. HRIS / Payroll path check ─────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
     const isDuplicate = earnings.some(
       (earning) =>
         earning.id !== editingItem.id &&
@@ -278,6 +337,7 @@ export function EarningSetupPage() {
       return;
     }
 
+    // ── 4. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -289,17 +349,12 @@ export function EarningSetupPage() {
       };
 
       await apiClient.put(`/Fs/Process/AllowanceAndEarnings/EarningsSetUp/${editingItem.id}`, payload);
-      try {
-        await auditTrail.log({
-          accessType: 'Edit',
-          trans: `Updated earning ${formData.code}`,
-          messages: `Updated earning details: ${JSON.stringify(payload)}`,
-          formName: formName,
-        });
-      } catch (err) {
-        console.error('Audit trail failed:', err);
-      }
-
+      await auditTrail.log({
+        accessType: 'Edit',
+        trans: `Updated earning ${formData.code}`,
+        messages: `Updated earning details: ${JSON.stringify(payload)}`,
+        formName: formName,
+      });
       await Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -307,7 +362,6 @@ export function EarningSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-
       await fetchEarningData();
       setShowEditModal(false);
       setEditingItem(null);
@@ -334,7 +388,6 @@ export function EarningSetupPage() {
     setCodeError('');
   };
 
-  // Handle ESC key press with hierarchy
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -358,17 +411,13 @@ export function EarningSetupPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Earnings Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -404,7 +453,7 @@ export function EarningSetupPage() {
 
             {/* Top Controls */}
             <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-              {(hasPermission('Add') && hasPermission('View')) && (
+              {hasPermission('Add') && hasPermission('View') && (
                 <button
                   onClick={handleCreateNew}
                   className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
@@ -413,7 +462,6 @@ export function EarningSetupPage() {
                   Create New
                 </button>
               )}
-
               {hasPermission('View') && (
                 <div className="flex items-center gap-2">
                   <label className="text-gray-700 text-sm">Search:</label>
@@ -457,31 +505,32 @@ export function EarningSetupPage() {
                           <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
                           {(hasPermission('Edit') || hasPermission('Delete')) && (
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              {hasPermission('Edit') && (
-                                <button
-                                  onClick={() => handleEdit(item)}
-                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                  title="Edit"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                              )}
-                              {hasPermission("Edit") && hasPermission("Delete") && (
-                                <span className="text-gray-300">|</span>
-                              )}
-                              {hasPermission('Delete') && (
-                                <button
-                                  onClick={() => handleDelete(item)}
-                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </td>)}
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                {hasPermission('Edit') && (
+                                  <button
+                                    onClick={() => handleEdit(item)}
+                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {hasPermission('Edit') && hasPermission('Delete') && (
+                                  <span className="text-gray-300">|</span>
+                                )}
+                                {hasPermission('Delete') && (
+                                  <button
+                                    onClick={() => handleDelete(item)}
+                                    className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     ) : (
@@ -492,47 +541,49 @@ export function EarningSetupPage() {
                       </tr>
                     )}
                   </tbody>
-                </table> ) : (
-                  <div className="text-center py-10 text-gray-500">
-                      You do not have permission to view this list.
-                  </div>
+                </table>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+                </div>
               )}
             </div>
 
             {/* Pagination */}
             {hasPermission('View') && (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-gray-600">
-                Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="text-gray-600">
+                  Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                </span>
+                <div className="flex items-center gap-2">
                   <button
-                    key={page}
-                    className={`px-3 py-1 rounded transition-colors ${
-                      currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'
-                    }`}
-                    onClick={() => setCurrentPage(page)}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {page}
+                    Previous
                   </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
-                  disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      className={`px-3 py-1 rounded transition-colors ${
+                        currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'
+                      }`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                    disabled={currentPage >= totalPages || filteredData.length === 0}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>)}
+            )}
           </div>
         </div>
       </div>
@@ -552,7 +603,7 @@ export function EarningSetupPage() {
             </div>
             <form onSubmit={handleSubmitCreate} className="p-6">
               <h3 className="text-blue-600 mb-6">Earnings Setup</h3>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <label className="text-gray-700 text-sm whitespace-nowrap w-28">
@@ -565,8 +616,8 @@ export function EarningSetupPage() {
                       onChange={(e) => handleCodeChange(e.target.value)}
                       maxLength={10}
                       className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                        codeError 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        codeError
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-blue-500'
                       }`}
                       required
@@ -628,7 +679,7 @@ export function EarningSetupPage() {
             </div>
             <form onSubmit={handleSubmitEdit} className="p-6">
               <h3 className="text-blue-600 mb-6">Earnings Setup</h3>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <label className="text-gray-700 text-sm whitespace-nowrap w-28">
@@ -641,8 +692,8 @@ export function EarningSetupPage() {
                       onChange={(e) => handleCodeChange(e.target.value)}
                       maxLength={10}
                       className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                        codeError 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        codeError
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-blue-500'
                       }`}
                       required
@@ -689,7 +740,6 @@ export function EarningSetupPage() {
         </div>
       )}
 
-      {/* Footer */}
       <Footer />
     </div>
   );

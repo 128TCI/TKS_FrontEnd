@@ -284,6 +284,30 @@ export function CalendarSetup({ onBack }: CalendarSetupProps) {
       return;
     }
 
+    // Duplicate validation: mirrors backend check for same Year + Month + Day + Branch
+    // For Add:   block if any existing record matches (all records compared)
+    // For Edit:  block if any OTHER existing record matches (exclude current record by id)
+    const normalizedBranch = selectedBranches.join(', ').trim().toUpperCase();
+    const isDuplicate = holidays.some(holiday => {
+      const sameYear   = holiday.year.trim().toUpperCase()  === formData.year.trim().toUpperCase();
+      const sameMonth  = holiday.month.trim().toUpperCase() === formData.month.trim().toUpperCase();
+      const sameDay    = holiday.day.trim().toUpperCase()   === formData.day.trim().toUpperCase();
+      const existingBranch = (holiday.branch ?? '').trim().toUpperCase();
+      const sameBranch = existingBranch === normalizedBranch;
+      // On Edit, skip comparing the record being edited (same as i.ID != model.ID in backend)
+      const isDifferentRecord = !editingHoliday || holiday.id !== editingHoliday.id;
+      return sameYear && sameMonth && sameDay && sameBranch && isDifferentRecord;
+    });
+
+    if (isDuplicate) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Duplicate Entry',
+        text: 'This setup already exists. Please use a different Year, Month, Day, or Branch combination.',
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Create date string from form data

@@ -5,8 +5,10 @@ import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Employee Status SetUp';
+
+// Form Name
+const formName = 'Employee Status SetUp';
+
 export function EmployeeStatusSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,7 +53,6 @@ export function EmployeeStatusSetupPage() {
         (p) => decryptData(p.formName) === "EmployeeStatusSetUp",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -64,7 +65,6 @@ export function EmployeeStatusSetupPage() {
     }
   };
 
-  // Fetch data from API
   useEffect(() => {
     fetchStatusData();
   }, []);
@@ -95,7 +95,6 @@ export function EmployeeStatusSetupPage() {
     }
   };
 
-  // Handle ESC key
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -106,9 +105,66 @@ export function EmployeeStatusSetupPage() {
     return () => document.removeEventListener("keydown", handleEscKey);
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setStatusId(null);
+    setSelectedStatusIndex(null);
     setCode("");
     setDescription("");
     setShowCreateModal(true);
@@ -124,6 +180,11 @@ export function EmployeeStatusSetupPage() {
   };
 
   const handleDelete = async (status: any) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
@@ -132,59 +193,117 @@ export function EmployeeStatusSetupPage() {
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(
-          `/Fs/Employment/EmployeeStatusSetUp/${status.id}`,
-        );
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted status ${status.code}`,
-            messages: `Status deleted: ${status.code} - ${status.description}`,
-            formName,
-        });
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Check if status is used in Employee Masterfile ────────────────
+    try {
+      const empResponse = await apiClient.get('/Maintenance/EmployeeMasterFile');
+      const employees: any[] = Array.isArray(empResponse.data)
+        ? empResponse.data
+        : [];
+
+      const isUsedInMasterfile = employees.some(
+        (emp: any) =>
+          (emp.empStatCode ?? "").trim().toUpperCase() ===
+          (status.code ?? "").trim().toUpperCase(),
+      );
+
+      if (isUsedInMasterfile) {
         await Swal.fire({
-          icon: "success",
-          title: "Deleted",
-          text: "Status deleted successfully.",
-          timer: 1500,
-          showConfirmButton: false,
+          icon: "error",
+          title: "Cannot Delete",
+          text: "This setup is already used in Employee Masterfile.",
         });
-        fetchStatusData();
-      } catch (error: any) {
-        Swal.fire(
-          "Error",
-          error.response?.data?.message || "Failed to delete",
-          "error",
-        );
+        return;
       }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate status usage.",
+      });
+      return;
+    }
+
+    // ── 4. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(
+        `/Fs/Employment/EmployeeStatusSetUp/${status.id}`,
+      );
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted status ${status.code}`,
+        messages: `Status deleted: ${status.code} - ${status.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Deleted",
+        text: "Status deleted successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      fetchStatusData();
+    } catch (error: any) {
+      Swal.fire(
+        "Error",
+        error.response?.data?.message || "Failed to delete",
+        "error",
+      );
     }
   };
 
   const handleSubmit = async () => {
+    // ── 1. Basic required-field check ────────────────────────────────────
     if (!code.trim()) {
       Swal.fire("Warning", "Please enter a Code.", "warning");
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = statusList.some((status, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedStatusIndex === index) {
-        return false;
-      }
-      return status.code.toLowerCase() === code.trim().toLowerCase();
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
+    const isDuplicateCode = statusList.some((status, index) => {
+      if (isEditMode && selectedStatusIndex === index) return false;
+      return status.code.trim().toUpperCase() === code.trim().toUpperCase();
     });
 
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
         title: "Duplicate Code",
-        text: "This code is already in use. Please use a different code.",
+        text: "Code is already exist.",
       });
       return;
     }
+
+    // ── 4. Duplicate description check ──────────────────────────────────
+    const isDuplicateDesc = statusList.some((status, index) => {
+      if (isEditMode && selectedStatusIndex === index) return false;
+      return (
+        (status.description ?? "").trim().toUpperCase() ===
+        description.trim().toUpperCase()
+      );
+    });
+
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
+      return;
+    }
+
+    // ── 5. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -199,18 +318,18 @@ export function EmployeeStatusSetupPage() {
           payload,
         );
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited status ${payload.empStatCode}`,
-            messages: `Status updated: ${payload.empStatCode} - ${payload.empStatDesc}`,
-            formName,
+          accessType: 'Edit',
+          trans: `Edited status ${payload.empStatCode}`,
+          messages: `Status updated: ${payload.empStatCode} - ${payload.empStatDesc}`,
+          formName,
         });
       } else {
         await apiClient.post("/Fs/Employment/EmployeeStatusSetUp", payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added status ${payload.empStatCode}`,
-            messages: `Status created: ${payload.empStatCode} - ${payload.empStatDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added status ${payload.empStatCode}`,
+          messages: `Status created: ${payload.empStatCode} - ${payload.empStatDesc}`,
+          formName,
         });
       }
 
@@ -256,7 +375,6 @@ export function EmployeeStatusSetupPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Original Header Design */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Employee Status Setup</h1>
           </div>
@@ -373,6 +491,10 @@ export function EmployeeStatusSetupPage() {
                                   <Edit className="w-4 h-4" />
                                 </button>
                               )}
+                              {hasPermission("Edit") &&
+                                hasPermission("Delete") && (
+                                  <span className="text-gray-300">|</span>
+                                )}
                               {hasPermission("Delete") && (
                                 <button
                                   onClick={() => handleDelete(status)}
@@ -497,7 +619,8 @@ export function EmployeeStatusSetupPage() {
                         </button>
                         <button
                           onClick={() => setShowCreateModal(false)}
-                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm disabled:opacity-50"
                         >
                           Back to List
                         </button>

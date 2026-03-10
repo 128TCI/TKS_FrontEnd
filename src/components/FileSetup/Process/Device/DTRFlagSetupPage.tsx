@@ -142,6 +142,12 @@ export function DTRFlagSetupPage() {
     setShowBreak3InPicker(false);
   };
 
+  // Matches backend: CheckCodeIfRegularExpression (alphanumeric + hyphen/underscore, no spaces)
+  const isValidFlagCode = (value: string): boolean => {
+    const codeRegex = /^[a-zA-Z0-9\-_]+$/;
+    return codeRegex.test(value.trim());
+  };
+
   const handleCreateNew = () => {
     setFormData({
       flagCode: '',
@@ -224,6 +230,12 @@ export function DTRFlagSetupPage() {
       return;
     }
 
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidFlagCode(formData.flagCode)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Flag Code.' });
+      return;
+    }
+
     const isDuplicate = flags.some(flag =>
       flag.flagCode.toLowerCase() === formData.flagCode.trim().toLowerCase()
     );
@@ -285,6 +297,12 @@ export function DTRFlagSetupPage() {
 
     if (!formData.flagCode.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Flag Code is required.' });
+      return;
+    }
+
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidFlagCode(formData.flagCode)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Flag Code.' });
       return;
     }
 
@@ -376,7 +394,6 @@ export function DTRFlagSetupPage() {
   }, [showCreateModal, showEditModal]);
 
   // ── Reusable time field renderer ──────────────────────────────────────────
-  // Renders a label + text input + clock-icon button that opens the TimePicker
   const renderTimeField = (
     label: string,
     fieldKey: keyof typeof formData,
@@ -399,7 +416,6 @@ export function DTRFlagSetupPage() {
           className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           title="Pick time"
         >
-          {/* Clock icon */}
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -422,7 +438,6 @@ export function DTRFlagSetupPage() {
   // ── Shared modal form body ─────────────────────────────────────────────────
   const renderFormFields = () => (
     <div className="space-y-3">
-      {/* Flag Code – no TimePicker, plain text */}
       <div className="flex items-center gap-3">
         <label className="text-gray-700 text-sm whitespace-nowrap w-28">Flag Code :</label>
         <input
