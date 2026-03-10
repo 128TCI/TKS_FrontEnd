@@ -518,6 +518,7 @@ const handleEditUser = (user: User) => {
           messages: `Security Manager - Users update record: ${selectedUser.username}`,
           formName: 'Security Manager - Users',
         });
+        console.log("API response:", res);
         showSuccessModal('User updated successfully.');
       } else {
         await securityService.createUser({

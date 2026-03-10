@@ -1,12 +1,10 @@
-﻿import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar, Check, Search, X, Clock, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box, RefreshCw } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { LeaveCodeSearchModal } from './../Modals/LeaveCodeSearchModal';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
-import Swal from 'sweetalert2';
-
 
 interface GroupItem {
   id: number;
@@ -26,141 +24,66 @@ interface LeaveCode {
   description: string;
 }
 
-interface CalendarPopupProps {
-  value: string;
-  onChange: (date: string) => void;
-  onClose: () => void;
-  position: { top: number; left: number };
-}
+type TabName = 'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit';
 
-function CalendarPopup({ value, onChange, onClose, position }: CalendarPopupProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const popupRef = useRef<HTMLDivElement>(null);
+const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
+  { name: 'TK Group',        icon: Users         },
+  { name: 'Branch',          icon: Building2     },
+  { name: 'Department',      icon: Briefcase     },
+  { name: 'Division',        icon: Network       },
+  { name: 'Group Schedule',  icon: CalendarClock },
+  { name: 'Pay House',       icon: Wallet        },
+  { name: 'Section',         icon: Grid          },
+  { name: 'Unit',            icon: Box           },
+];
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
-  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-  
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                     'July', 'August', 'September', 'October', 'November', 'December'];
-
-  const handlePrevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
-  };
-
-  const handleNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
-  };
-
-  const handleDateClick = (day: number) => {
-    const month = currentMonth.getMonth() + 1;
-    const year = currentMonth.getFullYear();
-    const formattedDate = `${month}/${day}/${year}`;
-    onChange(formattedDate);
-    onClose();
-  };
-
-  const renderDays = () => {
-    const days = [];
-    const prevMonthDays = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 0).getDate();
-    
-    for (let i = firstDayOfMonth - 1; i >= 0; i--) {
-      days.push(
-        <div key={`prev-${i}`} className="text-center py-2 text-gray-400 text-sm">
-          {prevMonthDays - i}
-        </div>
-      );
-    }
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(
-        <div
-          key={day}
-          onClick={() => handleDateClick(day)}
-          className="text-center py-2 text-sm cursor-pointer hover:bg-blue-100 rounded transition-colors"
-        >
-          {day}
-        </div>
-      );
-    }
-    
-    const remainingDays = 42 - days.length;
-    for (let day = 1; day <= remainingDays; day++) {
-      days.push(
-        <div key={`next-${day}`} className="text-center py-2 text-gray-400 text-sm">
-          {day}
-        </div>
-      );
-    }
-    
-    return days;
-  };
-
-  return (
-    <div
-      ref={popupRef}
-      className="absolute bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-50"
-      style={{ top: position.top, left: position.left, width: '280px' }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={handlePrevMonth} className="p-1 hover:bg-gray-100 rounded transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div className="font-medium">
-          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-        </div>
-        <button onClick={handleNextMonth} className="p-1 hover:bg-gray-100 rounded transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-          <div key={day} className="text-center text-xs text-gray-600 font-medium">
-            {day}
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {renderDays()}
-      </div>
-    </div>
-  );
-}
+const EMPTY_SELECTION: Record<TabName, number[]> = {
+  'TK Group': [], 'Branch': [], 'Department': [], 'Division': [],
+  'Group Schedule': [], 'Pay House': [], 'Section': [], 'Unit': [],
+};
 
 export function UpdateEmployeeLeaveApplicationPage() {
-  const [activeTab, setActiveTab] = useState<'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit'>('TK Group');
-  const [dateFrom, setDateFrom] = useState('5/5/2021');
-  const [dateTo, setDateTo] = useState('05/05/2021');
+  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
+  const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
+  const [dateFrom,           setDateFrom]           = useState('');
+  const [dateTo,             setDateTo]             = useState('');
+  const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+
+  const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
+  const selectedGroups = selectedGroupsMap[activeTab] ?? [];
+  const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) => {
+    setSelectedGroupsMap(prev => ({
+      ...prev,
+      [activeTab]: typeof updater === 'function' ? updater(prev[activeTab]) : updater,
+    }));
+  };
+
+  const [selectedEmployees,  setSelectedEmployees]  = useState<number[]>([]);
+  const [currentGroupPage,   setCurrentGroupPage]   = useState(1);
+  const [currentEmpPage,     setCurrentEmpPage]     = useState(1);
+  const [isUpdating,         setIsUpdating]         = useState(false);
+  const itemsPerPage = 10;
+
+  const [tkGroupItems,       setTKSGroupItems]      = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [divisionItems,      setDivisionItems]      = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
+  const [unitItems,          setUnitItems]          = useState<GroupItem[]>([]);
+  const [employeeItems,      setEmployeeItems]      = useState<EmployeeItem[]>([]);
+  const [loadingEmployees,   setLoadingEmployees]   = useState(false);
+
   const [showCalendar, setShowCalendar] = useState<'dateFrom' | 'dateTo' | null>(null);
   const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
   const [period, setPeriod] = useState('');
   const [numberOfHours, setNumberOfHours] = useState<number>(0); 
   const [withPay, setWithPay] = useState(false);
   const [sssNotification, setSssNotification] = useState(false);
-  const [groupSearchTerm, setGroupSearchTerm] = useState('');
-  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);  
-  const [currentGroupPage, setCurrentGroupPage] = useState(1);
-  const [currentEmpPage, setCurrentEmpPage] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1); 
-  const itemsPerPage = 10;
+
+  useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
 
   //Form Fields
   const [leaveCode, setleaveCode] = useState<string>('');
@@ -172,7 +95,6 @@ export function UpdateEmployeeLeaveApplicationPage() {
   // Modal state
   const [showLeaveCodeModal, setshowLeaveCodeModal] = useState(false)  
 
-  const [isUpdating, setIsUpdating] = useState(false);  
 
  useEffect(() => {
     setCurrentGroupPage(1);
@@ -181,242 +103,174 @@ export function UpdateEmployeeLeaveApplicationPage() {
     [activeTab]
   );
 
-  // TKSGroup List states
-  const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
-  const [tkGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
-
-  // Branch List states
-  const [loadingBranches, setLoadingBranches] = useState(false);
-  const [branchItems, setBranchItems] = useState<GroupItem[]>([]);
-
-  // Department List states
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
-  const [departmentItems, setDepartmentItems] = useState<GroupItem[]>([]);
-
-  // Division List states
-  const [loadingDivisions, setLoadingDivisions] = useState(false);
-  const [divisionItems, setDivisionItems] = useState<GroupItem[]>([]);
-
-  // GroupSchedule List states
-  const [loadingGroupSchedules, setLoadingGroupSchedules] = useState(false);
-  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
-
-  // PayHouse List states
-  const [loadingPayHouses, setLoadingPayHouses] = useState(false);
-  const [payHouseItems, setPayHouseItems] = useState<GroupItem[]>([]);
-
-  // Section List states
-  const [loadingSections, setLoadingSections] = useState(false);
-  const [sectionItems, setSectionItems] = useState<GroupItem[]>([]);
-
-  // Unit List states
-  const [loadingUnits, setLoadingUnits] = useState(false);
-  const [unitItems, setUnitItems] = useState<GroupItem[]>([]);
-
-  // Employee List states
-  const [loadingEmployees, setLoadingEmployees] = useState(false);
-  const [employeeItems, setEmployeeItems] = useState<EmployeeItem[]>([]);
   const [EmployeeError, setEmployeeError] = useState('');
 
-  // Fetch TKSGroup data from API
-  const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
-  const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+   useEffect(() => {
+    const load = async () => {
+      try {
+        const [tks, bra, dep, div, grp, pay, sec, unit] = await Promise.all([
+          apiClient.get('/Fs/Process/TimeKeepGroupSetUp'),
+          apiClient.get('/Fs/Employment/BranchSetUp'),
+          apiClient.get('/Fs/Employment/DepartmentSetUp'),
+          apiClient.get('/Fs/Employment/DivisionSetUp'),
+          apiClient.get('/Fs/Employment/GroupSetUp'),
+          apiClient.get('/Fs/Employment/PayHouseSetUp'),
+          apiClient.get('/Fs/Employment/SectionSetUp'),
+          apiClient.get('/Fs/Employment/UnitSetUp'),
+        ]);
+        const map = (data: any[], idKey: string, codeKey: string, descKey: string): GroupItem[] =>
+          (Array.isArray(data) ? data : []).map(i => ({
+            id:          i[idKey]   ?? i.ID   ?? i.id   ?? 0,
+            code:        i[codeKey] ?? i.code ?? '',
+            description: i[descKey] ?? i.description ?? '',
+          }));
+        setTKSGroupItems(     map(tks.data,  'ID',       'groupCode',  'groupDescription'));
+        setBranchItems(       map(bra.data,  'braID',    'braCode',    'braDesc'));
+        setDepartmentItems(   map(dep.data,  'depID',    'depCode',    'depDesc'));
+        setDivisionItems(     map(div.data,  'divID',    'divCode',    'divDesc'));
+        setGroupScheduleItems(map(grp.data,  'grpSchID', 'grpCode',    'grpDesc'));
+        setPayHouseItems(     map(pay.data,  'lineID',   'lineCode',   'lineDesc'));
+        setSectionItems(      map(sec.data,  'secID',    'secCode',    'secDesc'));
+        setUnitItems(         map(unit.data, 'unitID',   'unitCode',   'unitDesc'));
+      } catch (err) {
+        console.error('Failed to load group lists:', err);
+      }
+    };
+    load();
+  }, []);
 
-    return response.data.map((item: any) => ({
-      id: item.ID || item.id ,
-      code: item.groupCode || item.code,
-      description: item.groupDescription || item.description,
-    }));
-  };
+  const getCurrentData = useCallback((): GroupItem[] => {
+    switch (activeTab) {
+      case 'Branch':         return branchItems;
+      case 'Department':     return departmentItems;
+      case 'Division':       return divisionItems;
+      case 'Group Schedule': return groupScheduleItems;
+      case 'Pay House':      return payHouseItems;
+      case 'Section':        return sectionItems;
+      case 'Unit':           return unitItems;
+      default:               return tkGroupItems;
+    }
+  }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems,
+       groupScheduleItems, payHouseItems, sectionItems, unitItems]);
+
+  const buildSpParams = useCallback((
+    tab: TabName, selectedIds: number[], allItems: GroupItem[],
+    status: 'active' | 'inactive' | 'all'
+  ) => {
+    const selectedCodes = allItems.filter(i => selectedIds.includes(i.id)).map(i => i.code).join(',');
+    return {
+      Transaction:    status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
+      GroupCodes:     tab === 'TK Group'       ? selectedCodes : '',
+      Branches:       tab === 'Branch'         ? selectedCodes : '',
+      Divisions:      tab === 'Division'       ? selectedCodes : '',
+      Departments:    tab === 'Department'     ? selectedCodes : '',
+      Sections:       tab === 'Section'        ? selectedCodes : '',
+      Units:          tab === 'Unit'           ? selectedCodes : '',
+      Lines:          '',
+      Areas:          '',
+      Locations:      '',
+      GroupSchedules: tab === 'Group Schedule' ? selectedCodes : '',
+    };
+  }, []);
+
+  const fetchFilteredEmployees = useCallback(async (
+    tab: TabName, selectedIds: number[], allItems: GroupItem[],
+    status: 'active' | 'inactive' | 'all'
+  ) => {
+    setLoadingEmployees(true);
+    setCurrentEmpPage(1);
+    try {
+      if (selectedIds.length === 0) {
+        const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
+        const list = Array.isArray(response.data) ? response.data : [];
+        setEmployeeItems(list.map((item: any): EmployeeItem => ({
+          id:   item.empID   ?? item.ID   ?? item.id  ?? 0,
+          code: item.empCode ?? item.code ?? '',
+          name: `${item.lName ?? ''}, ${item.fName ?? ''} ${item.mName ?? ''}`.trim(),
+        })));
+      } else {
+        const params = buildSpParams(tab, selectedIds, allItems, status);
+        const response = await apiClient.post('/Utilities/GetFilteredEmployees', params);
+        const list = Array.isArray(response.data) ? response.data : [];
+        setEmployeeItems(list.map((item: any): EmployeeItem => ({
+          id:   item.empID   ?? item.ID   ?? item.id  ?? 0,
+          code: item.empCode ?? item.EmpCode ?? item.code ?? '',
+          name: `${item.lName ?? item.LName ?? ''}, ${item.fName ?? item.FName ?? ''} ${item.mName ?? item.MName ?? ''}`.trim(),
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to fetch employees:', err);
+      setEmployeeItems([]);
+    } finally {
+      setLoadingEmployees(false);
+    }
+  }, [buildSpParams]);
 
   useEffect(() => {
-    const loadTKSGroup = async () => {
-        const items = await fetchTKSGroupData(); // ✅ array
-      setTKSGroupItems(items);
-    };
+    const allItems = getCurrentData();
+    fetchFilteredEmployees(activeTab, selectedGroups, allItems, statusFilter);
+    setSelectedEmployees([]);
+  }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
 
-      loadTKSGroup();
-  }, []); 
+  const getSelectionTitle = () => {
+    switch (activeTab) {
+      case 'TK Group': return 'TK Group Selection';
+      case 'Branch': return 'Branch Selection';
+      case 'Department': return 'Department Selection';
+      case 'Division': return 'Division Selection';
+      case 'Group Schedule': return 'Group Schedule Selection';
+      case 'Pay House': return 'Pay House Selection';
+      case 'Section': return 'Section Selection';
+      case 'Unit': return 'Unit Selection';
+      default: return 'Selection';
+    }
+  };
 
-  // Fetch branch data from API
-    const fetchBranchData = async (): Promise<GroupItem[]> => {
-        const response = await apiClient.get('/Fs/Employment/BranchSetUp');
+  const currentItems    = getCurrentData();
+  const filteredGroups  = currentItems.filter(item =>
+    item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
+    item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
+  );
+  const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
+  const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
+  const endGroupIndex   = startGroupIndex + itemsPerPage;
+  const paginatedGroups = filteredGroups.slice(startGroupIndex, endGroupIndex);
 
-        return response.data.map((item: any) => ({
-            id: item.braID || item.ID,
-            code: item.braCode || item.code,
-            description: item.braDesc || item.description,
-        }));
-    };
+  const filteredEmployees  = employeeItems.filter(emp =>
+    emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+  const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const startEmpIndex      = (currentEmpPage - 1) * itemsPerPage;
+  const endEmpIndex        = startEmpIndex + itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startEmpIndex, endEmpIndex);
 
-    useEffect(() => {
-        const loadBranches = async () => {
-            const items = await fetchBranchData(); // ✅ array
-            setBranchItems(items);
-        };
+  const getPageNumbers = (current: number, total: number) => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages: (number | string)[] = [];
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...'); pages.push(total);
+    } else if (current >= total - 3) {
+      pages.push(1); pages.push('...');
+      for (let i = total - 4; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1); pages.push('...');
+      for (let i = current - 1; i <= current + 1; i++) pages.push(i);
+      pages.push('...'); pages.push(total);
+    }
+    return pages;
+  };
 
-        loadBranches();
-    }, []);
+  const handleGroupToggle      = (id: number) =>
+    setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleEmployeeToggle   = (id: number) =>
+    setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleSelectAllGroups  = () =>
+    setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
+  const handleSelectAllEmployees = () =>
+    setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
-    // Fetch department data from API
-    const fetchDepartmentData = async (): Promise<GroupItem[]> => {
-        const response = await apiClient.get('/Fs/Employment/DepartmentSetUp');
-
-        return response.data.map((item: any) => ({
-            id: item.depID || item.ID,
-            code: item.depCode || item.code,
-            description: item.depDesc || item.description,
-        }));
-
-    };
-
-    useEffect(() => {
-        const loadDepartments = async () => {
-            const items = await fetchDepartmentData(); // array
-            setDepartmentItems(items);
-        };
-
-        loadDepartments();
-    }, []
-    );
-
-     // Fetch division data from API
-    const fetchDivisionData = async (): Promise<GroupItem[]> => {
-        const response = await apiClient.get('/Fs/Employment/DivisionSetUp');
-
-        return response.data.map((item: any) => ({
-            id: item.divID || item.ID,
-            code: item.divCode || item.code,
-            description: item.divDesc || item.description,
-        }));
-
-    };
-
-    useEffect(() => {
-        const loadDivisions = async () => {
-            const items = await fetchDivisionData(); // array
-            setDivisionItems(items);
-        };
-
-        loadDivisions();
-    }, []
-    );   
-
-    // Fetch groupSchedule data from API
-    const fetchGroupScheduleData = async (): Promise<GroupItem[]> => {
-        const response = await apiClient.get('/Fs/Employment/GroupSetUp');
-
-        const list = Array.isArray(response.data) ? response.data : [];
-
-        return list.map((item: any) => ({
-            id: item.grpSchID || item.id || item.ID,
-            code: item.grpCode || item.code,
-            description: item.grpDesc || item.description,
-        }));
-    };
-
-    useEffect(() => {
-        const loadGroupSchedule = async () => {
-            const items = await fetchGroupScheduleData();
-            setGroupScheduleItems(items);
-        };
-
-        loadGroupSchedule();
-    }, []
-    );
-
-    // Fetch payHouse data from API
-    const fetchPayHouseData = async (): Promise<GroupItem[]> => {
-        const response = await apiClient.get('/Fs/Employment/PayHouseSetUp');
-
-        const list = Array.isArray(response.data) ? response.data : [];
-
-        return list.map((item: any) => ({
-            id: item.lineID ?? item.ID ?? item.id,
-            code: item.lineCode ?? item.code,
-            description: item.lineDesc ?? item.Description ?? item.description,
-        }));
-    };
-
-
-    useEffect(() => {
-        const loadPayHouses = async () => {
-            const items = await fetchPayHouseData(); // ✅ array
-            setPayHouseItems(items);
-        };
-
-        loadPayHouses();
-    }, []
-    );
-
-    // Fetch section data from API
-    const fetchSectionData = async (): Promise<GroupItem[]> => {
-        const response = await apiClient.get('/Fs/Employment/SectionSetUp');
-
-        const list = Array.isArray(response.data) ? response.data : [];
-
-        return list.map((item: any) => ({
-            id: item.secID ?? item.ID ?? item.id,
-            code: item.secCode ?? item.sectionCode ?? item.code,
-            description: item.secDesc ?? item.Description ?? item.description,
-        }));
-    };
-
-    useEffect(() => {
-        const loadSections = async () => {
-            const items = await fetchSectionData(); // ✅ array
-            setSectionItems(items);
-        };
-
-        loadSections();
-    }, []
-    );
-
-    // Fetch unit data from API
-    const fetchUnitData = async (): Promise<GroupItem[]> => {
-        const response = await apiClient.get('/Fs/Employment/UnitSetUp');
-
-        return response.data.map((item: any) => ({
-            id: item.unitID || item.ID,
-            code: item.unitCode || item.code,
-            description: item.unitDesc || item.description,
-        }));
-
-    };
-
-    useEffect(() => {
-        const loadUnits = async () => {
-            const items = await fetchUnitData(); // array
-            setUnitItems(items);
-        };
-
-        loadUnits();
-    }, []
-    );
-
-    // Fetch employee data from API
-    const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
-        const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-
-        const list = Array.isArray(response.data) ? response.data : [];
-
-        return list.map((item: any): EmployeeItem => ({
-            id: item.empID ?? item.ID ?? item.id,
-            code: item.empCode || item.code || '',
-            name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
-
-        }));
-    };
-
-    useEffect(() => {
-        const loadEmployees = async () => {
-            const items = await fetchEmployeeData(); // EmployeeItem[]
-            setEmployeeItems(items);
-        };
-
-        loadEmployees();
-    }, []
-    );
 
     // Fetch leave code data from API
     const fetchLeaveCodeData = async (): Promise<LeaveCode[]> => {
@@ -445,137 +299,12 @@ export function UpdateEmployeeLeaveApplicationPage() {
         loadLeaveCodes();
     }, []);
 
-    // Get current data based on active tab
-    const getCurrentData = () => {
-        switch (activeTab) {
-            case 'Branch':
-                return branchItems;
-            case 'Department':
-                return departmentItems;
-            case 'Division':
-                return divisionItems;    
-            case 'Group Schedule':
-                return groupScheduleItems;
-            case 'Pay House':
-                return payHouseItems;
-            case 'Section':
-                return sectionItems;
-            case 'Unit':
-                return unitItems;    
-            default:
-                return tkGroupItems;
-        }
-
-    };
-
-    const currentItems = getCurrentData();
 
   const handleLeaveCodeSelect = (code: string, description: string) => {
       setleaveCode(code);
       setLeave(description);
       setshowLeaveCodeModal(false);
   };  
-
-    const filteredGroups = currentItems.filter(item =>
-        item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
-    );
-
-    const filteredEmployees = employeeItems.filter(emp =>
-        emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-        emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
-    );
-
-    // Group Pagination logic
-    const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
-    const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
-    const endGroupIndex = startGroupIndex + itemsPerPage;
-
-    const paginatedGroups = filteredGroups.slice(
-        (currentGroupPage - 1) * itemsPerPage,
-        currentGroupPage * itemsPerPage
-    );
-
-    // Get visible page numbers
-    const getGroupPageNumbers = () => {
-        const pages = [];
-        if (totalGroupPages <= 7) {
-            for (let i = 1; i <= totalGroupPages; i++) {
-                pages.push(i);
-            }
-        } else {
-            if (currentGroupPage <= 4) {
-                for (let i = 1; i <= 5; i++) pages.push(i);
-                pages.push('...');
-                pages.push(totalGroupPages);
-            } else if (currentGroupPage >= totalGroupPages - 3) {
-                pages.push(1);
-                pages.push('...');
-                for (let i = totalGroupPages - 4; i <= totalGroupPages; i++) pages.push(i);
-            } else {
-                pages.push(1);
-                pages.push('...');
-                for (let i = currentGroupPage - 1; i <= currentGroupPage + 1; i++) pages.push(i);
-                pages.push('...');
-                pages.push(totalGroupPages);
-            }
-        }
-        return pages;
-    };
-
-    // Employee Pagination logic
-    const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
-    const startEmployeeIndex = (currentEmpPage - 1) * itemsPerPage;
-    const endEmployeeIndex = startEmployeeIndex + itemsPerPage;
-
-    const paginatedEmployees = filteredEmployees.slice(
-        (currentEmpPage - 1) * itemsPerPage,
-        currentEmpPage * itemsPerPage
-    );
-    // Get visible page numbers
-    const getEmployeePageNumbers = () => {
-        const pages = [];
-        const maxVisible = 5;
-        if (totalEmployeePages <= maxVisible) {
-            return Array.from({ length: totalEmployeePages }, (_, i) => i + 1);
-        }
-        pages.push(1);
-        if (currentEmpPage > 3) pages.push('...');
-        const start = Math.max(2, currentEmpPage - 1);
-        const end = Math.min(totalEmployeePages - 1, currentEmpPage + 1);
-        for (let i = start; i <= end; i++) pages.push(i);
-        if (currentEmpPage < totalEmployeePages - 2) pages.push('...');
-        pages.push(totalEmployeePages);
-        return pages;
-    };
-
-    const handleGroupToggle = (id: number) => {
-        setSelectedGroups(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
-    };
-
-  const handleEmployeeToggle = (id: number) => {
-    setSelectedEmployees(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectAllGroups = () => {
-      if (selectedGroups.length === filteredGroups.length) {
-          setSelectedGroups([]);
-      } else {
-          setSelectedGroups(filteredGroups.map(g => g.id));
-      }
-  };
-
-  const handleSelectAllEmployees = () => {
-      if (selectedEmployees.length === filteredEmployees.length) {
-          setSelectedEmployees([]);
-      } else {
-          setSelectedEmployees(filteredEmployees.map(e => e.id));
-      }
-  };
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) {
@@ -600,7 +329,6 @@ export function UpdateEmployeeLeaveApplicationPage() {
       setIsUpdating(true);
       await showSuccessModal('Successfully updated Employees Leave Application.');
 
-
       setSelectedGroups([]);
       setSelectedEmployees([]);
       setDateFrom('');
@@ -623,28 +351,35 @@ export function UpdateEmployeeLeaveApplicationPage() {
     setShowCalendar(event.currentTarget.name as 'dateFrom' | 'dateTo');
   };
 
-  const handleDateChange = (date: string) => {
-    if (showCalendar === 'dateFrom') {
-      setDateFrom(date);
-    } else if (showCalendar === 'dateTo') {
-      setDateTo(date);
-    }
-    setShowCalendar(null);
-  };
-
-  const renderPageNumbers = (totalPages: number, currentPage: number) => {
-    const pages = [];
-    for (let i = 1; i <= Math.min(5, totalPages); i++) {
-      pages.push(i);
-    }
-    
-    if (totalPages > 6) {
-      pages.push('...' as any);
-      pages.push(totalPages);
-    }
-    
-    return pages;
-  };
+ 
+  const renderPagination = (
+    current: number, total: number, setPage: (p: number) => void,
+    startIdx: number, endIdx: number, totalCount: number, label = 'entries'
+  ) => (
+    <div className="flex items-center justify-between mt-3">
+      <span className="text-xs text-gray-500">
+        Showing {totalCount === 0 ? 0 : startIdx + 1} to {Math.min(endIdx, totalCount)} of {totalCount} {label}
+      </span>
+      <div className="flex items-center gap-1">
+        <button onClick={() => setPage(Math.max(1, current - 1))} disabled={current === 1}
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+          Previous
+        </button>
+        {getPageNumbers(current, total).map((page, idx) =>
+          page === '...'
+            ? <span key={`e-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+            : <button key={page} onClick={() => setPage(page as number)}
+                className={`px-2 py-1 rounded text-xs ${current === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                {page}
+              </button>
+        )}
+        <button onClick={() => setPage(Math.min(total, current + 1))} disabled={current === total || total === 0}
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+          Next
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -713,6 +448,10 @@ export function UpdateEmployeeLeaveApplicationPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Section - Group List */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">{getSelectionTitle()}</h3>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
+                </div>                
                   <div className="mb-4 flex items-center gap-3">
                       <label className="text-sm text-gray-700">Search:</label>
                       <input
@@ -758,49 +497,18 @@ export function UpdateEmployeeLeaveApplicationPage() {
                       </table>
                   </div>
                   {/* Pagination */}
-                  <div className="flex items-center justify-between mt-3">
-                      <div className="text-gray-600 text-xs">
-                          Showing {filteredEmployees.length === 0 ? 0 : startGroupIndex + 1} to {Math.min(endGroupIndex, filteredGroups.length)} of {filteredGroups.length} entries
-                      </div>
-                      <div className="flex gap-1">
-                          <button
-                              onClick={() => setCurrentGroupPage(prev => Math.max(prev - 1, 1))}
-                              disabled={currentGroupPage === 1}
-                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                              Previous
-                          </button>
-                          {getGroupPageNumbers().map((page, idx) => (
-                              page === '...' ? (
-                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-                              ) : (
-                                  <button
-                                      key={page}
-                                      onClick={() => setCurrentGroupPage(page as number)}
-                                      className={`px-2 py-1 rounded text-xs ${currentGroupPage === page
-                                              ? 'bg-blue-600 text-white'
-                                              : 'border border-gray-300 hover:bg-gray-100'
-                                          }`}
-                                  >
-                                      {page}
-                                  </button>
-                              )
-                          ))}
-                          <button
-                              onClick={() => setCurrentGroupPage(prev => Math.min(prev + 1, totalGroupPages))}
-                              disabled={currentGroupPage === totalGroupPages || totalGroupPages === 0}
-                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                              Next
-                          </button>
-                      </div>
-                  </div>
+                  {renderPagination(currentGroupPage, totalGroupPages, setCurrentGroupPage,
+                    startGroupIndex, endGroupIndex, filteredGroups.length)}
               </div>
 
               {/* Right Section - Employee List and Form */}
               <div className="space-y-6">
                 {/* Employee List */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-gray-900">Employees</h3>
+                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
+                  </div>                                          
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input
@@ -846,46 +554,8 @@ export function UpdateEmployeeLeaveApplicationPage() {
                     </table>
                   </div>
                   {/* Pagination */}
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
-                        disabled={currentEmpPage === 1}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
-                      {getEmployeePageNumbers().map((page, index) => (
-                        typeof page === 'number' ? (
-                          <button
-                            key={index}
-                            onClick={() => setCurrentEmpPage(page)}
-                            className={`px-2 py-1 rounded text-xs ${
-                              currentEmpPage === page
-                                ? 'bg-blue-500 text-white'
-                                : 'border border-gray-300 hover:bg-gray-100'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ) : (
-                          <span key={index} className="px-2">
-                            {page}
-                          </span>
-                        )
-                      ))}
-                      <button
-                        onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
-                        disabled={currentEmpPage === totalEmployeePages}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
+                  {renderPagination(currentEmpPage, totalEmployeePages, setCurrentEmpPage,
+                    startEmpIndex, endEmpIndex, filteredEmployees.length)}
                 </div>
 
                 {/* Form Fields */}
@@ -1016,25 +686,15 @@ export function UpdateEmployeeLeaveApplicationPage() {
         </div>
       </div>
 
-      {/* Calendar Popup */}
-      {showCalendar && (
-        <CalendarPopup
-          value={showCalendar === 'dateFrom' ? dateFrom : dateTo}
-          onChange={handleDateChange}
-          onClose={() => setShowCalendar(null)}
-          position={calendarPosition}
-        />
-      )}
-
       <Footer />
       <LeaveCodeSearchModal
           isOpen={showLeaveCodeModal}
           onClose={() => setshowLeaveCodeModal(false)}
           onSelect={handleLeaveCodeSelect}
-          leaveCodeItems={leaveCodeItems}
-          loading={loadingLeaveCodes}
-          error={leaveCodeError}
-      />      
+          //leaveCodeItems={leaveCodeItems}
+          //loading={loadingLeaveCodes}
+          //error={leaveCodeError}
+      />     
     </div>
   );
 }

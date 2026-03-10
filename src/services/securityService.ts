@@ -16,6 +16,7 @@ import type {
   ChangePasswordRequest,
   SaveGroupAccessRequest,
 } from '../components/Types/security';
+
 const BASE = '/Security';
 
 export const securityService = {

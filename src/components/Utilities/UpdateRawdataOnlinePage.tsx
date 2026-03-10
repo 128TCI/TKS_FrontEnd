@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, Check, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { getLoggedInUsername } from '../../services/apiClient';
 
 interface GroupItem {
   id: number;
@@ -17,42 +18,36 @@ interface EmployeeItem {
   name: string;
 }
 
-// ── Tab config ─────────────────────────────────────────────────────────────────
+// ── Tab config ──────────────────────────────────────────────────────────────
 type TabName = 'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit';
 
 const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
-  { name: 'TK Group',        icon: Users        },
-  { name: 'Branch',          icon: Building2    },
-  { name: 'Department',      icon: Briefcase    },
-  { name: 'Division',        icon: Network      },
-  { name: 'Group Schedule',  icon: CalendarClock},
-  { name: 'Pay House',       icon: Wallet       },
-  { name: 'Section',         icon: Grid         },
-  { name: 'Unit',            icon: Box          },
+  { name: 'TK Group',        icon: Users         },
+  { name: 'Branch',          icon: Building2     },
+  { name: 'Department',      icon: Briefcase     },
+  { name: 'Division',        icon: Network       },
+  { name: 'Group Schedule',  icon: CalendarClock },
+  { name: 'Pay House',       icon: Wallet        },
+  { name: 'Section',         icon: Grid          },
+  { name: 'Unit',            icon: Box           },
 ];
 
-export function UpdateFlexiBreakPage() {
-  const [activeTab, setActiveTab]             = useState<TabName>('TK Group');
-  const [statusFilter, setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
-  const [dateFrom, setDateFrom]               = useState('');
-  const [dateTo, setDateTo]                   = useState('');
-  const [groupSearchTerm, setGroupSearchTerm] = useState('');
+const EMPTY_SELECTION: Record<TabName, number[]> = {
+  'TK Group': [], 'Branch': [], 'Department': [], 'Division': [],
+  'Group Schedule': [], 'Pay House': [], 'Section': [], 'Unit': [],
+};
+
+export function UpdateRawdataOnlinePage() {
+  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
+  const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
+  const [dateFrom,           setDateFrom]           = useState('');
+  const [dateTo,             setDateTo]             = useState('');
+  const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  // ── Per-tab selections — each tab keeps its own checked IDs independently ──
-  const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>({
-    'TK Group':       [],
-    'Branch':         [],
-    'Department':     [],
-    'Division':       [],
-    'Group Schedule': [],
-    'Pay House':      [],
-    'Section':        [],
-    'Unit':           [],
-  });
 
-  // Convenience: selected IDs for the currently active tab
+  // ── Per-tab selections — each tab keeps its own checked IDs independently ─
+  const [selectedGroupsMap, setSelectedGroupsMap]   = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
   const selectedGroups = selectedGroupsMap[activeTab] ?? [];
-
   const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) => {
     setSelectedGroupsMap(prev => ({
       ...prev,
@@ -60,32 +55,30 @@ export function UpdateFlexiBreakPage() {
     }));
   };
 
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
-  const [currentGroupPage, setCurrentGroupPage]   = useState(1);
-  const [currentEmpPage, setCurrentEmpPage]       = useState(1);
-  const [isUpdating, setIsUpdating]               = useState(false);
+  const [selectedEmployees,  setSelectedEmployees]  = useState<number[]>([]);
+  const [currentGroupPage,   setCurrentGroupPage]   = useState(1);
+  const [currentEmpPage,     setCurrentEmpPage]     = useState(1);
+  const [isUpdating,         setIsUpdating]         = useState(false);
   const itemsPerPage = 10;
 
-  // ── Group list states ──────────────────────────────────────────────────────
-  const [tkGroupItems,        setTKSGroupItems]       = useState<GroupItem[]>([]);
-  const [branchItems,         setBranchItems]         = useState<GroupItem[]>([]);
-  const [departmentItems,     setDepartmentItems]     = useState<GroupItem[]>([]);
-  const [divisionItems,       setDivisionItems]       = useState<GroupItem[]>([]);
-  const [groupScheduleItems,  setGroupScheduleItems]  = useState<GroupItem[]>([]);
-  const [payHouseItems,       setPayHouseItems]       = useState<GroupItem[]>([]);
-  const [sectionItems,        setSectionItems]        = useState<GroupItem[]>([]);
-  const [unitItems,           setUnitItems]           = useState<GroupItem[]>([]);
+  // ── Group list states ─────────────────────────────────────────────────────
+  const [tkGroupItems,       setTKSGroupItems]      = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [divisionItems,      setDivisionItems]      = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
+  const [unitItems,          setUnitItems]          = useState<GroupItem[]>([]);
 
-  // ── Employee list states ───────────────────────────────────────────────────
+  // ── Employee list states ──────────────────────────────────────────────────
   const [employeeItems,    setEmployeeItems]    = useState<EmployeeItem[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
 
-  // ── Reset group page when tab changes ─────────────────────────────────────
-  useEffect(() => {
-    setCurrentGroupPage(1);
-  }, [activeTab]);
+  // ── Reset group page when tab changes ────────────────────────────────────
+  useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
 
-  // ── Load all group lists on mount ──────────────────────────────────────────
+  // ── Load all group lists on mount ─────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
@@ -107,14 +100,14 @@ export function UpdateFlexiBreakPage() {
             description: i[descKey] ?? i.description ?? '',
           }));
 
-        setTKSGroupItems(map(tks.data,  'ID',          'groupCode',        'groupDescription'));
-        setBranchItems(map(bra.data,    'braID',        'braCode',          'braDesc'));
-        setDepartmentItems(map(dep.data,'depID',        'depCode',          'depDesc'));
-        setDivisionItems(map(div.data,  'divID',        'divCode',          'divDesc'));
-        setGroupScheduleItems(map(grp.data,'grpSchID',  'grpCode',          'grpDesc'));
-        setPayHouseItems(map(pay.data,  'lineID',       'lineCode',         'lineDesc'));
-        setSectionItems(map(sec.data,   'secID',        'secCode',          'secDesc'));
-        setUnitItems(map(unit.data,     'unitID',       'unitCode',         'unitDesc'));
+        setTKSGroupItems(     map(tks.data,  'ID',       'groupCode',  'groupDescription'));
+        setBranchItems(       map(bra.data,  'braID',    'braCode',    'braDesc'));
+        setDepartmentItems(   map(dep.data,  'depID',    'depCode',    'depDesc'));
+        setDivisionItems(     map(div.data,  'divID',    'divCode',    'divDesc'));
+        setGroupScheduleItems(map(grp.data,  'grpSchID', 'grpCode',    'grpDesc'));
+        setPayHouseItems(     map(pay.data,  'lineID',   'lineCode',   'lineDesc'));
+        setSectionItems(      map(sec.data,  'secID',    'secCode',    'secDesc'));
+        setUnitItems(         map(unit.data, 'unitID',   'unitCode',   'unitDesc'));
       } catch (err) {
         console.error('Failed to load group lists:', err);
       }
@@ -122,7 +115,7 @@ export function UpdateFlexiBreakPage() {
     load();
   }, []);
 
-  // ── Helpers: get selected codes per tab ───────────────────────────────────
+  // ── Get current tab's data ────────────────────────────────────────────────
   const getCurrentData = useCallback((): GroupItem[] => {
     switch (activeTab) {
       case 'Branch':         return branchItems;
@@ -135,41 +128,38 @@ export function UpdateFlexiBreakPage() {
       default:               return tkGroupItems;
     }
   }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems,
-      groupScheduleItems, payHouseItems, sectionItems, unitItems]);
+       groupScheduleItems, payHouseItems, sectionItems, unitItems]);
 
-  // ── Build SP params from active tab + selected group IDs ──────────────────
+  // ── Build SP params from active tab + selected IDs ────────────────────────
   const buildSpParams = useCallback((
     tab: TabName,
     selectedIds: number[],
     allItems: GroupItem[],
     status: 'active' | 'inactive' | 'all'
   ) => {
-    // Map selected IDs → codes
     const selectedCodes = allItems
       .filter(i => selectedIds.includes(i.id))
       .map(i => i.code)
       .join(',');
 
-    const empty = '';
-
     return {
       Transaction:    status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
-      GroupCodes:     tab === 'TK Group'        ? selectedCodes : empty,
-      Branches:       tab === 'Branch'          ? selectedCodes : empty,
-      Divisions:      tab === 'Division'        ? selectedCodes : empty,
-      Departments:    tab === 'Department'      ? selectedCodes : empty,
-      Sections:       tab === 'Section'         ? selectedCodes : empty,
-      Units:          tab === 'Unit'            ? selectedCodes : empty,
-      Lines:          empty,
-      Areas:          empty,
-      Locations:      empty,
-      GroupSchedules: tab === 'Group Schedule'  ? selectedCodes : empty,
+      GroupCodes:     tab === 'TK Group'       ? selectedCodes : '',
+      Branches:       tab === 'Branch'         ? selectedCodes : '',
+      Divisions:      tab === 'Division'       ? selectedCodes : '',
+      Departments:    tab === 'Department'     ? selectedCodes : '',
+      Sections:       tab === 'Section'        ? selectedCodes : '',
+      Units:          tab === 'Unit'           ? selectedCodes : '',
+      Lines:          '',
+      Areas:          '',
+      Locations:      '',
+      GroupSchedules: tab === 'Group Schedule' ? selectedCodes : '',
     };
   }, []);
 
-  // ── Fetch employees ────────────────────────────────────────────────────────
-  // No groups selected → GET /Maintenance/EmployeeMasterFile  (always, regardless of status)
-  // Groups selected    → POST /Utilities/GetFilteredEmployees (SP with status + group codes)
+  // ── Fetch employees ───────────────────────────────────────────────────────
+  // No groups selected → GET /Maintenance/EmployeeMasterFile
+  // Groups selected    → POST /Utilities/GetFilteredEmployees
   const fetchFilteredEmployees = useCallback(async (
     tab: TabName,
     selectedIds: number[],
@@ -178,10 +168,8 @@ export function UpdateFlexiBreakPage() {
   ) => {
     setLoadingEmployees(true);
     setCurrentEmpPage(1);
-
     try {
       if (selectedIds.length === 0) {
-        // ── No groups selected → full master file (status filter handled client-side) ──
         const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
         const list = Array.isArray(response.data) ? response.data : [];
         setEmployeeItems(list.map((item: any): EmployeeItem => ({
@@ -190,7 +178,6 @@ export function UpdateFlexiBreakPage() {
           name: `${item.lName ?? ''}, ${item.fName ?? ''} ${item.mName ?? ''}`.trim(),
         })));
       } else {
-        // ── Groups selected → call SP, pass status + selected group codes ─────
         const params = buildSpParams(tab, selectedIds, allItems, status);
         const response = await apiClient.post('/Utilities/GetFilteredEmployees', params);
         const list = Array.isArray(response.data) ? response.data : [];
@@ -208,13 +195,12 @@ export function UpdateFlexiBreakPage() {
     }
   }, [buildSpParams]);
 
-  // ── Re-fetch employees when tab / selection / status changes ──────────────
+  // ── Re-fetch when tab / selection / status changes ────────────────────────
   useEffect(() => {
     const allItems = getCurrentData();
     fetchFilteredEmployees(activeTab, selectedGroups, allItems, statusFilter);
-    // Also clear employee selection when filter changes
     setSelectedEmployees([]);
-  }, [activeTab, selectedGroups, statusFilter]);  // eslint-disable-line
+  }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
 
   const getSelectionTitle = () => {
     switch (activeTab) {
@@ -231,30 +217,27 @@ export function UpdateFlexiBreakPage() {
   };
 
   // ── Filtered + paginated groups ───────────────────────────────────────────
-  const currentItems = getCurrentData();
-
+  const currentItems   = getCurrentData();
   const filteredGroups = currentItems.filter(item =>
     item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
-
-  const totalGroupPages   = Math.ceil(filteredGroups.length / itemsPerPage);
-  const startGroupIndex   = (currentGroupPage - 1) * itemsPerPage;
-  const endGroupIndex     = startGroupIndex + itemsPerPage;
-  const paginatedGroups   = filteredGroups.slice(startGroupIndex, endGroupIndex);
+  const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
+  const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
+  const endGroupIndex   = startGroupIndex + itemsPerPage;
+  const paginatedGroups = filteredGroups.slice(startGroupIndex, endGroupIndex);
 
   // ── Filtered + paginated employees ────────────────────────────────────────
   const filteredEmployees = employeeItems.filter(emp =>
     emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
     emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
-
   const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
   const startEmpIndex      = (currentEmpPage - 1) * itemsPerPage;
   const endEmpIndex        = startEmpIndex + itemsPerPage;
   const paginatedEmployees = filteredEmployees.slice(startEmpIndex, endEmpIndex);
 
-  // ── Pagination page numbers ────────────────────────────────────────────────
+  // ── Pagination helper ─────────────────────────────────────────────────────
   const getPageNumbers = (current: number, total: number) => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: (number | string)[] = [];
@@ -272,7 +255,7 @@ export function UpdateFlexiBreakPage() {
     return pages;
   };
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleGroupToggle = (id: number) =>
     setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
@@ -280,14 +263,10 @@ export function UpdateFlexiBreakPage() {
     setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const handleSelectAllGroups = () =>
-    setSelectedGroups(
-      selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id)
-    );
+    setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
 
   const handleSelectAllEmployees = () =>
-    setSelectedEmployees(
-      selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id)
-    );
+    setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
@@ -297,47 +276,37 @@ export function UpdateFlexiBreakPage() {
       setIsUpdating(true);
       const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
-        empCodes: selectedEmployees.map(id =>
-          employeeItems.find(e => e.id === id)?.code ?? String(id)
-        ),
-        DateFrom: toISO(dateFrom),
-        DateTo:   toISO(dateTo),
+        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
+        userName: getLoggedInUsername(),
+        doNotIncludeResignedEmp: false,
       };
 
-      const res = await apiClient.post('/Utilities/UpdateFlexiBreakByDate', payload);
-      if (ApiService.isApiSuccess(res)) {
-        await showSuccessModal('Flexi Break settings successfully updated.');
-        // Clear selections across ALL tabs
-        setSelectedGroupsMap({
-          'TK Group':       [],
-          'Branch':         [],
-          'Department':     [],
-          'Division':       [],
-          'Group Schedule': [],
-          'Pay House':      [],
-          'Section':        [],
-          'Unit':           [],
-        });
+      const res = await apiClient.post('/Utilities/UpdateRawDataOnline', payload);
+      if (res.data?.success) {
+        const affected = res.data.recordsAffected ?? 0;
+        const message  = res.data.message ?? 'Raw data updated successfully.';
+        await showSuccessModal(`${message}\nRecords Affected: ${affected}`);
+        setSelectedGroupsMap({ ...EMPTY_SELECTION });
         setSelectedEmployees([]);
         setDateFrom('');
         setDateTo('');
+      } else {
+        await showErrorModal(res.data?.message ?? 'Failed to update records.');
       }
-    } catch {
-      await showErrorModal('Failed to update records.');
+    } catch (err: any) {
+      const message = err?.response?.data?.message ?? 'Failed to update records.';
+      await showErrorModal(message);
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // ── Pagination row renderer ────────────────────────────────────────────────
+  // ── Pagination renderer ───────────────────────────────────────────────────
   const renderPagination = (
-    current: number,
-    total: number,
-    setPage: (p: number) => void,
-    startIdx: number,
-    endIdx: number,
-    totalCount: number,
-    label = 'entries'
+    current: number, total: number, setPage: (p: number) => void,
+    startIdx: number, endIdx: number, totalCount: number, label = 'entries'
   ) => (
     <div className="flex items-center justify-between mt-3">
       <span className="text-xs text-gray-500">
@@ -364,7 +333,7 @@ export function UpdateFlexiBreakPage() {
     </div>
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 p-6">
@@ -372,7 +341,7 @@ export function UpdateFlexiBreakPage() {
 
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
-            <h1 className="text-white">Update Flexi Break Utility</h1>
+            <h1 className="text-white">Update Rawdata Online</h1>
           </div>
 
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
@@ -384,19 +353,24 @@ export function UpdateFlexiBreakPage() {
                   <AlertCircle className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-700 mb-3">
-                    Update flexible break configurations for selected employees. Apply customized break time policies
-                    and manage break hour allocations based on workshift requirements.
-                  </p>
+                  <p className="text-sm text-gray-700 mb-3">Update existing raw attendance data in bulk. Upload Excel files to modify employee time records, correct attendance entries, and update timekeeping information for selected date ranges.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    {['Select groups and employees', 'Filter by employee status',
-                      'Set date range for updates',  'Batch update flexi break settings'
-                    ].map(t => (
-                      <div key={t} className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-600">{t}</span>
-                      </div>
-                    ))}
+                    <div key="Select groups and employees" className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Update raw attendance records by date range</span>
+                    </div>
+                    <div key="Filter by employee status" className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Modify existing employee time entries</span>
+                    </div>
+                    <div key="Set date range for updates" className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Set date range for updates</span>
+                    </div>
+                    <div key="Batch update assumed days settings" className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Batch process multiple attendance corrections</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -424,7 +398,7 @@ export function UpdateFlexiBreakPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                   
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm}

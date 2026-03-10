@@ -10,7 +10,7 @@ import { decryptData } from '../services/encryptionService';
 
 const SECRET_KEY = "128bl3$$1ng$";
 const SALT       = "bl3$$1ng$128";
-
+const KeySize    = 256 / 8; 
 let cached: { key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray } | null = null;
 
 function getKeyAndIV() {
@@ -19,7 +19,7 @@ function getKeyAndIV() {
   const saltBytes = CryptoJS.enc.Utf16LE.parse(SALT);
 
   const derived = CryptoJS.PBKDF2(SECRET_KEY, saltBytes, {
-    keySize:    12,
+    keySize:    KeySize,
     iterations: 1000,
     hasher:     CryptoJS.algo.SHA1,
   });
