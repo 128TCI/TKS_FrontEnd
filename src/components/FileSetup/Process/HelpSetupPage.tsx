@@ -42,38 +42,36 @@ export function HelpSetupPage() {
   const itemsPerPage = 10;
 
   // Permissions
-    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-    const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
-    useEffect(() => {
-      getHelpSetupPermissions();
-    }, []);
-  
-    const getHelpSetupPermissions = () => {
-      const rawPayload = localStorage.getItem("loginPayload");
-      if (!rawPayload) return;
-  
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-        const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-        const branchEntries = encryptedArray.filter(
-          (p) => decryptData(p.formName) === "HelpSetUp"
-        );
-  
-        // Build a map: { Add: true, Edit: true, ... }
-        const permMap: Record<string, boolean> = {};
-        branchEntries.forEach((p) => {
-          const accessType = decryptData(p.accessTypeName);
-          if (accessType) permMap[accessType] = true;
-        });
-  
-        setPermissions(permMap);
-  
-      } catch (e) {
-        console.error("Error parsing or decrypting payload", e);
-      }
-    };
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
+
+  useEffect(() => {
+    getHelpSetupPermissions();
+  }, []);
+
+  const getHelpSetupPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "HelpSetUp"
+      );
+
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -105,6 +103,13 @@ export function HelpSetupPage() {
       window.open(getFileUrl(fileName), '_blank', 'noopener,noreferrer');
     }
   };
+
+  // ── Validation helpers ────────────────────────────────────────────────────
+  // Matches backend: CheckCodeIfRegularExpression (alphanumeric + hyphen/underscore, no spaces)
+  const isValidCode = (value: string): boolean => /^[a-zA-Z0-9\-_]+$/.test(value.trim());
+
+  // Matches backend: CheckCodeIfRegularExpressionWithSpace (alphanumeric with spaces allowed)
+  const isValidDescription = (value: string): boolean => /^[a-zA-Z0-9\s\-_]*$/.test(value.trim());
 
   // ── Filter / paginate ─────────────────────────────────────────────────────
   const filteredData = helpItems.filter(item =>
@@ -178,13 +183,44 @@ export function HelpSetupPage() {
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Matches backend: string.IsNullOrEmpty(model.Code)
     if (!formData.code.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
       return;
     }
 
-    if (helpItems.some(item => item.code.toLowerCase() === formData.code.trim().toLowerCase())) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'This code is already in use. Please use a different one.' });
+    // Matches backend: string.IsNullOrEmpty(model.Description)
+    if (!formData.description.trim()) {
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' });
+      return;
+    }
+
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.code)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Code.' });
+      return;
+    }
+
+    // Matches backend: CheckCodeIfRegularExpressionWithSpace
+    if (!isValidDescription(formData.description)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Description.' });
+      return;
+    }
+
+    // Matches backend: duplicate Code check (case-insensitive, trimmed)
+    if (helpItems.some(item => item.code.trim().toUpperCase() === formData.code.trim().toUpperCase())) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      return;
+    }
+
+    // Matches backend: duplicate Description check (case-insensitive, trimmed, null-safe)
+    const normalizedInputDesc = formData.description.trim().toUpperCase().replace(/\s+/g, ' ');
+    const isDuplicateDesc = helpItems.some(item => {
+      const normalizedExisting = (item.description ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+      return normalizedExisting === normalizedInputDesc && normalizedExisting.length > 0;
+    });
+    if (isDuplicateDesc) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
       return;
     }
 
@@ -223,13 +259,45 @@ export function HelpSetupPage() {
     e.preventDefault();
     if (!editingItem) return;
 
+    // Matches backend: string.IsNullOrEmpty(model.Code)
     if (!formData.code.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
       return;
     }
 
-    if (helpItems.some(item => item.id !== editingItem.id && item.code.toLowerCase() === formData.code.trim().toLowerCase())) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'This code is already in use. Please use a different one.' });
+    // Matches backend: string.IsNullOrEmpty(model.Description)
+    if (!formData.description.trim()) {
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' });
+      return;
+    }
+
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.code)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Code.' });
+      return;
+    }
+
+    // Matches backend: CheckCodeIfRegularExpressionWithSpace
+    if (!isValidDescription(formData.description)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Description.' });
+      return;
+    }
+
+    // Matches backend: duplicate Code check (case-insensitive, trimmed), skip current record
+    if (helpItems.some(item => item.id !== editingItem.id && item.code.trim().toUpperCase() === formData.code.trim().toUpperCase())) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      return;
+    }
+
+    // Matches backend: duplicate Description check (case-insensitive, trimmed, null-safe), skip current record
+    const normalizedInputDesc = formData.description.trim().toUpperCase().replace(/\s+/g, ' ');
+    const isDuplicateDesc = helpItems.some(item => {
+      if (item.id === editingItem.id) return false;
+      const normalizedExisting = (item.description ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+      return normalizedExisting === normalizedInputDesc && normalizedExisting.length > 0;
+    });
+    if (isDuplicateDesc) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
       return;
     }
 
@@ -328,7 +396,6 @@ export function HelpSetupPage() {
             <div className="flex items-center gap-3">
               <label className="text-gray-900 text-sm whitespace-nowrap w-32">File Name :</label>
               <div className="flex-1 flex items-center gap-2 flex-wrap">
-                {/* hidden native input – unique id per mode */}
                 <input
                   type="file"
                   onChange={handleFileChange}
@@ -342,12 +409,10 @@ export function HelpSetupPage() {
                   Choose File
                 </label>
 
-                {/* display name */}
                 <span className="text-sm text-gray-600">
                   {selectedFile ? selectedFile.name : formData.fileName || 'No file chosen'}
                 </span>
 
-                {/* "View file" button – only when editing AND there is an existing fileName */}
                 {isEdit && formData.fileName && (
                   <button
                     type="button"
@@ -425,11 +490,11 @@ export function HelpSetupPage() {
             {hasPermission('View') && (
             <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
               {hasPermission('Add') && (
-                <button 
-                  onClick={handleCreateNew} 
+                <button
+                  onClick={handleCreateNew}
                   className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
                   <Plus className="w-4 h-4" /> Create New
-              </button>
+                </button>
               )}
               {hasPermission('View') && (
                 <div className="flex items-center gap-2">
@@ -490,7 +555,7 @@ export function HelpSetupPage() {
                               </button>
                             )}
                             {hasPermission("Edit") && hasPermission("Delete") && (
-                                <span className="text-gray-300">|</span>
+                              <span className="text-gray-300">|</span>
                             )}
                             {hasPermission('Delete') && (
                               <button onClick={() => handleDelete(item)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
@@ -509,10 +574,10 @@ export function HelpSetupPage() {
                     )}
                   </tbody>
                 </table>
-                ) : (
-                  <div className="text-center py-10 text-gray-500">
-                      You do not have permission to view this list.
-                  </div>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+                </div>
               )}
             </div>
 

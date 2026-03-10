@@ -7,6 +7,7 @@ import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
 
 const formName = 'Company Information SetUp';
+
 interface CompanyInformationProps {
   onBack?: () => void;
 }
@@ -58,8 +59,18 @@ interface CompanyData {
   enableAutoPairingLogsFlag: boolean;
   enableAppOTRawDataFlag: boolean;
   enable2ndShiftRawDataFlag: boolean;
-  registeredDatabase: string
+  // License Policy fields (from API response)
+  serverName: string | null;
+  maxNoOfCompanies: string | null;
+  maxNoOfEmployees: string | null;
+  registeredDatabase: string | null;
+}
 
+interface CompanyConfigData {
+  id: number;
+  numberOfAttempts: number;
+  numberOfSeconds: number;
+  passwordAge: number;
 }
 
 export function CompanyInformation({ onBack }: CompanyInformationProps) {
@@ -68,10 +79,13 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [formData, setFormData] = useState<CompanyData | null>(null);
 
+  // Config state (numberOfAttempts, numberOfSeconds, passwordAge)
+  const [configData, setConfigData] = useState<CompanyConfigData | null>(null);
+  const [configForm, setConfigForm] = useState<CompanyConfigData | null>(null);
+
   // Permissions
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-  const hasPermission = (accessType: string) =>
-    permissions[accessType] === true;
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
 
   useEffect(() => {
     getCompanyInformationSetUpPermissions();
@@ -80,109 +94,114 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
   const getCompanyInformationSetUpPermissions = () => {
     const rawPayload = localStorage.getItem("loginPayload");
     if (!rawPayload) return;
-
     try {
       const parsedPayload = JSON.parse(rawPayload);
       const encryptedArray: any[] = parsedPayload.permissions || [];
-
       const branchEntries = encryptedArray.filter(
         (p) => decryptData(p.formName) === "CompanyInformationSetUp",
       );
-
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
         if (accessType) permMap[accessType] = true;
       });
-
       setPermissions(permMap);
     } catch (e) {
       console.error("Error parsing or decrypting payload", e);
     }
   };
 
-  // Fetch company information on component mount
   useEffect(() => {
-    fetchCompanyInformation();
+    fetchAll();
   }, []);
 
-  const fetchCompanyInformation = async () => {
+  // Fetch both endpoints in parallel
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const [companyRes, configRes] = await Promise.all([
+        apiClient.get("/Fs/System/CompanyInformation"),
+        apiClient.get("/Fs/System/CompanyInformation/Config"),
+      ]);
 
-      if (response.status === 200 && response.data) {
-        // Assuming the API returns an array and we want the first item
-        const data = Array.isArray(response.data)
-          ? response.data[0]
-          : response.data;
+      if (companyRes.status === 200 && companyRes.data) {
+        const data = Array.isArray(companyRes.data)
+          ? companyRes.data[0]
+          : companyRes.data;
         setCompanyData(data);
         setFormData(data);
+      }
+
+      if (configRes.status === 200 && configRes.data) {
+        const cfg = Array.isArray(configRes.data)
+          ? configRes.data[0]
+          : configRes.data;
+        setConfigData(cfg);
+        setConfigForm(cfg);
       }
     } catch (error: any) {
       const errorMsg =
         error.response?.data?.message ||
         error.message ||
         "Failed to load company information";
-      await Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: "error", title: "Error", text: errorMsg });
       console.error("Error fetching company information:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
+  const handleEdit = () => setIsEditing(true);
 
   const handleSave = async () => {
     if (!formData) return;
-
     try {
       setLoading(true);
 
-      const response = await apiClient.put(
-        "/Fs/System/CompanyInformation",
-        formData,
-      );
+      // Save both endpoints in parallel
+      const [companyRes, configRes] = await Promise.all([
+        apiClient.put("/Fs/System/CompanyInformation", formData),
+        configForm
+          ? apiClient.put("/Fs/System/CompanyInformation/Config", configForm)
+          : Promise.resolve(null),
+      ]);
 
-      if (response.status === 200) {
-        const updatedData = response.data;
+      if (companyRes.status === 200) {
+        const updatedData = companyRes.data;
         setCompanyData(updatedData);
         setFormData(updatedData);
-        setIsEditing(false);
-        await auditTrail.log({
-          accessType: "Edit",
-          trans: "Updated company information",
-          messages: `Company information updated: ${JSON.stringify(updatedData)}`,
-          formName: formName,
-        });
-
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Company information updated successfully!",
-          timer: 2000,
-          showConfirmButton: false,
-        });
       }
+
+      if (configRes && configRes.status === 200) {
+        const updatedCfg = Array.isArray(configRes.data)
+          ? configRes.data[0]
+          : configRes.data;
+        setConfigData(updatedCfg);
+        setConfigForm(updatedCfg);
+      }
+
+      setIsEditing(false);
+
+      await auditTrail.log({
+        accessType: "Edit",
+        trans: "Updated company information",
+        messages: `Company information updated: ${JSON.stringify(companyRes.data)}`,
+        formName: formName,
+      });
+
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Company information updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (error: any) {
       const errorMsg =
         error.response?.data?.message ||
         error.message ||
         "Failed to save changes";
-
-      await Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: errorMsg,
-      });
-
+      await Swal.fire({ icon: "error", title: "Error", text: errorMsg });
       console.error("Error updating company information:", error);
     } finally {
       setLoading(false);
@@ -191,22 +210,62 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
 
   const handleCancel = () => {
     setFormData(companyData);
+    setConfigForm(configData);
     setIsEditing(false);
   };
 
   const handleInputChange = (field: keyof CompanyData, value: any) => {
     if (formData) {
-      setFormData({
-        ...formData,
-        [field]: value,
-      });
+      setFormData({ ...formData, [field]: value });
     }
   };
 
+  const handleConfigChange = (field: keyof CompanyConfigData, value: any) => {
+    if (configForm) {
+      setConfigForm({ ...configForm, [field]: value });
+    }
+  };
+
+  // ── Image upload handlers ─────────────────────────────────────────────────
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => handleInputChange("companyLogo", reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleLogoRemove = () => handleInputChange("companyLogo", null);
+
+  const handleSiteLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => handleInputChange("siteLogo", reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleSiteLogoRemove = () => handleInputChange("siteLogo", null);
+
+  const handleSiteContentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => handleInputChange("siteContent", reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleSiteContentRemove = () => handleInputChange("siteContent", null);
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US");
+    return new Date(dateString).toLocaleDateString("en-US");
   };
 
   if (loading && !formData) {
@@ -219,7 +278,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Page Header */}
@@ -229,66 +287,46 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
 
           {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
+            {/* Info Banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Configure essential company details including identification
-                    numbers, addresses, contact information, database paths, and
-                    system policies. Upload company and site logos to customize
-                    the application appearance.
+                    Configure essential company details including identification numbers, addresses,
+                    contact information, database paths, and system policies. Upload company and site
+                    logos to customize the application appearance.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">
-                        Company registration details
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">
-                        Government ID numbers
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">
-                        Database path configuration
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">
-                        Logo and branding management
-                      </span>
-                    </div>
+                    {[
+                      "Company registration details",
+                      "Government ID numbers",
+                      "Database path configuration",
+                      "Logo and branding management",
+                    ].map((item) => (
+                      <div key={item} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">{item}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
+
             {hasPermission("View") ? (
               <div className="grid grid-cols-12 gap-6 p-6 pt-0">
-                {/* Left Sidebar - Logo Upload */}
+
+                {/* ── Left Sidebar – Company Logo ── */}
                 <div className="col-span-3">
                   <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                    <div className="aspect-square bg-white border-2 border-dashed border-gray-300 rounded-lg mb-4 flex items-center justify-center">
+                    {/* Preview */}
+                    <div className="aspect-square bg-white border-2 border-dashed border-gray-300 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
                       {formData?.companyLogo ? (
                         <img
                           src={formData.companyLogo}
@@ -296,163 +334,152 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           className="max-w-full max-h-full object-contain"
                         />
                       ) : (
-                        <span className="text-gray-400">Company Logo</span>
+                        <span className="text-gray-400 text-sm text-center px-2">
+                          Company Logo
+                        </span>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      <label className="block">
-                        <input
-                          type="file"
-                          className="hidden"
-                          disabled={!isEditing}
-                        />
-                        <span
-                          className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors ${isEditing ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed opacity-50"}`}
-                        >
-                          Choose File
-                        </span>
+
+                    <input
+                      id="company-logo-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={!isEditing}
+                      onChange={handleLogoUpload}
+                    />
+                    <label
+                      htmlFor="company-logo-input"
+                      className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors mb-2 ${
+                        isEditing ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      Choose File
+                    </label>
+                    <div className="flex gap-2">
+                      <label
+                        htmlFor="company-logo-input"
+                        className={`flex-1 px-4 py-2 bg-blue-500 text-white rounded transition-colors flex items-center justify-center gap-2 ${
+                          isEditing
+                            ? "cursor-pointer hover:bg-blue-600"
+                            : "opacity-50 cursor-not-allowed pointer-events-none"
+                        }`}
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload
                       </label>
-                      <div className="flex gap-2">
-                        <button
-                          className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={!isEditing}
-                        >
-                          <Upload className="w-4 h-4" />
-                          Upload
-                        </button>
-                        <button
-                          className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={!isEditing}
-                        >
-                          <X className="w-4 h-4" />
-                          Remove
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                        onClick={handleLogoRemove}
+                      >
+                        <X className="w-4 h-4" />
+                        Remove
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Main Content Area */}
+                {/* ── Main Content ── */}
                 <div className="col-span-9 space-y-6">
+
                   {/* Basic Information */}
                   <div className="grid grid-cols-2 gap-4">
+                    {/* Code + Edit/Save/Cancel buttons */}
                     <div className="col-span-2">
-                      {hasPermission("View") && (
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="block text-gray-700">Code</label>
-
-                          <div className="flex gap-2">
-                            {hasPermission("Edit") && (
-                              <>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-gray-700">Code</label>
+                        <div className="flex gap-2">
+                          {hasPermission("Edit") && (
+                            <>
+                              <button
+                                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-sm ${
+                                  isEditing
+                                    ? "bg-green-600 text-white hover:bg-green-700"
+                                    : "bg-gray-600 text-white hover:bg-gray-700"
+                                }`}
+                                onClick={isEditing ? handleSave : handleEdit}
+                                disabled={loading}
+                              >
+                                {isEditing ? (
+                                  <><Save className="w-4 h-4" />Save</>
+                                ) : (
+                                  <><Pencil className="w-4 h-4" />Edit</>
+                                )}
+                              </button>
+                              {isEditing && (
                                 <button
-                                  className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-sm ${
-                                    isEditing
-                                      ? "bg-green-600 text-white hover:bg-green-700"
-                                      : "bg-gray-600 text-white hover:bg-gray-700"
-                                  }`}
-                                  onClick={isEditing ? handleSave : handleEdit}
+                                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
+                                  onClick={handleCancel}
                                   disabled={loading}
                                 >
-                                  {isEditing ? (
-                                    <>
-                                      <Save className="w-4 h-4" />
-                                      Save
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Pencil className="w-4 h-4" />
-                                      Edit
-                                    </>
-                                  )}
+                                  <X className="w-4 h-4" />Cancel
                                 </button>
-
-                                {isEditing && (
-                                  <button
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
-                                    onClick={handleCancel}
-                                    disabled={loading}
-                                  >
-                                    <X className="w-4 h-4" />
-                                    Cancel
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                      )}
+                      </div>
                       <input
                         type="text"
                         value={formData?.companyCode || ""}
-                        onChange={(e) =>
-                          handleInputChange("companyCode", e.target.value)
-                        }
+                        onChange={(e) => handleInputChange("companyCode", e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
                     </div>
+
                     <div className="col-span-2">
                       <label className="block text-gray-700 mb-2">Name</label>
                       <input
                         type="text"
                         value={formData?.companyName || ""}
-                        onChange={(e) =>
-                          handleInputChange("companyName", e.target.value)
-                        }
+                        onChange={(e) => handleInputChange("companyName", e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
                     </div>
+
                     <div className="col-span-2">
-                      <label className="block text-gray-700 mb-2">
-                        Address
-                      </label>
+                      <label className="block text-gray-700 mb-2">Address</label>
                       <input
                         type="text"
                         value={formData?.address || ""}
-                        onChange={(e) =>
-                          handleInputChange("address", e.target.value)
-                        }
+                        onChange={(e) => handleInputChange("address", e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
                     </div>
+
                     <div>
                       <label className="block text-gray-700 mb-2">City</label>
                       <input
                         type="text"
                         value={formData?.city || ""}
-                        onChange={(e) =>
-                          handleInputChange("city", e.target.value)
-                        }
+                        onChange={(e) => handleInputChange("city", e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
                     </div>
+
                     <div>
-                      <label className="block text-gray-700 mb-2">
-                        Province
-                      </label>
+                      <label className="block text-gray-700 mb-2">Province</label>
                       <input
                         type="text"
                         value={formData?.province || ""}
-                        onChange={(e) =>
-                          handleInputChange("province", e.target.value)
-                        }
+                        onChange={(e) => handleInputChange("province", e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
                     </div>
+
                     <div className="col-span-2">
-                      <label className="block text-gray-700 mb-2">
-                        ZIP Code
-                      </label>
+                      <label className="block text-gray-700 mb-2">ZIP Code</label>
                       <input
                         type="text"
                         value={formData?.zipCode || ""}
-                        onChange={(e) =>
-                          handleInputChange("zipCode", e.target.value)
-                        }
+                        onChange={(e) => handleInputChange("zipCode", e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         readOnly={!isEditing}
                       />
@@ -463,118 +490,42 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                   <div className="grid grid-cols-2 gap-6">
                     {/* Left Column */}
                     <div className="space-y-4">
+                      {[
+                        { label: "SSS No.", field: "sssNo" as keyof CompanyData },
+                        { label: "Philhealth No", field: "philHealthNo" as keyof CompanyData },
+                        { label: "Pagibig No :", field: "pag_Ibig" as keyof CompanyData },
+                        { label: "Tin No :", field: "tin" as keyof CompanyData },
+                        { label: "Branch Code (BIR) :", field: "biR_BRNCode" as keyof CompanyData },
+                        { label: "GSIS No.", field: "gsisNo" as keyof CompanyData },
+                      ].map(({ label, field }) => (
+                        <div key={field}>
+                          <label className="block text-gray-700 mb-2">{label}</label>
+                          <input
+                            type="text"
+                            value={(formData?.[field] as string) || ""}
+                            onChange={(e) => handleInputChange(field, e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            readOnly={!isEditing}
+                          />
+                        </div>
+                      ))}
+
                       <div>
-                        <label className="block text-gray-700 mb-2">
-                          SSS No.
-                        </label>
+                        <label className="block text-gray-700 mb-2">Business Cycle From</label>
                         <input
                           type="text"
-                          value={formData?.sssNo || ""}
-                          onChange={(e) =>
-                            handleInputChange("sssNo", e.target.value)
-                          }
+                          value={formData?.busFr ? formatDate(formData.busFr) : ""}
+                          onChange={(e) => handleInputChange("busFr", e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 mb-2">
-                          Philhealth No
-                        </label>
+                        <label className="block text-gray-700 mb-2">Business Cycle To</label>
                         <input
                           type="text"
-                          value={formData?.philHealthNo || ""}
-                          onChange={(e) =>
-                            handleInputChange("philHealthNo", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">
-                          Pagibig No :
-                        </label>
-                        <input
-                          type="text"
-                          value={formData?.pag_Ibig || ""}
-                          onChange={(e) =>
-                            handleInputChange("pag_Ibig", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">
-                          Tin No :
-                        </label>
-                        <input
-                          type="text"
-                          value={formData?.tin || ""}
-                          onChange={(e) =>
-                            handleInputChange("tin", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">
-                          Branch Code (BIR) :
-                        </label>
-                        <input
-                          type="text"
-                          value={formData?.biR_BRNCode || ""}
-                          onChange={(e) =>
-                            handleInputChange("biR_BRNCode", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">
-                          GSIS No.
-                        </label>
-                        <input
-                          type="text"
-                          value={formData?.gsisNo || ""}
-                          onChange={(e) =>
-                            handleInputChange("gsisNo", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">
-                          Business Cycle From
-                        </label>
-                        <input
-                          type="text"
-                          value={
-                            formData?.busFr ? formatDate(formData.busFr) : ""
-                          }
-                          onChange={(e) =>
-                            handleInputChange("busFr", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">
-                          Business Cycle To
-                        </label>
-                        <input
-                          type="text"
-                          value={
-                            formData?.busTo ? formatDate(formData.busTo) : ""
-                          }
-                          onChange={(e) =>
-                            handleInputChange("busTo", e.target.value)
-                          }
+                          value={formData?.busTo ? formatDate(formData.busTo) : ""}
+                          onChange={(e) => handleInputChange("busTo", e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
@@ -584,405 +535,304 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                     {/* Right Column */}
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-gray-700 mb-2">
-                          Telephone
-                        </label>
+                        <label className="block text-gray-700 mb-2">Telephone</label>
                         <input
                           type="text"
-                          defaultValue="128PC-87\SQL2022"
-                          className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={formData?.telNo || ""}
+                          onChange={(e) => handleInputChange("telNo", e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 mb-2">
-                          Email
-                        </label>
+                        <label className="block text-gray-700 mb-2">Email</label>
                         <input
                           type="email"
                           value={formData?.email || ""}
-                          onChange={(e) =>
-                            handleInputChange("email", e.target.value)
-                          }
+                          onChange={(e) => handleInputChange("email", e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 mb-2">
-                          Hrs Database Path:
-                        </label>
+                        <label className="block text-gray-700 mb-2">Hrs Database Path:</label>
                         <input
                           type="text"
                           value={formData?.hrisPath || ""}
-                          onChange={(e) =>
-                            handleInputChange("hrisPath", e.target.value)
-                          }
+                          onChange={(e) => handleInputChange("hrisPath", e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 mb-2">
-                          Payroll Database Path:
-                        </label>
+                        <label className="block text-gray-700 mb-2">Payroll Database Path:</label>
                         <input
                           type="text"
                           value={formData?.payrollPath || ""}
-                          onChange={(e) =>
-                            handleInputChange("payrollPath", e.target.value)
-                          }
+                          onChange={(e) => handleInputChange("payrollPath", e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 mb-2">
-                          TKS Photo Path:
-                        </label>
+                        <label className="block text-gray-700 mb-2">TKS Photo Path:</label>
                         <input
                           type="text"
                           value={formData?.tksPhotoPath || ""}
-                          onChange={(e) =>
-                            handleInputChange("tksPhotoPath", e.target.value)
-                          }
+                          onChange={(e) => handleInputChange("tksPhotoPath", e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           readOnly={!isEditing}
                         />
                       </div>
+
+                      {/* Checkboxes */}
                       <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={formData?.otPremiumFlag || false}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "otPremiumFlag",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">
-                            Use OT Premium Breakdown
-                          </span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={formData?.terminalID || false}
-                            onChange={(e) =>
-                              handleInputChange("terminalID", e.target.checked)
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">With Terminal</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={formData?.validateLogs || false}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "validateLogs",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">Logs Validate</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={formData?.readOnlyTxtDate || false}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "readOnlyTxtDate",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">
-                            Read Only Textbox Date
-                          </span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={formData?.exportEmail || false}
-                            onChange={(e) =>
-                              handleInputChange("exportEmail", e.target.checked)
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">
-                            Export with Sending Email
-                          </span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={
-                              formData?.exportLateFilingDateFlag || false
-                            }
-                            onChange={(e) =>
-                              handleInputChange(
-                                "exportLateFilingDateFlag",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">
-                            Export Late Filing Date
-                          </span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={
-                              formData?.enableAutoPairingLogsFlag || false
-                            }
-                            onChange={(e) =>
-                              handleInputChange(
-                                "enableAutoPairingLogsFlag",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">
-                            Enable Auto Pairing Logs
-                          </span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={formData?.enableAppOTRawDataFlag || false}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "enableAppOTRawDataFlag",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">
-                            Enable Approved OT
-                          </span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={
-                              formData?.enable2ndShiftRawDataFlag || false
-                            }
-                            onChange={(e) =>
-                              handleInputChange(
-                                "enable2ndShiftRawDataFlag",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={!isEditing}
-                          />
-                          <span className="text-gray-700">
-                            Enable 2nd Shift in Raw Data
-                          </span>
-                        </label>
+                        {[
+                          { label: "Use OT Premium Breakdown", field: "otPremiumFlag" as keyof CompanyData },
+                          { label: "With Terminal", field: "terminalID" as keyof CompanyData },
+                          { label: "Logs Validate", field: "validateLogs" as keyof CompanyData },
+                          { label: "Read Only Textbox Date", field: "readOnlyTxtDate" as keyof CompanyData },
+                          { label: "Export with Sending Email", field: "exportEmail" as keyof CompanyData },
+                          { label: "Export Late Filing Date", field: "exportLateFilingDateFlag" as keyof CompanyData },
+                          { label: "Enable Auto Pairing Logs", field: "enableAutoPairingLogsFlag" as keyof CompanyData },
+                          { label: "Enable Approved OT", field: "enableAppOTRawDataFlag" as keyof CompanyData },
+                          { label: "Enable 2nd Shift in Raw Data", field: "enable2ndShiftRawDataFlag" as keyof CompanyData },
+                        ].map(({ label, field }) => (
+                          <label key={field} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              checked={(formData?.[field] as boolean) || false}
+                              onChange={(e) => handleInputChange(field, e.target.checked)}
+                              disabled={!isEditing}
+                            />
+                            <span className="text-gray-700">{label}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Company Config and License Policy Section */}
+                  {/* Company Config & License Policy */}
                   <div className="grid grid-cols-2 gap-6">
-                    {/* Company Config */}
+
+                    {/* Company Config — from /Fs/System/CompanyInformation/Config */}
                     <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
                       <h3 className="text-gray-800 mb-4">Company Config</h3>
                       <div className="space-y-3">
+
+                        {/* Number of Attempts */}
                         <div className="flex items-center justify-between">
-                          <label className="text-gray-700">
-                            Number of Attempts
-                          </label>
+                          <label className="text-gray-700 text-sm">Number of Attempts</label>
                           <input
-                            type="text"
-                            defaultValue="5"
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            type="number"
+                            value={configForm?.numberOfAttempts ?? ""}
+                            onChange={(e) =>
+                              handleConfigChange(
+                                "numberOfAttempts",
+                                e.target.value === "" ? 0 : Number(e.target.value),
+                              )
+                            }
+                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
                           />
                         </div>
+
+                        {/* Policy — from main CompanyData */}
                         <div className="flex items-center justify-between">
-                          <label className="text-gray-700">Policy</label>
+                          <label className="text-gray-700 text-sm">Policy</label>
                           <input
                             type="text"
                             value={formData?.policy || ""}
-                            onChange={(e) =>
-                              handleInputChange("policy", e.target.value)
-                            }
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onChange={(e) => handleInputChange("policy", e.target.value)}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
                           />
                         </div>
+
+                        {/* Password Age */}
                         <div className="flex items-center justify-between">
-                          <label className="text-gray-700">Password Age</label>
+                          <label className="text-gray-700 text-sm">Password Age</label>
                           <input
-                            type="text"
-                            defaultValue="5"
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            type="number"
+                            value={configForm?.passwordAge ?? ""}
+                            onChange={(e) =>
+                              handleConfigChange(
+                                "passwordAge",
+                                e.target.value === "" ? 0 : Number(e.target.value),
+                              )
+                            }
+                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
                           />
                         </div>
+
+                        {/* Enforce Password History — from main CompanyData */}
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             checked={formData?.passwordHistory || false}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "passwordHistory",
-                                e.target.checked,
-                              )
-                            }
+                            onChange={(e) => handleInputChange("passwordHistory", e.target.checked)}
                             disabled={!isEditing}
                           />
-                          <span className="text-gray-700">
-                            Enforce Password History
-                          </span>
+                          <span className="text-gray-700 text-sm">Enforce Password History</span>
                         </label>
                       </div>
                     </div>
 
-                    {/* License Policy */}
+                    {/* License Policy — from main CompanyData */}
                     <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
                       <h3 className="text-gray-800 mb-4">License Policy</h3>
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <label className="text-gray-700">Server Name:</label>
+                          <label className="text-gray-700 text-sm">Server Name:</label>
                           <input
                             type="text"
-                            defaultValue="TIMEKEEP128_VERSION910_Test"
-                            className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={formData?.serverName ?? ""}
+                            onChange={(e) => handleInputChange("serverName", e.target.value)}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
                           />
                         </div>
                         <div className="flex items-center justify-between">
-                          <label className="text-gray-700">
-                            Max No Companies:
-                          </label>
+                          <label className="text-gray-700 text-sm">Max No Companies:</label>
                           <input
                             type="text"
-                            defaultValue="Unlimited"
-                            className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={formData?.maxNoOfCompanies ?? ""}
+                            onChange={(e) => handleInputChange("maxNoOfCompanies", e.target.value)}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
                           />
                         </div>
                         <div className="flex items-center justify-between">
-                          <label className="text-gray-700">
-                            Max No Employees:
-                          </label>
+                          <label className="text-gray-700 text-sm">Max No Employees:</label>
                           <input
                             type="text"
-                            defaultValue="Unlimited"
-                            className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={formData?.maxNoOfEmployees ?? ""}
+                            onChange={(e) => handleInputChange("maxNoOfEmployees", e.target.value)}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
                           />
                         </div>
                         <div className="flex items-center justify-between">
-                          <label className="text-gray-700">
-                            Registered Database:
-                          </label>
+                          <label className="text-gray-700 text-sm">Registered Database:</label>
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
-                              value={formData?.registeredDatabase || ""}  
-                              className="w-50 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={formData?.registeredDatabase ?? ""}
+                              onChange={(e) => handleInputChange("registeredDatabase", e.target.value)}
+                              className="w-28 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                               readOnly={!isEditing}
                             />
+                            <button
+                              type="button"
+                              className="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={!isEditing}
+                            >
+                              ▶
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Site Logo and Content */}
+                  {/* Site Logo & Site Content */}
                   <div className="grid grid-cols-2 gap-6">
+                    {/* Site Logo */}
                     <div>
-                      <label className="block text-gray-700 mb-2">
-                        Site Logo :
+                      <label className="block text-gray-700 mb-2">Site Logo :</label>
+                      {formData?.siteLogo && (
+                        <div className="mb-2 w-full h-24 border border-gray-200 rounded overflow-hidden flex items-center justify-center bg-white">
+                          <img src={formData.siteLogo} alt="Site Logo" className="max-w-full max-h-full object-contain" />
+                        </div>
+                      )}
+                      <input
+                        id="site-logo-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={!isEditing}
+                        onChange={handleSiteLogoUpload}
+                      />
+                      <label
+                        htmlFor="site-logo-input"
+                        className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors mb-2 ${
+                          isEditing ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed opacity-50"
+                        }`}
+                      >
+                        Choose File
                       </label>
-                      <div className="flex gap-2 mb-2">
-                        <label className="flex-1">
-                          <input
-                            type="file"
-                            className="hidden"
-                            disabled={!isEditing}
-                          />
-                          <span
-                            className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors ${isEditing ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed opacity-50"}`}
-                          >
-                            Choose File
-                          </span>
-                        </label>
-                      </div>
                       <div className="flex gap-2">
-                        <button
-                          className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={!isEditing}
+                        <label
+                          htmlFor="site-logo-input"
+                          className={`flex-1 px-4 py-2 bg-blue-500 text-white rounded transition-colors flex items-center justify-center gap-2 ${
+                            isEditing
+                              ? "cursor-pointer hover:bg-blue-600"
+                              : "opacity-50 cursor-not-allowed pointer-events-none"
+                          }`}
                         >
-                          Upload
-                        </button>
+                          <Upload className="w-4 h-4" />Upload
+                        </label>
                         <button
-                          className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          type="button"
+                          className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={!isEditing}
+                          onClick={handleSiteLogoRemove}
                         >
-                          Remove
+                          <X className="w-4 h-4" />Remove
                         </button>
                       </div>
                     </div>
+
+                    {/* Site Content */}
                     <div>
-                      <label className="block text-gray-700 mb-2">
-                        Site Content :
+                      <label className="block text-gray-700 mb-2">Site Content :</label>
+                      {formData?.siteContent && (
+                        <div className="mb-2 w-full h-24 border border-gray-200 rounded overflow-hidden flex items-center justify-center bg-white">
+                          <img src={formData.siteContent} alt="Site Content" className="max-w-full max-h-full object-contain" />
+                        </div>
+                      )}
+                      <input
+                        id="site-content-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={!isEditing}
+                        onChange={handleSiteContentUpload}
+                      />
+                      <label
+                        htmlFor="site-content-input"
+                        className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors mb-2 ${
+                          isEditing ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed opacity-50"
+                        }`}
+                      >
+                        Choose File
                       </label>
-                      <div className="flex gap-2 mb-2">
-                        <label className="flex-1">
-                          <input
-                            type="file"
-                            className="hidden"
-                            disabled={!isEditing}
-                          />
-                          <span
-                            className={`block w-full px-4 py-2 bg-gray-200 text-gray-700 text-center rounded transition-colors ${isEditing ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed opacity-50"}`}
-                          >
-                            Choose File
-                          </span>
-                        </label>
-                      </div>
                       <div className="flex gap-2">
-                        <button
-                          className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={!isEditing}
+                        <label
+                          htmlFor="site-content-input"
+                          className={`flex-1 px-4 py-2 bg-blue-500 text-white rounded transition-colors flex items-center justify-center gap-2 ${
+                            isEditing
+                              ? "cursor-pointer hover:bg-blue-600"
+                              : "opacity-50 cursor-not-allowed pointer-events-none"
+                          }`}
                         >
-                          Upload
-                        </button>
+                          <Upload className="w-4 h-4" />Upload
+                        </label>
                         <button
-                          className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          type="button"
+                          className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={!isEditing}
+                          onClick={handleSiteContentRemove}
                         >
-                          Remove
+                          <X className="w-4 h-4" />Remove
                         </button>
                       </div>
                     </div>
                   </div>
+
                 </div>
               </div>
             ) : (
@@ -994,7 +844,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
         </div>
       </div>
 
-      {/* Footer */}
       <Footer />
     </div>
   );

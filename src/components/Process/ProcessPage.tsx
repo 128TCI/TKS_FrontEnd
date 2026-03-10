@@ -171,7 +171,8 @@ export function ProcessPage() {
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
-  const [dateApplied, setDateApplied] = useState('7/7/2021');
+const today = new Date();
+const [dateApplied, setDateApplied] = useState(`${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`);
   const [lateFiling, setLateFiling] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -476,13 +477,13 @@ const formatDate = (date: Date | undefined): string => {
       const newValue = !processOptions.selectAll;
       setProcessOptions({
         tardiness: newValue,
-        allowances: newValue,
+        allowances: false,
         undertime: newValue,
         overtime: newValue,
         selectAll: newValue,
         leaveAbsences: newValue,
         nightDifferentials: newValue,
-        regularWorking: newValue,
+        regularWorking: false,
         holidayPay: newValue
       });
     } else {
@@ -1080,7 +1081,7 @@ console.log(response);
                     ['undertime', 'Undertime'],
                     ['overtime', 'Overtime'],
                     ['leaveAbsences', 'Leave/Absences'],
-                    ['regularWorking', 'Regular Working'],
+                    ['regularWorking', 'Regular Working Days/Hours'],
                     ['allowances', 'Allowances'],
                     ['nightDifferentials', 'Night Differential'],
                     ['holidayPay', 'Holiday Pay'],
