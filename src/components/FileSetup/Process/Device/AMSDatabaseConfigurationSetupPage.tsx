@@ -1,14 +1,81 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, X, Check, Calendar, Edit, Trash2 } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Search, Plus, X, Check, Calendar, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
 import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
 import { CalendarPopup } from '../../../CalendarPopup';
+import CryptoJS from 'crypto-js';
 
+// ─── 3DES Encryption/Decryption ───────────────────────────────────────────────
+// Exactly matches C# TIME_KEEPING_WINDOWS.Security.Encrypt / Security.Decrypt
+// Algorithm : TripleDES | ECB mode | PKCS7 padding | MD5-hashed key | UTF-8
+
+const AMS_SECRET_KEY = "128TechInc";
+
+function getTripleDESKey(): CryptoJS.lib.WordArray {
+    // MD5 hash of the key string → 16-byte key used by 3DES
+    return CryptoJS.MD5(AMS_SECRET_KEY);
+}
+
+function encryptPassword(plainText: string): string {
+    if (!plainText) return "";
+    try {
+        const key = getTripleDESKey();
+        const encrypted = CryptoJS.TripleDES.encrypt(
+            CryptoJS.enc.Utf8.parse(plainText),
+            key,
+            {
+                mode:    CryptoJS.mode.ECB,
+                padding: CryptoJS.pad.Pkcs7,
+            }
+        );
+        return encrypted.toString(); // Base64 output — matches C# Convert.ToBase64String
+    } catch (error) {
+        console.error("Encryption Error:", error);
+        return "";
+    }
+}
+
+function decryptPassword(cipherText: string): string {
+    if (!cipherText) return "";
+    try {
+        const key = getTripleDESKey();
+        const decrypted = CryptoJS.TripleDES.decrypt(
+            cipherText,
+            key,
+            {
+                mode:    CryptoJS.mode.ECB,
+                padding: CryptoJS.pad.Pkcs7,
+            }
+        );
+        return decrypted.toString(CryptoJS.enc.Utf8); // UTF-8 output — matches C# UTF8Encoding.UTF8.GetString
+    } catch (error) {
+        console.error("Decryption Error:", error);
+        return "";
+    }
+}
+
+// ✅ Converts "MM/DD/YYYY" or any date string → ISO 8601 for the API (required field)
+function toISOString(dateStr: string | null | undefined): string {
+    if (!dateStr || dateStr.trim() === '') return new Date().toISOString();
+    const parsed = new Date(dateStr);
+    return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+// ✅ For nullable date fields — returns null if empty (matches C# Nullable<DateTime>)
+function toISOStringOrNull(dateStr: string | null | undefined): string | null {
+    if (!dateStr || dateStr.trim() === '') return null;
+    const parsed = new Date(dateStr);
+    return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 
 const formName = 'AMS Database Configuration SetUp';
+
 interface AMSDatabase {
     id: number;
     description: string;
@@ -29,10 +96,10 @@ interface AMSDatabase {
     empoyeeCodeIDCol: string;
     dateDaysAhead: number;
     lastDateUpdateReplica: string;
-    lastDateUpdateTo: string;
-    lastDateUpdateFlag: boolean;
-    lastDateUpdateFrom: string;
-    deviceNameCol: string;
+    lastDateUpdateTo: string | null;
+    lastDateUpdateFlag: boolean | null;
+    lastDateUpdateFrom: string | null;
+    deviceNameCol: string | null;
 }
 
 interface FlagCode {
@@ -58,6 +125,9 @@ export function AMSDatabaseConfigurationSetupPage() {
     const [flagSearchTerm, setFlagSearchTerm] = useState('');
     const [showCalendar, setShowCalendar] = useState<'lastDateUpdated' | 'lastDateUpdatedFrom' | 'lastDateUpdatedTo' | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    // ✅ Show/hide password toggle
+    const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState({
         description: '',
@@ -86,7 +156,6 @@ export function AMSDatabaseConfigurationSetupPage() {
     const [databases, setDatabases] = useState<AMSDatabase[]>([]);
     const [loadingDatabases, setLoadingDatabases] = useState(false);
     const [databasesError, setDatabasesError] = useState('');
-
     const [flagCodes, setFlagCodes] = useState<FlagCode[]>([]);
     const [loadingFlags, setLoadingFlags] = useState(false);
 
@@ -96,9 +165,7 @@ export function AMSDatabaseConfigurationSetupPage() {
     const [permissions, setPermissions] = useState<Record<string, boolean>>({});
     const hasPermission = (accessType: string) => permissions[accessType] === true;
 
-    useEffect(() => {
-        getAMSDatabaseConfigPermissions();
-    }, []);
+    useEffect(() => { getAMSDatabaseConfigPermissions(); }, []);
 
     const getAMSDatabaseConfigPermissions = () => {
         const rawPayload = localStorage.getItem("loginPayload");
@@ -130,12 +197,9 @@ export function AMSDatabaseConfigurationSetupPage() {
         setDatabasesError('');
         try {
             const response = await apiClient.get('/Fs/Process/Device/AMSDbConfigSetUp');
-            if (response.status === 200 && response.data) {
-                setDatabases(response.data);
-            }
+            if (response.status === 200 && response.data) setDatabases(response.data);
         } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load AMS databases';
-            setDatabasesError(errorMsg);
+            setDatabasesError(error.response?.data?.message || error.message || 'Failed to load AMS databases');
         } finally {
             setLoadingDatabases(false);
         }
@@ -145,9 +209,7 @@ export function AMSDatabaseConfigurationSetupPage() {
         setLoadingFlags(true);
         try {
             const response = await apiClient.get('/Fs/Process/Device/DTRFlagSetUp');
-            if (response.status === 200 && response.data) {
-                setFlagCodes(response.data);
-            }
+            if (response.status === 200 && response.data) setFlagCodes(response.data);
         } catch (error: any) {
             console.error('Error fetching flag codes:', error);
             setFlagCodes([]);
@@ -166,84 +228,69 @@ export function AMSDatabaseConfigurationSetupPage() {
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
-
     const filteredFlags = flagCodes.filter(flag =>
         flag.flagCode.toLowerCase().includes(flagSearchTerm.toLowerCase())
     );
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm]);
+    useEffect(() => { setCurrentPage(1); }, [searchTerm]);
+
+    // ✅ Reset all form fields + toggle states
+    const resetForm = () => {
+        setFormData({
+            description: '', server: '', databaseName: '', username: '', password: '',
+            withDeviceCode: false, lastDateUpdated: '', tableName: '', empCodeColumn: '',
+            timeStampColumn: '', flagColumn: '', flagCode: '', automaticEmpCode: false,
+            empCodeTableName: '', empCodeColumnName: '', empCodeIDColumn: '', daysToDeduct: '',
+            specificRange: false, lastDateUpdatedFrom: '', lastDateUpdatedTo: '', deviceNameColumn: ''
+        });
+        setShowPassword(false);
+        setShowCalendar(null);
+    };
 
     const handleCreateNew = () => {
-        setFormData({
-            description: '',
-            server: '',
-            databaseName: '',
-            username: '',
-            password: '',
-            withDeviceCode: false,
-            lastDateUpdated: '',
-            tableName: '',
-            empCodeColumn: '',
-            timeStampColumn: '',
-            flagColumn: '',
-            flagCode: '',
-            automaticEmpCode: false,
-            empCodeTableName: '',
-            empCodeColumnName: '',
-            empCodeIDColumn: '',
-            daysToDeduct: '',
-            specificRange: false,
-            lastDateUpdatedFrom: '',
-            lastDateUpdatedTo: '',
-            deviceNameColumn: ''
-        });
-        setShowCalendar(null);
+        resetForm();
         setShowCreateModal(true);
     };
 
     const handleEdit = (item: AMSDatabase) => {
         setEditingItem(item);
         setFormData({
-            description: item.description,
-            server: item.server,
-            databaseName: item.databaseName,
-            username: item.username,
-            password: '',
-            withDeviceCode: item.withDeviceCode,
-            lastDateUpdated: item.lastDateUpdated,
-            tableName: item.tableName,
-            empCodeColumn: item.empCode,
-            timeStampColumn: item.timeStamp,
-            flagColumn: item.flag,
-            flagCode: item.flagCode,
-            automaticEmpCode: item.isAutomaticEmpCode,
-            empCodeTableName: item.employeeCodeTable,
-            empCodeColumnName: item.employeeCodeCol,
-            empCodeIDColumn: item.empoyeeCodeIDCol,
-            daysToDeduct: item.dateDaysAhead.toString(),
-            specificRange: item.lastDateUpdateFlag,
-            lastDateUpdatedFrom: item.lastDateUpdateFrom,
-            lastDateUpdatedTo: item.lastDateUpdateTo,
-            deviceNameColumn: item.deviceNameCol
+            description:      item.description ?? '',
+            server:           item.server ?? '',
+            databaseName:     item.databaseName ?? '',
+            username:         item.username ?? '',
+            // ✅ Decrypt the C# 3DES-encrypted password so it shows as plaintext
+            password:         item.password ? decryptPassword(item.password) : '',
+            withDeviceCode:   item.withDeviceCode ?? false,
+            lastDateUpdated:  item.lastDateUpdated ?? '',
+            tableName:        item.tableName ?? '',
+            empCodeColumn:    item.empCode ?? '',
+            timeStampColumn:  item.timeStamp ?? '',
+            flagColumn:       item.flag ?? '',
+            flagCode:         item.flagCode ?? '',
+            automaticEmpCode: item.isAutomaticEmpCode ?? false,
+            empCodeTableName: item.employeeCodeTable ?? '',
+            empCodeColumnName:item.employeeCodeCol ?? '',
+            empCodeIDColumn:  item.empoyeeCodeIDCol ?? '',
+            daysToDeduct:     item.dateDaysAhead?.toString() ?? '0',
+            specificRange:    item.lastDateUpdateFlag ?? false,
+            // ✅ Null-safe — API can return null for these fields
+            lastDateUpdatedFrom: item.lastDateUpdateFrom ?? '',
+            lastDateUpdatedTo:   item.lastDateUpdateTo ?? '',
+            deviceNameColumn:    item.deviceNameCol ?? ''
         });
+        setShowPassword(false);
         setShowCalendar(null);
         setShowEditModal(true);
     };
 
     const handleDelete = async (item: AMSDatabase) => {
         const confirmed = await Swal.fire({
-            icon: 'warning',
-            title: 'Confirm Delete',
+            icon: 'warning', title: 'Confirm Delete',
             text: `Are you sure you want to delete database configuration "${item.description}"?`,
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Delete',
-            cancelButtonText: 'Cancel',
+            showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Delete', cancelButtonText: 'Cancel',
         });
-
         if (confirmed.isConfirmed) {
             try {
                 await apiClient.delete(`/Fs/Process/Device/AMSDbConfigSetUp/${item.id}`);
@@ -251,58 +298,91 @@ export function AMSDatabaseConfigurationSetupPage() {
                     accessType: 'Delete',
                     trans: `Database configuration "${item.description}" deleted.`,
                     messages: `Database configuration "${item.description}" deleted.`,
-                    formName: formName,
+                    formName,
                 });
                 await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration deleted successfully.', timer: 2000, showConfirmButton: false });
                 await fetchAMSDatabases();
             } catch (error: any) {
-                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete database configuration';
-                await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+                await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete' });
             }
         }
     };
 
+    // ✅ Validate automatic emp code required fields
+    const validateAutomaticEmpCode = async (): Promise<boolean> => {
+        if (formData.automaticEmpCode) {
+            if (!(formData.empCodeTableName ?? '').trim()) {
+                await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Employee Code Table is required if Automatic Employee Code is checked.' });
+                return false;
+            }
+            if (!(formData.empCodeColumnName ?? '').trim()) {
+                await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Employee Code Column is required if Automatic Employee Code is checked.' });
+                return false;
+            }
+            if (!(formData.empCodeIDColumn ?? '').trim()) {
+                await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Employee Code ID Column is required if Automatic Employee Code is checked.' });
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // ✅ MANUAL if both From and To dates are filled, otherwise SYSTEM
+    const getLastDateUpdateReplica = (): string =>
+        (formData.lastDateUpdatedFrom ?? '').trim() !== '' && (formData.lastDateUpdatedTo ?? '').trim() !== ''
+            ? 'MANUAL'
+            : 'SYSTEM';
+
     const handleSubmitCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.description.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' }); return; }
-        if (!formData.server.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Server is required.' }); return; }
-        if (!formData.databaseName.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Database Name is required.' }); return; }
-        if (!formData.username.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Username is required.' }); return; }
+        if (!(formData.description ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' }); return; }
+        if (!(formData.server ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Server is required.' }); return; }
+        if (!(formData.databaseName ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Database Name is required.' }); return; }
+        if (!(formData.username ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Username is required.' }); return; }
+
+        const isValid = await validateAutomaticEmpCode();
+        if (!isValid) return;
 
         setSubmitting(true);
         try {
             const payload = {
                 id: 0,
-                description: formData.description,
-                server: formData.server,
-                databaseName: formData.databaseName,
-                username: formData.username,
-                password: formData.password,
-                lastDateUpdated: formData.lastDateUpdated || new Date().toISOString(),
-                withDeviceCode: formData.withDeviceCode,
-                tableName: formData.tableName,
-                empCode: formData.empCodeColumn,
-                timeStamp: formData.timeStampColumn,
-                flag: formData.flagColumn,
-                flagCode: formData.flagCode,
-                isAutomaticEmpCode: formData.automaticEmpCode,
-                employeeCodeTable: formData.empCodeTableName,
-                employeeCodeCol: formData.empCodeColumnName,
-                empoyeeCodeIDCol: formData.empCodeIDColumn,
-                dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
-                lastDateUpdateReplica: '',
-                lastDateUpdateTo: formData.lastDateUpdatedTo || new Date().toISOString(),
-                lastDateUpdateFlag: formData.specificRange,
-                lastDateUpdateFrom: formData.lastDateUpdatedFrom || new Date().toISOString(),
-                deviceNameCol: formData.deviceNameColumn
+                description:          formData.description,
+                server:               formData.server,
+                databaseName:         formData.databaseName,
+                username:             formData.username,
+                password:             encryptPassword(formData.password),       // ✅ 3DES encrypted
+                lastDateUpdated:      toISOString(formData.lastDateUpdated),    // ✅ ISO 8601
+                withDeviceCode:       formData.withDeviceCode,
+                tableName:            formData.tableName,
+                empCode:              formData.empCodeColumn,
+                timeStamp:            formData.timeStampColumn,
+                flag:                 formData.flagColumn,
+                flagCode:             formData.flagCode,
+                isAutomaticEmpCode:   formData.automaticEmpCode,
+                employeeCodeTable:    formData.empCodeTableName,
+                employeeCodeCol:      formData.empCodeColumnName,
+                empoyeeCodeIDCol:     formData.empCodeIDColumn,
+                dateDaysAhead:        parseInt(formData.daysToDeduct) || 0,
+                lastDateUpdateReplica: getLastDateUpdateReplica(),              // ✅ MANUAL or SYSTEM
+                lastDateUpdateTo:     toISOStringOrNull(formData.lastDateUpdatedTo),
+                lastDateUpdateFlag:   formData.specificRange,
+                lastDateUpdateFrom:   toISOStringOrNull(formData.lastDateUpdatedFrom),
+                deviceNameCol:        formData.deviceNameColumn
             };
             await apiClient.post('/Fs/Process/Device/AMSDbConfigSetUp', payload);
+            await auditTrail.log({
+                accessType: 'Add',
+                trans: `Database configuration "${formData.description}" created.`,
+                messages: `Database configuration "${formData.description}" created.`,
+                formName,
+            });
             await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration created successfully.', timer: 2000, showConfirmButton: false });
             await fetchAMSDatabases();
             setShowCreateModal(false);
+            resetForm();
         } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+            await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'An error occurred' });
         } finally {
             setSubmitting(false);
         }
@@ -311,46 +391,62 @@ export function AMSDatabaseConfigurationSetupPage() {
     const handleSubmitEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingItem) return;
-        if (!formData.description.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' }); return; }
-        if (!formData.server.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Server is required.' }); return; }
-        if (!formData.databaseName.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Database Name is required.' }); return; }
-        if (!formData.username.trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Username is required.' }); return; }
+        if (!(formData.description ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' }); return; }
+        if (!(formData.server ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Server is required.' }); return; }
+        if (!(formData.databaseName ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Database Name is required.' }); return; }
+        if (!(formData.username ?? '').trim()) { await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Username is required.' }); return; }
+
+        const isValid = await validateAutomaticEmpCode();
+        if (!isValid) return;
 
         setSubmitting(true);
         try {
             const payload = {
-                id: editingItem.id,
-                description: formData.description,
-                server: formData.server,
-                databaseName: formData.databaseName,
-                username: formData.username,
-                password: formData.password || editingItem.password,
-                lastDateUpdated: formData.lastDateUpdated || editingItem.lastDateUpdated,
-                withDeviceCode: formData.withDeviceCode,
-                tableName: formData.tableName,
-                empCode: formData.empCodeColumn,
-                timeStamp: formData.timeStampColumn,
-                flag: formData.flagColumn,
-                flagCode: formData.flagCode,
-                isAutomaticEmpCode: formData.automaticEmpCode,
-                employeeCodeTable: formData.empCodeTableName,
-                employeeCodeCol: formData.empCodeColumnName,
-                empoyeeCodeIDCol: formData.empCodeIDColumn,
-                dateDaysAhead: parseInt(formData.daysToDeduct) || 0,
-                lastDateUpdateReplica: editingItem.lastDateUpdateReplica,
-                lastDateUpdateTo: formData.lastDateUpdatedTo || editingItem.lastDateUpdateTo,
-                lastDateUpdateFlag: formData.specificRange,
-                lastDateUpdateFrom: formData.lastDateUpdatedFrom || editingItem.lastDateUpdateFrom,
-                deviceNameCol: formData.deviceNameColumn
+                id:                   editingItem.id,
+                description:          formData.description,
+                server:               formData.server,
+                databaseName:         formData.databaseName,
+                username:             formData.username,
+                // ✅ Re-encrypt the plaintext shown in the field (decrypted on load)
+                password:             encryptPassword(formData.password),
+                lastDateUpdated:      formData.lastDateUpdated
+                    ? toISOString(formData.lastDateUpdated)
+                    : toISOString(editingItem.lastDateUpdated),
+                withDeviceCode:       formData.withDeviceCode,
+                tableName:            formData.tableName,
+                empCode:              formData.empCodeColumn,
+                timeStamp:            formData.timeStampColumn,
+                flag:                 formData.flagColumn,
+                flagCode:             formData.flagCode,
+                isAutomaticEmpCode:   formData.automaticEmpCode,
+                employeeCodeTable:    formData.empCodeTableName,
+                employeeCodeCol:      formData.empCodeColumnName,
+                empoyeeCodeIDCol:     formData.empCodeIDColumn,
+                dateDaysAhead:        parseInt(formData.daysToDeduct) || 0,
+                lastDateUpdateReplica: getLastDateUpdateReplica(),              // ✅ MANUAL or SYSTEM
+                lastDateUpdateTo:     formData.lastDateUpdatedTo
+                    ? toISOStringOrNull(formData.lastDateUpdatedTo)
+                    : toISOStringOrNull(editingItem.lastDateUpdateTo),
+                lastDateUpdateFlag:   formData.specificRange,
+                lastDateUpdateFrom:   formData.lastDateUpdatedFrom
+                    ? toISOStringOrNull(formData.lastDateUpdatedFrom)
+                    : toISOStringOrNull(editingItem.lastDateUpdateFrom),
+                deviceNameCol:        formData.deviceNameColumn
             };
             await apiClient.put(`/Fs/Process/Device/AMSDbConfigSetUp/${editingItem.id}`, payload);
+            await auditTrail.log({
+                accessType: 'Edit',
+                trans: `Database configuration "${formData.description}" updated.`,
+                messages: `Database configuration "${formData.description}" updated.`,
+                formName,
+            });
             await Swal.fire({ icon: 'success', title: 'Success', text: 'Database configuration updated successfully.', timer: 2000, showConfirmButton: false });
             await fetchAMSDatabases();
             setShowEditModal(false);
             setEditingItem(null);
+            resetForm();
         } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+            await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'An error occurred' });
         } finally {
             setSubmitting(false);
         }
@@ -362,6 +458,7 @@ export function AMSDatabaseConfigurationSetupPage() {
         setShowFlagSearchModal(false);
         setShowCalendar(null);
         setEditingItem(null);
+        resetForm();
     };
 
     const handleSelectFlagCode = (code: string) => {
@@ -378,16 +475,10 @@ export function AMSDatabaseConfigurationSetupPage() {
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
-                if (showCalendar) {
-                    setShowCalendar(null);
-                } else if (showFlagSearchModal) {
-                    setShowFlagSearchModal(false);
-                } else if (showCreateModal) {
-                    setShowCreateModal(false);
-                } else if (showEditModal) {
-                    setShowEditModal(false);
-                    setEditingItem(null);
-                }
+                if (showCalendar) { setShowCalendar(null); }
+                else if (showFlagSearchModal) { setShowFlagSearchModal(false); }
+                else if (showCreateModal) { setShowCreateModal(false); resetForm(); }
+                else if (showEditModal) { setShowEditModal(false); setEditingItem(null); resetForm(); }
             }
         };
         if (showCreateModal || showEditModal || showFlagSearchModal || showCalendar) {
@@ -399,37 +490,50 @@ export function AMSDatabaseConfigurationSetupPage() {
     const labelClass = "text-gray-700 text-sm whitespace-nowrap w-40 shrink-0";
     const inputClass = "flex-1 min-w-0 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
 
+    const calendarBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+    const [calendarPos, setCalendarPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+    const openCalendar = (fieldKey: 'lastDateUpdated' | 'lastDateUpdatedFrom' | 'lastDateUpdatedTo') => {
+        if (showCalendar === fieldKey) { setShowCalendar(null); return; }
+        const btn = calendarBtnRefs.current[fieldKey];
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            setCalendarPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+        }
+        setShowCalendar(fieldKey);
+    };
+
     const renderDateField = (
         label: string,
         fieldKey: 'lastDateUpdated' | 'lastDateUpdatedFrom' | 'lastDateUpdatedTo',
-        labelWidth: string = 'w-40'
+        _labelWidth: string = 'w-40'
     ) => (
-        <div className="flex items-center gap-1 flex-1 min-w-0 relative">
-            <input
-                type="text"
-                value={formData[fieldKey]}
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+            <input type="text" value={formData[fieldKey]}
                 onChange={(e) => setFormData({ ...formData, [fieldKey]: e.target.value })}
-                placeholder="MM/DD/YYYY"
-                className={inputClass}
-            />
-            <button
-                type="button"
+                placeholder="MM/DD/YYYY" className={inputClass} />
+            <button type="button"
+                ref={(el) => { calendarBtnRefs.current[fieldKey] = el; }}
                 className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center transition-colors shrink-0"
-                onClick={() => setShowCalendar(showCalendar === fieldKey ? null : fieldKey)}
-            >
+                onClick={() => openCalendar(fieldKey)}>
                 <Calendar className="w-4 h-4" />
             </button>
-            {showCalendar === fieldKey && (
-                <CalendarPopup
-                    onDateSelect={(date) => handleCalendarSelect(fieldKey, date)}
-                    onClose={() => setShowCalendar(null)}
-                />
+            {showCalendar === fieldKey && typeof document !== 'undefined' && ReactDOM.createPortal(
+                <div style={{ position: 'absolute', top: calendarPos.top, left: calendarPos.left, zIndex: 99999 }}>
+                    <CalendarPopup
+                        onDateSelect={(date) => handleCalendarSelect(fieldKey, date)}
+                        onClose={() => setShowCalendar(null)} />
+                </div>,
+                document.body
             )}
         </div>
     );
 
+    const isManual = (formData.lastDateUpdatedFrom ?? '').trim() !== '' && (formData.lastDateUpdatedTo ?? '').trim() !== '';
+
     const renderFormFields = () => (
         <div className="space-y-3">
+            {/* Description */}
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Description :</label>
                 <input type="text" value={formData.description}
@@ -437,6 +541,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className={inputClass} required />
             </div>
 
+            {/* Server / Database Name */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>Server :</label>
@@ -452,6 +557,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+            {/* Username / Password */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>Username :</label>
@@ -459,14 +565,28 @@ export function AMSDatabaseConfigurationSetupPage() {
                         onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                         className={inputClass} required />
                 </div>
+                {/* ✅ Password with show/hide toggle */}
                 <div className="flex items-center gap-3">
                     <label className="text-gray-700 text-sm whitespace-nowrap w-36 shrink-0">Password :</label>
-                    <input type="password" value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className={inputClass} />
+                    <div className="flex items-center gap-1 flex-1 min-w-0">
+                        <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            className={inputClass}
+                            autoComplete="new-password"
+                        />
+                        <button type="button"
+                            onClick={() => setShowPassword(prev => !prev)}
+                            className="w-8 h-8 bg-gray-500 hover:bg-gray-600 text-white rounded flex items-center justify-center transition-colors shrink-0"
+                            title={showPassword ? 'Hide password' : 'Show password'}>
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                    </div>
                 </div>
             </div>
 
+            {/* With Device Code / Last Date Updated */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>With Device Code :</label>
@@ -480,6 +600,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+            {/* Table Name */}
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Table Name :</label>
                 <input type="text" value={formData.tableName}
@@ -487,6 +608,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className={inputClass} />
             </div>
 
+            {/* EmpCode / TimeStamp Column */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>EmpCode Column :</label>
@@ -502,6 +624,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+            {/* Flag Column / Flag Code */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>Flag Column :</label>
@@ -527,6 +650,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+            {/* Automatic EmpCode */}
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Automatic EmpCode :</label>
                 <input type="checkbox" checked={formData.automaticEmpCode}
@@ -534,35 +658,50 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500" />
             </div>
 
+            {/* EmpCode Table Name */}
             <div className="flex items-center gap-3">
                 <label className={labelClass}>EmpCode Table Name :</label>
                 <input type="text" value={formData.empCodeTableName}
                     onChange={(e) => setFormData({ ...formData, empCodeTableName: e.target.value })}
-                    className={inputClass} />
+                    className={`${inputClass} ${formData.automaticEmpCode && !(formData.empCodeTableName ?? '').trim() ? 'border-red-400 focus:ring-red-500' : ''}`} />
             </div>
 
+            {/* EmpCode Column / EmpCode ID Column */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className={labelClass}>EmpCode Column :</label>
                     <input type="text" value={formData.empCodeColumnName}
                         onChange={(e) => setFormData({ ...formData, empCodeColumnName: e.target.value })}
-                        className={inputClass} />
+                        className={`${inputClass} ${formData.automaticEmpCode && !(formData.empCodeColumnName ?? '').trim() ? 'border-red-400 focus:ring-red-500' : ''}`} />
                 </div>
                 <div className="flex items-center gap-3">
                     <label className="text-gray-700 text-sm whitespace-nowrap w-36 shrink-0">EmpCode ID Column :</label>
                     <input type="text" value={formData.empCodeIDColumn}
                         onChange={(e) => setFormData({ ...formData, empCodeIDColumn: e.target.value })}
-                        className={inputClass} />
+                        className={`${inputClass} ${formData.automaticEmpCode && !(formData.empCodeIDColumn ?? '').trim() ? 'border-red-400 focus:ring-red-500' : ''}`} />
                 </div>
             </div>
 
+            {/* Automatic EmpCode hint */}
+            {formData.automaticEmpCode && (
+                <div className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                    * EmpCode Table Name, EmpCode Column, and EmpCode ID Column are required when Automatic EmpCode is enabled.
+                </div>
+            )}
+
+            {/* Days to Deduct */}
             <div className="flex items-center gap-3">
                 <label className="text-gray-700 text-sm whitespace-nowrap w-56 shrink-0">Days to Deduct to Convert Date :</label>
-                <input type="text" value={formData.daysToDeduct}
-                    onChange={(e) => setFormData({ ...formData, daysToDeduct: e.target.value })}
+                <input type="number" min="0" step="1" value={formData.daysToDeduct}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d+$/.test(val)) setFormData({ ...formData, daysToDeduct: val });
+                    }}
+                    onKeyDown={(e) => { if (['-', '+', 'e', 'E', '.'].includes(e.key)) e.preventDefault(); }}
                     className={inputClass} />
             </div>
 
+            {/* Specific Range */}
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Specific Range :</label>
                 <input type="checkbox" checked={formData.specificRange}
@@ -570,6 +709,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500" />
             </div>
 
+            {/* Date From / Date To */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
                     <label className="text-gray-700 text-sm whitespace-nowrap w-40 shrink-0">Last Date Updated From :</label>
@@ -581,6 +721,14 @@ export function AMSDatabaseConfigurationSetupPage() {
                 </div>
             </div>
 
+            {/* ✅ Live replica mode hint — fully null-safe */}
+            <div className={`text-xs rounded px-3 py-2 border ${isManual ? 'text-green-700 bg-green-50 border-green-200' : 'text-gray-500 bg-gray-50 border-gray-200'}`}>
+                Sync Mode: <strong>
+                    {isManual ? 'MANUAL — date range will be used for sync' : 'SYSTEM — automatic date will be used for sync'}
+                </strong>
+            </div>
+
+            {/* Device Name Column */}
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Device Name Column :</label>
                 <input type="text" value={formData.deviceNameColumn}
@@ -628,8 +776,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                             {(hasPermission('Add') && hasPermission('View')) && (
                                 <button onClick={handleCreateNew}
                                     className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                                    <Plus className="w-4 h-4" />
-                                    Create New
+                                    <Plus className="w-4 h-4" /> Create New
                                 </button>
                             )}
                             {hasPermission('View') && (
@@ -677,7 +824,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                                                     <td className="px-6 py-4 text-sm text-gray-600">{item.username}</td>
                                                     <td className="px-6 py-4 text-sm text-gray-600">{item.withDeviceCode ? 'Yes' : 'No'}</td>
                                                     <td className="px-6 py-4 text-sm text-gray-600">
-                                                        {new Date(item.lastDateUpdated).toLocaleDateString()}
+                                                        {item.lastDateUpdated ? new Date(item.lastDateUpdated).toLocaleDateString() : '—'}
                                                     </td>
                                                     {(hasPermission('Edit') || hasPermission('Delete')) && (
                                                         <td className="px-6 py-4">
@@ -688,9 +835,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                                                                         <Edit className="w-4 h-4" />
                                                                     </button>
                                                                 )}
-                                                                {hasPermission('Edit') && hasPermission('Delete') && (
-                                                                    <span className="text-gray-300">|</span>
-                                                                )}
+                                                                {hasPermission('Edit') && hasPermission('Delete') && <span className="text-gray-300">|</span>}
                                                                 {hasPermission('Delete') && (
                                                                     <button onClick={() => handleDelete(item)}
                                                                         className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
@@ -712,9 +857,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                                     </tbody>
                                 </table>
                             ) : (
-                                <div className="text-center py-10 text-gray-500">
-                                    You do not have permission to view this list.
-                                </div>
+                                <div className="text-center py-10 text-gray-500">You do not have permission to view this list.</div>
                             )}
                         </div>
 
@@ -730,9 +873,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                                         className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
                                         Previous
                                     </button>
-                                    <button className="px-3 py-1 bg-blue-500 text-white rounded">
-                                        {currentPage}
-                                    </button>
+                                    <button className="px-3 py-1 bg-blue-500 text-white rounded">{currentPage}</button>
                                     <button onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
                                         disabled={currentPage >= totalPages || filteredData.length === 0}
                                         className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -760,11 +901,11 @@ export function AMSDatabaseConfigurationSetupPage() {
                             {renderFormFields()}
                             <div className="flex gap-3 mt-5 pt-4 border-t border-gray-200">
                                 <button type="submit" disabled={submitting}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm">
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
                                     {submitting ? 'Submitting...' : 'Submit'}
                                 </button>
                                 <button type="button" onClick={handleCloseModal} disabled={submitting}
-                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm">
+                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
                                     Back to List
                                 </button>
                             </div>
@@ -788,11 +929,11 @@ export function AMSDatabaseConfigurationSetupPage() {
                             {renderFormFields()}
                             <div className="flex gap-3 mt-5 pt-4 border-t border-gray-200">
                                 <button type="submit" disabled={submitting}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm">
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
                                     {submitting ? 'Updating...' : 'Update'}
                                 </button>
                                 <button type="button" onClick={handleCloseModal} disabled={submitting}
-                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm">
+                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
                                     Back to List
                                 </button>
                             </div>

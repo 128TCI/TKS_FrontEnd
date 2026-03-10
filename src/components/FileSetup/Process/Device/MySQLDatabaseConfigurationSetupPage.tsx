@@ -328,11 +328,26 @@ export function MySQLDatabaseConfigurationSetupPage() {
         }
     };
 
-    const handleSubmit = async () => {
-        if (!formData.description.trim()) {
-            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a Description.' });
-            return;
-        }
+const handleSubmit = async () => {
+    if (!formData.description.trim()) {
+        await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a Description.' });
+        return;
+    }
+
+    // Duplicate check: Server + DatabaseName must be unique
+const isDuplicate = configs.some(item => {
+    const sameRecord = isEditMode && item.id === selectedId;
+    return (
+        !sameRecord &&
+        item.server?.trim().toUpperCase() === formData.server.trim().toUpperCase() &&
+        item.databaseName?.trim().toUpperCase() === formData.databaseName.trim().toUpperCase()
+    );
+});
+
+if (isDuplicate) {
+    await Swal.fire({ icon: 'warning', title: 'Duplicate Entry', text: 'Setup already exists.' });
+    return;
+}
 
         setSubmitting(true);
         try {

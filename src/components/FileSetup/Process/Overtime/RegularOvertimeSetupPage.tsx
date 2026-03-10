@@ -204,7 +204,18 @@ export function RegularOvertimeSetupPage() {
     }
   };
 
+  // Mirrors C#: CheckCodeIfRegularExpression — no spaces allowed
+  const isValidCode = (value: string): boolean => {
+    return /^[a-zA-Z0-9_\-]+$/.test(value);
+  };
+
+  // Mirrors C#: CheckCodeIfRegularExpressionWithSpace — spaces allowed
+  const isValidDescWithSpace = (value: string): boolean => {
+    return /^[a-zA-Z0-9_\-\s]+$/.test(value);
+  };
+
   const handleSubmit = async () => {
+    // ── 1. Required field checks ───────────────────────────────────────────
     if (!formData.code.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
       return;
@@ -218,16 +229,45 @@ export function RegularOvertimeSetupPage() {
       return;
     }
 
-    const isDuplicate = regularOvertimeData.some(
+    // ── 2. Duplicate Code check ────────────────────────────────────────────
+    // Mirrors: db.tk_RegularDayOTRateSetUp.Any(i => i.Code == model.Code)
+    const duplicateCode = regularOvertimeData.some(
       item =>
         (!editingItem || item.id !== editingItem.id) &&
-        item.code.toLowerCase() === formData.code.toLowerCase()
+        item.code.trim().toUpperCase() === formData.code.trim().toUpperCase()
     );
-    if (isDuplicate) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'A record with this code already exists.' });
+    if (duplicateCode) {
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code already exists.' });
       return;
     }
 
+    // ── 3. Invalid character in Code ───────────────────────────────────────
+    // Mirrors: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.code.trim())) {
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Invalid Character in Code.' });
+      return;
+    }
+
+    // ── 4. Invalid character in Description ────────────────────────────────
+    // Mirrors: CheckCodeIfRegularExpressionWithSpace
+    if (!isValidDescWithSpace(formData.desc.trim())) {
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Invalid Character in Description.' });
+      return;
+    }
+
+    // ── 5. Duplicate Description check ────────────────────────────────────
+    // Mirrors: db.tk_RegularDayOTRateSetUp.Any(i => i.Desc == model.Desc)
+    const duplicateDesc = regularOvertimeData.some(
+      item =>
+        (!editingItem || item.id !== editingItem.id) &&
+        item.desc.trim().toUpperCase() === formData.desc.trim().toUpperCase()
+    );
+    if (duplicateDesc) {
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description already exists.' });
+      return;
+    }
+
+    // ── 6. Submit ──────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload: RegularOvertimeRecord = {
@@ -320,19 +360,15 @@ export function RegularOvertimeSetupPage() {
     </div>
   );
 
-  // ── OT Search Modal — rendered via portal directly onto document.body ──
   const searchModalContent = showSearchModal ? createPortal(
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl flex flex-col" style={{ maxHeight: '85vh' }}>
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg flex-shrink-0">
           <h2 className="text-gray-800 text-lg font-semibold">Overtime Code</h2>
           <button onClick={() => setShowSearchModal(false)} className="text-gray-600 hover:text-gray-800">
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Search field */}
         <div className="px-6 py-3 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-2 justify-end">
             <label className="text-gray-700 text-sm">Search:</label>
@@ -346,8 +382,6 @@ export function RegularOvertimeSetupPage() {
             />
           </div>
         </div>
-
-        {/* Table (scrollable) */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loadingOTCodes ? (
             <div className="py-8 text-center text-gray-500 text-sm">Loading OT codes...</div>
@@ -363,56 +397,30 @@ export function RegularOvertimeSetupPage() {
               </thead>
               <tbody>
                 {currentOTCodes.length > 0 ? currentOTCodes.map((item) => (
-                  <tr
-                    key={item.otfid}
-                    onClick={() => handleSelectOTCode(item.otfCode)}
-                    className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                  >
+                  <tr key={item.otfid} onClick={() => handleSelectOTCode(item.otfCode)} className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer">
                     <td className="px-4 py-2 text-sm text-blue-600 font-medium">{item.otfCode}</td>
                     <td className="px-4 py-2 text-sm">{item.description}</td>
                     <td className="px-4 py-2 text-sm text-right">{item.rate1.toFixed(2)}</td>
                     <td className="px-4 py-2 text-sm text-right">{item.defAmt.toFixed(2)}</td>
                   </tr>
                 )) : (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">No OT codes found.</td>
-                  </tr>
+                  <tr><td colSpan={4} className="py-8 text-center text-gray-500 text-sm">No OT codes found.</td></tr>
                 )}
               </tbody>
             </table>
           )}
         </div>
-
-        {/* Pagination */}
         <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 rounded-b-lg flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="text-gray-600 text-sm">
               Showing {otStartIndex + 1} to {Math.min(otEndIndex, filteredOTCodes.length)} of {filteredOTCodes.length} entries
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setOtSearchPage(prev => Math.max(1, prev - 1))}
-                disabled={otSearchPage === 1}
-                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm"
-              >
-                Previous
-              </button>
+              <button onClick={() => setOtSearchPage(prev => Math.max(1, prev - 1))} disabled={otSearchPage === 1} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm">Previous</button>
               {[...Array(Math.min(5, otTotalPages))].map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setOtSearchPage(i + 1)}
-                  className={`px-3 py-1 rounded text-sm ${otSearchPage === i + 1 ? 'bg-orange-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}
-                >
-                  {i + 1}
-                </button>
+                <button key={i} onClick={() => setOtSearchPage(i + 1)} className={`px-3 py-1 rounded text-sm ${otSearchPage === i + 1 ? 'bg-orange-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>{i + 1}</button>
               ))}
-              <button
-                onClick={() => setOtSearchPage(prev => Math.min(otTotalPages, prev + 1))}
-                disabled={otSearchPage === otTotalPages || otTotalPages === 0}
-                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm"
-              >
-                Next
-              </button>
+              <button onClick={() => setOtSearchPage(prev => Math.min(otTotalPages, prev + 1))} disabled={otSearchPage === otTotalPages || otTotalPages === 0} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 text-sm">Next</button>
             </div>
           </div>
         </div>
@@ -425,13 +433,11 @@ export function RegularOvertimeSetupPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Regular Day OT Rate Setup</h1>
           </div>
 
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Info banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -455,7 +461,6 @@ export function RegularOvertimeSetupPage() {
               </div>
             </div>
 
-            {/* Controls Row */}
             <div className="flex items-center gap-4 mb-6">
               <button onClick={handleCreateNew} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
                 <Plus className="w-4 h-4" /> Create New
@@ -466,7 +471,6 @@ export function RegularOvertimeSetupPage() {
               </div>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto border border-gray-200 rounded-lg">
               {loadingROT ? (
                 <div className="flex items-center justify-center py-8">
@@ -492,71 +496,49 @@ export function RegularOvertimeSetupPage() {
                         <td className="px-4 py-2">{item.desc}</td>
                         <td className="px-4 py-2">
                           <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => handleDetails(item)} className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors" title="Details">
-                              <Info className="w-4 h-4" />
-                            </button>
+                            <button onClick={() => handleDetails(item)} className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors" title="Details"><Info className="w-4 h-4" /></button>
                             <span className="text-gray-300">|</span>
-                            <button onClick={() => handleEdit(item)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">
-                              <Edit className="w-4 h-4" />
-                            </button>
+                            <button onClick={() => handleEdit(item)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit"><Edit className="w-4 h-4" /></button>
                             <span className="text-gray-300">|</span>
-                            <button onClick={() => handleDelete(item)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <button onClick={() => handleDelete(item)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>
                     )) : (
-                      <tr>
-                        <td colSpan={3} className="px-6 py-16 text-center text-gray-500">No data available in table</td>
-                      </tr>
+                      <tr><td colSpan={3} className="px-6 py-16 text-center text-gray-500">No data available in table</td></tr>
                     )}
                   </tbody>
                 </table>
               )}
             </div>
 
-            {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
               <div className="text-gray-600">
                 Showing {startIndex + 1} to {Math.min(endIndex, filteredMainData.length)} of {filteredMainData.length} entries
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
-                  Previous
-                </button>
+                <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">Previous</button>
                 {[...Array(totalPages)].map((_, i) => (
-                  <button key={i} onClick={() => setCurrentPage(i + 1)} className={`px-3 py-1 rounded ${currentPage === i + 1 ? 'bg-orange-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
-                    {i + 1}
-                  </button>
+                  <button key={i} onClick={() => setCurrentPage(i + 1)} className={`px-3 py-1 rounded ${currentPage === i + 1 ? 'bg-orange-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>{i + 1}</button>
                 ))}
-                <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">
-                  Next
-                </button>
+                <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50">Next</button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Create/Edit Modal ── */}
+      {/* Create/Edit Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0 z-[1]">
               <h2 className="text-gray-900">{editingItem ? 'Edit' : 'Create New'}</h2>
-              <button onClick={handleCloseModal} className="text-gray-600 hover:text-gray-800">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={handleCloseModal} className="text-gray-600 hover:text-gray-800"><X className="w-5 h-5" /></button>
             </div>
-
-            {/* Body */}
             <div className="p-4">
               <h3 className="text-blue-600 mb-3">Regular Day OT Rate Setup</h3>
-
               <div className="space-y-2">
-                {/* Code */}
                 <div className="flex items-center gap-3">
                   <label className="w-56 text-gray-700 text-sm">Code :</label>
                   <input
@@ -569,8 +551,6 @@ export function RegularOvertimeSetupPage() {
                   />
                   <span className="text-xs text-gray-500 w-16 text-right">{formData.code.length}/10</span>
                 </div>
-
-                {/* Description */}
                 <div className="flex items-center gap-3">
                   <label className="w-56 text-gray-700 text-sm">Description :</label>
                   <input
@@ -580,7 +560,6 @@ export function RegularOvertimeSetupPage() {
                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
-
                 {renderFieldRow('After the Shift', 'afterTheShift')}
                 {renderFieldRow('Within the Shift with ND', 'withinTheShiftND')}
                 {renderFieldRow('After the Shift with ND', 'afterTheShiftND')}
@@ -588,21 +567,11 @@ export function RegularOvertimeSetupPage() {
                 {renderFieldRow('OT Premium Within the Shift', 'otPremiumWithinTheShift')}
                 {renderFieldRow('DOLE Regular Day', 'doleRegDay')}
               </div>
-
-              {/* Actions */}
               <div className="flex gap-3 mt-4">
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm"
-                >
+                <button onClick={handleSubmit} disabled={submitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm">
                   {submitting ? (editingItem ? 'Updating...' : 'Submitting...') : (editingItem ? 'Update' : 'Submit')}
                 </button>
-                <button
-                  onClick={handleCloseModal}
-                  disabled={submitting}
-                  className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm"
-                >
+                <button onClick={handleCloseModal} disabled={submitting} className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm">
                   Back to List
                 </button>
               </div>
@@ -611,22 +580,16 @@ export function RegularOvertimeSetupPage() {
         </div>
       )}
 
-      {/* OT Search Modal rendered via portal onto document.body */}
       {searchModalContent}
 
-      {/* ── Details Modal ── */}
+      {/* Details Modal */}
       {showDetailsModal && selectedRecord && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto">
-            {/* Header */}
             <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between sticky top-0 z-10">
               <h2 className="text-gray-800 font-semibold">Details</h2>
-              <button onClick={() => setShowDetailsModal(false)} className="text-gray-600 hover:text-gray-800">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => setShowDetailsModal(false)} className="text-gray-600 hover:text-gray-800"><X className="w-5 h-5" /></button>
             </div>
-
-            {/* Body */}
             <div className="p-6">
               <h3 className="text-blue-600 mb-3">Regular Day OT Rate Setup</h3>
               <div className="space-y-3">
@@ -644,7 +607,6 @@ export function RegularOvertimeSetupPage() {
         </div>
       )}
 
-      {/* Footer */}
       <Footer />
     </div>
   );

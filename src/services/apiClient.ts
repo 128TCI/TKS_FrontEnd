@@ -14,6 +14,8 @@ import { decryptData } from './encryptionService';
 
 
 const BASE_URL = 'https://localhost:7264/api';
+//server 2
+  // const BASE_URL = 'https://dev2svr.128techconsultinginc.com/128_TKS/api';
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 const TOKEN_KEY = '128bl3$$1ng$';
@@ -28,7 +30,7 @@ const apiClient = axios.create({
   //  baseURL: 'https://demo.128techconsultinginc.com/DEMO_128_TKS/api',
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30_000,
+  timeout: 0,
 });
 
 // ── Request interceptor — attach Bearer token ─────────────────────────────────
