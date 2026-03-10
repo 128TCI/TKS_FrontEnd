@@ -199,6 +199,62 @@ export function PayrollLocationSetupPage() {
       }
     };
 
+    // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+    /**
+     * Fetches company information and checks whether HRIS or Payroll paths are
+     * configured. Returns true when the transaction is allowed to proceed.
+     */
+    const validateCompanyPaths = async (): Promise<boolean> => {
+        try {
+            const response = await apiClient.get("/Fs/System/CompanyInformation");
+            const companyInfo =
+                Array.isArray(response.data) ? response.data[0] : response.data;
+
+            if (!companyInfo) {
+                await Swal.fire({
+                    icon: "error",
+                    title: "Validation Error",
+                    text: "Company Information is not properly set.",
+                });
+                return false;
+            }
+
+            const hrisPath = (companyInfo.hrisPath ?? "").trim();
+            const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+            if (hrisPath !== "") {
+                await Swal.fire({
+                    icon: "error",
+                    title: "Not Allowed",
+                    text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+                });
+                return false;
+            }
+
+            if (payrollPath !== "") {
+                await Swal.fire({
+                    icon: "error",
+                    title: "Not Allowed",
+                    text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+                });
+                return false;
+            }
+
+            return true;
+        } catch (error: any) {
+            await Swal.fire({
+                icon: "error",
+                title: "Error",
+                text:
+                    error.response?.data?.message ||
+                    error.message ||
+                    "Failed to retrieve company information.",
+            });
+            return false;
+        }
+    };
+    // ─────────────────────────────────────────────────────────────────────────────
+
     const handleCreateNew = () => {
         setFormData({
             locCode: '',
@@ -264,11 +320,50 @@ export function PayrollLocationSetupPage() {
     };
 
     const handleSubmit = async () => {
+        // ── 1. Basic required-field / length check ───────────────────────────
         if (!formData.locCode.trim()) {
             await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a Location Code.' });
             return;
         }
+        if (formData.locCode.length > 10) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Location Code must not exceed 10 characters.' });
+            return;
+        }
 
+        // ── 2. HRIS / Payroll path check ─────────────────────────────────────
+        const companyPathsValid = await validateCompanyPaths();
+        if (!companyPathsValid) return;
+
+        // ── 3. Create-only validations ────────────────────────────────────────
+        if (!isEditMode) {
+            const noOfDaysValue = parseInt(formData.noOfDays) || 0;
+
+            // No. of Days range check
+            if (noOfDaysValue > 365 || noOfDaysValue <= 0) {
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Validation Error',
+                    text: 'No of Days must not be greater than 365 or less than or equal to 0.',
+                });
+                return;
+            }
+
+            // Duplicate Loc Name check
+            const isDuplicateName = payrollLocationData.some(
+                (item) =>
+                    item.locName?.trim().toUpperCase() === formData.locName.trim().toUpperCase()
+            );
+            if (isDuplicateName) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Duplicate Entry',
+                    text: 'Description is already exist.',
+                });
+                return;
+            }
+        }
+
+        // ── 4. Submit ────────────────────────────────────────────────────────
         setSubmitting(true);
         try {
             const payload = {
@@ -593,6 +688,7 @@ export function PayrollLocationSetupPage() {
                                                     type="text"
                                                     value={formData.locCode}
                                                     onChange={(e) => setFormData({ ...formData, locCode: e.target.value })}
+                                                    maxLength={10}
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>

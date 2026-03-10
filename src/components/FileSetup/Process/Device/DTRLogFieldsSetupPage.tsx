@@ -315,6 +315,12 @@ export function DTRLogFieldsSetupPage() {
     }
   };
 
+  // Matches backend: CheckCodeIfRegularExpression (alphanumeric + hyphen/underscore, no spaces)
+  const isValidCode = (value: string): boolean => /^[a-zA-Z0-9\-_]+$/.test(value.trim());
+
+  // Matches backend: CheckCodeIfRegularExpressionWithSpace (alphanumeric with spaces allowed)
+  const isValidDescription = (value: string): boolean => /^[a-zA-Z0-9\s\-_]*$/.test(value.trim());
+
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -323,22 +329,40 @@ export function DTRLogFieldsSetupPage() {
       return;
     }
 
-    const isDuplicate = logFields.some(field =>
-      field.code.toLowerCase() === formData.code.trim().toLowerCase()
-    );
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.code)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Code.' });
+      return;
+    }
 
-    if (isDuplicate) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'This code is already in use. Please use a different code.' });
+    // Matches backend: CheckCodeIfRegularExpressionWithSpace
+    if (formData.description.trim() && !isValidDescription(formData.description)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Description.' });
+      return;
+    }
+
+    // Matches backend: duplicate Code check (case-insensitive, trimmed)
+    const isDuplicateCode = logFields.some(field =>
+      field.code.trim().toUpperCase() === formData.code.trim().toUpperCase()
+    );
+    if (isDuplicateCode) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code already exist.' });
+      return;
+    }
+
+    // Matches backend: duplicate Description check (case-insensitive, trimmed)
+    const normalizedInputDesc = formData.description.trim().toUpperCase().replace(/\s+/g, ' ');
+    const isDuplicateDescription = normalizedInputDesc.length > 0 && logFields.some(field => {
+      const normalizedExistingDesc = (field.description ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+      return normalizedExistingDesc === normalizedInputDesc && normalizedExistingDesc.length > 0;
+    });
+    if (isDuplicateDescription) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description already exist.' });
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = {
-        id: 0,
-        ...formData
-      };
-
       await apiClient.post('/Fs/Process/Device/DTRLogFIeldsSetUp', { id: 0, ...formData });
       await auditTrail.log({
         accessType: 'Add',
@@ -353,8 +377,6 @@ export function DTRLogFieldsSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the list
       await fetchDTRLogFields();
       setShowCreateModal(false);
     } catch (error: any) {
@@ -375,23 +397,42 @@ export function DTRLogFieldsSetupPage() {
       return;
     }
 
-    const isDuplicate = logFields.some(field =>
-      field.id !== editingItem.id &&
-      field.code.toLowerCase() === formData.code.trim().toLowerCase()
-    );
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.code)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Code.' });
+      return;
+    }
 
-    if (isDuplicate) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'This code is already in use. Please use a different code.' });
+    // Matches backend: CheckCodeIfRegularExpressionWithSpace
+    if (formData.description.trim() && !isValidDescription(formData.description)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Description.' });
+      return;
+    }
+
+    // Matches backend: duplicate Code check (case-insensitive, trimmed), skip current record
+    const isDuplicateCode = logFields.some(field =>
+      field.id !== editingItem.id &&
+      field.code.trim().toUpperCase() === formData.code.trim().toUpperCase()
+    );
+    if (isDuplicateCode) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code already exist.' });
+      return;
+    }
+
+    // Matches backend: duplicate Description check (case-insensitive, trimmed), skip current record
+    const normalizedInputDesc = formData.description.trim().toUpperCase().replace(/\s+/g, ' ');
+    const isDuplicateDescription = normalizedInputDesc.length > 0 && logFields.some(field => {
+      if (field.id === editingItem.id) return false;
+      const normalizedExistingDesc = (field.description ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+      return normalizedExistingDesc === normalizedInputDesc && normalizedExistingDesc.length > 0;
+    });
+    if (isDuplicateDescription) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description already exist.' });
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = {
-        id: editingItem.id,
-        ...formData
-      };
-
       await apiClient.put(`/Fs/Process/Device/DTRLogFIeldsSetUp/${editingItem.id}`, { id: editingItem.id, ...formData });
       await auditTrail.log({
         accessType: 'Edit',
@@ -406,8 +447,6 @@ export function DTRLogFieldsSetupPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-      
-      // Refresh the list
       await fetchDTRLogFields();
       setShowEditModal(false);
       setEditingItem(null);
@@ -640,7 +679,6 @@ export function DTRLogFieldsSetupPage() {
           deviceTypes={deviceTypes}
           deviceFormats={deviceFormats}
           dateFormats={dateFormats}
-          // Flag modal props
           showFlagModal={showFlagModal}
           onOpenFlagModal={handleOpenFlagModal}
           onCloseFlagModal={() => setShowFlagModal(false)}
@@ -667,7 +705,6 @@ interface DTRLogFieldModalProps {
   deviceTypes: string[];
   deviceFormats: string[];
   dateFormats: string[];
-  // Flag modal
   showFlagModal: boolean;
   onOpenFlagModal: () => void;
   onCloseFlagModal: () => void;
@@ -736,7 +773,7 @@ function DTRLogFieldModal({
     />
   </div>
 
-  {/* Flag Code — label on its own row, then input+buttons below */}
+  {/* Flag Code */}
   <div className="flex flex-col gap-1">
     <label className="text-gray-700 text-sm whitespace-nowrap">Flag Code :</label>
     <div className="flex items-center gap-2">

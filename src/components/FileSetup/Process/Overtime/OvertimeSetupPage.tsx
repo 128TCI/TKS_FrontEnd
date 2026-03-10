@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Search, ArrowLeft, Check, Edit, Trash2 } from 'lucide-react';
+import { X, Plus, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../../services/apiClient';
@@ -29,7 +29,7 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [editingItem, setEditingItem] = useState<OvertimeItem | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    
+
     const [formData, setFormData] = useState({
         otfCode: '',
         earnCode: '',
@@ -48,7 +48,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
     const [loadingData, setLoadingData] = useState(false);
     const [dataError, setDataError] = useState('');
 
-    // Fetch overtime data from API
     useEffect(() => {
         fetchOvertimeData();
     }, []);
@@ -84,10 +83,55 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
     const endIndex = startIndex + itemsPerPage;
     const currentData = filteredData.slice(startIndex, endIndex);
 
-    // Reset to page 1 when search query changes
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery]);
+
+    // ─── Company Info Validation (Payroll Path only) ──────────────────────────
+    /**
+     * Fetches company information and checks whether the Payroll path is
+     * configured. Returns true when the transaction is allowed to proceed.
+     */
+    const validateCompanyPaths = async (): Promise<boolean> => {
+        try {
+            const response = await apiClient.get('/Fs/System/CompanyInformation');
+            const companyInfo =
+                Array.isArray(response.data) ? response.data[0] : response.data;
+
+            if (!companyInfo) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Validation Error',
+                    text: 'Company Information is not properly set.',
+                });
+                return false;
+            }
+
+            const payrollPath = (companyInfo.payrollPath ?? '').trim();
+
+            if (payrollPath !== '') {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Not Allowed',
+                    text: 'You are connected to Payroll. you are not allowed to do any transaction for this setup.',
+                });
+                return false;
+            }
+
+            return true;
+        } catch (error: any) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text:
+                    error.response?.data?.message ||
+                    error.message ||
+                    'Failed to retrieve company information.',
+            });
+            return false;
+        }
+    };
+    // ─────────────────────────────────────────────────────────────────────────────
 
     const handleEdit = (item: OvertimeItem) => {
         setEditingItem(item);
@@ -124,6 +168,11 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
     };
 
     const handleDelete = async (item: OvertimeItem) => {
+        // ── 1. Payroll path check ────────────────────────────────────────────
+        const companyPathsValid = await validateCompanyPaths();
+        if (!companyPathsValid) return;
+
+        // ── 2. Confirm deletion ──────────────────────────────────────────────
         const confirmed = await Swal.fire({
             icon: 'warning',
             title: 'Confirm Delete',
@@ -135,71 +184,86 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
             cancelButtonText: 'Cancel',
         });
 
-        if (confirmed.isConfirmed) {
-            try {
-                await apiClient.delete(`/Fs/Process/Overtime/OverTimeFileSetUp/${item.otfid}`);
-                await auditTrail.log({
-                    accessType: 'Delete',
-                    trans: `Deleted overtime code "${item.otfCode} - ${item.description}"`,
-                    messages: `Overtime code "${item.otfCode} - ${item.description}" removed`,
-                    formName
-                });
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'Success',
-                    text: 'Overtime code deleted successfully.',
-                    timer: 2000,
-                    showConfirmButton: false,
-                });
-                await fetchOvertimeData();
-            } catch (error: any) {
-                const errorMsg = error.response?.data?.message || error.message || 'Failed to delete overtime code';
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: errorMsg,
-                });
-                console.error('Error deleting overtime code:', error);
-            }
+        if (!confirmed.isConfirmed) return;
+
+        // ── 3. Proceed with deletion ─────────────────────────────────────────
+        try {
+            await apiClient.delete(`/Fs/Process/Overtime/OverTimeFileSetUp/${item.otfid}`);
+            await auditTrail.log({
+                accessType: 'Delete',
+                trans: `Deleted overtime code "${item.otfCode} - ${item.description}"`,
+                messages: `Overtime code "${item.otfCode} - ${item.description}" removed`,
+                formName
+            });
+            await Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: 'Overtime code deleted successfully.',
+                timer: 2000,
+                showConfirmButton: false,
+            });
+            await fetchOvertimeData();
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to delete overtime code';
+            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+            console.error('Error deleting overtime code:', error);
         }
+    };
+
+    // Mirrors C#: CheckCodeIfRegularExpression — no spaces allowed
+    const isValidCode = (value: string): boolean => {
+        return /^[a-zA-Z0-9_\-]+$/.test(value);
+    };
+
+    // Mirrors C#: CheckCodeIfRegularExpressionWithSpace — spaces allowed
+    const isValidDescWithSpace = (value: string): boolean => {
+        return /^[a-zA-Z0-9_\-\s]+$/.test(value);
     };
 
     const handleSubmitCreate = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validate required fields
+        // ── 1. Required field checks ─────────────────────────────────────────
         if (!formData.otfCode.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Code is required.',
-            });
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
             return;
         }
-
         if (!formData.description.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Description is required.',
-            });
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' });
             return;
         }
 
-        // Check for duplicate code
-        const isDuplicate = overtimeData.some(item => 
-            item.otfCode.toLowerCase() === formData.otfCode.trim().toLowerCase()
+        // ── 2. Payroll path check ────────────────────────────────────────────
+        const companyPathsValid = await validateCompanyPaths();
+        if (!companyPathsValid) return;
+
+        // ── 3. Invalid character checks ──────────────────────────────────────
+        if (!isValidCode(formData.otfCode.trim())) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Invalid Character in Overtime Code.' });
+            return;
+        }
+        if (!isValidDescWithSpace(formData.description.trim())) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Invalid Character in Description.' });
+            return;
+        }
+
+        // ── 4. Duplicate checks ──────────────────────────────────────────────
+        const duplicateCode = overtimeData.some(item =>
+            item.otfCode.trim().toUpperCase() === formData.otfCode.trim().toUpperCase()
         );
-
-        if (isDuplicate) {
-            await Swal.fire({
-                icon: 'error',
-                title: 'Duplicate Code',
-                text: 'This overtime code is already in use. Please use a different code.',
-            });
+        if (duplicateCode) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code already exists.' });
+            return;
+        }
+        const duplicateDesc = overtimeData.some(item =>
+            item.description.trim().toUpperCase() === formData.description.trim().toUpperCase()
+        );
+        if (duplicateDesc) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description already exists.' });
             return;
         }
 
+        // ── 5. Submit ────────────────────────────────────────────────────────
         setSubmitting(true);
         try {
             const payload = {
@@ -218,10 +282,10 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
 
             await apiClient.post('/Fs/Process/Overtime/OverTimeFileSetUp', payload);
             await auditTrail.log({
-            accessType: 'Add',
-            trans: `Created overtime code "${formData.otfCode} - ${formData.description}"`,
-            messages: `Overtime code "${formData.otfCode} - ${formData.description}" created`,
-            formName
+                accessType: 'Add',
+                trans: `Created overtime code "${formData.otfCode} - ${formData.description}"`,
+                messages: `Overtime code "${formData.otfCode} - ${formData.description}" created`,
+                formName
             });
             await Swal.fire({
                 icon: 'success',
@@ -230,16 +294,11 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                 timer: 2000,
                 showConfirmButton: false,
             });
-
             await fetchOvertimeData();
             setShowCreateModal(false);
         } catch (error: any) {
             const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: errorMsg,
-            });
+            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
             console.error('Error creating overtime code:', error);
         } finally {
             setSubmitting(false);
@@ -248,43 +307,51 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
 
     const handleSubmitEdit = async (e: React.FormEvent) => {
         e.preventDefault();
-
         if (!editingItem) return;
 
-        // Validate required fields
+        // ── 1. Required field checks ─────────────────────────────────────────
         if (!formData.otfCode.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Code is required.',
-            });
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
             return;
         }
-
         if (!formData.description.trim()) {
-            await Swal.fire({
-                icon: 'warning',
-                title: 'Validation Error',
-                text: 'Description is required.',
-            });
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description is required.' });
             return;
         }
 
-        // Check for duplicate code (excluding current item)
-        const isDuplicate = overtimeData.some(item => 
-            item.otfid !== editingItem.otfid && 
-            item.otfCode.toLowerCase() === formData.otfCode.trim().toLowerCase()
+        // ── 2. Payroll path check ────────────────────────────────────────────
+        const companyPathsValid = await validateCompanyPaths();
+        if (!companyPathsValid) return;
+
+        // ── 3. Invalid character checks ──────────────────────────────────────
+        if (!isValidCode(formData.otfCode.trim())) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Invalid Character in Overtime Code.' });
+            return;
+        }
+        if (!isValidDescWithSpace(formData.description.trim())) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Invalid Character in Description.' });
+            return;
+        }
+
+        // ── 4. Duplicate checks (excluding current item) ─────────────────────
+        const duplicateCode = overtimeData.some(item =>
+            item.otfid !== editingItem.otfid &&
+            item.otfCode.trim().toUpperCase() === formData.otfCode.trim().toUpperCase()
         );
-
-        if (isDuplicate) {
-            await Swal.fire({
-                icon: 'error',
-                title: 'Duplicate Code',
-                text: 'This overtime code is already in use. Please use a different code.',
-            });
+        if (duplicateCode) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code already exists.' });
+            return;
+        }
+        const duplicateDesc = overtimeData.some(item =>
+            item.otfid !== editingItem.otfid &&
+            item.description.trim().toUpperCase() === formData.description.trim().toUpperCase()
+        );
+        if (duplicateDesc) {
+            await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Description already exists.' });
             return;
         }
 
+        // ── 5. Submit ────────────────────────────────────────────────────────
         setSubmitting(true);
         try {
             const payload = {
@@ -303,10 +370,10 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
 
             await apiClient.put(`/Fs/Process/Overtime/OverTimeFileSetUp/${editingItem.otfid}`, payload);
             await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Updated overtime code "${formData.otfCode} - ${formData.description}"`,
-            messages: `Overtime code "${formData.otfCode} - ${formData.description}" updated`,
-            formName
+                accessType: 'Edit',
+                trans: `Updated overtime code "${formData.otfCode} - ${formData.description}"`,
+                messages: `Overtime code "${formData.otfCode} - ${formData.description}" updated`,
+                formName
             });
             await Swal.fire({
                 icon: 'success',
@@ -315,17 +382,12 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                 timer: 2000,
                 showConfirmButton: false,
             });
-
             await fetchOvertimeData();
             setShowCreateModal(false);
             setEditingItem(null);
         } catch (error: any) {
             const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-            await Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: errorMsg,
-            });
+            await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
             console.error('Error updating overtime code:', error);
         } finally {
             setSubmitting(false);
@@ -340,7 +402,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
         }
     };
 
-    // Handle ESC key press to close modals
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -350,11 +411,9 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                 }
             }
         };
-
         if (showCreateModal) {
             document.addEventListener('keydown', handleEscKey);
         }
-
         return () => {
             document.removeEventListener('keydown', handleEscKey);
         };
@@ -362,17 +421,13 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Main Content */}
             <div className="flex-1 p-6">
                 <div className="max-w-7xl mx-auto">
-                    {/* Page Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
                         <h1 className="text-white">Overtime File Setup</h1>
                     </div>
 
-                    {/* Content Container */}
                     <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-                        {/* Information Frame */}
                         <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
                             <div className="flex items-start gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -406,7 +461,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                             </div>
                         </div>
 
-                        {/* Controls Row */}
                         <div className="flex items-center gap-4 mb-6">
                             <button
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
@@ -426,7 +480,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                             </div>
                         </div>
 
-                        {/* Table */}
                         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                             {loadingData ? (
                                 <div className="flex items-center justify-center py-8">
@@ -503,7 +556,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                             )}
                         </div>
 
-                        {/* Pagination */}
                         <div className="mt-4 flex items-center justify-between text-sm">
                             <span className="text-gray-600">
                                 Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
@@ -543,25 +595,19 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                         {showCreateModal && (
                             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                                 <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                                    {/* Modal Header */}
                                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
                                         <h2 className="text-gray-900">{editingItem ? 'Edit' : 'Create New'}</h2>
                                         <button
-                                            onClick={() => {
-                                                setShowCreateModal(false);
-                                                setEditingItem(null);
-                                            }}
+                                            onClick={() => { setShowCreateModal(false); setEditingItem(null); }}
                                             className="text-gray-400 hover:text-gray-600 transition-colors"
                                         >
                                             <X className="w-5 h-5" />
                                         </button>
                                     </div>
 
-                                    {/* Modal Content */}
                                     <form onSubmit={handleSubmit} className="p-6">
                                         <h3 className="text-blue-600 mb-4">Overtime File Setup</h3>
 
-                                        {/* Form Fields */}
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Code :</label>
@@ -574,7 +620,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     required
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Description :</label>
                                                 <input
@@ -585,7 +630,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     required
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Earn Code :</label>
                                                 <input
@@ -595,7 +639,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Rate 1 :</label>
                                                 <input
@@ -606,7 +649,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     className="w-32 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Rate 2 :</label>
                                                 <input
@@ -617,7 +659,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     className="w-32 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Default Amount :</label>
                                                 <input
@@ -628,7 +669,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     className="w-32 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Inc Payslip :</label>
                                                 <input
@@ -638,7 +678,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Inc Cola OT :</label>
                                                 <input
@@ -648,7 +687,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Inc Cola Basic :</label>
                                                 <input
@@ -658,7 +696,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <label className="text-gray-700 text-sm whitespace-nowrap w-36">Is Exempted Rpt :</label>
                                                 <input
@@ -670,7 +707,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                             </div>
                                         </div>
 
-                                        {/* Modal Actions */}
                                         <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
                                             <button
                                                 type="submit"
@@ -681,10 +717,7 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    setShowCreateModal(false);
-                                                    setEditingItem(null);
-                                                }}
+                                                onClick={() => { setShowCreateModal(false); setEditingItem(null); }}
                                                 disabled={submitting}
                                                 className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                                             >
@@ -699,7 +732,6 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                 </div>
             </div>
 
-            {/* Footer */}
             <Footer />
         </div>
     );

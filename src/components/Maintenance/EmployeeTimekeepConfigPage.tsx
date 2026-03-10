@@ -287,7 +287,7 @@ export function EmployeeTimekeepConfigPage() {
   const [newPassword, setNewPassword] = useState('');
   const [newEffectivityDate, setNewEffectivityDate] = useState('');
   const [newExpiryDate, setNewExpiryDate] = useState('');
-
+  const [originalGroupCode, setOriginalGroupCode] = useState('');
   // Search modal state
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showGroupScheduleModal, setShowGroupScheduleModal] = useState(false);
@@ -580,37 +580,40 @@ const fetchLeaveCodes = async () => {
 };
 
   // Fetch Basic Configuration by Employee Code
-  const fetchBasicConfigByEmpCode = async (empCodeParam: string) => {
+const fetchBasicConfigByEmpCode = async (empCodeParam: string) => {
     if (!empCodeParam) return;
     
     setBasicConfigLoading(true);
     setBasicConfigError('');
     try {
-      const response = await apiClient.get('/Maintenance/EmployeeBasicConfiguration', {
-        params: { empCode: empCodeParam }
-      });
-      
-      if (response.status === 200 && response.data) {
-        if (response.data.items && response.data.items.length > 0) {
-          const config = response.data.items[0];
-          setBasicConfigData(config);
-          setIsCreatingNew(false);
-        } else {
-          setBasicConfigData(null);
-          setIsCreatingNew(true);
+        const response = await apiClient.get('/Maintenance/EmployeeBasicConfiguration', {
+            params: { empCode: empCodeParam }
+        });
+        
+        if (response.status === 200 && response.data) {
+            if (response.data.items && response.data.items.length > 0) {
+                const config = response.data.items[0];
+                setBasicConfigData(config);
+                setOriginalGroupCode(config.groupCode ?? ''); // ✅ store original
+                setIsCreatingNew(false);
+            } else {
+                setBasicConfigData(null);
+                setOriginalGroupCode('');                     // ✅ reset if no config
+                setIsCreatingNew(true);
+            }
         }
-      }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load basic configuration';
-      setBasicConfigError(errorMsg);
-      if (error.response?.status === 404) {
-        setBasicConfigData(null);
-        setIsCreatingNew(true);
-      }
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to load basic configuration';
+        setBasicConfigError(errorMsg);
+        if (error.response?.status === 404) {
+            setBasicConfigData(null);
+            setOriginalGroupCode('');                         // ✅ reset on 404
+            setIsCreatingNew(true);
+        }
     } finally {
-      setBasicConfigLoading(false);
+        setBasicConfigLoading(false);
     }
-  };
+};
 
   // Fetch Exemptions by Employee Code
  const fetchExemptionsByEmpCode = async (empCodeParam: string) => {
@@ -663,7 +666,7 @@ const fetchLeaveCodes = async () => {
 };
 
   // Fetch Leave Applications by Employee Code
- const fetchLeaveApplicationsByEmpCode = async (empCodeParam: string) => {
+const fetchLeaveApplicationsByEmpCode = async (empCodeParam: string) => {
   if (!empCodeParam) return;
 
   setLeaveApplicationsLoading(true);
@@ -673,24 +676,29 @@ const fetchLeaveCodes = async () => {
     if (response.status === 200 && response.data) {
       const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
 
-      const filteredAndMapped = allItems
-        .filter((item: any) => 
+      const filtered = allItems
+        .filter((item: any) =>
           (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()
         )
         .map((item: any) => ({
-          id: item.id,
-          empCode: item.empCode?.trim() ?? '',
-          leaveDate: item.date ? new Date(item.date).toLocaleDateString() : 'N/A',
-          leaveCode: item.leaveCode?.trim() ?? '',
-          hours: item.hoursApprovedNum ?? 0,
-          reason: item.reason ?? 'No reason provided',
-          remarks: item.remarks ?? '',
-          withPay: item.withPay ?? false,
-          isLate: item.isLateFiling ?? false,
-          status: item.hoursApprovedNum > 0 ? "Approved" : "Pending" 
+          id:               item.id,
+          empCode:          item.empCode?.trim() ?? '',
+          date:             item.date ?? '',           // ✅ keep raw, format in table
+          hoursApprovedNum: item.hoursApprovedNum ?? 0,
+          leaveCode:        item.leaveCode?.trim() ?? '',
+          period:           item.period ?? '',
+          reason:           item.reason ?? '',
+          remarks:          item.remarks ?? '',
+          withPay:          item.withPay ?? false,
+          sssNotif:         item.sssNotif ?? false,
+          isProcSSSNotif:   item.isProcSSSNotif ?? false,
+          balanceID:        item.balanceID ?? '',
+          isLateFiling:     item.isLateFiling ?? false,
+          isLateFilingProcessed: item.isLateFilingProcessed ?? false,
+          exemptAllowFlag:  item.exemptAllowFlag ?? false,
         }));
 
-      setLeaveApplicationsData(filteredAndMapped);
+      setLeaveApplicationsData(filtered);
     }
   } catch (error: any) {
     setLeaveApplicationsData([]);
@@ -1229,7 +1237,28 @@ const fetchOvertimeApplicationsByEmpCode = async (empCodeParam: string) => {
     const response = await apiClient.get('/Maintenance/EmployeeOvertimeApplication');
     if (response.status === 200 && response.data) {
       const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      setOvertimeApplicationsData(allItems.filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()));
+      const filtered = allItems
+        .filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase())
+        .map((item: any) => ({
+          id:                      item.id,
+          empCode:                 item.empCode ?? '',
+          date:                    item.date ?? '',
+          numOTHoursApproved:      item.numOTHoursApproved ?? 0,
+          earlyOTStartTime:        item.earlyOTStartTime ?? '',
+          earlyTimeIn:             item.earlyTimeIn ?? '',
+          startOTPM:               item.startOTPM ?? '',
+          minHRSOTBreak:           item.minHRSOTBreak ?? 0,
+          earlyOTStartTimeRestHol: item.earlyOTStartTimeRestHol ?? '',
+          reason:                  item.reason ?? '',
+          remarks:                 item.remarks ?? '',
+          approvedOTBreaksHrs:     item.approvedOTBreaksHrs ?? 0,
+          stotats:                 item.stotats ?? '',
+          isLateFiling:            item.isLateFiling ?? false,
+          isLateFilingProcessed:   item.isLateFilingProcessed ?? false,
+          appliedBeforeShiftDate:  item.appliedBeforeShiftDate ?? '',
+          isOTBeforeShiftNextDay:  item.isOTBeforeShiftNextDay ?? false,
+        }));
+      setOvertimeApplicationsData(filtered);
     }
   } catch (error: any) {
     setOvertimeApplicationsData([]);
@@ -1329,7 +1358,14 @@ const fetchContractualByEmpCode = async (empCodeParam: string) => {
     const response = await apiClient.get('/Maintenance/EmployeeContractual');
     if (response.status === 200 && response.data) {
       const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      setContractualData(allItems.filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()));
+      const filtered = allItems
+        .filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase())
+        .map((item: any) => ({
+          id: item.id,
+          dateFrom: item.dateFr || item.dateFrom || '',   // ✅ handle both field names
+          dateTo:   item.dateTo || '',
+        }));
+      setContractualData(filtered);
     }
   } catch (error: any) {
     setContractualData([]);
@@ -1405,7 +1441,12 @@ const handleContractualSubmit = async () => {
     console.error('Error submitting contractual:', error);
   }
 };
-
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString();
+};
 const fetchSuspensionByEmpCode = async (empCodeParam: string) => {
   if (!empCodeParam) return;
   setSuspensionLoading(true);
@@ -1413,7 +1454,14 @@ const fetchSuspensionByEmpCode = async (empCodeParam: string) => {
     const response = await apiClient.get('/Maintenance/EmployeeSuspension');
     if (response.status === 200 && response.data) {
       const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      setSuspensionData(allItems.filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()));
+      const filtered = allItems
+        .filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase())
+        .map((item: any) => ({
+          id: item.id,
+          dateFrom: item.dateFrom || '',
+          dateTo:   item.dateTo   || '',
+        }));
+      setSuspensionData(filtered);
     }
   } catch (error: any) {
     setSuspensionData([]);
@@ -1685,42 +1733,122 @@ const handleSuspensionSubmit = async () => {
       await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load employee details' });
     }
   };
+// ─── Company Info Validation (HRIS / Payroll Path) ────────────────────────────
+const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+        const response = await apiClient.get("/Fs/System/CompanyInformation");
+        const companyInfo =
+            Array.isArray(response.data) ? response.data[0] : response.data;
 
+        if (!companyInfo) {
+            await Swal.fire({
+                icon: "error",
+                title: "Validation Error",
+                text: "Company Information is not properly set.",
+            });
+            return false;
+        }
+
+        const hrisPath    = (companyInfo.hrisPath    ?? "").trim();
+
+        if (hrisPath !== "") {
+            await Swal.fire({
+                icon: "error",
+                title: "Not Allowed",
+                text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+            });
+            return false;
+        }
+
+      
+
+        return true;
+    } catch (error: any) {
+        await Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: error.response?.data?.message || error.message || "Failed to retrieve company information.",
+        });
+        return false;
+    }
+};
+// ──────────────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     try {
       if (!empCode) {
         await Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select an employee first' });
         return;
       }
-      if (activeTab === 'basic-config') {
-        const configData: Partial<EmployeeBasicConfig> = {
-          empCode: empCode,
-          groupCode: tksGroup,
-          groupScheduleCode: basicConfigData?.groupScheduleCode || '',
-          allowOTDefault: basicConfigData?.allowOTDefault || false,
-          active: basicConfigData?.active ?? true,
-          compAllowFrRDExmpOT: basicConfigData?.compAllowFrRDExmpOT || false,
-          compAllowFrHolExmpOT: basicConfigData?.compAllowFrHolExmpOT || false,
-          timeAttendanceStatus: basicConfigData?.timeAttendanceStatus || false
-        };
-        if (isCreatingNew || !basicConfigData) {
-          await createBasicConfig(configData);
-        } else {
-          await updateBasicConfig(basicConfigData.id, configData);
+if (activeTab === 'basic-config') {
+
+            // ✅ 1. HRIS / Payroll path check
+            const companyPathsValid = await validateCompanyPaths();
+            if (!companyPathsValid) return;
+
+            // ✅ 2. Validate GroupScheduleCode exists if provided
+            if (basicConfigData?.groupScheduleCode && basicConfigData.groupScheduleCode.trim() !== '') {
+                const groupScheduleExists = groupSchedules.some(
+                    (gs) => gs.groupScheduleCode.trim() === basicConfigData.groupScheduleCode.trim()
+                );
+                if (!groupScheduleExists) {
+                    await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Group Schedule does not exist in Group Schedule SetUp.' });
+                    return;
+                }
+            }
+
+            // ✅ 3. On Edit — check if TKS Group (GroupCode) was changed (HRIS restriction)
+            if (!isCreatingNew && basicConfigData) {
+                const orig    = originalGroupCode.trim().toUpperCase();
+                const current = tksGroup.trim().toUpperCase();
+
+                if (orig !== current) {
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'Not Allowed',
+                        text: 'You are connected to HRIS. You are not allowed to change TK Group.'
+                    });
+                    return;
+                }
+            }
+
+            // ✅ 4. Validate EmpCode and TKS Group are selected
+            if (!empCode.trim() || !tksGroup.trim()) {
+                await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Employee Code / Group Code does not exist in Setup.' });
+                return;
+            }
+
+            const configData: Partial<EmployeeBasicConfig> = {
+                id:                   basicConfigData?.id,   // ✅ add this
+                empCode:              empCode,
+                groupCode:            tksGroup,
+                groupScheduleCode:    basicConfigData?.groupScheduleCode || '',
+                allowOTDefault:       basicConfigData?.allowOTDefault || false,
+                active:               basicConfigData?.active ?? true,
+                compAllowFrRDExmpOT:  basicConfigData?.compAllowFrRDExmpOT || false,
+                compAllowFrHolExmpOT: basicConfigData?.compAllowFrHolExmpOT || false,
+                timeAttendanceStatus: basicConfigData?.timeAttendanceStatus || false
+            };
+
+            if (isCreatingNew || !basicConfigData) {
+                await createBasicConfig(configData);
+            } else {
+                await updateBasicConfig(basicConfigData.id, configData);
+            }
+
+        } else if (activeTab === 'exemptions') {
+            await saveExemptions();
+        } else if (activeTab === 'rest-day' && restDayMode === 'fixed') {
+            await saveRestDayFixed();
+        } else if (activeTab === 'workshift' && workshiftMode === 'fixed') {
+            await saveWorkshiftFixed();
+        } else if (activeTab === 'classification' && classificationMode === 'fixed') {
+            await saveClassificationFixed();
         }
-      } else if (activeTab === 'exemptions') {
-        await saveExemptions();
-      } else if (activeTab === 'rest-day' && restDayMode === 'fixed') {
-        await saveRestDayFixed();
-      } else if (activeTab === 'workshift' && workshiftMode === 'fixed') {
-        await saveWorkshiftFixed();
-      } else if (activeTab === 'classification' && classificationMode === 'fixed') {
-        await saveClassificationFixed();
-      }
+
     } catch (error) {
-      console.error('Error saving:', error);
+        console.error('Error saving:', error);
     }
-  };
+};
 
   const handleCancel = () => {
     setIsEditMode(false);
@@ -1960,29 +2088,48 @@ const handleSuspensionSubmit = async () => {
                         <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No leave applications found</td></tr>
                       ) : (
                         leaveApplicationsData.map((entry) => (
-                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-6 py-3 text-gray-900">{new Date(entry.date).toLocaleDateString()}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.hoursApprovedNum}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.leaveCode}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.period}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.withPay ? 'Yes' : 'No'}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.sssNotif ? 'Yes' : 'No'}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
-                            <td className="px-6 py-3">
-                              <div className="flex items-center justify-center gap-2">
-                                <button onClick={() => { const rawDate = entry.date ? new Date(entry.date) : null; const isValidDate = rawDate && !isNaN(rawDate.getTime()); setIsLeaveEditMode(true); setCurrentLeaveId(entry.id); setLeaveDate(isValidDate ? rawDate.toISOString().split('T')[0] : ""); setLeaveHoursApproved(entry.hoursApprovedNum?.toString() ?? "0"); setLeaveCode(entry.leaveCode?.trim() ?? ""); setLeavePeriod(entry.period ?? ""); setLeaveReason(entry.reason ?? ""); setLeaveRemarks(entry.remarks ?? ""); setLeaveWithPay(entry.withPay ?? false); setLeaveSssNotification(entry.sssNotif ?? false); setLeaveIsLateFiling(entry.isLateFiling ?? false); setShowLeaveModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <span className="text-gray-300">|</span>
-                                <button onClick={() => handleLeaveDelete(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+  <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+    <td className="px-6 py-3 text-gray-900">{formatDate(entry.date)}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.hoursApprovedNum}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.leaveCode}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.period}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.withPay ? 'Yes' : 'No'}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.sssNotif ? 'Yes' : 'No'}</td>
+    <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
+    <td className="px-6 py-3">
+      <div className="flex items-center justify-center gap-2">
+        <button
+          onClick={() => {
+            setIsLeaveEditMode(true);
+            setCurrentLeaveId(entry.id);
+            setLeaveDate(entry.date ? new Date(entry.date).toISOString().split('T')[0] : '');
+            setLeaveHoursApproved(entry.hoursApprovedNum?.toString() ?? '0');
+            setLeaveCode(entry.leaveCode?.trim() ?? '');
+            setLeavePeriod(entry.period ?? '');
+            setLeaveReason(entry.reason ?? '');
+            setLeaveRemarks(entry.remarks ?? '');
+            setLeaveWithPay(entry.withPay ?? false);
+            setLeaveSssNotification(entry.sssNotif ?? false);
+            setLeaveIsLateFiling(entry.isLateFiling ?? false);
+            setShowLeaveModal(true);
+          }}
+          className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+        >
+          <Edit className="w-4 h-4" />
+        </button>
+        <span className="text-gray-300">|</span>
+        <button
+          onClick={() => handleLeaveDelete(entry.id)}
+          className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </td>
+  </tr>
+))
                       )}
                     </tbody>
                   </table>
@@ -2301,66 +2448,119 @@ const handleSuspensionSubmit = async () => {
           </div>
         );
 
-      case 'overtime-applications':
-        return (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="space-y-6">
-              <div>
-                <button onClick={() => { setIsOvertimeEditMode(false); setCurrentOvertimeId(null); setOvertimeDate(''); setOvertimeHoursApproved(''); setOvertimeActualDateInOTBefore(''); setOvertimeStartTimeBefore(''); setOvertimeStartOvertimeDate(''); setOvertimeStartOvertimeTime(''); setOvertimeApprovedBreak(''); setOvertimeReason(''); setOvertimeRemarks(''); setOvertimeIsLateFiling(false); setShowOvertimeModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                  <Plus className="w-4 h-4" />Create New
-                </button>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                {overtimeLoading ? (
-                  <div className="text-center py-8">Loading overtime applications...</div>
+     case 'overtime-applications':
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="space-y-6">
+        <div>
+          <button
+            onClick={() => {
+              setIsOvertimeEditMode(false);
+              setCurrentOvertimeId(null);
+              setOvertimeDate('');
+              setOvertimeNumOTHoursApproved('');
+              setOvertimeEarlyOTStartTime('');
+              setOvertimeEarlyTimeIn('');
+              setOvertimeStartOTPM('');
+              setOvertimeMinHRSOTBreak('');
+              setOvertimeEarlyOTStartTimeRestHol('');
+              setOvertimeReason('');
+              setOvertimeRemarks('');
+              setOvertimeApprovedOTBreaksHrs('');
+              setOvertimeStotats('');
+              setOvertimeIsLateFiling(false);
+              setOvertimeAppliedBeforeShiftDate('');
+              setOvertimeIsOTBeforeShiftNextDay(false);
+              setShowOvertimeModal(true);
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+          >
+            <Plus className="w-4 h-4" />Create New
+          </button>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {overtimeLoading ? (
+            <div className="text-center py-8">Loading overtime applications...</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-100 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-gray-700">Date</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Hours Approved</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Early OT Start</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Early Time In</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Start OT PM</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Approved OT Breaks Hrs</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Reason</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Remarks</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Late Filing</th>
+                  <th className="px-6 py-3 text-left text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overtimeApplicationsData.length === 0 ? (
+                  <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No overtime applications found</td></tr>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-100 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-gray-700">Date</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Hours Approved</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Start Time OT Before</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Approved OT Break</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Reason</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Remarks</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Late Filing</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overtimeApplicationsData.length === 0 ? (
-                        <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-500">No overtime applications found</td></tr>
-                      ) : (
-                        overtimeApplicationsData.map((entry) => (
-                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-6 py-3 text-gray-900">{entry.date}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.hoursApproved}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.startTimeOTBefore}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.approvedOTBreak}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
-                            <td className="px-6 py-3">
-                              <div className="flex gap-2">
-                                <button onClick={() => { setIsOvertimeEditMode(true); setCurrentOvertimeId(entry.id); setOvertimeDate(entry.date); setOvertimeHoursApproved(entry.hoursApproved); setOvertimeActualDateInOTBefore(entry.actualDateInOTBefore); setOvertimeStartTimeBefore(entry.startTimeOTBefore); setOvertimeStartOvertimeDate(entry.startOvertimeDate); setOvertimeStartOvertimeTime(entry.startOvertimeTime); setOvertimeApprovedBreak(entry.approvedOTBreak); setOvertimeReason(entry.reason); setOvertimeRemarks(entry.remarks); setOvertimeIsLateFiling(entry.isLateFiling); setShowOvertimeModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <span className="text-gray-300">|</span>
-                                <button onClick={() => handleOvertimeDelete(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                  overtimeApplicationsData.map((entry) => (
+                    <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-6 py-3 text-gray-900">{formatDate(entry.date)}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.numOTHoursApproved}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.earlyOTStartTime}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.earlyTimeIn}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.startOTPM}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.approvedOTBreaksHrs}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
+                      <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
+                      <td className="px-6 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setIsOvertimeEditMode(true);
+                              setCurrentOvertimeId(entry.id);
+                              setOvertimeDate(entry.date ? new Date(entry.date).toISOString().split('T')[0] : '');
+                              setOvertimeNumOTHoursApproved(entry.numOTHoursApproved?.toString() ?? '');
+                              setOvertimeEarlyOTStartTime(entry.earlyOTStartTime ?? '');
+                              setOvertimeEarlyTimeIn(entry.earlyTimeIn ?? '');
+                              setOvertimeStartOTPM(entry.startOTPM ?? '');
+                              setOvertimeMinHRSOTBreak(entry.minHRSOTBreak?.toString() ?? '');
+                              setOvertimeEarlyOTStartTimeRestHol(entry.earlyOTStartTimeRestHol ?? '');
+                              setOvertimeReason(entry.reason ?? '');
+                              setOvertimeRemarks(entry.remarks ?? '');
+                              setOvertimeApprovedOTBreaksHrs(entry.approvedOTBreaksHrs?.toString() ?? '');
+                              setOvertimeStotats(entry.stotats ?? '');
+                              setOvertimeIsLateFiling(entry.isLateFiling ?? false);
+                              setOvertimeAppliedBeforeShiftDate(
+                                entry.appliedBeforeShiftDate
+                                  ? new Date(entry.appliedBeforeShiftDate).toISOString().split('T')[0]
+                                  : ''
+                              );
+                              setOvertimeIsOTBeforeShiftNextDay(entry.isOTBeforeShiftNextDay ?? false);
+                              setShowOvertimeModal(true);
+                            }}
+                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => handleOvertimeDelete(entry.id)}
+                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </div>
-            </div>
-          </div>
-        );
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
       case 'contractual':
         return (
@@ -2389,8 +2589,8 @@ const handleSuspensionSubmit = async () => {
                       ) : (
                         contractualData.map((entry) => (
                           <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-6 py-3 text-gray-900">{entry.dateFrom}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.dateTo}</td>
+                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateFrom)}</td>
+                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td>
                             <td className="px-6 py-3">
                               <div className="flex gap-2">
                                 <button onClick={() => { setIsContractualEditMode(true); setCurrentContractualId(entry.id); setContractualDateFrom(entry.dateFrom); setContractualDateTo(entry.dateTo); setShowContractualModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
@@ -2440,8 +2640,8 @@ const handleSuspensionSubmit = async () => {
                       ) : (
                         suspensionData.map((entry) => (
                           <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-6 py-3 text-gray-900">{entry.dateFrom}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.dateTo}</td>
+                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateFrom)}</td>
+                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td> 
                             <td className="px-6 py-3">
                               <div className="flex gap-2">
                                 <button onClick={() => { setIsSuspensionEditMode(true); setCurrentSuspensionId(entry.id); setSuspensionDateFrom(entry.dateFrom); setSuspensionDateTo(entry.dateTo); setShowSuspensionModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
