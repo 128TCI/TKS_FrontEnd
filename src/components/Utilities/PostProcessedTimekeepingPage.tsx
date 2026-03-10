@@ -3,7 +3,7 @@ import { Send, Check, Users, Building2, Briefcase, Network, CalendarClock, Walle
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
@@ -200,10 +200,7 @@ export function PostProcessedTimekeepingPage() {
         empCodes:      selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
         dateFrom:      new Date(dateFrom).toISOString(),
         dateTo:        new Date(dateTo).toISOString(),
-        year,
-        month,
-        noOfTardiness,
-        gracePeriod,
+        userName:      getLoggedInUsername(), 
         updateOptions: {
           tardiness:        options.tardiness,
           otherEarnings:    options.otherEarnings,

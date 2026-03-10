@@ -3,7 +3,7 @@ import { RotateCcw, Check, RefreshCw, Users, Building2, Briefcase, Network, Cale
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 
 interface GroupItem {
   id: number;
@@ -286,6 +286,7 @@ export function UnpostTransactionPage() {
         dateFrom: toISO(dateFrom),
         dateTo:   toISO(dateTo),
         empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        userName: getLoggedInUsername(),
         updateOptions: {
           tardiness:        options.tardiness,
           otherEarnings:    options.otherEarnings,
@@ -297,7 +298,7 @@ export function UnpostTransactionPage() {
           lateFiling:       options.lateFiling,
         },
       };
-      const res = await apiClient.post('/Utilities/UnpostTransaction_RawDataUnpost', payload);
+      const res = await apiClient.post('/Utilities/UnpostTransaction', payload);
       if (res.data?.success) {
         await showSuccessModal(res.data.message ?? 'Successfully Unpost Transactions.');
         resetForm();
