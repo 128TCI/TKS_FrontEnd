@@ -14,7 +14,7 @@ import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
 import Swal from 'sweetalert2';
 import auditTrail from '../../services/auditTrail'
-
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 
 const parseToISO = (raw: string): string | null => {
     if (!raw) return null;
@@ -220,25 +220,22 @@ export function ProcessedDataPage() {
     const [advancedTotalCount, setAdvancedTotalCount] = useState(0);
    
     // ──  EMPLOYEE SEARCH ─────────────────────────────────────────────────────
-    const fetchEmployees = async () => {
-        setLoadingEmployees(true);
-        setEmployeeError('');
-        try {
-            const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-            if (response.status === 200 && response.data) {
-                const mappedData = response.data.map((emp: any) => ({
-                    empCode:   emp.empCode || emp.code || '',
-                    name:      `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-                    groupCode: emp.grpCode || '',
-                }));
-                setEmployeeData(mappedData);
-            }
-        } catch (error: any) {
-            setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
-        } finally {
-            setLoadingEmployees(false);
-        }
-    };
+const fetchEmployees = async () => {
+    setLoadingEmployees(true);
+    setEmployeeError('');
+    try {
+        const { employees } = await fetchEmployeesService();
+        setEmployeeData(employees.map((emp) => ({
+            empCode:   emp.empCode || '',
+            name:      `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+            groupCode: emp.grpCode || '',
+        })));
+    } catch (error: any) {
+        setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+    } finally {
+        setLoadingEmployees(false);
+    }
+};
 
     const handleOpenEmpSearch = () => { fetchEmployees(); setShowEmpSearchModal(true); };
     const handleEmployeeSelect = (empCode: string, name: string, groupCode: string) => {

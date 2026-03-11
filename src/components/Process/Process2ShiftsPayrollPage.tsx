@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Calendar, RotateCcw, Check, Users, Building2, Briefcase, CalendarClock, Clock, Search, Play, CheckCircle, Wallet, Grid, Network, Box, RefreshCw } from 'lucide-react';
 import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 import Swal from 'sweetalert2';
 
 interface GroupItem {
@@ -205,14 +206,20 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
   const [employeeItems, setEmployeeItems] = useState<EmployeeItem[]>([]);
 
   // ── Fetch helpers ─────────────────────────────────────────────────────────
-  const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
-    const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
-    return response.data.map((item: any) => ({
-      id: item.ID || item.id,
-      code: item.groupCode || item.code,
-      description: item.groupDescription || item.description,
-    }));
-  };
+// ADD this
+const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
+  const userName = getLoggedInUsername();
+  const url = userName && userName !== 'Guest'
+    ? `/Fs/Process/TimeKeepGroupSetUp/by-user?userName=${encodeURIComponent(userName)}`
+    : `/Fs/Process/TimeKeepGroupSetUp`;
+
+  const response = await apiClient.get(url);
+  return (response.data ?? []).map((item: any) => ({
+    id: item.ID ?? item.id,
+    code: item.groupCode ?? item.code ?? '',
+    description: item.groupDescription ?? item.description ?? '',
+  })).filter((i: GroupItem) => i.id !== 0);
+};
 
   const fetchBranchData = async (): Promise<GroupItem[]> => {
     const response = await apiClient.get('/Fs/Employment/BranchSetUp');
@@ -280,23 +287,22 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
     }));
   };
 
-  const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
-    const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-    const list = Array.isArray(response.data) ? response.data : [];
-    return list.map((item: any): EmployeeItem => ({
-      id: item.empID ?? item.ID ?? item.id,
-      code: item.empCode || item.code || '',
-      name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
-      tkGroup:           item.tkGroup       ?? item.tKGroup       ?? item.groupCode      ?? item.tkGroupCode ?? '',
-      branchCode:        item.braCode       ?? item.branchCode    ?? item.branch         ?? '',
-      departmentCode:    item.depCode       ?? item.departmentCode?? item.department     ?? '',
-      divisionCode:      item.divCode       ?? item.divisionCode  ?? item.division       ?? '',
-      groupScheduleCode: item.grpCode       ?? item.groupSchedule ?? item.grpSchCode     ?? '',
-      payHouseCode:      item.lineCode      ?? item.payCode       ?? item.payHouseCode  ?? item.payHouse ?? '',
-      sectionCode:       item.secCode       ?? item.sectionCode   ?? item.section        ?? '',
-      unitCode:          item.unitCode      ?? item.unit          ?? '',
+const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
+    const { employees } = await fetchEmployeesService();
+    return employees.map((item: any): EmployeeItem => ({
+        id: item.empID ?? item.ID ?? item.id,
+        code: item.empCode || item.code || '',
+        name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
+        tkGroup:           item.tkGroup       ?? item.tKGroup       ?? item.groupCode      ?? item.tkGroupCode ?? '',
+        branchCode:        item.braCode       ?? item.branchCode    ?? item.branch         ?? '',
+        departmentCode:    item.depCode       ?? item.departmentCode?? item.department     ?? '',
+        divisionCode:      item.divCode       ?? item.divisionCode  ?? item.division       ?? '',
+        groupScheduleCode: item.grpCode       ?? item.groupSchedule ?? item.grpSchCode     ?? '',
+        payHouseCode:      item.lineCode      ?? item.payCode       ?? item.payHouseCode   ?? item.payHouse ?? '',
+        sectionCode:       item.secCode       ?? item.sectionCode   ?? item.section        ?? '',
+        unitCode:          item.unitCode      ?? item.unit          ?? '',
     }));
-  };
+};
 
   useEffect(() => { fetchTKSGroupData().then(setTKSGroupItems); }, []);
   useEffect(() => { fetchBranchData().then(setBranchItems); }, []);
