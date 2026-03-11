@@ -259,6 +259,68 @@ export function ImportLogsFromDevice2ShiftsPage() {
           loading;
         }
   };
+  const fetchValidateData = async () => {
+    //setEmpCode(selectedEmpCodes);
+    if(selectedEmpCodes.length === 0){
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Please select employee.',
+          });
+          return;
+        }
+    setLoading(true);
+      error;
+      try {
+      const response = await apiClient.post("/Import/ImportLogsFromDevice2Shifts/ValidateLogs", {
+        dateFrom,
+        dateTo,
+        userName: getLoggedInUsername(),
+        doNotIncludeResignedEmp: doNotIncludeResigned,
+        empCodes: selectedEmpCodes,
+        devices: selectedDevice
+      });
+      if (response.data) {
+        const mappedData = response.data.map((rawData: any) => ({
+          id: rawData.id || rawData.Id || rawData.ID,
+          empCode: rawData.empCode || rawData.EmpCode || '',
+          lName: rawData.lName || rawData.LName || '',
+          fName: rawData.fName || rawData.FName || '',
+          mName: rawData.mName || rawData.MName || '',
+          suffix: rawData.suffix || rawData.Suffix || '',
+          rawDateIn: rawData.rawDateIn || rawData.RawDateIn || '',
+          workShiftCode: rawData.workShiftCode || rawData.WorkShiftCode || '',
+          workShiftDesc: rawData.workShiftDesc || rawData.WorkShiftDesc || '',
+          dayType: rawData.dayType || rawData.DayType || '',
+          rawTimeIn: rawData.rawTimeIn || rawData.RawTimeIn || '',
+          rawBreak1In: rawData.rawBreak1In || rawData.RawBreak1In || '',
+          rawBreak1Out: rawData.rawBreak1Out || rawData.RawBreak1Out || '',
+          rawBreak2In: rawData.rawBreak2In || rawData.RawBreak2In || '',
+          rawBreak2Out: rawData.rawBreak2Out || rawData.RawBreak2Out || '',
+          rawBreak3In: rawData.rawBreak3In || rawData.RawBreak3In || '',
+          rawBreak3Out: rawData.rawBreak3Out || rawData.RawBreak3Out || '',
+          rawTimeOut: rawData.rawTimeOut || rawData.RawTimeOut || '',
+          rawDateOut: rawData.rawDateOut || rawData.RawDateOut || '',
+          rawOTApproved: rawData.rawOTApproved || rawData.RawOTApproved || '',
+          rawRemarks: rawData.rawRemarks || rawData.RawRemarks || '',
+          entryFlag: rawData.entryFlag || rawData.EntryFlag || '',
+          terminalID: rawData.terminalID || rawData.TerminalID || '',
+          dayTypeDOLE: rawData.dayTypeDOLE || rawData.DayTypeDOLE || '',
+          aprOTTime: rawData.aprOTTime || rawData.AprOTTime || ''
+        }));
+        setGetRawData(mappedData);
+        console.log(empCode)
+        console.log(dateFrom, dateTo)
+        console.log(getRawData);
+      }
+      } catch (error: any) {
+          const errorMsg = error.response?.data?.message || error.message || 'Failed to Load Data';
+          setError(errorMsg);
+          console.error('Error fetching data', error);
+        } finally {
+          loading;
+        }
+  };
 
   useEffect(() => {
       fetchTKSData();
