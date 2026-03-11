@@ -77,7 +77,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/file-setup/process/payroll-location-setup':                                    'PayrollLocationSetup',
   '/file-setup/process/system-configuration-setup':                                'SystemConfig',
   '/file-setup/process/timekeep-group-setup':                                      'TimeKeepGroupSetUp',
-  //'/file-setup/process/unpaid-lunch-deduction-bracket-setup':                      'UnpaidLunchDeductionBracketSetup',
+  '/file-setup/process/unpaid-lunch-deduction-bracket-setup':                      'UnpaidLunchDeductionBracketSetup',
 
   // ── File Setup › Employment ──────────────────────────────────────────
   '/file-setup/employment/area-setup':                                             'AreaSetUp',
@@ -109,7 +109,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
 
   // ── Maintenance › 2 Shifts In A Day ──────────────────────────────────
   '/maintenance/2-shifts/employee-timekeep-config':                                'EmpTKConfigMaintWorkshift2ShiftsInADay',
-  //'/maintenance/2-shifts/raw-data':                                                'RawData2ShiftsInADay',
+  '/maintenance/2-shifts/raw-data':                                                'RawData2ShiftsInADay',
 
 
   // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -162,7 +162,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/utilities/employee/update-classification':                                     'UpdateEmployeeClassification',
   '/utilities/employee/delete-transactions':                                       'DeleteEmployeeTransactions',
   '/utilities/employee/update-rawdata-online':                                     'UpdateRawData',
-  //'/utilities/employee/update-pay-house':                                          '',                              // ⚠️ no formName in DB yet — pending
+  '/utilities/employee/update-pay-house':                                          'UpdateEmployeesLine',                              // ⚠️ no formName in DB yet — pending
 
   // ── Utilities › Employee RawData ─────────────────────────────────────
   '/utilities/rawdata/update-daytype':                                             'UpdateEmpRawDayType',
@@ -188,7 +188,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/utilities/processed/deduct-absences-excess':                                   'DeductAbsinExcessTotalHoursWithPayifWithFiledLvUtl',
   '/utilities/processed/post-processed-timekeeping':                               'PostTKSTransactionsUtil',
   '/utilities/processed/update-time-flag-breaks':                                  'UpdateTimeFlags',
-  //'/utilities/processed/unpaid-lunch-deduction':                                   'UnpaidLunchDeductionUtl',
+  '/utilities/processed/unpaid-lunch-deduction':                                   'UnpaidLunchDeductionUtl',
   '/utilities/processed/update-flexi-break':                                       'UpdateFlexiBreakUtil',
   '/utilities/processed/update-gl-code-utility':                                   'UpdateGLCode',
 
@@ -196,13 +196,13 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/utilities/reports/timekeep-email-distribution':                                'DTRDistribution',
 
   // ── Utilities › 2 Shifts In A Day ────────────────────────────────────
-//   '/utilities/2-shifts/include-unworked-holiday-pay':                              'IncludeUnWorkHolInRegDayUtl',
-//   '/utilities/2-shifts/nd-basic-round-down':                                       'NDBasicRoundDownUtl',
-//   '/utilities/2-shifts/saturday-unworked-paid-regular-hours':                      'SaturdayUnWrkConsiderPdRegHrs',
-//   '/utilities/2-shifts/sunday-work-ot-if-worked-saturday':                         'SunDayOTIfWrkSaturdayUtl',
-//   '/utilities/2-shifts/unpost-transaction':                                        'Unpost2ShiftsInADayTransactionsUtil',
-//   '/utilities/2-shifts/delete-incomplete-logs':                                    'DeleteIncompleteLogs2ShiftsInADay',
-//   '/utilities/2-shifts/delete-records-raw-data':                                   'DeleteRecordsInRawData2ShiftsInADay',
+  '/utilities/2-shifts/include-unworked-holiday-pay':                              'IncludeUnWorkHolInRegDayUtl',
+  '/utilities/2-shifts/nd-basic-round-down':                                       'NDBasicRoundDownUtl',
+  '/utilities/2-shifts/saturday-unworked-paid-regular-hours':                      'SaturdayUnWrkConsiderPdRegHrs',
+  '/utilities/2-shifts/sunday-work-ot-if-worked-saturday':                         'SunDayOTIfWrkSaturdayUtl',
+  '/utilities/2-shifts/unpost-transaction':                                        'Unpost2ShiftsInADayTransactionsUtil',
+  '/utilities/2-shifts/delete-incomplete-logs':                                    'DeleteIncompleteLogs2ShiftsInADay',
+  '/utilities/2-shifts/delete-records-raw-data':                                   'DeleteRecordsInRawData2ShiftsInADay',
 
 
   // ╔══════════════════════════════════════════════════════════════════════════╗
