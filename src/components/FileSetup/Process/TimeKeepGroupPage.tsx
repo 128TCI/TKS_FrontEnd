@@ -3937,6 +3937,9 @@ export function TimeKeepGroupPage() {
                           onChange={(e) => {
                             setGracePeriodSemiAnnual(e.target.checked);
                             uncheckedGracePeriodSemiAnnual();
+                             if(e.target.checked) {
+                                  setGracePeriodPerDay('');
+                            }
                           }}
                           disabled={!isEditMode}
                           className="w-4 h-4 mt-1"
@@ -3951,7 +3954,7 @@ export function TimeKeepGroupPage() {
                           type="text"
                           value={gracePeriodPerDay}
                           onChange={(e) => setGracePeriodPerDay(e.target.value)}
-                          readOnly={!isEditMode}
+                          readOnly={!isEditMode || gracePeriodSemiAnnual}
                           className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                         />
                         <span className="text-gray-500 text-sm">[hh:mm]</span>
@@ -3964,10 +3967,12 @@ export function TimeKeepGroupPage() {
                         <input
                           type="checkbox"
                           checked={gracePeriodIncludeTardiness}
-                          onChange={(e) =>
-                            setGracePeriodIncludeTardiness(e.target.checked)
+                          onChange={(e) => { 
+                              setGracePeriodIncludeTardiness(e.target.checked);
+                               
+                            }
                           }
-                          disabled={!isEditMode}
+                          disabled={!isEditMode || gracePeriodSemiAnnual}
                           className="w-4 h-4 mt-1"
                         />
                       </div>
