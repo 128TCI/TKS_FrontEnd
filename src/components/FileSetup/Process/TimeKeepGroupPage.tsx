@@ -1,4 +1,4 @@
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   X,
@@ -29,12 +29,12 @@ import apiClient from "../../../services/apiClient";
 import { useTablePagination } from "../../../hooks/useTablePagination";
 
 import Swal from "sweetalert2";
-import { group } from "console";
+
 
 interface GroupItem {
   id: number;
   groupCode: string;
-  groupDescription: string; // add this to handle direct GET response
+  groupDescription: string; 
   payrollGroup: string;
   cutOffDateFrom: string;
   cutOffDateTo: string;
@@ -190,19 +190,19 @@ interface LoginPolicyItem {
 
 interface OTBreakItem {
   id: number;
-  regDay: boolean | null;
-  restDay: boolean | null;
-  lHoliday: boolean | null;
-  sHoliday: boolean | null;
-  lHolidayRest: boolean | null;
-  sHolidayRest: boolean | null;
+  regDay: boolean;
+  restDay: boolean;
+  lHoliday: boolean;
+  sHoliday: boolean;
+  lHolidayRest: boolean;
+  sHolidayRest: boolean;
   groupCode: string;
-  doubleHoliday: boolean | null;
-  doubleHolidayRest: boolean | null;
-  s2Holiday: boolean | null;
-  s2HolidayRest: boolean | null;
-  nonWorkHoliday: boolean | null;
-  nonWorkHolidayRest: boolean | null;
+  doubleHoliday: boolean;
+  doubleHolidayRest: boolean;
+  s2Holiday: boolean;
+  s2HolidayRest: boolean;
+  nonWorkHoliday: boolean;
+  nonWorkHolidayRest: boolean;
 }
 
 interface OvertimeFileSetupItem {
@@ -263,6 +263,7 @@ export function TimeKeepGroupPage() {
     useState("");
   const [payrollLocationCode, setPayrollLocationCode] = useState("");
   const [payrollDescription, setPayrollDescription] = useState("");
+
   // Time Keep Cut Off Dates
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -474,13 +475,6 @@ export function TimeKeepGroupPage() {
   const [dayType, setDayType] = useState("");
   const [amount, setAmount] = useState("");
   const [earningCode, setEarningCode] = useState("");
-
-  // Other Policies State
-  const [useDefaultRestday, setUseDefaultRestday] = useState(false);
-  const [restdayWithWorkshift, setRestdayWithWorkshift] = useState(false);
-  const [useTardinessBracket, setUseTardinessBracket] = useState(false);
-  const [computeUndertimeToAbsences, setComputeUndertimeToAbsences] =
-    useState("3.00");
 
   // System Configuration State
   const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] =
@@ -958,7 +952,7 @@ export function TimeKeepGroupPage() {
     return response.data.map((item: any) => ({
       id: item.ID || item.id,
       groupCode: item.groupCode ?? "",
-      description: item.groupDescription ?? item.description ?? "", // handle both
+      description: item.groupDescription ?? "",
       groupDescription: item.groupDescription ?? "",
       payrollGroup: item.payrollGroup ?? "",
       cutOffDateMonth: item.cutOffDateMonth ?? "",
@@ -1053,6 +1047,20 @@ export function TimeKeepGroupPage() {
       const cBool = normalizeBool(cVal);
       if (pBool !== null && cBool !== null) {
         return pBool !== cBool;
+      }
+
+      const extractTime = (v: any): string | null => {
+        if (!v) return null;
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return null;
+        return `${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
+      };
+
+      const looksLikeISO = (v: any) =>
+        typeof v === "string" && v.includes("T") && !isNaN(Date.parse(v));
+
+      if (looksLikeISO(pVal) || looksLikeISO(cVal)) {
+        return extractTime(pVal) !== extractTime(cVal);
       }
 
       const looksLikeDate = (v: any) =>
@@ -1235,7 +1243,7 @@ export function TimeKeepGroupPage() {
 
       // Build payload using the login policy's OWN id, not currentGroupId
       const buildLoginPolicyPayload = (): Partial<LoginPolicyItem> => ({
-        id: currentPolicy.id, // ✅ login policy's own id
+        id: currentPolicy.id, // login policy's own id
         groupCode: tksGroupCode,
         gracePeriod: Number(gracePeriodPerDay),
         gracePeriodIncTard: gracePeriodIncludeTardiness,
@@ -2375,6 +2383,10 @@ export function TimeKeepGroupPage() {
           setShowForNoLoginModal(false);
         } else if (showForNoLogoutModal) {
           setShowForNoLogoutModal(false);
+        } else if (showForNoBreak2InModal) {
+          setShowForNoBreak2InModal(false);
+        } else if (showForNoBreak2OutModal) {
+          setShowForNoBreak2OutModal(false);
         } else if (showSupervisoryGroupModal) {
           setShowSupervisoryGroupModal(false);
         } else if (showOtCodeModal) {
@@ -2393,6 +2405,8 @@ export function TimeKeepGroupPage() {
     showForAbsentModal,
     showForNoLoginModal,
     showForNoLogoutModal,
+    showForNoBreak2InModal,
+    showForNoBreak2OutModal,
     showSupervisoryGroupModal,
     showOtCodeModal,
   ]);
@@ -2526,12 +2540,6 @@ export function TimeKeepGroupPage() {
     setMinimumNoOfHrsRequiredToCompHol("");
     setCompFirstRestdayHoliday(false);
 
-    // Other Policies
-    setUseDefaultRestday(false);
-    setRestdayWithWorkshift(false);
-    setUseTardinessBracket(false);
-    setComputeUndertimeToAbsences("");
-
     // System Configuration
     setUseTimekeepingSystemConfig(false);
     setMinBeforeShift(0);
@@ -2562,17 +2570,9 @@ export function TimeKeepGroupPage() {
           title: "Required Fields Missing",
           text: `Please fill in: ${missingFields.join(", ")}`,
         });
-        setIsCreateNew(false);
-        setIsEditMode(false);
-
-        // Re-select existing group if code exists
-        const codeToUse = tksGroupCode || "1";
-        if (!tksGroupCode) setTksGroupCode("1");
-        const item = tksGroupItems.find((i) => i.groupCode === codeToUse);
-        if (item) await handleGroupRowClick(item);
-
-        return;
+        return; 
       }
+
       // Check if group code already exists
       const existingGroup = tksGroupItems.find(
         (g) => g.groupCode === tksGroupCode,
@@ -2583,15 +2583,7 @@ export function TimeKeepGroupPage() {
           title: "Group Code Already In Use",
           text: `Group Code "${tksGroupCode}" is already taken. Please use a different code.`,
         });
-        setIsCreateNew(false);
-        setIsEditMode(false);
-
-        const codeToUse = tksGroupCode || "1";
-        if (!tksGroupCode) setTksGroupCode("1");
-        const item = tksGroupItems.find((i) => i.groupCode === codeToUse);
-        if (item) await handleGroupRowClick(item);
-
-        return;
+        return; 
       }
       // Create Group Definition
       const groupPayload = {
@@ -2623,9 +2615,7 @@ export function TimeKeepGroupPage() {
         showConfirmButton: false,
       });
 
-      // ----------------------
-      // 4️⃣ Fetch current child configs to avoid duplicates
-      // ----------------------
+      // Fetch current child configs to avoid duplicates
       const [
         freshLoginPolicies,
         freshOTRates,
@@ -2652,9 +2642,7 @@ export function TimeKeepGroupPage() {
         (s) => s.groupCode === newGroupCode,
       );
 
-      // ----------------------
-      // 5️⃣ Create Login Policy if not exists
-      // ----------------------
+      // Create Login Policy if not exists
       if (!loginPolicyExists) {
         const loginPolicyPayload = {
           id: 0,
@@ -2668,10 +2656,7 @@ export function TimeKeepGroupPage() {
           loginPolicyPayload,
         );
       }
-
-      // ----------------------
-      // 6️⃣ Create OT Rates if not exists
-      // ----------------------
+      // Create OT Rates if not exists
       if (!otRateExists) {
         const otRatesPayload = {
           id: 0,
@@ -2686,9 +2671,7 @@ export function TimeKeepGroupPage() {
         );
       }
 
-      // ----------------------
-      // 7️⃣ Create OT Break if not exists
-      // ----------------------
+      // Create OT Break if not exists
       if (!otBreakExists) {
         await apiClient.post("/Fs/Process/TimeKeepGroup/GroupOTBreak", {
           id: 0,
@@ -2708,9 +2691,7 @@ export function TimeKeepGroupPage() {
         });
       }
 
-      // ----------------------
-      // 8️⃣ Create System Config if not exists
-      // ----------------------
+      // Create System Config if not exists
       if (!systemConfigExists) {
         const systemConfigPayload = {
           id: 0,
@@ -2727,9 +2708,8 @@ export function TimeKeepGroupPage() {
         );
       }
 
-      // ----------------------
-      // 9️⃣ Update selected CutOff rows if any
-      // ----------------------
+      // Update selected CutOff rows if any
+
       if (selectedCutOffRows.length > 0) {
         const selectedIds = selectedCutOffRows
           .map(Number)
@@ -2746,9 +2726,7 @@ export function TimeKeepGroupPage() {
         );
       }
 
-      // ----------------------
-      // 🔟 Update selected AutoPairing rows if any
-      // ----------------------
+      // Update selected AutoPairing rows if any
       if (selectedAutoPairingRows.length > 0) {
         const selectedIds = selectedAutoPairingRows
           .map(Number)
@@ -2765,9 +2743,10 @@ export function TimeKeepGroupPage() {
         );
       }
 
-      // ----------------------
-      // 1️⃣1️⃣ Load new group
-      // ----------------------
+      setIsEditMode(false);
+      setIsCreateNew(false);
+
+      // Load new group
       await loadTKSGroup(newGroupId);
 
       await Swal.fire({
@@ -2945,6 +2924,157 @@ export function TimeKeepGroupPage() {
 
     setShowTksGroupModal(false);
   };
+  function TimeInput({
+    value,
+    onChange,
+    readOnly,
+    isEditMode,
+  }: {
+    value: string;
+    onChange?: (val: string) => void;
+    readOnly: boolean;
+    isEditMode: boolean;
+  }) {
+    const [hh, setHh] = useState("__");
+    const [mm, setMm] = useState("__");
+    const [period, setPeriod] = useState("AM");
+
+    const hhRef = useRef<HTMLInputElement>(null);
+    const mmRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      if (value) {
+        const match = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+        if (match) {
+          setHh(match[1].padStart(2, "0"));
+          setMm(match[2]);
+          if (match[3]) setPeriod(match[3].toUpperCase());
+        }
+      }
+    }, []);
+
+    const emit = (newHh: string, newMm: string, newPeriod: string) => {
+      if (newHh !== "__" && newMm !== "__") {
+        onChange?.(`${newHh}:${newMm} ${newPeriod}`);
+      }
+    };
+
+    const handleHhChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let val = e.target.value.replace(/\D/g, "");
+      if (val.length > 2) val = val.slice(-1);
+
+      const num = parseInt(val, 10);
+      if (val === "") {
+        setHh("__");
+        return;
+      }
+
+      if (val.length === 1 && num > 1) {
+        const padded = `0${val}`;
+        setHh(padded);
+        emit(padded, mm, period);
+        mmRef.current?.focus();
+        mmRef.current?.select();
+        return;
+      }
+
+      if (val.length === 2) {
+        const clamped = Math.min(12, Math.max(1, num));
+        const padded = String(clamped).padStart(2, "0");
+        setHh(padded);
+        emit(padded, mm, period);
+        mmRef.current?.focus();
+        mmRef.current?.select();
+        return;
+      }
+
+      setHh(val);
+    };
+
+    const handleMmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let val = e.target.value.replace(/\D/g, "");
+      if (val.length > 2) val = val.slice(-1);
+
+      if (val === "") {
+        setMm("__");
+        return;
+      }
+
+      const num = parseInt(val, 10);
+
+      if (val.length === 1 && num > 5) {
+        const padded = `0${val}`;
+        setMm(padded);
+        emit(hh, padded, period);
+        return;
+      }
+
+      if (val.length === 2) {
+        const clamped = Math.min(59, Math.max(0, num));
+        const padded = String(clamped).padStart(2, "0");
+        setMm(padded);
+        emit(hh, padded, period);
+        return;
+      }
+
+      setMm(val);
+    };
+
+    const togglePeriod = () => {
+      if (readOnly) return;
+      const next = period === "AM" ? "PM" : "AM";
+      setPeriod(next);
+      emit(hh, mm, next);
+    };
+
+    const inputBase = `w-8 text-center bg-transparent border-none outline-none text-sm font-mono text-gray-800 focus:bg-blue-50 rounded px-0`;
+
+    return (
+      <div
+        className={`inline-flex items-center gap-0.5 px-3 py-2 border border-gray-300 rounded focus-within:ring-2 focus-within:ring-blue-500 text-sm ${
+          !isEditMode ? "bg-gray-50" : "bg-white"
+        }`}
+      >
+        <input
+          ref={hhRef}
+          type="text"
+          inputMode="numeric"
+          value={hh}
+          onChange={handleHhChange}
+          onFocus={(e) => e.target.select()}
+          readOnly={readOnly}
+          placeholder="HH"
+          maxLength={2}
+          className={inputBase}
+        />
+        <span className="text-gray-400 font-mono select-none">:</span>
+        <input
+          ref={mmRef}
+          type="text"
+          inputMode="numeric"
+          value={mm}
+          onChange={handleMmChange}
+          onFocus={(e) => e.target.select()}
+          readOnly={readOnly}
+          placeholder="MM"
+          maxLength={2}
+          className={inputBase}
+        />
+        <button
+          type="button"
+          onClick={togglePeriod}
+          disabled={readOnly}
+          className={`ml-1.5 w-8 text-xs font-semibold rounded px-1 py-0.5 transition-colors ${
+            readOnly
+              ? "text-gray-400 cursor-default"
+              : "text-blue-600 hover:bg-blue-50 cursor-pointer"
+          }`}
+        >
+          {period}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -3093,8 +3223,7 @@ export function TimeKeepGroupPage() {
                           }
                         }
 
-                        setIsEditMode(false);
-                        setIsCreateNew(false);
+                        
                       } catch (error) {
                         console.error("Error saving all:", error);
                         alert("Some saves failed. Check console.");
@@ -3109,14 +3238,10 @@ export function TimeKeepGroupPage() {
                     onClick={async () => {
                       setIsEditMode(false);
                       setIsCreateNew(false);
-                      const codeToUse = tksGroupCode || "1";
-
-                      if (!tksGroupCode) {
-                        setTksGroupCode("1");
-                      }
+                      setTksGroupCode("1");
 
                       const item = tksGroupItems.find(
-                        (i) => i.groupCode === codeToUse,
+                        (i) => i.groupCode === "1",
                       );
 
                       if (item) {
@@ -3175,6 +3300,9 @@ export function TimeKeepGroupPage() {
                       <div className="flex items-center gap-3">
                         <label className="w-40 text-gray-700 text-sm flex-shrink-0">
                           TKS Group Code
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
                         </label>
                         <input
                           type="text"
@@ -3188,6 +3316,9 @@ export function TimeKeepGroupPage() {
                       <div className="flex items-center gap-3">
                         <label className="w-40 text-gray-700 text-sm flex-shrink-0">
                           TKS Group Description
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
                         </label>
                         <input
                           type="text"
@@ -3206,6 +3337,9 @@ export function TimeKeepGroupPage() {
                       <div className="flex items-center gap-3">
                         <label className="w-40 text-gray-700 text-sm flex-shrink-0">
                           Payroll Location Code
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
                         </label>
                         <div className="flex-1 min-w-0 flex gap-2">
                           <input
@@ -3228,7 +3362,13 @@ export function TimeKeepGroupPage() {
                               >
                                 <Search className="w-4 h-4" />
                               </button>
-                              <button className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95">
+                              <button
+                                onClick={() => {
+                                  setPayrollLocationCode("");
+                                  setPayrollDescription("");
+                                }}
+                                className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95"
+                              >
                                 <X className="w-4 h-4" />
                               </button>
                             </>
@@ -3239,6 +3379,9 @@ export function TimeKeepGroupPage() {
                       <div className="flex items-center gap-3">
                         <label className="w-40 text-gray-700 text-sm flex-shrink-0">
                           Payroll Description
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
                         </label>
                         <input
                           type="text"
@@ -3258,6 +3401,9 @@ export function TimeKeepGroupPage() {
                       <div className="flex items-center mb-3">
                         <h3 className="text-gray-700">
                           Time Keep Cut Off Dates
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
                         </h3>
                         {isEditMode && (
                           <div className="flex items-center gap-2 ml-auto">
@@ -3604,6 +3750,9 @@ export function TimeKeepGroupPage() {
                       <div className="flex items-center mb-3">
                         <h3 className="text-gray-700">
                           Auto Pairing Logs Cut-Off Dates
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
                         </h3>
                         {isEditMode && (
                           <div className="flex items-center gap-2 ml-auto">
@@ -3937,6 +4086,9 @@ export function TimeKeepGroupPage() {
                           onChange={(e) => {
                             setGracePeriodSemiAnnual(e.target.checked);
                             uncheckedGracePeriodSemiAnnual();
+                            if (e.target.checked) {
+                              setGracePeriodPerDay("");
+                            }
                           }}
                           disabled={!isEditMode}
                           className="w-4 h-4 mt-1"
@@ -3948,10 +4100,10 @@ export function TimeKeepGroupPage() {
                           Grace Period Per Day
                         </label>
                         <input
-                          type="text"
+                          type="number"
                           value={gracePeriodPerDay}
                           onChange={(e) => setGracePeriodPerDay(e.target.value)}
-                          readOnly={!isEditMode}
+                          readOnly={!isEditMode && gracePeriodSemiAnnual}
                           className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                         />
                         <span className="text-gray-500 text-sm">[hh:mm]</span>
@@ -3964,10 +4116,10 @@ export function TimeKeepGroupPage() {
                         <input
                           type="checkbox"
                           checked={gracePeriodIncludeTardiness}
-                          onChange={(e) =>
-                            setGracePeriodIncludeTardiness(e.target.checked)
-                          }
-                          disabled={!isEditMode}
+                          onChange={(e) => {
+                            setGracePeriodIncludeTardiness(e.target.checked);
+                          }}
+                          disabled={!isEditMode || gracePeriodSemiAnnual}
                           className="w-4 h-4 mt-1"
                         />
                       </div>
@@ -4007,7 +4159,7 @@ export function TimeKeepGroupPage() {
                           Grace Period Per Semi-Annual
                         </label>
                         <input
-                          type="text"
+                          type="number"
                           value={gracePeriodPerSemiAnnual}
                           onChange={(e) =>
                             setGracePeriodPerSemiAnnual(e.target.value)
@@ -4136,14 +4288,11 @@ export function TimeKeepGroupPage() {
                         <label className="w-60 text-gray-700 text-sm flex-shrink-0">
                           Night Diff. Start Time
                         </label>
-                        <input
-                          type="text"
+                        <TimeInput
                           value={nightDiffStartTime}
-                          onChange={(e) =>
-                            setNightDiffStartTime(e.target.value)
-                          }
+                          onChange={setNightDiffStartTime}
                           readOnly={!isEditMode}
-                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                          isEditMode={isEditMode}
                         />
                         <span className="text-gray-500 text-sm">[hh:mm]</span>
                       </div>
@@ -4152,12 +4301,11 @@ export function TimeKeepGroupPage() {
                         <label className="w-60 text-gray-700 text-sm flex-shrink-0">
                           Night Diff. End Time
                         </label>
-                        <input
-                          type="text"
+                        <TimeInput
                           value={nightDiffEndTime}
-                          onChange={(e) => setNightDiffEndTime(e.target.value)}
+                          onChange={setNightDiffEndTime}
                           readOnly={!isEditMode}
-                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                          isEditMode={isEditMode}
                         />
                         <span className="text-gray-500 text-sm">[hh:mm]</span>
                       </div>
@@ -5013,7 +5161,7 @@ export function TimeKeepGroupPage() {
                         type="number"
                         value={minIgnoreMultipleBreak}
                         onChange={(e) =>
-                          setMinIgnoreMultipleBreak(Number(e.target.value))
+                          setMinIgnoreMultipleBreak(parseFloat(e.target.value))
                         }
                         readOnly={!isEditMode}
                         className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
@@ -5039,10 +5187,10 @@ export function TimeKeepGroupPage() {
                         No. of Min. Before Midnight Shift :
                       </label>
                       <input
-                        type="text"
+                        type="number"
                         value={minBeforeMidnightShift}
                         onChange={(e) =>
-                          setMinBeforeMidnightShift(Number(e.target.value))
+                          setMinBeforeMidnightShift(parseFloat(e.target.value))
                         }
                         readOnly={!isEditMode}
                         className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
@@ -5063,10 +5211,10 @@ export function TimeKeepGroupPage() {
                         No of Min. to Consider Break2 In :
                       </label>
                       <input
-                        type="text"
+                        type="number"
                         value={minConsiderBreak2In}
                         onChange={(e) =>
-                          setMinConsiderBreak2In(Number(e.target.value))
+                          setMinConsiderBreak2In(parseFloat(e.target.value))
                         }
                         readOnly={!isEditMode}
                         className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
@@ -6898,3 +7046,4 @@ export function TimeKeepGroupPage() {
     </div>
   );
 }
+
