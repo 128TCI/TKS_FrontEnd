@@ -8,7 +8,7 @@ import apiClient from '../../services/apiClient';
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
 import { TimePicker } from '../Modals/TimePickerModal';
 import Swal from 'sweetalert2';
-
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface WorkShift {
     code: string;
@@ -352,27 +352,24 @@ export function TwoShiftsRawDataPage() {
     }
 }, []);
 
-    const fetchEmployeeData = async () => {
-        setLoadingEmployees(true);
-        setEmployeeError('');
-        try {
-            const response = await apiClient.get(EMPLOYEE_MASTER_URL);
-            if (response.status === 200 && response.data) {
-                const mappedData = response.data.map((emp: any) => ({
-                    empCode: emp.empCode || emp.code || '',
-                    name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-                    groupCode: emp.grpCode || '',
-                }));
-                setEmployeeData(mappedData);
-            }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-            setEmployeeError(errorMsg);
-            console.error('Error fetching employees:', error);
-        } finally {
-            setLoadingEmployees(false);
-        }
-    };
+const fetchEmployeeData = async () => {
+    setLoadingEmployees(true);
+    setEmployeeError('');
+    try {
+        const { employees } = await fetchEmployeesService();
+        setEmployeeData(employees.map((emp) => ({
+            empCode: emp.empCode || '',
+            name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+            groupCode: emp.grpCode || '',
+        })));
+    } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+        setEmployeeError(errorMsg);
+        console.error('Error fetching employees:', error);
+    } finally {
+        setLoadingEmployees(false);
+    }
+};
 
     // ─────────────────────────────────────────────────────────────────────────
     // CRUD

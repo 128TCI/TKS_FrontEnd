@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Lock } from 'lucide-react';
+import { Building2, User, Lock, Eye, EyeOff } from 'lucide-react';
 import apiClient from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
 import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
@@ -68,6 +68,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   const [windowsAuth, setWindowsAuth] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // ─── Fetch companies from API on mount ──────────────────────────────────────
   useEffect(() => {
@@ -230,15 +231,28 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   autoComplete='new-password'
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
+                  className="w-full pl-10 pr-11 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Password"
                   autoComplete="new-password"
                   name="password-no-autofill"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
 
               {/* Company Name — dynamically populated */}

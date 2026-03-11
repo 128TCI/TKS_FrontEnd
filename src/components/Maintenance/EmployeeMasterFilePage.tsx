@@ -2,85 +2,14 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Plus, Pencil, Trash2, Search, Check, X, Save, User, Briefcase, Upload, Camera } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { InlineDatePicker } from '../InlineDatePicker';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 import Swal from 'sweetalert2';
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
-
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
+import type { AuthorizedEmployee, Employee } from '../../services/employeeService';
 
 type TabType = 'employment' | 'personal';
 
-// Types
-interface Employee {
-  empID: number;
-  empCode: string;
-  empStatCode: string;
-  courtesy: string;
-  lName: string;
-  fName: string;
-  mName: string;
-  nickName: string;
-  hAddress: string;
-  pAddress: string;
-  city: string;
-  province: string;
-  postalCode: string;
-  civilStatus: string;
-  citizenship: string;
-  religion: string;
-  sex: string;
-  email: string;
-  weight: string;
-  height: string;
-  mobilePhone: string;
-  homePhone: string;
-  presentPhone: string;
-  dateHired: string | null;
-  dateRegularized: string | null;
-  dateResigned: string | null;
-  dateSuspended: string | null;
-  probeStart: string | null;
-  probeEnd: string | null;
-  suspend: boolean;
-  separated: boolean;
-  birthDate: string | null;
-  age: number;
-  birthPlace: string;
-  unionMember: boolean;
-  agency: boolean;
-  divCode: string;
-  depCode: string;
-  secCode: string;
-  grpCode: string;
-  braCode: string;
-  subAcctCode: string;
-  desCode: string;
-  shiftCode: string;
-  superior: string;
-  grdCode: string;
-  clsCode: string;
-  payCode: string;
-  locId: number;
-  rateCode: string;
-  taxID: number;
-  taxCode: string;
-  bankAccount: string;
-  bankCode: string;
-  sssNo: string;
-  pHilHealthNo: string;
-  pagIbigNo: string;
-  tin: string;
-  pagibigCode: string;
-  photo: string;
-  photoBytes?: string;
-  catCode: string;
-  unitCode: string;
-  contractual: boolean;
-  areaCode: string;
-  locCode: string;
-  gsisNo: string;
-  suffix: string;
-  onlineAppCode: string;
-}
 
 interface Branch {
   branchId: string;
@@ -214,7 +143,7 @@ export function EmployeeMasterFilePage() {
   const [employeeError, setEmployeeError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [empStatSearchTerm, setEmpStatSearchTerm] = useState('');
-  
+  const [authorizedEmployees, setAuthorizedEmployees] = useState<AuthorizedEmployee[]>([]);
   // Photo upload state
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -486,22 +415,20 @@ export function EmployeeMasterFilePage() {
 
   // ==================== API FUNCTIONS ====================
   
-  const fetchEmployees = async () => {
-    setEmployeeLoading(true);
-    setEmployeeError('');
-    try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-      if (response.status === 200 && response.data) {
-        setEmployees(response.data);
-      }
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-      setEmployeeError(errorMsg);
-      console.error('Error fetching employees:', error);
-    } finally {
-      setEmployeeLoading(false);
-    }
-  };
+const fetchEmployees = async () => {
+  setEmployeeLoading(true);
+  setEmployeeError('');
+  try {
+    const { employees, authorizedEmployees } = await fetchEmployeesService();
+    setEmployees(employees);
+    setAuthorizedEmployees(authorizedEmployees);
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+    setEmployeeError(errorMsg);
+  } finally {
+    setEmployeeLoading(false);
+  }
+};
 
   const fetchEmployeeById = async (id: number) => {
     setEmployeeLoading(true);

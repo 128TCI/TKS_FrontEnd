@@ -7,6 +7,7 @@ import apiClient from "../../../services/apiClient";
 import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
+import { fetchEmployees } from "../../../services/employeeService";
 
 // Form Name
 const formName = 'Branch SetUp';
@@ -118,26 +119,22 @@ export function BranchSetupPage() {
     }
   };
 
-  const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError("");
-    try {
-      const response = await apiClient.get("/Maintenance/EmployeeMasterFile");
-      if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((emp: any) => ({
-          empCode: emp.empCode || emp.code || "",
-          name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
-          groupCode: emp.grpCode || "",
-        }));
-        setEmployeeData(mappedData);
-      }
-    } catch (error: any) {
-      setEmployeeError("Failed to load employees");
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
-
+const fetchEmployeeData = async () => {
+  setLoadingEmployees(true);
+  setEmployeeError('');
+  try {
+    const { employees } = await fetchEmployees();
+    setEmployeeData(employees.map((emp) => ({
+      empCode: emp.empCode || '',
+      name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+      groupCode: emp.grpCode || '',
+    })));
+  } catch (error: any) {
+    setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+  } finally {
+    setLoadingEmployees(false);
+  }
+};
   const fetchDeviceData = async () => {
     setLoadingDevices(true);
     setDeviceError("");
