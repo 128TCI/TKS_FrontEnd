@@ -4,7 +4,7 @@ import { DatePickerWithButton } from '../DateSetup/DatePickerWithButton';
 import { Footer } from '../Footer/Footer';
 import { TKSGroupTable } from '../TKSGroupTable';
 import { tksGroupData } from '../../data/tksGroupData';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername} from '../../services/apiClient';
 import { Search, Trash2, X, TableOfContents } from 'lucide-react';
 import Swal from 'sweetalert2';
 import * as XLSX from "xlsx";
@@ -47,13 +47,6 @@ export function UpdateRawDataPage() {
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
-  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
-  const [selectedDivisions, setSelectedDivisions] = useState<string[]>([]);
-  const [selectedSchedules, setSelectedSchedules] = useState<string[]>([]);
-  const [selectedPayHouses, setSelectedPayHouses] = useState<string[]>([]);
-  const [selectedSections, setSelectedSections] = useState<string[]>([]);
-  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [selectedEmpCodes, setSelectedEmpCodes] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('10/01/2025');
   const [dateTo, setDateTo] = useState('11/16/2025');
@@ -158,15 +151,68 @@ export function UpdateRawDataPage() {
   //   fetchRawData();
   // }, []);
 
+  // const fetchRawData = async () => {
+  //   setEmpCode(selectedEmpCodes);
+  //   setLoading(true);
+  //     error;
+  //     try {
+  //     const response = await apiClient.get(`/Import/LogsFromDevice/GetRawData?rawDateInFrom=${dateFrom}&rawDateInTo=${dateTo}&empCode=${selectedEmpCodes}`);
+  //     if (response.data) {
+  //       const mappedData = response.data.map((rawData: any) => ({
+  //         id: rawData.id || rawData.Id || '',
+  //         empCode: rawData.empCode || rawData.EmpCode || '',
+  //         lName: rawData.lName || rawData.LName || '',
+  //         fName: rawData.fName || rawData.FName || '',
+  //         mName: rawData.mName || rawData.MName || '',
+  //         suffix: rawData.suffix || rawData.Suffix || '',
+  //         rawDateIn: rawData.rawDateIn || rawData.RawDateIn || '',
+  //         workShiftCode: rawData.workShiftCode || rawData.WorkShiftCode || '',
+  //         workShiftDesc: rawData.workShiftDesc || rawData.WorkShiftDesc || '',
+  //         dayType: rawData.dayType || rawData.DayType || '',
+  //         rawTimeIn: rawData.rawTimeIn || rawData.RawTimeIn || '',
+  //         rawBreak1In: rawData.rawBreak1In || rawData.RawBreak1In || '',
+  //         rawBreak1Out: rawData.rawBreak1Out || rawData.RawBreak1Out || '',
+  //         rawBreak2In: rawData.rawBreak2In || rawData.RawBreak2In || '',
+  //         rawBreak2Out: rawData.rawBreak2Out || rawData.RawBreak2Out || '',
+  //         rawBreak3In: rawData.rawBreak3In || rawData.RawBreak3In || '',
+  //         rawBreak3Out: rawData.rawBreak3Out || rawData.RawBreak3Out || '',
+  //         rawTimeOut: rawData.rawTimeOut || rawData.RawTimeOut || '',
+  //         rawDateOut: rawData.rawDateOut || rawData.RawDateOut || '',
+  //         rawOTApproved: rawData.rawOTApproved || rawData.RawOTApproved || '',
+  //         rawRemarks: rawData.rawRemarks || rawData.RawRemarks || '',
+  //         entryFlag: rawData.entryFlag || rawData.EntryFlag || '',
+  //         terminalID: rawData.terminalID || rawData.TerminalID || '',
+  //         dayTypeDOLE: rawData.dayTypeDOLE || rawData.DayTypeDOLE || '',
+  //         aprOTTime: rawData.aprOTTime || rawData.AprOTTime || ''
+  //       }));
+  //       setGetRawData(mappedData);
+  //       console.log(empCode)
+  //       console.log(dateFrom, dateTo)
+  //       console.log(getRawData);
+  //     }
+  //     } catch (error: any) {
+  //         const errorMsg = error.response?.data?.message || error.message || 'Failed to Load Data';
+  //         setError(errorMsg);
+  //         console.error('Error fetching data', error);
+  //       } finally {
+  //         loading;
+  //       }
+  // };
   const fetchRawData = async () => {
     setEmpCode(selectedEmpCodes);
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get(`/Import/LogsFromDevice/GetRawData?rawDateInFrom=${dateFrom}&rawDateInTo=${dateTo}&empCode=${selectedEmpCodes}`);
+      const response = await apiClient.post("/Import/ImportUpdateRawData/GetDTRLogs/GetDTRLogs", {
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        userName: getLoggedInUsername(),
+        doNotIncludeResignedEmp: doNotIncludeResigned,
+        empCodes: selectedEmpCodes
+      });
       if (response.data) {
         const mappedData = response.data.map((rawData: any) => ({
-          id: rawData.id || rawData.Id || '',
+          id: rawData.id || rawData.Id || rawData.ID,
           empCode: rawData.empCode || rawData.EmpCode || '',
           lName: rawData.lName || rawData.LName || '',
           fName: rawData.fName || rawData.FName || '',
