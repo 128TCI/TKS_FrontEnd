@@ -4,7 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
-import { getLoggedInUsername } from '../../services/apiClient';
+import { getLoggedInUsername } from '../../services/apiClient'; 
 
 interface GroupItem {
   id: number;
@@ -279,13 +279,13 @@ export function UpdateRawdataOnlinePage() {
         empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
         dateFrom: toISO(dateFrom),
         dateTo:   toISO(dateTo),
+        userName: getLoggedInUsername(),
+        doNotIncludeResignedEmp: true,
       };
 
       const res = await apiClient.post('/Utilities/UpdateRawDataOnline', payload);
       if (res.data?.success) {
-        const affected = res.data.recordsAffected ?? 0;
-        const message  = res.data.message ?? 'Raw data updated successfully.';
-        await showSuccessModal(`${message}\nRecords Affected: ${affected}`);
+        await showSuccessModal(res.data.message ?? 'Raw data updated successfully.');
         setSelectedGroupsMap({ ...EMPTY_SELECTION });
         setSelectedEmployees([]);
         setDateFrom('');
