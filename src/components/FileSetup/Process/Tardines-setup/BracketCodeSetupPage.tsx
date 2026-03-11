@@ -230,10 +230,9 @@ export function BracketCodeSetupPage() {
   };
 
   const handleSubmit = async () => {
-    // Validation
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!bracketCode.trim() || bracketCode.length > 10) {
       setCodeError("Code must be between 1 and 10 characters.");
-
       await Swal.fire({
         icon: "warning",
         title: "Validation Error",
@@ -251,20 +250,52 @@ export function BracketCodeSetupPage() {
       return;
     }
 
-    // Duplicate check
-    const isDuplicate = bracketCodeList.some((item, index) => {
+    // ── 2. Duplicate Bracket Code check ──────────────────────────────────
+    const isDuplicateCode = bracketCodeList.some((item, index) => {
       if (isEditMode && selectedIndex === index) return false;
-
-      return (
-        item.bracketCode.toLowerCase() === bracketCode.trim().toLowerCase()
-      );
+      return item.bracketCode.trim().toUpperCase() === bracketCode.trim().toUpperCase();
     });
-
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
-        title: "Duplicate Code",
-        text: "This code is already in use.",
+        title: "Duplicate Entry",
+        text: "Bracket Code is already exist.",
+      });
+      return;
+    }
+
+    // ── 3. Invalid character check for Code (no spaces, alphanumeric + _ - only) ──
+    const codeRegex = /^[a-zA-Z0-9_\-]+$/;
+    if (!codeRegex.test(bracketCode.trim())) {
+      await Swal.fire({
+        icon: "error",
+        title: "Invalid Character",
+        text: "Invalid Character in Bracket Code",
+      });
+      return;
+    }
+
+    // ── 4. Invalid character check for Description (allows spaces) ───────
+    const descRegex = /^[a-zA-Z0-9\s_\-]+$/;
+    if (description.trim() && !descRegex.test(description.trim())) {
+      await Swal.fire({
+        icon: "error",
+        title: "Invalid Character",
+        text: "Invalid Character in Description",
+      });
+      return;
+    }
+
+    // ── 5. Duplicate Description check ───────────────────────────────────
+    const isDuplicateDesc = bracketCodeList.some((item, index) => {
+      if (isEditMode && selectedIndex === index) return false;
+      return item.description.trim().toUpperCase() === description.trim().toUpperCase();
+    });
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Entry",
+        text: "Bracket Description is already exist.",
       });
       return;
     }
@@ -610,6 +641,7 @@ export function BracketCodeSetupPage() {
                             type="text"
                             value={bracketCode}
                             onChange={(e) => setBracketCode(e.target.value)}
+                            maxLength={10}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="Enter code"
                           />
@@ -650,13 +682,15 @@ export function BracketCodeSetupPage() {
                       <div className="flex gap-3 mt-6">
                         <button
                           onClick={handleSubmit}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isEditMode ? "Update" : "Submit"}
+                          {submitting ? 'Processing...' : (isEditMode ? "Update" : "Submit")}
                         </button>
                         <button
                           onClick={() => setShowCreateModal(false)}
-                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Back to List
                         </button>

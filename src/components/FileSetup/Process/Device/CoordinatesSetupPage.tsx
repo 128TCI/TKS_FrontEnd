@@ -194,16 +194,56 @@ export function CoordinatesSetupPage() {
             return;
         }
 
-        const isDuplicate = coordinates.some((coordinate, index) => {
+        // Matches backend: CheckCodeIfRegularExpression (alphanumeric + hyphen/underscore, no spaces)
+        const codeRegex = /^[a-zA-Z0-9\-_]+$/;
+        if (!codeRegex.test(code.trim())) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Validation Error',
+                text: 'Invalid Character in Code.',
+            });
+            return;
+        }
+
+        // Matches backend: CheckCodeIfRegularExpressionWithSpace (alphanumeric with spaces allowed)
+        const descriptionRegex = /^[a-zA-Z0-9\s\-_]*$/;
+        if (description.trim() && !descriptionRegex.test(description.trim())) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Validation Error',
+                text: 'Invalid Character in Description.',
+            });
+            return;
+        }
+
+        // Matches backend: duplicate Code check (case-insensitive, trimmed)
+        const isDuplicateCode = coordinates.some((coordinate, index) => {
             if (isEditMode && selectedCoordinateIndex === index) return false;
-            return coordinate.code.toLowerCase() === code.trim().toLowerCase();
+            return coordinate.code.trim().toUpperCase() === code.trim().toUpperCase();
         });
 
-        if (isDuplicate) {
+        if (isDuplicateCode) {
             await Swal.fire({
                 icon: 'error',
                 title: 'Duplicate Code',
-                text: 'This code is already in use.',
+                text: 'Code is already exist.',
+            });
+            return;
+        }
+
+        // Matches backend: duplicate Description check (case-insensitive, trimmed)
+        const normalizedInputDesc = description.trim().toUpperCase().replace(/\s+/g, ' ');
+        const isDuplicateDescription = normalizedInputDesc.length > 0 && coordinates.some((coordinate, index) => {
+            if (isEditMode && selectedCoordinateIndex === index) return false;
+            const normalizedExistingDesc = (coordinate.description ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+            return normalizedExistingDesc === normalizedInputDesc && normalizedExistingDesc.length > 0;
+        });
+
+        if (isDuplicateDescription) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Description',
+                text: 'Description is already exist.',
             });
             return;
         }

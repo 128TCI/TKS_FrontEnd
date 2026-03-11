@@ -1,40 +1,44 @@
-import { useState, useRef, useEffect } from "react";
-import { Upload, Download, Check, FileText, CheckCircle } from "lucide-react";
-import { DatePickerWithButton } from "../DateSetup/DatePickerWithButton";
-import { Footer } from "../Footer/Footer";
-import { TKSGroupTable } from "../TKSGroupTable";
-import apiClient from "../../services/apiClient";
+import { useState, useEffect } from "react";
+import { Upload, Download, Check, FileText } from "lucide-react";
+import { DatePickerWithButton } from "../../DateSetup/DatePickerWithButton";
+import { Footer } from "../../Footer/Footer";
+import { TKSGroupTable } from "../../TKSGroupTable";
+import { tksGroupData } from "../../../data/tksGroupData";
 import * as XLSX from "xlsx";
+import apiClient from "../../../services/apiClient";
 import Swal from "sweetalert2";
+import { decryptData } from "../../../services/encryptionService";
 
-interface ImportOvertimeApplicationDto {
-  message: string;
-  rowNumber: number;
-  columnNumber: number;
+interface ImportOvertimeApplication2ShiftsDto {
+  id: number;
   empCode: string;
-  empName: string;
-  dateFrom: Date | string | null;
-  dateTo: Date | string | null;
+  empName?: string;
+  dateFrom?: string | Date | null;
+  dateTo?: string | Date | null;
   numOTHoursApproved: number;
-  earlyOTStartTime: Date | string | null;
-  earlyTimeIn: Date | string | null;
-  startOTPM: Date | string | null;
-  minHRSOTBreak: number;
-  earlyOTStartTimeRestHol: Date | string | null;
-  tksGroup: string;
-  reason: string;
-  remarks: string;
-  approvedOTBreaksHrs: number;
-  stotats: Date | string | null;
+  earlyOTStartTime?: string | Date | null;
+  earlyTimeIn?: string | Date | null;
+  startOTPM?: string | Date | null;
+  minHRSOTBreak?: number;
+  earlyOTStartTimeRestHol?: string | Date | null;
+  reason?: string;
+  remarks?: string;
+  approvedOTBreaksHrs?: number;
+  stotats?: string | Date | null;
   isLateFiling: boolean;
   isLateFilingProcessed: boolean;
-  appliedBeforeShiftDate: Date | string | null;
+  appliedBeforeShiftDate?: string | Date | null;
+  tksGroup?: string;
+  message?: string;
+  rowNumber?: number;
+  columnNumber?: number;
 }
-interface ImportOvertimeApplicationFormDto {
-  dateFrom: "";
-  dateTo: "";
-  isDeleteExistingRecord: false;
-  imports: ImportOvertimeApplicationDto[];
+
+interface ImportOvertimeApplication2ShiftsFormDto {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  isDeleteExistingRecord: boolean;
+  imports: ImportOvertimeApplication2ShiftsDto[];
 }
 
 type ResponseResultDto<T> = {
@@ -44,69 +48,52 @@ type ResponseResultDto<T> = {
   messages: string;
 };
 
-export function OvertimeApplicationPage() {
+export function OvertimeApplication2ShiftsPage() {
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [fileLoaded, setFileLoaded] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [deleteExisting, setDeleteExisting] = useState(false);
   const [tksGroupList, setTKSGroupList] = useState<
-    Array<{ id: number; groupCode: string; groupDescription: string }>
+    { id: number; groupCode: string; groupDescription: string }[]
   >([]);
-  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
-  const fileInput = useRef<HTMLInputElement | null>(null);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  const [error, setError] = useState<string | null>(null);
   const [importDataResult, setImportDataResult] = useState<
-    ImportOvertimeApplicationDto[]
+    ImportOvertimeApplication2ShiftsDto[]
   >([]);
-  const [form, setForm] = useState<ImportOvertimeApplicationFormDto>({
-    dateFrom: "",
-    dateTo: "",
-    isDeleteExistingRecord: false,
-    imports: [] as ImportOvertimeApplicationDto[],
-  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(importDataResult.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = importDataResult.slice(startIndex, endIndex);
+  const [errors, setErrors] = useState<string[]>([]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    error;
+  const fetchTKSGroups = async () => {
     try {
-      const response = await apiClient.get("/Fs/Process/TimeKeepGroupSetUp");
+      const response = await apiClient.get("/Fs/Process/TimeKeepGroupSetUp"); // endpoint may differ
       if (response.data) {
-        const mappedData = response.data.map((tksGroupList: any) => ({
-          id: tksGroupList.id || tksGroupList.ID || "",
-          groupCode: tksGroupList.groupCode || tksGroupList.GroupCode || "",
-          groupDescription:
-            tksGroupList.groupDescription ||
-            tksGroupList.GroupDescription ||
-            "",
+        const mapped = response.data.map((x: any) => ({
+          id: x.id,
+          groupCode: x.groupCode,
+          groupDescription: x.groupDescription,
         }));
-        setTKSGroupList(mappedData);
+        setTKSGroupList(mapped);
       }
-    } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to load TKS Group";
-      setError(errorMsg);
-      console.error("Error fetching TKSGroup:", error);
-    } finally {
-      loading;
+    } catch (err: any) {
+      console.error(err);
     }
   };
+  useEffect(() => {
+    fetchTKSGroups();
+  }, []);
 
   const handleCodeToggle = (id: number) => {
     setSelectedCodes((prev) =>
@@ -122,87 +109,45 @@ export function OvertimeApplicationPage() {
     }
   };
 
-  const getDefaultSheetName = (sheetNames: string[]) => {
-    return sheetNames.includes("OvertimeApplication")
-      ? "OvertimeApplication"
-      : sheetNames[0];
-  };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    setXlsxFile(file);
     setFileName(file.name);
+    setImportDataResult([]);
+    setErrors([]);
+    setFileLoaded(false);
+    setWorkbook(null);
+    setSheetData([]);
+    setSheetNames([]);
+    setSelectedSheet("");
+    setFileInputKey((prev) => prev + 1);
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const data = event.target?.result;
+    reader.onload = (evt) => {
+      const data = evt.target?.result;
       if (!data) return;
 
-      const workbook = XLSX.read(data, { type: "array", cellDates: true });
-      const sheetNames = workbook.SheetNames;
-      const defaultSheet = getDefaultSheetName(sheetNames);
-      const worksheet = workbook.Sheets[defaultSheet];
-      const sheetData = XLSX.utils.sheet_to_json(worksheet, {
-        defval: "",
-      });
+      const blob = new Blob([data as ArrayBuffer], { type: file.type });
+      const memoryFile = new File([blob], file.name, { type: file.type });
+      setXlsxFile(memoryFile);
 
-      setWorkbook(workbook);
-      setSheetNames(workbook.SheetNames);
+      const wb = XLSX.read(data, { type: "array", cellDates: true });
+      const names = wb.SheetNames;
+      const defaultSheet = names.includes("OvertimeApplication2Shifts")
+        ? "OvertimeApplication2Shifts"
+        : names[0];
+      const ws = wb.Sheets[defaultSheet];
+      const jsonData = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      setWorkbook(wb);
+      setSheetNames(names);
       setSelectedSheet(defaultSheet);
-      setSheetData(sheetData);
-
-      console.log("Sheets:", workbook.SheetNames);
-      console.log(sheetData);
+      setSheetData(jsonData);
+      setFileLoaded(true);
     };
-
     reader.readAsArrayBuffer(file);
   };
-
-  const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const sheetName = e.target.value;
-    setSelectedSheet(sheetName);
-
-    if (!workbook) return;
-
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet, {
-      defval: "", // prevent undefined cells
-    });
-
-    setSheetData(data);
-    //console.log(data);
-    //setForm(data);
-  };
-  useEffect(() => {
-    console.log("sheetData updated:", sheetData);
-  }, [sheetData]);
-
-  const createXlsxFileFromSheetData = (
-    sheetData: any[],
-    sheetName: string,
-  ): File => {
-    const worksheet = XLSX.utils.json_to_sheet(sheetData);
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-
-    const buffer = XLSX.write(workbook, {
-      bookType: "xlsx",
-      type: "array",
-    });
-
-    return new File([buffer], `${sheetName}.xlsx`, {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-  };
-  useEffect(() => {
-    if (!sheetData.length || !selectedSheet) return;
-
-    const file = createXlsxFileFromSheetData(sheetData, selectedSheet);
-    setXlsxFile(file);
-  }, [sheetData, selectedSheet]);
-
   const fileLinkCreate = (blob: Blob, filename: string): void => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -213,6 +158,7 @@ export function OvertimeApplicationPage() {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
   };
+
   const downloadTemplate = async () => {
     setIsProcessing(true);
     try {
@@ -224,129 +170,126 @@ export function OvertimeApplicationPage() {
       );
       const mimeType = response.headers["content-type"];
       const blob = new Blob([response.data], { type: mimeType });
-      fileLinkCreate(blob, `ImportOTApp_Template.xlsx`);
+      fileLinkCreate(blob, `ImportOTApp2Shifts_Template.xlsx`);
     } finally {
-      isProcessing;
+      setIsProcessing(false); // ✅ fixed: was just `isProcessing` (no-op)
     }
   };
+
+  const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sheetName = e.target.value;
+    setSelectedSheet(sheetName);
+    if (!workbook) return;
+
+    const ws = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: "" });
+    setSheetData(jsonData);
+  };
+
   const onClickImport = async () => {
-    if (!xlsxFile) {
-      setError("Please select a file to import.");
+    if (!xlsxFile || selectedCodes.length === 0 || !dateFrom || !dateTo) {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Please select a file to import.",
+        text: "Please select file, TKS group and dates",
       });
       return;
     }
-    if (selectedCodes.length === 0) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Please select group.",
-      });
-      return;
-    }
-    if (!dateFrom || !dateTo) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Please select date.",
-      });
-      return;
-    }
+
     setIsProcessing(true);
-    const formData = new FormData();
-    formData.append("dateFrom", dateFrom);
-    formData.append("dateTo", dateTo);
-    formData.append("isDeleteExistingRecord", String(deleteExisting));
-    formData.append("file", xlsxFile, fileName);
 
     try {
-      const data = await apiClient.post<
-        ResponseResultDto<ImportOvertimeApplicationDto[]>
-      >(`/Utilities/Import/ImportOvertimeApplication`, formData);
-      setImportDataResult(data.data.resultData);
-      if (data.data.errors.length > 0) {
-        console.log(data.data.errors);
+      const formData = new FormData();
+      formData.append("dateFrom", new Date(dateFrom).toISOString());
+      formData.append("dateTo", new Date(dateTo).toISOString());
+      formData.append("isDeleteExistingRecord", String(deleteExisting));
+      formData.append("tksGroupIds", JSON.stringify(selectedCodes));
+      formData.append("file", xlsxFile, fileName);
+
+      const res = await apiClient.post<
+        ResponseResultDto<ImportOvertimeApplication2ShiftsDto[]>
+      >("/Utilities/Import/ImportOTApplication2Shifts", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data.errors.length > 0) {
         setImportDataResult([]);
+        setErrors(res.data.errors);
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+          text: res.data.errors.join(", "),
         });
-        setErrors(data.data.errors);
-      }
-    } finally {
-      setIsProcessing(false);
-      setFileLoaded(true);
-    }
-  };
-  function addOneDay(dateStr: string) {
-    if (!dateStr) return null;
-    const date = new Date(dateStr);
-    date.setDate(date.getDate() + 1); // Add 1 day
-    return date.toISOString();
-  }
-  const onClickInsertUpdate = async () => {
-    const param = {
-      dateFrom: addOneDay(dateFrom),
-      dateTo: addOneDay(dateTo),
-      isDeleteExistingRecord: deleteExisting,
-      imports: importDataResult.filter((x) => !x.message), // only valid records
-    };
-    console.log(param, dateFrom, dateTo);
-    console.log(xlsxFile);
-    try {
-      const data = await apiClient.post<
-        ResponseResultDto<ImportOvertimeApplicationDto[]>
-      >(`/Utilities/Import/UpdateImportOvertimeApplication`, param);
-      setImportDataResult(data.data.resultData);
-      if (data.data.errors.length > 0) {
-        setImportDataResult([]);
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: data.data.resultData?.[0]?.message ?? data.data.errors,
-        });
-        setErrors(data.data.errors);
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-  const totalPages = Math.ceil(importDataResult.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentData = importDataResult.slice(
-    startIndex,
-    startIndex + itemsPerPage,
-  );
-
-  const getPageNumbers = () => {
-    const pages = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (currentPage <= 4) {
-        for (let i = 1; i <= 5; i++) pages.push(i);
-        pages.push("...");
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 3) {
-        pages.push(1);
-        pages.push("...");
-        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
       } else {
-        pages.push(1);
-        pages.push("...");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-        pages.push("...");
-        pages.push(totalPages);
+        setImportDataResult(res.data.resultData || []);
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: "File imported successfully",
+        });
       }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Import Failed",
+        text:
+          error.response?.data?.errors?.join(", ") ||
+          error.message ||
+          "Something went wrong",
+      });
+    } finally {
+      setIsProcessing(false);
     }
-    return pages;
+  };
+
+  const onClickInsertUpdate = async () => {
+    if (!importDataResult.length) {
+      Swal.fire({
+        icon: "warning",
+        title: "No Data",
+        text: "There is no imported data to update",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const payload: ImportOvertimeApplication2ShiftsFormDto = {
+        dateFrom: new Date(dateFrom).toISOString(),
+        dateTo: new Date(dateTo).toISOString(),
+        isDeleteExistingRecord: deleteExisting,
+        imports: importDataResult.filter((x) => !x.message),
+      };
+
+      const res = await apiClient.post<
+        ResponseResultDto<ImportOvertimeApplication2ShiftsDto[]>
+      >("/Utilities/Import/UpdateOTApplication2Shifts", payload);
+
+      if (res.data.errors.length > 0) {
+        setImportDataResult([]);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: res.data.errors.join(", "),
+        });
+      } else {
+        setImportDataResult(res.data.resultData);
+        Swal.fire({
+          icon: "success",
+          title: "Update Success",
+          text: "Overtime applications updated successfully",
+        });
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: error.message || "Something went wrong",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -356,10 +299,9 @@ export function OvertimeApplicationPage() {
         <div className="max-w-7xl mx-auto relative">
           {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
-            <h1 className="text-white">Import Overtime Application</h1>
-            <p className="text-white opacity-90 text-sm mt-1">
-              Import and manage overtime applications for employees
-            </p>
+            <h1 className="text-white">
+              Import Overtime Application 2 Shifts In A Day
+            </h1>
           </div>
 
           {/* Content Container */}
@@ -428,37 +370,32 @@ export function OvertimeApplicationPage() {
                     </label>
                     <div className="bg-teal-50 border-2 border-teal-200 rounded-lg p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {xlsxFile! && (
-                          <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
-                            <svg
-                              className="w-5 h-5 text-white"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          </div>
-                        )}
+                        <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                          <svg
+                            className="w-5 h-5 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        </div>
                         <div>
                           <div className="text-sm text-gray-900">
                             {fileName}
                           </div>
-                          {xlsxFile! && (
-                            <div className="text-xs text-teal-600">
-                              File loaded successfully
-                            </div>
-                          )}
+                          <div className="text-xs text-teal-600">
+                            File loaded successfully
+                          </div>
                         </div>
                       </div>
                       <input
                         type="file"
-                        ref={fileInput}
                         onChange={handleFileChange}
                         accept=".xlsx,.xls"
                         className="hidden"
@@ -468,10 +405,11 @@ export function OvertimeApplicationPage() {
                         htmlFor="file-upload"
                         className="px-4 py-2 bg-teal-500 text-white rounded-lg cursor-pointer hover:bg-teal-600 transition-colors text-sm"
                       >
-                        Choose File
+                        Change File
                       </label>
                     </div>
                   </div>
+
                   <div>
                     <label className="block text-gray-700 text-sm mb-2">
                       Worksheet:
@@ -491,16 +429,20 @@ export function OvertimeApplicationPage() {
 
                   {/* Date Range */}
                   <div className="grid grid-cols-2 gap-4">
-                    <DatePickerWithButton
-                      date={dateFrom}
-                      onChange={setDateFrom}
-                      label="Date From"
-                    />
-                    <DatePickerWithButton
-                      date={dateTo}
-                      onChange={setDateTo}
-                      label="Date To"
-                    />
+                    <div>
+                      <DatePickerWithButton
+                        date={dateFrom}
+                        onChange={setDateFrom}
+                        label="Date From"
+                      />
+                    </div>
+                    <div>
+                      <DatePickerWithButton
+                        date={dateTo}
+                        onChange={setDateTo}
+                        label="Date To"
+                      />
+                    </div>
                   </div>
 
                   {/* Delete Existing Warning */}
@@ -510,7 +452,9 @@ export function OvertimeApplicationPage() {
                         type="checkbox"
                         id="delete-existing"
                         checked={deleteExisting}
-                        onChange={(e) => setDeleteExisting(e.target.checked)}
+                        onChange={(e) => {
+                          setDeleteExisting(e.target.checked);
+                        }}
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
                       />
                       <div>
@@ -525,8 +469,8 @@ export function OvertimeApplicationPage() {
                     </label>
                   </div>
 
-                  {/* List Not Equal Info */}
-                  {/* <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
+                  {/* List Not Equal Info
+                  <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input
                         type="checkbox"
@@ -546,13 +490,16 @@ export function OvertimeApplicationPage() {
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start gap-2">
                       <Download
-                        className="w-4 h-4 text-blue-600 mt-0.5"
+                        className="w-4 h-4 text-blue-600 mt-0.5 cursor-pointer"
                         onClick={downloadTemplate}
                       />
                       <a
                         href="#"
                         className="text-sm text-blue-600 hover:text-blue-700"
-                        onClick={downloadTemplate}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          downloadTemplate();
+                        }}
                       >
                         Download Template
                       </a>
@@ -565,17 +512,26 @@ export function OvertimeApplicationPage() {
                       className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                       onClick={onClickImport}
                     >
-                      <Upload className="w-4 h-4" onClick={onClickImport} />
+                      <Upload className="w-4 h-4" />
                       Import Data
                     </button>
                     <button
                       className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <CheckCircle
+                      <svg
                         className="w-4 h-4"
-                        onClick={onClickInsertUpdate}
-                      />
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
                       Update Data
                     </button>
                   </div>
@@ -587,11 +543,9 @@ export function OvertimeApplicationPage() {
             <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
               <div className="px-5 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-gray-900">Import Preview</h3>
-                {fileLoaded && (
-                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-xs">
-                    File loaded
-                  </span>
-                )}
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                  Ready to import
+                </span>
               </div>
               <div className="overflow-x-auto bg-white">
                 <table className="w-full">
@@ -631,118 +585,123 @@ export function OvertimeApplicationPage() {
                         StartTimeOfOvertime
                       </th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">
-                        IsLateFiling
+                        Is Late Filing
                       </th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">
-                        ActualDateInOTBeforeShift
+                        Message
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Array.isArray(currentData) &&
-                      currentData.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-2">{item.empCode || "-"}</td>
-                          <td className="px-4 py-2">{item.empName || "-"}</td>
-                          <td className="px-4 py-2">
+                    {currentData.length === 0 ? (
+                      <tr>
+                        <td colSpan={13} className="px-4 py-16 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <FileText className="w-16 h-16 text-gray-300" />
+                            <div>
+                              <div className="text-gray-900">
+                                No data available
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                Upload and select a file to preview import data
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      currentData.map((item, idx) => (
+                        <tr
+                          key={idx}
+                          className={`border-b border-gray-200 ${item.message ? "bg-red-50" : ""}`}
+                        >
+                          <td className="px-4 py-2 text-sm">{item.empCode}</td>
+                          <td className="px-4 py-2 text-sm">
+                            {decryptData(item.empName ?? "")}
+                          </td>
+                          <td className="px-4 py-2 text-sm">
                             {item.dateFrom
                               ? new Date(item.dateFrom).toLocaleDateString()
                               : "-"}
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-4 py-2 text-sm">
                             {item.dateTo
                               ? new Date(item.dateTo).toLocaleDateString()
                               : "-"}
                           </td>
-                          <td className="px-4 py-2">
-                            {item.numOTHoursApproved ?? "-"}
+                          <td className="px-4 py-2 text-sm">
+                            {item.numOTHoursApproved}
                           </td>
-                          <td className="px-4 py-2">{item.tksGroup || "-"}</td>
-                          <td className="px-4 py-2">{item.reason || "-"}</td>
-                          <td className="px-4 py-2">{item.remarks || "-"}</td>
-                          <td className="px-4 py-2">
-                            {item.appliedBeforeShiftDate
-                              ? new Date(
-                                  item.appliedBeforeShiftDate,
-                                ).toLocaleTimeString()
-                              : "-"}
+                          <td className="px-4 py-2 text-sm">
+                            {item.tksGroup || "-"}
                           </td>
-                          <td className="px-4 py-2">
-                            {item.approvedOTBreaksHrs ?? "-"}
+                          <td className="px-4 py-2 text-sm">
+                            {item.reason || "-"}
                           </td>
-                          <td className="px-4 py-2">
-                            {item.earlyOTStartTime
-                              ? new Date(
-                                  item.earlyOTStartTime,
-                                ).toLocaleTimeString()
-                              : "-"}
+                          <td className="px-4 py-2 text-sm">
+                            {item.remarks || "-"}
                           </td>
-                          <td className="px-4 py-2">
-                            {item.isLateFiling ? "Yes" : "No"}
-                          </td>
-                          <td className="px-4 py-2">
+                          <td className="px-4 py-2 text-sm">
                             {item.appliedBeforeShiftDate
                               ? new Date(
                                   item.appliedBeforeShiftDate,
                                 ).toLocaleDateString()
                               : "-"}
                           </td>
+                          <td className="px-4 py-2 text-sm">
+                            {item.approvedOTBreaksHrs || "-"}
+                          </td>
+                          <td className="px-4 py-2 text-time">
+                            {item.earlyOTStartTime
+                              ? new Date(
+                                  item.earlyOTStartTime,
+                                ).toLocaleDateString()
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-2 text-sm">
+                            {item.isLateFiling ? "Yes" : "No"}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-red-500">
+                            {item.message || "-"}
+                          </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
-              <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center text-xs text-gray-500 justify-between">
-                {!fileLoaded && (
-                  <span>
-                    Showing {Math.min(endIndex, importDataResult.length)} of{" "}
-                    {importDataResult.length} entries
-                  </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  className="w-6 h-6 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs"
+                >
+                  ‹
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (p) => (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p)}
+                      className={`w-6 h-6 flex items-center justify-center rounded text-xs ${
+                        currentPage === p
+                          ? "bg-blue-500 text-white"
+                          : "border border-gray-300 bg-white hover:bg-gray-100"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
                 )}
-                {fileLoaded && (
-                  <span>
-                    Showing {startIndex + 1} to{" "}
-                    {Math.min(endIndex, importDataResult.length)} of{" "}
-                    {importDataResult.length} entries
-                  </span>
-                )}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  {getPageNumbers().map((page, index) =>
-                    typeof page === "number" ? (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-2 py-1 rounded text-xs ${
-                          currentPage === page
-                            ? "bg-blue-500 text-white"
-                            : "border border-gray-300 hover:bg-gray-100"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ) : (
-                      <span key={index} className="px-2">
-                        {page}
-                      </span>
-                    ),
-                  )}
-                  <button
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
+
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(p + 1, totalPages))
+                  }
+                  className="w-6 h-6 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-100 text-xs"
+                >
+                  ›
+                </button>
               </div>
             </div>
           </div>

@@ -7,8 +7,10 @@ import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Employee Designation SetUp';
+
+// Form Name
+const formName = 'Employee Designation SetUp';
+
 export function EmployeeDesignationSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [jobLevelSearchTerm, setJobLevelSearchTerm] = useState("");
@@ -41,6 +43,7 @@ export function EmployeeDesignationSetupPage() {
   >([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [deviceError, setDeviceError] = useState("");
+
   // Job Level List states
   const [levelList, setLevelList] = useState<
     Array<{ id: string; code: string; description: string }>
@@ -61,7 +64,7 @@ export function EmployeeDesignationSetupPage() {
   const [loadingDesignation, setLoadingDesignation] = useState(false);
   const [designationError, setDesignationError] = useState("");
 
-  //Permissions
+  // Permissions
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
@@ -82,7 +85,6 @@ export function EmployeeDesignationSetupPage() {
         (p) => decryptData(p.formName) === "EmployeeDesignationSetup",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -95,7 +97,6 @@ export function EmployeeDesignationSetupPage() {
     }
   };
 
-  // Fetch job level data from API
   useEffect(() => {
     fetchJobLevelData();
   }, []);
@@ -106,7 +107,6 @@ export function EmployeeDesignationSetupPage() {
     try {
       const response = await apiClient.get("/Fs/Employment/JobLevelSetUp");
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((division: any) => ({
           id: division.jobLevelID || "",
           code: division.jobLevelCode || "",
@@ -118,14 +118,14 @@ export function EmployeeDesignationSetupPage() {
       const errorMsg =
         error.response?.data?.message ||
         error.message ||
-        "Failed to load divisions";
+        "Failed to load job levels";
       setJobLevelError(errorMsg);
-      console.error("Error fetching divisions:", error);
+      console.error("Error fetching job levels:", error);
     } finally {
       setLoadingJobLevels(false);
     }
   };
-  // Fetch division data from API
+
   useEffect(() => {
     fetchDesignationData();
   }, []);
@@ -136,7 +136,6 @@ export function EmployeeDesignationSetupPage() {
     try {
       const response = await apiClient.get("/Fs/Employment/DesignationSetUp");
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((division: any) => ({
           id: division.desID || "",
           code: division.desCode || "",
@@ -150,14 +149,14 @@ export function EmployeeDesignationSetupPage() {
       const errorMsg =
         error.response?.data?.message ||
         error.message ||
-        "Failed to load divisions";
+        "Failed to load designations";
       setDesignationError(errorMsg);
-      console.error("Error fetching Designation:", error);
+      console.error("Error fetching designations:", error);
     } finally {
       setLoadingDesignation(false);
     }
   };
-  // Fetch device data from API
+
   useEffect(() => {
     fetchDeviceData();
   }, []);
@@ -170,7 +169,6 @@ export function EmployeeDesignationSetupPage() {
         "/Fs/Process/Device/BorrowedDeviceName",
       );
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((device: any) => ({
           id: device.id || "",
           code: device.code || "",
@@ -190,7 +188,6 @@ export function EmployeeDesignationSetupPage() {
     }
   };
 
-  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -207,11 +204,66 @@ export function EmployeeDesignationSetupPage() {
     };
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedDesignationIndex(null);
     setDesignationId(null);
-    // Clear form
     setCode("");
     setCodeError("");
     setDescription("");
@@ -233,7 +285,11 @@ export function EmployeeDesignationSetupPage() {
   };
 
   const handleDelete = async (designation: any) => {
-    console.log(designation);
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
@@ -245,36 +301,69 @@ export function EmployeeDesignationSetupPage() {
       cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/Employment/Designation/${designation.id}`);
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted designation ${designation.code}`,
-            messages: `Designation deleted: ${designation.code} - ${designation.description}`,
-            formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Designation deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the designation list
-        await fetchDesignationData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete designation";
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Check if designation is used in Employee Masterfile ───────────
+    try {
+      const empResponse = await apiClient.get('/Maintenance/EmployeeMasterFile');
+      const employees: any[] = Array.isArray(empResponse.data)
+        ? empResponse.data
+        : [];
+
+      const isUsedInMasterfile = employees.some(
+        (emp: any) =>
+          (emp.desCode ?? "").trim().toUpperCase() ===
+          (designation.code ?? "").trim().toUpperCase(),
+      );
+
+      if (isUsedInMasterfile) {
         await Swal.fire({
           icon: "error",
-          title: "Error",
-          text: errorMsg,
+          title: "Cannot Delete",
+          text: "This setup is already used in Employee Masterfile.",
         });
-        console.error("Error deleting designation:", error);
+        return;
       }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate designation usage.",
+      });
+      return;
+    }
+
+    // ── 4. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/Employment/Designation/${designation.id}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted designation ${designation.code}`,
+        messages: `Designation deleted: ${designation.code} - ${designation.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Designation deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchDesignationData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete designation";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting designation:", error);
     }
   };
 
@@ -288,7 +377,7 @@ export function EmployeeDesignationSetupPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate code - must not be empty and must be max 10 characters
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!code.trim() || code.length > 10) {
       await Swal.fire({
         icon: "warning",
@@ -297,23 +386,67 @@ export function EmployeeDesignationSetupPage() {
       });
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = designationList.some((designation, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedDesignationIndex === index) {
-        return false;
-      }
-      return designation.code.toLowerCase() === code.trim().toLowerCase();
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
+    const isDuplicateCode = designationList.some((designation, index) => {
+      if (isEditMode && selectedDesignationIndex === index) return false;
+      return (
+        designation.code.trim().toUpperCase() === code.trim().toUpperCase()
+      );
     });
 
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
         title: "Duplicate Code",
-        text: "This code is already in use. Please use a different code.",
+        text: "Code is already exist.",
       });
       return;
     }
+
+    // ── 4. Duplicate description check ──────────────────────────────────
+    const isDuplicateDesc = designationList.some((designation, index) => {
+      if (isEditMode && selectedDesignationIndex === index) return false;
+      return (
+        (designation.description ?? "").trim().toUpperCase() ===
+        description.trim().toUpperCase()
+      );
+    });
+
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
+      return;
+    }
+
+    // ── 5. Duplicate device name check (skip when deviceName is empty) ───
+    if (deviceName.trim() !== "") {
+      const isDuplicateDevice = designationList.some((designation, index) => {
+        if (isEditMode && selectedDesignationIndex === index) return false;
+        return (
+          (designation.deviceName ?? "").trim().toUpperCase() ===
+          deviceName.trim().toUpperCase()
+        );
+      });
+
+      if (isDuplicateDevice) {
+        await Swal.fire({
+          icon: "error",
+          title: "Duplicate Device",
+          text: "Device Name is already used.",
+        });
+        return;
+      }
+    }
+
+    // ── 6. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -325,16 +458,15 @@ export function EmployeeDesignationSetupPage() {
       };
 
       if (isEditMode && designationId) {
-        // Update existing record via PUT
         await apiClient.put(
           `/Fs/Employment/DesignationSetUp/${designationId}`,
           payload,
         );
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited designation ${payload.desCode}`,
-            messages: `Designation updated: ${payload.desCode} - ${payload.desDesc}`,
-            formName,
+          accessType: 'Edit',
+          trans: `Edited designation ${payload.desCode}`,
+          messages: `Designation updated: ${payload.desCode} - ${payload.desDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -343,16 +475,14 @@ export function EmployeeDesignationSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the designation list
         await fetchDesignationData();
       } else {
-        // Create new record via POST
         await apiClient.post("/Fs/Employment/DesignationSetUp", payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added designation ${payload.desCode}`,
-            messages: `Designation created: ${payload.desCode} - ${payload.desDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added designation ${payload.desCode}`,
+          messages: `Designation created: ${payload.desCode} - ${payload.desDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -361,11 +491,9 @@ export function EmployeeDesignationSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the designation list
         await fetchDesignationData();
       }
 
-      // Close modal and reset form
       setShowCreateModal(false);
       setCode("");
       setCodeError("");
@@ -388,6 +516,7 @@ export function EmployeeDesignationSetupPage() {
       setSubmitting(false);
     }
   };
+
   const handleJobLevelSelect = (empCode: string, name: string) => {
     setJobLevelCode(empCode);
     setShowJobLevelModal(false);
@@ -397,6 +526,7 @@ export function EmployeeDesignationSetupPage() {
     setDeviceName(deviceName);
     setShowDeviceNameModal(false);
   };
+
   const filteredDesignations = designationList.filter(
     (designation) =>
       designation.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -421,29 +551,21 @@ export function EmployeeDesignationSetupPage() {
   const totalPages = Math.ceil(filteredDesignations.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedDesignations = filteredDesignations.slice(
-    startIndex,
-    endIndex,
-  );
+  const paginatedDesignations = filteredDesignations.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Designation Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -566,9 +688,7 @@ export function EmployeeDesignationSetupPage() {
                       >
                         <td className="px-4 py-2">{designation.code}</td>
                         <td className="px-4 py-2">{designation.description}</td>
-                        <td className="px-4 py-2">
-                          {designation.jobLevelCode}
-                        </td>
+                        <td className="px-4 py-2">{designation.jobLevelCode}</td>
                         <td className="px-4 py-2">{designation.deviceName}</td>
 
                         {(hasPermission("Edit") || hasPermission("Delete")) && (
@@ -660,10 +780,8 @@ export function EmployeeDesignationSetupPage() {
             {/* Create/Edit Modal */}
             {showCreateModal && (
               <>
-                {/* Modal Dialog */}
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                    {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                       <h2 className="text-gray-800">
                         {isEditMode ? "Edit Designation" : "Create New"}
@@ -676,11 +794,9 @@ export function EmployeeDesignationSetupPage() {
                       </button>
                     </div>
 
-                    {/* Modal Content */}
                     <div className="p-4">
                       <h3 className="text-blue-600 mb-3">Designation Setup</h3>
 
-                      {/* Form Fields */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="w-36 text-gray-700 text-sm">
@@ -689,10 +805,20 @@ export function EmployeeDesignationSetupPage() {
                           <input
                             type="text"
                             value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            onChange={(e) => handleCodeChange(e.target.value)}
+                            maxLength={10}
+                            className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
+                              codeError
+                                ? "border-red-500 focus:ring-red-500"
+                                : "border-gray-300 focus:ring-blue-500"
+                            }`}
                           />
                         </div>
+                        {codeError && (
+                          <p className="ml-36 text-red-500 text-xs mt-1">
+                            {codeError}
+                          </p>
+                        )}
 
                         <div className="flex items-center gap-3">
                           <label className="w-36 text-gray-700 text-sm">
@@ -757,17 +883,22 @@ export function EmployeeDesignationSetupPage() {
                         </div>
                       </div>
 
-                      {/* Modal Actions */}
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
-                          {isEditMode ? "Update" : "Submit"}
+                          {submitting
+                            ? "Saving..."
+                            : isEditMode
+                              ? "Update"
+                              : "Submit"}
                         </button>
                         <button
                           onClick={() => setShowCreateModal(false)}
-                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                          disabled={submitting}
+                          className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                         >
                           Back to List
                         </button>
@@ -781,16 +912,13 @@ export function EmployeeDesignationSetupPage() {
             {/* Job Level Search Modal */}
             {showJobLevelModal && (
               <>
-                {/* Modal Backdrop */}
                 <div
                   className="fixed inset-0 bg-black/30 z-30"
                   onClick={() => setShowJobLevelModal(false)}
                 ></div>
 
-                {/* Modal Dialog */}
                 <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[110vh] overflow-y-auto">
-                    {/* Modal Header */}
                     <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
                       <h2 className="text-gray-800">Search</h2>
                       <button
@@ -801,11 +929,9 @@ export function EmployeeDesignationSetupPage() {
                       </button>
                     </div>
 
-                    {/* Modal Content */}
                     <div className="p-4 flex-1 overflow-y-auto">
                       <h3 className="text-blue-600 mb-3">Job Level Code</h3>
 
-                      {/* Search Field */}
                       <div className="flex items-center gap-2 mb-4">
                         <label className="text-gray-700 text-sm">Search:</label>
                         <input
@@ -818,7 +944,6 @@ export function EmployeeDesignationSetupPage() {
                         />
                       </div>
 
-                      {/* Job Level Table */}
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse">
                           <thead>
@@ -855,7 +980,6 @@ export function EmployeeDesignationSetupPage() {
                         </table>
                       </div>
 
-                      {/* Pagination Info */}
                       <div className="flex items-center justify-between mt-4">
                         <div className="text-gray-600 text-sm">
                           Showing 1 to {filteredJobLevels.length} of{" "}
@@ -879,7 +1003,6 @@ export function EmployeeDesignationSetupPage() {
               </>
             )}
 
-            {/* Device Search Modal - Reusable Component */}
             <DeviceSearchModal
               isOpen={showDeviceNameModal}
               onClose={() => setShowDeviceNameModal(false)}
@@ -892,7 +1015,6 @@ export function EmployeeDesignationSetupPage() {
         </div>
       </div>
 
-      {/* Footer */}
       <Footer />
     </div>
   );

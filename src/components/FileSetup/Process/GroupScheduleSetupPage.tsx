@@ -56,39 +56,37 @@ export function GroupScheduleSetupPage() {
   const itemsPerPage = 10;
 
   // Permissions
-    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-    const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
-    useEffect(() => {
-      getGroupSchedSetupPermissions();
-    }, []);
-  
-    const getGroupSchedSetupPermissions = () => {
-      const rawPayload = localStorage.getItem("loginPayload");
-      if (!rawPayload) return;
-  
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-        const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-        const branchEntries = encryptedArray.filter(
-          (p) => decryptData(p.formName) === "GroupScheduleSetUp"
-        );
-  
-        // Build a map: { Add: true, Edit: true, ... }
-        const permMap: Record<string, boolean> = {};
-        branchEntries.forEach((p) => {
-          const accessType = decryptData(p.accessTypeName);
-          if (accessType) permMap[accessType] = true;
-        });
-  
-        setPermissions(permMap);
-  
-      } catch (e) {
-        console.error("Error parsing or decrypting payload", e);
-      }
-    };
-  
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
+
+  useEffect(() => {
+    getGroupSchedSetupPermissions();
+  }, []);
+
+  const getGroupSchedSetupPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "GroupScheduleSetUp"
+      );
+
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
+
   const filteredData = schedules.filter(item =>
     item.groupScheduleCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.groupScheduleDesc.toLowerCase().includes(searchTerm.toLowerCase())
@@ -162,30 +160,49 @@ export function GroupScheduleSetupPage() {
     }
   };
 
+  // Matches backend: CheckCodeIfRegularExpression (alphanumeric + hyphen/underscore, no spaces)
+  const isValidCode = (value: string): boolean => /^[a-zA-Z0-9\-_]+$/.test(value.trim());
+
+  // Matches backend: CheckCodeIfRegularExpressionWithSpace (alphanumeric with spaces allowed)
+  const isValidDescription = (value: string): boolean => /^[a-zA-Z0-9\s\-_]*$/.test(value.trim());
+
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields
     if (!formData.groupScheduleCode.trim()) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Code is required.',
-      });
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
       return;
     }
 
-    // Check for duplicate code
-    const isDuplicate = schedules.some(item => 
-      item.groupScheduleCode.toLowerCase() === formData.groupScheduleCode.trim().toLowerCase()
-    );
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.groupScheduleCode)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Group Schedule Code.' });
+      return;
+    }
 
-    if (isDuplicate) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Duplicate Code',
-        text: 'This group schedule code is already in use. Please use a different code.',
-      });
+    // Matches backend: CheckCodeIfRegularExpressionWithSpace
+    if (formData.groupScheduleDesc.trim() && !isValidDescription(formData.groupScheduleDesc)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Description.' });
+      return;
+    }
+
+    // Matches backend: duplicate Code check (case-insensitive, trimmed)
+    const isDuplicateCode = schedules.some(item =>
+      item.groupScheduleCode.trim().toUpperCase() === formData.groupScheduleCode.trim().toUpperCase()
+    );
+    if (isDuplicateCode) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      return;
+    }
+
+    // Matches backend: duplicate Description check (case-insensitive, trimmed, null-safe)
+    const normalizedInputDesc = formData.groupScheduleDesc.trim().toUpperCase().replace(/\s+/g, ' ');
+    const isDuplicateDesc = normalizedInputDesc.length > 0 && schedules.some(item => {
+      const normalizedExisting = (item.groupScheduleDesc ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+      return normalizedExisting === normalizedInputDesc && normalizedExisting.length > 0;
+    });
+    if (isDuplicateDesc) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
       return;
     }
 
@@ -216,11 +233,7 @@ export function GroupScheduleSetupPage() {
       setShowCreateModal(false);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error creating group schedule:', error);
     } finally {
       setSubmitting(false);
@@ -229,31 +242,44 @@ export function GroupScheduleSetupPage() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!editingItem) return;
 
-    // Validate required fields
     if (!formData.groupScheduleCode.trim()) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Code is required.',
-      });
+      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Code is required.' });
       return;
     }
 
-    // Check for duplicate code (excluding current item)
-    const isDuplicate = schedules.some(item => 
-      item.groupScheduleID !== editingItem.groupScheduleID && 
-      item.groupScheduleCode.toLowerCase() === formData.groupScheduleCode.trim().toLowerCase()
-    );
+    // Matches backend: CheckCodeIfRegularExpression
+    if (!isValidCode(formData.groupScheduleCode)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Group Schedule Code.' });
+      return;
+    }
 
-    if (isDuplicate) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Duplicate Code',
-        text: 'This group schedule code is already in use. Please use a different code.',
-      });
+    // Matches backend: CheckCodeIfRegularExpressionWithSpace
+    if (formData.groupScheduleDesc.trim() && !isValidDescription(formData.groupScheduleDesc)) {
+      await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid Character in Description.' });
+      return;
+    }
+
+    // Matches backend: duplicate Code check (case-insensitive, trimmed), skip current record
+    const isDuplicateCode = schedules.some(item =>
+      item.groupScheduleID !== editingItem.groupScheduleID &&
+      item.groupScheduleCode.trim().toUpperCase() === formData.groupScheduleCode.trim().toUpperCase()
+    );
+    if (isDuplicateCode) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      return;
+    }
+
+    // Matches backend: duplicate Description check (case-insensitive, trimmed, null-safe), skip current record
+    const normalizedInputDesc = formData.groupScheduleDesc.trim().toUpperCase().replace(/\s+/g, ' ');
+    const isDuplicateDesc = normalizedInputDesc.length > 0 && schedules.some(item => {
+      if (item.groupScheduleID === editingItem.groupScheduleID) return false;
+      const normalizedExisting = (item.groupScheduleDesc ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+      return normalizedExisting === normalizedInputDesc && normalizedExisting.length > 0;
+    });
+    if (isDuplicateDesc) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
       return;
     }
 
@@ -285,11 +311,7 @@ export function GroupScheduleSetupPage() {
       setEditingItem(null);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
       console.error('Error updating group schedule:', error);
     } finally {
       setSubmitting(false);
@@ -427,11 +449,11 @@ export function GroupScheduleSetupPage() {
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 title="Edit"
                               >
-                                  <Edit className="w-4 h-4" />
+                                <Edit className="w-4 h-4" />
                               </button>
                             )}
                             {hasPermission("Edit") && hasPermission("Delete") && (
-                                <span className="text-gray-300">|</span>
+                              <span className="text-gray-300">|</span>
                             )}
                             {hasPermission('Delete') && (
                               <button
@@ -439,7 +461,7 @@ export function GroupScheduleSetupPage() {
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
                               >
-                                  <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             )}
                           </div>
@@ -457,7 +479,7 @@ export function GroupScheduleSetupPage() {
               </table>
             </div>) : (
               <div className="text-center py-10 text-gray-500">
-                  You do not have permission to view this list.
+                You do not have permission to view this list.
               </div>
             )}
 

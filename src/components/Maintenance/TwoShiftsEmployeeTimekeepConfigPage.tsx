@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Search,
@@ -85,9 +85,50 @@ interface DailySchedule {
   sunday: string;
 }
 
+// ─── Portaled Calendar Wrapper ────────────────────────────────────────────────
+
+interface PortaledCalendarProps {
+  anchorRef: React.RefObject<HTMLElement>;
+  onDateSelect: (date: string) => void;
+  onClose: () => void;
+}
+
+function PortaledCalendar({ anchorRef, onDateSelect, onClose }: PortaledCalendarProps) {
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+      });
+    }
+  }, [anchorRef]);
+
+  return createPortal(
+    <>
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 99998 }}
+        onMouseDown={onClose}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: pos.top,
+          left: pos.left,
+          zIndex: 99999,
+        }}
+      >
+        <CalendarPopup onDateSelect={onDateSelect} onClose={onClose} />
+      </div>
+    </>,
+    document.body
+  );
+}
+
 // ─── Date / Time Helpers ──────────────────────────────────────────────────────
 
-/** MM/DD/YYYY or M/D/YYYY → ISO midnight UTC. Returns null if empty. */
 const safeDateToISO = (dateStr: string): string | null => {
   if (!dateStr || !dateStr.trim()) return null;
   try {
@@ -109,32 +150,23 @@ const safeDateToISO = (dateStr: string): string | null => {
   }
 };
 
-/**
- * "HH:MM AM/PM" → "1900-01-01THH:MM:00.000Z"
- * SQL Server uses 1900-01-01 as base date for time-only smalldatetime columns.
- * Returns null if empty or unparseable.
- */
 const safeTimeToISO = (timeStr: string): string | null => {
   if (!timeStr || !timeStr.trim()) return null;
   try {
     const upper = timeStr.trim().toUpperCase();
     const match = upper.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
     if (!match) return null;
-
     let hours = parseInt(match[1], 10);
     const mins = match[2];
     const period = match[3];
-
     if (period === 'PM' && hours !== 12) hours += 12;
     if (period === 'AM' && hours === 12) hours = 0;
-
     return `1900-01-01T${String(hours).padStart(2, '0')}:${mins}:00.000Z`;
   } catch {
     return null;
   }
 };
 
-/** ISO → MM/DD/YYYY */
 const isoToDisplay = (iso: string): string => {
   if (!iso) return '';
   try {
@@ -149,7 +181,6 @@ const isoToDisplay = (iso: string): string => {
   }
 };
 
-/** ISO time → "HH:MM AM/PM" for display in TimePicker */
 const isoTimeToDisplay = (iso: string): string => {
   if (!iso || !iso.trim()) return '';
   try {
@@ -166,7 +197,6 @@ const isoTimeToDisplay = (iso: string): string => {
   }
 };
 
-/** MM/DD/YYYY → ISO midnight (for workshift variable) */
 const mmddyyyyToISO = (s: string): string => {
   if (!s) return new Date().toISOString();
   try {
@@ -189,31 +219,24 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
   const [employeeName, setEmployeeName] = useState('');
   const [payPeriod] = useState('Main Monthly');
 
-  // ── Employee search ──
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeLoading, setEmployeeLoading] = useState(false);
   const [employeeError, setEmployeeError] = useState('');
 
-  // ── Global Edit Mode ──
   const [isEditMode, setIsEditMode] = useState(false);
-
-  // ── Loading ──
   const [workshiftLoading, setWorkshiftLoading] = useState(false);
   const [overtimeLoading, setOvertimeLoading] = useState(false);
 
-  // ── Workshift State ──
   const [workshiftMode, setWorkshiftMode] = useState<'fixed' | 'variable'>('variable');
   const [fixedDailySched, setFixedDailySched] = useState('');
   const [workshiftFixedData, setWorkshiftFixedData] = useState<WorkshiftFixed | null>(null);
 
-  // ── Workshift Fixed – Daily Schedule Search ──
   const [showDailyScheduleModal, setShowDailyScheduleModal] = useState(false);
   const [dailySchedules, setDailySchedules] = useState<DailySchedule[]>([]);
   const [dailyScheduleLoading, setDailyScheduleLoading] = useState(false);
   const [dailyScheduleSearchTerm, setDailyScheduleSearchTerm] = useState('');
 
-  // ── Workshift Variable Modal ──
   const [showWorkshiftModal, setShowWorkshiftModal] = useState(false);
   const [isWorkshiftEditMode, setIsWorkshiftEditMode] = useState(false);
   const [currentWorkshiftId, setCurrentWorkshiftId] = useState<number | null>(null);
@@ -224,26 +247,27 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
   const [showWorkshiftToCalendar, setShowWorkshiftToCalendar] = useState(false);
   const [workshiftShiftCode, setWorkshiftShiftCode] = useState('');
 
+  // Refs for calendar anchor positioning
+  const dateFromBtnRef = useRef<HTMLButtonElement>(null);
+  const dateToBtnRef = useRef<HTMLButtonElement>(null);
+
   const [workshiftVariableData, setWorkshiftVariableData] = useState<WorkshiftVariable[]>([]);
 
-  // ── Workshift Code Search (portal) ──
   const [workshiftCodes, setWorkshiftCodes] = useState<WorkshiftCode[]>([]);
   const [workshiftCodesLoading, setWorkshiftCodesLoading] = useState(false);
   const [showWorkshiftCodeModal, setShowWorkshiftCodeModal] = useState(false);
   const [workshiftCodeSearchTerm, setWorkshiftCodeSearchTerm] = useState('');
 
-  // ── Overtime Modal ──
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [isOvertimeEditMode, setIsOvertimeEditMode] = useState(false);
   const [currentOvertimeId, setCurrentOvertimeId] = useState<number | null>(null);
 
-  // All overtime form fields — fully wired up
-  const [overtimeDate, setOvertimeDate] = useState('');                         // Date field (MM/DD/YYYY)
+  const [overtimeDate, setOvertimeDate] = useState('');
   const [overtimeNumOTHoursApproved, setOvertimeNumOTHoursApproved] = useState('');
-  const [overtimeActualDateInOTBefore, setOvertimeActualDateInOTBefore] = useState(''); // ← FIX: was hardcoded ""
-  const [overtimeEarlyOTStartTime, setOvertimeEarlyOTStartTime] = useState('');         // Start Time of OT Before the Shift (time)
-  const [overtimeStartOvertimeDate, setOvertimeStartOvertimeDate] = useState('');       // ← FIX: was hardcoded ""
-  const [overtimeEarlyTimeIn, setOvertimeEarlyTimeIn] = useState('');                   // Start Time of Overtime (time)
+  const [overtimeActualDateInOTBefore, setOvertimeActualDateInOTBefore] = useState('');
+  const [overtimeEarlyOTStartTime, setOvertimeEarlyOTStartTime] = useState('');
+  const [overtimeStartOvertimeDate, setOvertimeStartOvertimeDate] = useState('');
+  const [overtimeEarlyTimeIn, setOvertimeEarlyTimeIn] = useState('');
   const [overtimeStartOTPM, setOvertimeStartOTPM] = useState('');
   const [overtimeMinHRSOTBreak, setOvertimeMinHRSOTBreak] = useState('');
   const [overtimeEarlyOTStartTimeRestHol, setOvertimeEarlyOTStartTimeRestHol] = useState('');
@@ -255,60 +279,87 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
 
   const [overtimeApplicationsData, setOvertimeApplicationsData] = useState<OvertimeApplication[]>([]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // GUARD
-  // ─────────────────────────────────────────────────────────────────────────
-
   const requireEmpCode = async (): Promise<boolean> => {
     if (!empCode) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Employee Code Required',
-        text: 'Please select an employee first before creating a record.',
-      });
+      await Swal.fire({ icon: 'warning', title: 'Employee Code Required', text: 'Please select an employee first before creating a record.' });
       return false;
     }
     return true;
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RESET OVERTIME FORM
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const resetOvertimeForm = () => {
-    setOvertimeDate('');
-    setOvertimeNumOTHoursApproved('');
-    setOvertimeActualDateInOTBefore('');
-    setOvertimeEarlyOTStartTime('');
-    setOvertimeStartOvertimeDate('');
-    setOvertimeEarlyTimeIn('');
-    setOvertimeStartOTPM('');
-    setOvertimeMinHRSOTBreak('');
-    setOvertimeEarlyOTStartTimeRestHol('');
-    setOvertimeReason('');
-    setOvertimeRemarks('');
-    setOvertimeApprovedOTBreaksHrs('');
-    setOvertimeStotats('');
-    setOvertimeIsLateFiling(false);
+  const validateOvertimeApplication = async (isEdit: boolean, date: string, stotats: string, stotatDate: string, currentId: number | null): Promise<boolean> => {
+    const normalizedDate = safeDateToISO(date);
+    const duplicateExists = overtimeApplicationsData.some(record => {
+      const sameEmp  = record.empCode.trim().toUpperCase() === empCode.trim().toUpperCase();
+      const sameDate = safeDateToISO(isoToDisplay(record.date)) === normalizedDate;
+      const notSelf  = isEdit ? record.id !== currentId : true;
+      return sameEmp && sameDate && notSelf;
+    });
+    if (duplicateExists) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Entry', text: 'Date already exist.' });
+      return false;
+    }
+    if (stotats && stotats.trim() !== '') {
+      if (!stotatDate || stotatDate.trim() === '') {
+        await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Start Time of Overtime Date should not be empty.' });
+        return false;
+      }
+    }
+    return true;
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // DATA FETCHING
-  // ─────────────────────────────────────────────────────────────────────────
+  const validateWorkshiftVariable = async (isEdit: boolean, dateFrom: string, dateTo: string, currentId: number | null): Promise<boolean> => {
+    const dF = new Date(mmddyyyyToISO(dateFrom));
+    const dT = new Date(mmddyyyyToISO(dateTo));
+    if (dF > dT) {
+      await Swal.fire({ icon: 'error', title: 'Invalid Date Range', text: 'Date From is greater than Date To.' });
+      return false;
+    }
+    const others = isEdit ? workshiftVariableData.filter(r => r.id !== currentId) : workshiftVariableData;
+    const toDate = (iso: string) => new Date(iso);
+    const hasConflict = others.some(r => {
+      const rF = toDate(r.dateFrom);
+      const rT = toDate(r.dateTo);
+      return (dF >= rF && dF <= rT) || (dT >= rF && dT <= rT) || (rF >= dF && rF <= dT) || (rT >= dF && rT <= dT);
+    });
+    if (hasConflict) {
+      await Swal.fire({ icon: 'error', title: 'Invalid Date Range', text: 'There is a conflict with your previous schedule.' });
+      return false;
+    }
+    return true;
+  };
+
+  const validateWorkshiftSave = async (): Promise<boolean> => {
+    if (workshiftMode === 'variable') {
+      if (workshiftVariableData.length < 1) {
+        await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Must add at least 1 Workshift.' });
+        return false;
+      }
+    } else {
+      if (!fixedDailySched || fixedDailySched.trim() === '') {
+        await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please fill Daily Schedule.' });
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const resetOvertimeForm = () => {
+    setOvertimeDate(''); setOvertimeNumOTHoursApproved(''); setOvertimeActualDateInOTBefore('');
+    setOvertimeEarlyOTStartTime(''); setOvertimeStartOvertimeDate(''); setOvertimeEarlyTimeIn('');
+    setOvertimeStartOTPM(''); setOvertimeMinHRSOTBreak(''); setOvertimeEarlyOTStartTimeRestHol('');
+    setOvertimeReason(''); setOvertimeRemarks(''); setOvertimeApprovedOTBreaksHrs('');
+    setOvertimeStotats(''); setOvertimeIsLateFiling(false);
+  };
 
   const fetchEmployees = async () => {
-    setEmployeeLoading(true);
-    setEmployeeError('');
+    setEmployeeLoading(true); setEmployeeError('');
     try {
       const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-      if (response.status === 200 && response.data) {
-        setEmployees(response.data);
-      }
+      if (response.status === 200 && response.data) setEmployees(response.data);
     } catch (error: any) {
       setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
-    } finally {
-      setEmployeeLoading(false);
-    }
+    } finally { setEmployeeLoading(false); }
   };
 
   const fetchWorkshiftCodes = useCallback(async () => {
@@ -317,16 +368,10 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
       const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
       if (response.status === 200 && response.data) {
         const list = response.data.data || [];
-        setWorkshiftCodes(list.map((w: any) => ({
-          code: w.code || '',
-          description: w.description || '',
-        })));
+        setWorkshiftCodes(list.map((w: any) => ({ code: w.code || '', description: w.description || '' })));
       }
-    } catch (err) {
-      console.error('Error fetching workshift codes:', err);
-    } finally {
-      setWorkshiftCodesLoading(false);
-    }
+    } catch (err) { console.error('Error fetching workshift codes:', err); }
+    finally { setWorkshiftCodesLoading(false); }
   }, []);
 
   const fetchDailySchedules = useCallback(async () => {
@@ -336,22 +381,13 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
       if (response.status === 200 && response.data) {
         const list = response.data.data || [];
         setDailySchedules(list.map((s: any) => ({
-          dailyScheduleID: s.dailyScheduleID || 0,
-          referenceNo: s.referenceNo || '',
-          monday: s.monday || '',
-          tuesday: s.tuesday || '',
-          wednesday: s.wednesday || '',
-          thursday: s.thursday || '',
-          friday: s.friday || '',
-          saturday: s.saturday || '',
-          sunday: s.sunday || '',
+          dailyScheduleID: s.dailyScheduleID || 0, referenceNo: s.referenceNo || '',
+          monday: s.monday || '', tuesday: s.tuesday || '', wednesday: s.wednesday || '',
+          thursday: s.thursday || '', friday: s.friday || '', saturday: s.saturday || '', sunday: s.sunday || '',
         })));
       }
-    } catch (err) {
-      console.error('Error fetching daily schedules:', err);
-    } finally {
-      setDailyScheduleLoading(false);
-    }
+    } catch (err) { console.error('Error fetching daily schedules:', err); }
+    finally { setDailyScheduleLoading(false); }
   }, []);
 
   const fetchWorkshiftFixed = async (ec: string) => {
@@ -361,20 +397,11 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
       const response = await apiClient.get('/Maintenance/EmployeeWorkshiftFixed/2ShiftsInADay');
       if (response.status === 200 && response.data) {
         const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-        const found = allItems.find((item: any) =>
-          (item.empCode?.trim() || '').toLowerCase() === ec.trim().toLowerCase()
-        );
-        if (found) {
-          setWorkshiftFixedData(found);
-          setFixedDailySched(found.dailySched || '');
-          setWorkshiftMode('fixed');
-        }
+        const found = allItems.find((item: any) => (item.empCode?.trim() || '').toLowerCase() === ec.trim().toLowerCase());
+        if (found) { setWorkshiftFixedData(found); setFixedDailySched(found.dailySched || ''); setWorkshiftMode('fixed'); }
       }
-    } catch {
-      setWorkshiftFixedData(null);
-    } finally {
-      setWorkshiftLoading(false);
-    }
+    } catch { setWorkshiftFixedData(null); }
+    finally { setWorkshiftLoading(false); }
   };
 
   const fetchWorkshiftVariable = async (ec: string) => {
@@ -384,19 +411,11 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
       const response = await apiClient.get('/Maintenance/EmployeeWorkshiftVariable/2ShiftsInADay');
       if (response.status === 200 && response.data) {
         const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-        const filtered = allItems.filter((item: any) =>
-          (item.empCode?.trim() || '').toLowerCase() === ec.trim().toLowerCase()
-        );
-        if (filtered.length > 0) {
-          setWorkshiftVariableData(filtered);
-          setWorkshiftMode('variable');
-        }
+        const filtered = allItems.filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === ec.trim().toLowerCase());
+        if (filtered.length > 0) { setWorkshiftVariableData(filtered); setWorkshiftMode('variable'); }
       }
-    } catch {
-      setWorkshiftVariableData([]);
-    } finally {
-      setWorkshiftLoading(false);
-    }
+    } catch { setWorkshiftVariableData([]); }
+    finally { setWorkshiftLoading(false); }
   };
 
   const fetchOvertimeApplications = async (ec: string) => {
@@ -406,51 +425,27 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
       const response = await apiClient.get('/Maintenance/EmployeeOvertimeApplication/2ShiftsInADay');
       if (response.status === 200 && response.data) {
         const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-        setOvertimeApplicationsData(allItems.filter((item: any) =>
-          (item.empCode?.trim() || '').toLowerCase() === ec.trim().toLowerCase()
-        ));
+        setOvertimeApplicationsData(allItems.filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === ec.trim().toLowerCase()));
       }
-    } catch {
-      setOvertimeApplicationsData([]);
-    } finally {
-      setOvertimeLoading(false);
-    }
+    } catch { setOvertimeApplicationsData([]); }
+    finally { setOvertimeLoading(false); }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SAVE WORKSHIFT FIXED
-  // ─────────────────────────────────────────────────────────────────────────
-
   const saveWorkshiftFixed = async () => {
-    const data: Partial<WorkshiftFixed> = {
-      id: workshiftFixedData?.id || 0,
-      empCode,
-      dailySched: fixedDailySched,
-      isFixed: true,
-    };
+    const data: Partial<WorkshiftFixed> = { id: workshiftFixedData?.id || 0, empCode, dailySched: fixedDailySched, isFixed: true };
     setWorkshiftLoading(true);
     try {
-      let response;
-      if (!data.id) {
-        response = await apiClient.post('/Maintenance/EmployeeWorkshiftFixed/2ShiftsInADay', data);
-      } else {
-        response = await apiClient.put(`/Maintenance/EmployeeWorkshiftFixed/2ShiftsInADay/${data.id}`, data);
-      }
+      const response = !data.id
+        ? await apiClient.post('/Maintenance/EmployeeWorkshiftFixed/2ShiftsInADay', data)
+        : await apiClient.put(`/Maintenance/EmployeeWorkshiftFixed/2ShiftsInADay/${data.id}`, data);
       if ([200, 201, 204].includes(response.status)) {
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Fixed workshift saved successfully.', timer: 2000, showConfirmButton: false });
-        await fetchWorkshiftFixed(empCode);
-        setIsEditMode(false);
+        await fetchWorkshiftFixed(empCode); setIsEditMode(false);
       }
     } catch (error: any) {
       await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to save fixed workshift' });
-    } finally {
-      setWorkshiftLoading(false);
-    }
+    } finally { setWorkshiftLoading(false); }
   };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // WORKSHIFT VARIABLE CRUD
-  // ─────────────────────────────────────────────────────────────────────────
 
   const createWorkshiftVariable = async (data: Partial<WorkshiftVariable>) => {
     setWorkshiftLoading(true);
@@ -458,14 +453,11 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
       const response = await apiClient.post('/Maintenance/EmployeeWorkshiftVariable/2ShiftsInADay', data);
       if ([200, 201].includes(response.status)) {
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Variable workshift created successfully.', timer: 2000, showConfirmButton: false });
-        await fetchWorkshiftVariable(empCode);
-        setShowWorkshiftModal(false);
+        await fetchWorkshiftVariable(empCode); setShowWorkshiftModal(false);
       }
     } catch (error: any) {
       await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create variable workshift' });
-    } finally {
-      setWorkshiftLoading(false);
-    }
+    } finally { setWorkshiftLoading(false); }
   };
 
   const updateWorkshiftVariable = async (id: number, data: Partial<WorkshiftVariable>) => {
@@ -474,22 +466,15 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
       const response = await apiClient.put(`/Maintenance/EmployeeWorkshiftVariable/2ShiftsInADay/${id}`, data);
       if ([200, 204].includes(response.status)) {
         await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Variable workshift updated successfully.', timer: 2000, showConfirmButton: false });
-        await fetchWorkshiftVariable(empCode);
-        setShowWorkshiftModal(false);
+        await fetchWorkshiftVariable(empCode); setShowWorkshiftModal(false);
       }
     } catch (error: any) {
       await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update variable workshift' });
-    } finally {
-      setWorkshiftLoading(false);
-    }
+    } finally { setWorkshiftLoading(false); }
   };
 
   const deleteWorkshiftVariable = async (id: number) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning',
-      showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!',
-    });
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
     if (result.isConfirmed) {
       setWorkshiftLoading(true);
       try {
@@ -500,19 +485,12 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
         }
       } catch (error: any) {
         await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete variable workshift' });
-      } finally {
-        setWorkshiftLoading(false);
-      }
+      } finally { setWorkshiftLoading(false); }
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // OVERTIME CRUD
-  // ─────────────────────────────────────────────────────────────────────────
-
   const prepareOvertimePayload = (data: Partial<OvertimeApplication>, id = 0) => ({
-    ID: id,
-    EmpCode: data.empCode,
+    ID: id, EmpCode: data.empCode,
     Date:                    safeDateToISO(data.date || ''),
     NumOTHoursApproved:      data.numOTHoursApproved || 0,
     EarlyOTStartTime:        safeTimeToISO(data.earlyOTStartTime || ''),
@@ -531,47 +509,31 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
   const createOvertimeApplication = async (data: Partial<OvertimeApplication>) => {
     setOvertimeLoading(true);
     try {
-      const response = await apiClient.post(
-        '/Maintenance/EmployeeOvertimeApplication/2ShiftsInADay',
-        prepareOvertimePayload(data)
-      );
+      const response = await apiClient.post('/Maintenance/EmployeeOvertimeApplication/2ShiftsInADay', prepareOvertimePayload(data));
       if ([200, 201].includes(response.status)) {
         await Swal.fire({ icon: 'success', title: 'Success', text: 'Overtime application created successfully.', timer: 2000, showConfirmButton: false });
-        await fetchOvertimeApplications(data.empCode || '');
-        setShowOvertimeModal(false);
+        await fetchOvertimeApplications(data.empCode || ''); setShowOvertimeModal(false);
       }
     } catch (error: any) {
       await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.title || error.message || 'Failed to create application' });
-    } finally {
-      setOvertimeLoading(false);
-    }
+    } finally { setOvertimeLoading(false); }
   };
 
   const updateOvertimeApplication = async (id: number, data: Partial<OvertimeApplication>) => {
     setOvertimeLoading(true);
     try {
-      const response = await apiClient.put(
-        `/Maintenance/EmployeeOvertimeApplication/2ShiftsInADay/${id}`,
-        prepareOvertimePayload(data, id)
-      );
+      const response = await apiClient.put(`/Maintenance/EmployeeOvertimeApplication/2ShiftsInADay/${id}`, prepareOvertimePayload(data, id));
       if ([200, 204].includes(response.status)) {
         await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Overtime application updated successfully.', timer: 2000, showConfirmButton: false });
-        await fetchOvertimeApplications(data.empCode || '');
-        setShowOvertimeModal(false);
+        await fetchOvertimeApplications(data.empCode || ''); setShowOvertimeModal(false);
       }
     } catch (error: any) {
       await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data || error.message || 'Failed to update application' });
-    } finally {
-      setOvertimeLoading(false);
-    }
+    } finally { setOvertimeLoading(false); }
   };
 
   const deleteOvertimeApplication = async (id: number) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning',
-      showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!',
-    });
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
     if (result.isConfirmed) {
       setOvertimeLoading(true);
       try {
@@ -582,34 +544,21 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
         }
       } catch (error: any) {
         await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete overtime application' });
-      } finally {
-        setOvertimeLoading(false);
-      }
+      } finally { setOvertimeLoading(false); }
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SUBMIT HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
-
   const handleOvertimeSubmit = async () => {
+    const isValid = await validateOvertimeApplication(isOvertimeEditMode, overtimeDate, overtimeStotats, overtimeStartOvertimeDate, currentOvertimeId);
+    if (!isValid) return;
     const data: Partial<OvertimeApplication> = {
-      empCode,
-      date:                    overtimeDate,
-      numOTHoursApproved:      parseFloat(overtimeNumOTHoursApproved) || 0,
-      earlyOTStartTime:        overtimeEarlyOTStartTime,
-      earlyTimeIn:             overtimeEarlyTimeIn,
-      startOTPM:               overtimeStartOTPM,
-      minHRSOTBreak:           parseFloat(overtimeMinHRSOTBreak) || 0,
-      earlyOTStartTimeRestHol: overtimeEarlyOTStartTimeRestHol,
-      reason:                  overtimeReason,
-      remarks:                 overtimeRemarks,
-      approvedOTBreaksHrs:     parseFloat(overtimeApprovedOTBreaksHrs) || 0,
-      stotats:                 overtimeStotats,
-      isLateFiling:            overtimeIsLateFiling,
-      isLateFilingProcessed:   false,
+      empCode, date: overtimeDate, numOTHoursApproved: parseFloat(overtimeNumOTHoursApproved) || 0,
+      earlyOTStartTime: overtimeEarlyOTStartTime, earlyTimeIn: overtimeEarlyTimeIn,
+      startOTPM: overtimeStartOTPM, minHRSOTBreak: parseFloat(overtimeMinHRSOTBreak) || 0,
+      earlyOTStartTimeRestHol: overtimeEarlyOTStartTimeRestHol, reason: overtimeReason,
+      remarks: overtimeRemarks, approvedOTBreaksHrs: parseFloat(overtimeApprovedOTBreaksHrs) || 0,
+      stotats: overtimeStotats, isLateFiling: overtimeIsLateFiling, isLateFilingProcessed: false,
     };
-
     if (isOvertimeEditMode && currentOvertimeId !== null) {
       await updateOvertimeApplication(currentOvertimeId, data);
     } else {
@@ -618,6 +567,8 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
   };
 
   const handleWorkshiftSubmit = async () => {
+    const isValid = await validateWorkshiftVariable(isWorkshiftEditMode, workshiftFrom, workshiftTo, currentWorkshiftId);
+    if (!isValid) return;
     const data: Partial<WorkshiftVariable> = {
       empCode,
       dateFrom:          workshiftFrom ? mmddyyyyToISO(workshiftFrom) : '',
@@ -634,88 +585,47 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
   };
 
   const handleSave = async () => {
-    if (!empCode) {
-      await Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select an employee first' });
-      return;
-    }
-    if (activeTab === 'workshift' && workshiftMode === 'fixed') {
-      await saveWorkshiftFixed();
-    }
+    if (!empCode) { await Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select an employee first' }); return; }
+    const saveValid = await validateWorkshiftSave();
+    if (!saveValid) return;
+    if (activeTab === 'workshift' && workshiftMode === 'fixed') await saveWorkshiftFixed();
   };
 
   const handleCancel = () => {
     setIsEditMode(false);
-    if (empCode) {
-      fetchWorkshiftFixed(empCode);
-      fetchWorkshiftVariable(empCode);
-    }
+    if (empCode) { fetchWorkshiftFixed(empCode); fetchWorkshiftVariable(empCode); }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // EMPLOYEE SELECT
-  // ─────────────────────────────────────────────────────────────────────────
-
   const adaptedEmployees = useMemo(() => employees.map(emp => ({
-    ...emp,
-    name: `${emp.lName}, ${emp.fName}`,
-    groupCode: emp.grpCode,
+    ...emp, name: `${emp.lName}, ${emp.fName}`, groupCode: emp.grpCode,
   })), [employees]);
 
   const handleEmployeeSearchSelect = async (empCodeValue: string, name: string) => {
     try {
       const employee = employees.find(emp => emp.empCode === empCodeValue);
-      if (!employee) {
-        await Swal.fire({ icon: 'error', title: 'Error', text: 'Employee not found' });
-        return;
-      }
-      setEmpCode(empCodeValue);
-      setTksGroup(employee.grpCode);
-      setEmployeeName(name);
+      if (!employee) { await Swal.fire({ icon: 'error', title: 'Error', text: 'Employee not found' }); return; }
+      setEmpCode(empCodeValue); setTksGroup(employee.grpCode); setEmployeeName(name);
       setShowSearchModal(false);
-      await Promise.all([
-        fetchWorkshiftFixed(empCodeValue),
-        fetchWorkshiftVariable(empCodeValue),
-        fetchOvertimeApplications(empCodeValue),
-      ]);
-    } catch {
-      await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load employee details' });
-    }
+      await Promise.all([fetchWorkshiftFixed(empCodeValue), fetchWorkshiftVariable(empCodeValue), fetchOvertimeApplications(empCodeValue)]);
+    } catch { await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load employee details' }); }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // EFFECTS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    fetchEmployees();
-    fetchWorkshiftCodes();
-    fetchDailySchedules();
-  }, []);
-
-  useEffect(() => {
-    if (empCode) {
-      fetchWorkshiftFixed(empCode);
-      fetchWorkshiftVariable(empCode);
-      fetchOvertimeApplications(empCode);
-    }
-  }, [empCode]);
-
+  useEffect(() => { fetchEmployees(); fetchWorkshiftCodes(); fetchDailySchedules(); }, []);
+  useEffect(() => { if (empCode) { fetchWorkshiftFixed(empCode); fetchWorkshiftVariable(empCode); fetchOvertimeApplications(empCode); } }, [empCode]);
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (showSearchModal)        { setShowSearchModal(false);        return; }
       if (showWorkshiftCodeModal) { setShowWorkshiftCodeModal(false); return; }
       if (showDailyScheduleModal) { setShowDailyScheduleModal(false); return; }
+      if (showWorkshiftFromCalendar) { setShowWorkshiftFromCalendar(false); return; }
+      if (showWorkshiftToCalendar)   { setShowWorkshiftToCalendar(false);   return; }
       if (showWorkshiftModal)     { setShowWorkshiftModal(false);     return; }
       if (showOvertimeModal)      { setShowOvertimeModal(false); }
     };
     document.addEventListener('keydown', onEsc);
     return () => document.removeEventListener('keydown', onEsc);
-  }, [showSearchModal, showWorkshiftCodeModal, showDailyScheduleModal, showWorkshiftModal, showOvertimeModal]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // FILTERED LISTS
-  // ─────────────────────────────────────────────────────────────────────────
+  }, [showSearchModal, showWorkshiftCodeModal, showDailyScheduleModal, showWorkshiftFromCalendar, showWorkshiftToCalendar, showWorkshiftModal, showOvertimeModal]);
 
   const filteredWorkshiftCodes = workshiftCodes.filter(ws =>
     ws.code.toLowerCase().includes(workshiftCodeSearchTerm.toLowerCase()) ||
@@ -726,13 +636,8 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
     ds.referenceNo.toLowerCase().includes(dailyScheduleSearchTerm.toLowerCase())
   );
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // TAB CONTENT
-  // ─────────────────────────────────────────────────────────────────────────
-
   const renderTabContent = () => {
     switch (activeTab) {
-
       case 'workshift':
         return (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -742,35 +647,25 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Fixed */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <input type="radio" id="workshift-fixed"
-                      checked={workshiftMode === 'fixed'}
-                      onChange={() => setWorkshiftMode('fixed')}
-                      disabled={!isEditMode}
-                      className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                    />
+                    <input type="radio" id="workshift-fixed" checked={workshiftMode === 'fixed'} onChange={() => setWorkshiftMode('fixed')} disabled={!isEditMode} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                     <label htmlFor="workshift-fixed" className="text-gray-700">Fixed</label>
                   </div>
                   {workshiftMode === 'fixed' && (
                     <div className="ml-7 bg-gray-50 rounded-lg border border-gray-200 p-6">
                       <div className="flex items-center gap-3 max-w-lg">
                         <label className="text-gray-700 w-36 flex-shrink-0">Daily Schedule</label>
-                        <input type="text" value={fixedDailySched} readOnly disabled={!isEditMode}
-                          placeholder="Select daily schedule..."
+                        <input type="text" value={fixedDailySched} readOnly disabled={!isEditMode} placeholder="Select daily schedule..."
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-pointer focus:outline-none"
-                          onClick={() => isEditMode && setShowDailyScheduleModal(true)}
-                        />
+                          onClick={() => isEditMode && setShowDailyScheduleModal(true)} />
                         {isEditMode && (
-                          <button onClick={() => setShowDailyScheduleModal(true)}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 flex-shrink-0">
+                          <button onClick={() => setShowDailyScheduleModal(true)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 flex-shrink-0">
                             <Search className="w-4 h-4" /> Search
                           </button>
                         )}
                         {isEditMode && fixedDailySched && (
-                          <button onClick={() => setFixedDailySched('')}
-                            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex-shrink-0">
+                          <button onClick={() => setFixedDailySched('')} className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex-shrink-0">
                             <X className="w-4 h-4" />
                           </button>
                         )}
@@ -779,15 +674,9 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                   )}
                 </div>
 
-                {/* Variable */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <input type="radio" id="workshift-variable"
-                      checked={workshiftMode === 'variable'}
-                      onChange={() => setWorkshiftMode('variable')}
-                      disabled={!isEditMode}
-                      className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                    />
+                    <input type="radio" id="workshift-variable" checked={workshiftMode === 'variable'} onChange={() => setWorkshiftMode('variable')} disabled={!isEditMode} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                     <label htmlFor="workshift-variable" className="text-gray-700">Variable</label>
                   </div>
                   {workshiftMode === 'variable' && (
@@ -795,8 +684,7 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                       <button
                         onClick={async () => {
                           if (!(await requireEmpCode())) return;
-                          setIsWorkshiftEditMode(false);
-                          setCurrentWorkshiftId(null);
+                          setIsWorkshiftEditMode(false); setCurrentWorkshiftId(null);
                           setWorkshiftFrom(''); setWorkshiftTo(''); setWorkshiftShiftCode('');
                           setShowWorkshiftModal(true);
                         }}
@@ -826,18 +714,14 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                                   <td className="px-6 py-3">
                                     <div className="flex gap-2">
                                       <button onClick={() => {
-                                        setIsWorkshiftEditMode(true);
-                                        setCurrentWorkshiftId(entry.id);
-                                        setWorkshiftFrom(isoToDisplay(entry.dateFrom));
-                                        setWorkshiftTo(isoToDisplay(entry.dateTo));
-                                        setWorkshiftShiftCode(entry.shiftCode || '');
-                                        setShowWorkshiftModal(true);
+                                        setIsWorkshiftEditMode(true); setCurrentWorkshiftId(entry.id);
+                                        setWorkshiftFrom(isoToDisplay(entry.dateFrom)); setWorkshiftTo(isoToDisplay(entry.dateTo));
+                                        setWorkshiftShiftCode(entry.shiftCode || ''); setShowWorkshiftModal(true);
                                       }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
                                         <Edit className="w-4 h-4" />
                                       </button>
                                       <span className="text-gray-300">|</span>
-                                      <button onClick={() => deleteWorkshiftVariable(entry.id)}
-                                        className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                      <button onClick={() => deleteWorkshiftVariable(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
                                         <Trash2 className="w-4 h-4" />
                                       </button>
                                     </div>
@@ -864,17 +748,14 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                 <button
                   onClick={async () => {
                     if (!(await requireEmpCode())) return;
-                    setIsOvertimeEditMode(false);
-                    setCurrentOvertimeId(null);
-                    resetOvertimeForm();
-                    setShowOvertimeModal(true);
+                    setIsOvertimeEditMode(false); setCurrentOvertimeId(null);
+                    resetOvertimeForm(); setShowOvertimeModal(true);
                   }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                 >
                   <Plus className="w-4 h-4" /> Create New
                 </button>
               </div>
-
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 {overtimeLoading ? (
                   <div className="flex items-center justify-center py-8 gap-2 text-gray-500">
@@ -905,37 +786,27 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                             <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
                             <td className="px-6 py-3">
                               <div className="flex items-center justify-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    setIsOvertimeEditMode(true);
-                                    setCurrentOvertimeId(entry.id);
-                                    // ── Populate all fields correctly ──
-                                    setOvertimeDate(isoToDisplay(entry.date));
-                                    setOvertimeNumOTHoursApproved(entry.numOTHoursApproved?.toString() || '');
-                                    // earlyOTStartTime is time-only stored as 1900-01-01T...
-                                    // the date portion came from earlyOTStartTime's date part
-                                    setOvertimeActualDateInOTBefore(isoToDisplay(entry.earlyOTStartTime));
-                                    setOvertimeEarlyOTStartTime(isoTimeToDisplay(entry.earlyOTStartTime));
-                                    // earlyTimeIn is Start Time of Overtime
-                                    setOvertimeStartOvertimeDate(isoToDisplay(entry.earlyTimeIn));
-                                    setOvertimeEarlyTimeIn(isoTimeToDisplay(entry.earlyTimeIn));
-                                    setOvertimeStartOTPM(isoTimeToDisplay(entry.startOTPM));
-                                    setOvertimeMinHRSOTBreak(entry.minHRSOTBreak?.toString() || '');
-                                    setOvertimeEarlyOTStartTimeRestHol(isoTimeToDisplay(entry.earlyOTStartTimeRestHol));
-                                    setOvertimeReason(entry.reason || '');
-                                    setOvertimeRemarks(entry.remarks || '');
-                                    setOvertimeApprovedOTBreaksHrs(entry.approvedOTBreaksHrs?.toString() || '');
-                                    setOvertimeStotats(isoTimeToDisplay(entry.stotats));
-                                    setOvertimeIsLateFiling(entry.isLateFiling || false);
-                                    setShowOvertimeModal(true);
-                                  }}
-                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                >
+                                <button onClick={() => {
+                                  setIsOvertimeEditMode(true); setCurrentOvertimeId(entry.id);
+                                  setOvertimeDate(isoToDisplay(entry.date));
+                                  setOvertimeNumOTHoursApproved(entry.numOTHoursApproved?.toString() || '');
+                                  setOvertimeActualDateInOTBefore(isoToDisplay(entry.earlyOTStartTime));
+                                  setOvertimeEarlyOTStartTime(isoTimeToDisplay(entry.earlyOTStartTime));
+                                  setOvertimeStartOvertimeDate(isoToDisplay(entry.earlyTimeIn));
+                                  setOvertimeEarlyTimeIn(isoTimeToDisplay(entry.earlyTimeIn));
+                                  setOvertimeStartOTPM(isoTimeToDisplay(entry.startOTPM));
+                                  setOvertimeMinHRSOTBreak(entry.minHRSOTBreak?.toString() || '');
+                                  setOvertimeEarlyOTStartTimeRestHol(isoTimeToDisplay(entry.earlyOTStartTimeRestHol));
+                                  setOvertimeReason(entry.reason || ''); setOvertimeRemarks(entry.remarks || '');
+                                  setOvertimeApprovedOTBreaksHrs(entry.approvedOTBreaksHrs?.toString() || '');
+                                  setOvertimeStotats(isoTimeToDisplay(entry.stotats));
+                                  setOvertimeIsLateFiling(entry.isLateFiling || false);
+                                  setShowOvertimeModal(true);
+                                }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <span className="text-gray-300">|</span>
-                                <button onClick={() => deleteOvertimeApplication(entry.id)}
-                                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                <button onClick={() => deleteOvertimeApplication(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
@@ -951,8 +822,7 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
           </div>
         );
 
-      default:
-        return null;
+      default: return null;
     }
   };
 
@@ -961,24 +831,17 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
     { id: 'workshift',             label: 'Workshift',             icon: Clock },
   ];
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
-
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex-1 relative z-10 p-6">
         <div className="max-w-7xl mx-auto relative">
 
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Employee Time Keep Group Configuration [2-Shifts]</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
 
-            {/* Info Banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -987,41 +850,29 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-700 mb-2">
-                    Configure work shifts and overtime applications for 2-shift employees with accurate time tracking and overtime management.
-                  </p>
+                  <p className="text-sm text-gray-700 mb-2">Configure work shifts and overtime applications for 2-shift employees with accurate time tracking and overtime management.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Work shift configuration (Fixed/Variable)</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Overtime application tracking</span>
-                    </div>
+                    <div className="flex items-start gap-2"><Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /><span className="text-gray-600">Work shift configuration (Fixed/Variable)</span></div>
+                    <div className="flex items-start gap-2"><Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /><span className="text-gray-600">Overtime application tracking</span></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Employee Search Section */}
             <div className="mb-6 space-y-4">
               <div className="flex items-center gap-4">
                 {activeTab === 'workshift' && (
                   <>
                     {!isEditMode ? (
-                      <button onClick={() => setIsEditMode(true)} disabled={!empCode}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                      <button onClick={() => setIsEditMode(true)} disabled={!empCode} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                         <Pencil className="w-4 h-4" /> Edit
                       </button>
                     ) : (
                       <>
-                        <button onClick={handleSave} disabled={workshiftLoading}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
+                        <button onClick={handleSave} disabled={workshiftLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
                           <Save className="w-4 h-4" /> {workshiftLoading ? 'Saving...' : 'Save'}
                         </button>
-                        <button onClick={handleCancel} disabled={workshiftLoading}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
+                        <button onClick={handleCancel} disabled={workshiftLoading} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
                           <X className="w-4 h-4" /> Cancel
                         </button>
                       </>
@@ -1034,15 +885,12 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-3">
                     <label className="text-gray-700 font-bold w-24">TKS Group</label>
-                    <input type="text" value={tksGroup} disabled placeholder="Auto-filled from selection"
-                      className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100" />
+                    <input type="text" value={tksGroup} disabled placeholder="Auto-filled from selection" className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100" />
                   </div>
                   <div className="flex items-center gap-3">
                     <label className="text-gray-700 font-bold w-24">EmpCode</label>
-                    <input type="text" value={empCode} disabled
-                      className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100" />
-                    <button onClick={() => setShowSearchModal(true)}
-                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
+                    <input type="text" value={empCode} disabled className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100" />
+                    <button onClick={() => setShowSearchModal(true)} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
                       <Search className="w-4 h-4" /> Search
                     </button>
                   </div>
@@ -1050,22 +898,15 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="text-blue-700 mb-1">
-                  {employeeName || <span className="text-blue-400 italic">No employee selected</span>}
-                </div>
+                <div className="text-blue-700 mb-1">{employeeName || <span className="text-blue-400 italic">No employee selected</span>}</div>
                 <div className="text-blue-600">{payPeriod}</div>
               </div>
             </div>
 
-            {/* Tabs */}
             <div className="flex gap-1 mb-6 border-b border-gray-300">
               {tabs.map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${
-                    activeTab === tab.id
-                      ? 'font-medium bg-blue-600 text-white -mb-px'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}>
+                  className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${activeTab === tab.id ? 'font-medium bg-blue-600 text-white -mb-px' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                   <tab.icon className="w-4 h-4" />
                   <span>{tab.label}</span>
                 </button>
@@ -1073,63 +914,34 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
             </div>
 
             {renderTabContent()}
-
           </div>
 
-          {/* Employee Search Modal */}
-          <EmployeeSearchModal
-            isOpen={showSearchModal}
-            onClose={() => setShowSearchModal(false)}
-            onSelect={handleEmployeeSearchSelect}
-            employees={adaptedEmployees}
-            loading={employeeLoading}
-            error={employeeError}
-          />
+          <EmployeeSearchModal isOpen={showSearchModal} onClose={() => setShowSearchModal(false)} onSelect={handleEmployeeSearchSelect} employees={adaptedEmployees} loading={employeeLoading} error={employeeError} />
 
-          {/* ── Overtime Modal — ALL fields fully wired ── */}
           <OvertimeApplicationModal
-            isOpen={showOvertimeModal}
-            isEditMode={isOvertimeEditMode}
-            empCode={empCode}
-            // Date field
-            date={overtimeDate}
-            onDateChange={setOvertimeDate}
-            // Hours approved
-            hoursApproved={overtimeNumOTHoursApproved}
-            onHoursApprovedChange={setOvertimeNumOTHoursApproved}
-            // Start Time of OT Before the Shift — date + time
-            actualDateInOTBefore={overtimeActualDateInOTBefore}
-            onActualDateInOTBeforeChange={setOvertimeActualDateInOTBefore}
-            startTimeBefore={overtimeEarlyOTStartTime}
-            onStartTimeBeforeChange={setOvertimeEarlyOTStartTime}
-            // Start Time of Overtime — date + time
-            startOvertimeDate={overtimeStartOvertimeDate}
-            onStartOvertimeDateChange={setOvertimeStartOvertimeDate}
-            startOvertimeTime={overtimeEarlyTimeIn}
-            onStartOvertimeTimeChange={setOvertimeEarlyTimeIn}
-            // Approved break, reason, remarks, late filing
-            approvedBreak={overtimeMinHRSOTBreak}
-            onApprovedBreakChange={setOvertimeMinHRSOTBreak}
-            reason={overtimeReason}
-            onReasonChange={setOvertimeReason}
-            remarks={overtimeRemarks}
-            onRemarksChange={setOvertimeRemarks}
-            isLateFiling={overtimeIsLateFiling}
-            onIsLateFilingChange={setOvertimeIsLateFiling}
-            onClose={() => setShowOvertimeModal(false)}
-            onSubmit={handleOvertimeSubmit}
+            isOpen={showOvertimeModal} isEditMode={isOvertimeEditMode} empCode={empCode}
+            date={overtimeDate} onDateChange={setOvertimeDate}
+            hoursApproved={overtimeNumOTHoursApproved} onHoursApprovedChange={setOvertimeNumOTHoursApproved}
+            actualDateInOTBefore={overtimeActualDateInOTBefore} onActualDateInOTBeforeChange={setOvertimeActualDateInOTBefore}
+            startTimeBefore={overtimeEarlyOTStartTime} onStartTimeBeforeChange={setOvertimeEarlyOTStartTime}
+            startOvertimeDate={overtimeStartOvertimeDate} onStartOvertimeDateChange={setOvertimeStartOvertimeDate}
+            startOvertimeTime={overtimeEarlyTimeIn} onStartOvertimeTimeChange={setOvertimeEarlyTimeIn}
+            approvedBreak={overtimeMinHRSOTBreak} onApprovedBreakChange={setOvertimeMinHRSOTBreak}
+            reason={overtimeReason} onReasonChange={setOvertimeReason}
+            remarks={overtimeRemarks} onRemarksChange={setOvertimeRemarks}
+            isLateFiling={overtimeIsLateFiling} onIsLateFilingChange={setOvertimeIsLateFiling}
+            onClose={() => setShowOvertimeModal(false)} onSubmit={handleOvertimeSubmit}
           />
-
         </div>
       </div>
 
-      {/* Workshift Variable Modal */}
+      {/* ── Workshift Variable Modal ── */}
       {showWorkshiftModal && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowWorkshiftModal(false)} />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
                 <h2 className="text-gray-800 font-semibold">
                   {isWorkshiftEditMode ? 'Edit Workshift Variable' : 'Create Workshift Variable'}
                 </h2>
@@ -1138,6 +950,7 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                 </button>
               </div>
               <div className="p-5 space-y-4">
+
                 {/* Date From */}
                 <div className="flex items-center gap-3">
                   <label className="w-28 text-gray-700 text-sm flex-shrink-0">Date From :</label>
@@ -1146,20 +959,17 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                       placeholder="MM/DD/YYYY"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <button type="button" onClick={() => setShowWorkshiftFromCalendar(!showWorkshiftFromCalendar)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    <button
+                      ref={dateFromBtnRef}
+                      type="button"
+                      onClick={() => { setShowWorkshiftToCalendar(false); setShowWorkshiftFromCalendar(v => !v); }}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
                       <Calendar className="w-4 h-4" />
                     </button>
-                    {showWorkshiftFromCalendar && (
-                      <div className="absolute top-full left-0 mt-1 z-50">
-                        <CalendarPopup
-                          onDateSelect={d => { setWorkshiftFrom(d); setShowWorkshiftFromCalendar(false); }}
-                          onClose={() => setShowWorkshiftFromCalendar(false)}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
+
                 {/* Date To */}
                 <div className="flex items-center gap-3">
                   <label className="w-28 text-gray-700 text-sm flex-shrink-0">Date To :</label>
@@ -1168,25 +978,21 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                       placeholder="MM/DD/YYYY"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <button type="button" onClick={() => setShowWorkshiftToCalendar(!showWorkshiftToCalendar)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    <button
+                      ref={dateToBtnRef}
+                      type="button"
+                      onClick={() => { setShowWorkshiftFromCalendar(false); setShowWorkshiftToCalendar(v => !v); }}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
                       <Calendar className="w-4 h-4" />
                     </button>
-                    {showWorkshiftToCalendar && (
-                      <div className="absolute top-full left-0 mt-1 z-50">
-                        <CalendarPopup
-                          onDateSelect={d => { setWorkshiftTo(d); setShowWorkshiftToCalendar(false); }}
-                          onClose={() => setShowWorkshiftToCalendar(false)}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
+
                 {/* Shift Code */}
                 <div className="flex items-center gap-3">
                   <label className="w-28 text-gray-700 text-sm flex-shrink-0">Shift Code :</label>
-                  <input type="text" value={workshiftShiftCode} readOnly
-                    placeholder="Select shift code..."
+                  <input type="text" value={workshiftShiftCode} readOnly placeholder="Select shift code..."
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-pointer focus:outline-none"
                     onClick={() => { setWorkshiftCodeSearchTerm(''); setShowWorkshiftCodeModal(true); }}
                   />
@@ -1199,6 +1005,7 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2 border-t border-gray-100">
                   <button onClick={handleWorkshiftSubmit} disabled={workshiftLoading}
@@ -1214,6 +1021,22 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
               </div>
             </div>
           </div>
+
+          {/* Portaled calendars — rendered outside the modal so they're never clipped */}
+          {showWorkshiftFromCalendar && (
+            <PortaledCalendar
+              anchorRef={dateFromBtnRef as React.RefObject<HTMLElement>}
+              onDateSelect={d => { setWorkshiftFrom(d); setShowWorkshiftFromCalendar(false); }}
+              onClose={() => setShowWorkshiftFromCalendar(false)}
+            />
+          )}
+          {showWorkshiftToCalendar && (
+            <PortaledCalendar
+              anchorRef={dateToBtnRef as React.RefObject<HTMLElement>}
+              onDateSelect={d => { setWorkshiftTo(d); setShowWorkshiftToCalendar(false); }}
+              onClose={() => setShowWorkshiftToCalendar(false)}
+            />
+          )}
         </>
       )}
 
@@ -1226,18 +1049,15 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                 <h2 className="text-gray-800 text-sm font-semibold">Search Workshift Code</h2>
-                <button onClick={() => { setShowWorkshiftCodeModal(false); setWorkshiftCodeSearchTerm(''); }}
-                  className="text-gray-600 hover:text-gray-800"><X className="w-4 h-4" /></button>
+                <button onClick={() => { setShowWorkshiftCodeModal(false); setWorkshiftCodeSearchTerm(''); }} className="text-gray-600 hover:text-gray-800"><X className="w-4 h-4" /></button>
               </div>
               <div className="p-3">
                 <h3 className="text-blue-600 mb-2 text-sm font-semibold">Workshift Code</h3>
                 <div className="flex items-center gap-2 mb-3">
                   <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
-                  <input type="text" value={workshiftCodeSearchTerm}
-                    onChange={e => setWorkshiftCodeSearchTerm(e.target.value)}
+                  <input type="text" value={workshiftCodeSearchTerm} onChange={e => setWorkshiftCodeSearchTerm(e.target.value)}
                     autoFocus placeholder="Type to filter..."
-                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                 </div>
                 <div className="border border-gray-200 rounded overflow-hidden" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                   <table className="w-full border-collapse text-sm">
@@ -1249,9 +1069,7 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {workshiftCodesLoading ? (
-                        <tr><td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic">
-                          <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Loading...
-                        </td></tr>
+                        <tr><td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic"><Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Loading...</td></tr>
                       ) : filteredWorkshiftCodes.length === 0 ? (
                         <tr><td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td></tr>
                       ) : (
@@ -1282,17 +1100,14 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
                 <h2 className="text-gray-800 font-semibold">Select Daily Schedule</h2>
-                <button onClick={() => { setShowDailyScheduleModal(false); setDailyScheduleSearchTerm(''); }}
-                  className="text-gray-500 hover:text-gray-800"><X className="w-5 h-5" /></button>
+                <button onClick={() => { setShowDailyScheduleModal(false); setDailyScheduleSearchTerm(''); }} className="text-gray-500 hover:text-gray-800"><X className="w-5 h-5" /></button>
               </div>
               <div className="px-6 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
-                  <input type="text" value={dailyScheduleSearchTerm}
-                    onChange={e => setDailyScheduleSearchTerm(e.target.value)}
+                  <input type="text" value={dailyScheduleSearchTerm} onChange={e => setDailyScheduleSearchTerm(e.target.value)}
                     autoFocus placeholder="Search by reference number..."
-                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
+                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                 </div>
               </div>
               <div className="overflow-x-auto">
