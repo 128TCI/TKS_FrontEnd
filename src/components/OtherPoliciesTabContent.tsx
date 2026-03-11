@@ -177,7 +177,6 @@ export const OtherPoliciesTabContent = forwardRef<
       useState<GroupSetUpOtherPoliciesItem[]>([]);
 
     // Other Policies States
-    const [groupCode, setGroupCode] = useState(tksGroupCode);
     const [useDefRestDay, setUseDefRestDay] = useState(false);
     const [restDayWithWorkShift, setRestDayWithWorkShift] = useState(false);
     const [defRestDay1, setDefRestDay1] = useState("");
@@ -462,7 +461,7 @@ export const OtherPoliciesTabContent = forwardRef<
     const startAllowPerClassIndex =
       (currentAllowPerClassPage - 1) * itemsPerPage;
     const endAllowPerClassIndex = startAllowPerClassIndex + itemsPerPage;
-
+    // dito
     // For Daily Schedule Pagination and Search
     const {
       filteredData: filteredDailySched,
@@ -821,6 +820,7 @@ export const OtherPoliciesTabContent = forwardRef<
         refNo: item.refNo,
         allowanceCode: item.allowanceCode,
         workShiftCode: item.workShiftCode,
+        classificationCode: item.classificationCode
       }));
     };
 
@@ -2905,7 +2905,9 @@ export const OtherPoliciesTabContent = forwardRef<
             onClick={() => setShowAllowPerClassModal(false)}
             className="fixed inset-0 flex items-center justify-center z-50"
           >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-medium">
@@ -3065,7 +3067,9 @@ export const OtherPoliciesTabContent = forwardRef<
             onClick={() => setShowAllowBracketCodeModal(false)}
             className="fixed inset-0 flex items-center justify-center z-50"
           >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-medium">
@@ -3215,7 +3219,9 @@ export const OtherPoliciesTabContent = forwardRef<
             className="fixed inset-0 flex items-center justify-center z-50"
             onClick={() => setShowAllowBrackByEmpStatModal(false)}
           >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-medium">

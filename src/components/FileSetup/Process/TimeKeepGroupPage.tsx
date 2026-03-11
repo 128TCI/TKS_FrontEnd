@@ -29,12 +29,12 @@ import apiClient from "../../../services/apiClient";
 import { useTablePagination } from "../../../hooks/useTablePagination";
 
 import Swal from "sweetalert2";
-import { group } from "console";
+
 
 interface GroupItem {
   id: number;
   groupCode: string;
-  groupDescription: string; // add this to handle direct GET response
+  groupDescription: string; 
   payrollGroup: string;
   cutOffDateFrom: string;
   cutOffDateTo: string;
@@ -190,19 +190,19 @@ interface LoginPolicyItem {
 
 interface OTBreakItem {
   id: number;
-  regDay: boolean | null;
-  restDay: boolean | null;
-  lHoliday: boolean | null;
-  sHoliday: boolean | null;
-  lHolidayRest: boolean | null;
-  sHolidayRest: boolean | null;
+  regDay: boolean;
+  restDay: boolean;
+  lHoliday: boolean;
+  sHoliday: boolean;
+  lHolidayRest: boolean;
+  sHolidayRest: boolean;
   groupCode: string;
-  doubleHoliday: boolean | null;
-  doubleHolidayRest: boolean | null;
-  s2Holiday: boolean | null;
-  s2HolidayRest: boolean | null;
-  nonWorkHoliday: boolean | null;
-  nonWorkHolidayRest: boolean | null;
+  doubleHoliday: boolean;
+  doubleHolidayRest: boolean;
+  s2Holiday: boolean;
+  s2HolidayRest: boolean;
+  nonWorkHoliday: boolean;
+  nonWorkHolidayRest: boolean;
 }
 
 interface OvertimeFileSetupItem {
@@ -263,6 +263,7 @@ export function TimeKeepGroupPage() {
     useState("");
   const [payrollLocationCode, setPayrollLocationCode] = useState("");
   const [payrollDescription, setPayrollDescription] = useState("");
+
   // Time Keep Cut Off Dates
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -474,13 +475,6 @@ export function TimeKeepGroupPage() {
   const [dayType, setDayType] = useState("");
   const [amount, setAmount] = useState("");
   const [earningCode, setEarningCode] = useState("");
-
-  // Other Policies State
-  const [useDefaultRestday, setUseDefaultRestday] = useState(false);
-  const [restdayWithWorkshift, setRestdayWithWorkshift] = useState(false);
-  const [useTardinessBracket, setUseTardinessBracket] = useState(false);
-  const [computeUndertimeToAbsences, setComputeUndertimeToAbsences] =
-    useState("3.00");
 
   // System Configuration State
   const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] =
@@ -958,7 +952,7 @@ export function TimeKeepGroupPage() {
     return response.data.map((item: any) => ({
       id: item.ID || item.id,
       groupCode: item.groupCode ?? "",
-      description: item.groupDescription ?? item.description ?? "", // handle both
+      description: item.groupDescription ?? "",
       groupDescription: item.groupDescription ?? "",
       payrollGroup: item.payrollGroup ?? "",
       cutOffDateMonth: item.cutOffDateMonth ?? "",
@@ -1055,7 +1049,6 @@ export function TimeKeepGroupPage() {
         return pBool !== cBool;
       }
 
-      // ✅ Normalize ISO datetime strings to comparable time strings (HH:MM)
       const extractTime = (v: any): string | null => {
         if (!v) return null;
         const d = new Date(v);
@@ -1250,7 +1243,7 @@ export function TimeKeepGroupPage() {
 
       // Build payload using the login policy's OWN id, not currentGroupId
       const buildLoginPolicyPayload = (): Partial<LoginPolicyItem> => ({
-        id: currentPolicy.id, // ✅ login policy's own id
+        id: currentPolicy.id, // login policy's own id
         groupCode: tksGroupCode,
         gracePeriod: Number(gracePeriodPerDay),
         gracePeriodIncTard: gracePeriodIncludeTardiness,
@@ -2546,12 +2539,6 @@ export function TimeKeepGroupPage() {
     setCompHolidayWithPaidLeave(false);
     setMinimumNoOfHrsRequiredToCompHol("");
     setCompFirstRestdayHoliday(false);
-
-    // Other Policies
-    setUseDefaultRestday(false);
-    setRestdayWithWorkshift(false);
-    setUseTardinessBracket(false);
-    setComputeUndertimeToAbsences("");
 
     // System Configuration
     setUseTimekeepingSystemConfig(false);
