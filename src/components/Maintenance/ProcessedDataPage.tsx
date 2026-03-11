@@ -168,7 +168,7 @@ export function ProcessedDataPage() {
     const [employeeGroupCode, setEmployeeGroupCode] = useState('');
 
     const [dateFrom,     setDateFrom]       = useState('01/01/2015');
-    const [dateTo,       setDateTo]         = useState('12/31/2025');
+    const [dateTo,       setDateTo]         = useState('12/31/2026');
     const [subTab,       setSubTab]         = useState('No Of Hrs Per Day');
 
     // ── Calendar popup state ──────────────────────────────────────────────────

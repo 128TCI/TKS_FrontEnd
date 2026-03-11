@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Upload, Download, Check, Eye } from 'lucide-react';
-import { DatePickerWithButton } from './DateSetup/DatePickerWithButton';
-import { Footer } from './Footer/Footer';
-import { TKSGroupTable } from './TKSGroupTable';
+import { DatePickerWithButton } from '../components/DateSetup/DatePickerWithButton';
+import { Footer } from '../components/Footer/Footer';
+import { TKSGroupTable } from '../components/TKSGroupTable';
 import { tksGroupData } from '../data/tksGroupData';
 
 export function ImportLogsFromDevice2ShiftsPage() {

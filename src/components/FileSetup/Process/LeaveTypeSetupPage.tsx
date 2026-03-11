@@ -547,9 +547,83 @@ export function LeaveTypeSetupPage() {
 
   const handleSelectChargeable = useCallback((code: string) => {
     setFormData((prev) => ({ ...prev, chargeableTo: code }));
-    setShowSearchModal(false);
-    setSearchModalTerm('');
-  }, []);
+    setShowSearchModal(false); setSearchModalTerm('');
+  };
+
+  // ── Chargeable-To Search Modal ─────────────────────────────────────────────
+  const renderSearchModal = () => (
+    <>
+      {showSearchModal && (
+        <div
+          className="fixed inset-0 bg-transparent flex items-center justify-center z-[100] p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSearchModal(false); }}
+        >
+          <div className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto" style={{ width: '600px' }}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+              <h2 className="text-gray-900 font-semibold text-sm">Search</h2>
+              <button type="button" onClick={() => setShowSearchModal(false)} className="text-gray-600 hover:text-gray-800 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4">
+              <h3 className="text-blue-600 mb-3 font-semibold text-sm">Leave Type</h3>
+              <div className="flex items-center gap-2 mb-3">
+                <label className="text-gray-900 text-xs whitespace-nowrap">Search:</label>
+                <input
+                  type="text"
+                  value={searchModalTerm}
+                  onChange={(e) => setSearchModalTerm(e.target.value)}
+                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="border border-gray-200 rounded overflow-hidden max-h-60 overflow-y-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs text-gray-700">Code</th>
+                      <th className="px-3 py-2 text-left text-xs text-gray-700">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredSearchData.length > 0 ? (
+                      filteredSearchData.map((item) => (
+                        <tr key={item.leaveID} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => handleSelectLeaveType(item.leaveCode)}>
+                          <td className="px-3 py-2 text-sm text-gray-900">{item.leaveCode}</td>
+                          <td className="px-3 py-2 text-sm text-gray-600">{item.leaveDesc}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={2} className="px-4 py-8 text-center text-gray-500 text-sm">No data available</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // ── form fields (compact) ──────────────────────────────────────────────────
+  type BooleanKeys = {
+    [K in keyof typeof defaultForm]: (typeof defaultForm)[K] extends boolean ? K : never;
+  }[keyof typeof defaultForm];
+
+  const checkbox = (key: BooleanKeys, label: string) => (
+    <div className="flex items-center gap-3">
+      <label className="text-gray-700 text-sm w-56 flex-shrink-0">{label} :</label>
+      <input
+        type="checkbox"
+        checked={formData[key] as boolean}
+        onChange={(e) => setFormData((prev) => ({ ...prev, [key]: e.target.checked }))}
+        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      />
+    </div>
+  );
 
   const handleFormChange = useCallback((updated: FormData) => {
     setFormData(updated);

@@ -38,7 +38,7 @@
  *        const fetchEmployees = async () => {
  *            try {
  *                setLoadingEmployees(true);
- *                const response = await apiClient.get('/EmployeeMasterFile');
+ *                const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
  *                const mapped = response.data.map((emp: any) => ({
  *                    empCode: emp.empCode || '',
  *                    name: `${emp.lName}, ${emp.fName} ${emp.mName}`.trim(),
@@ -168,7 +168,7 @@
  *         const fetch = async () => {
  *             setLoading(true);
  *             try {
- *                 const res = await apiClient.get('/EmployeeMasterFile');
+ *                 const res = await apiClient.get('/Maintenance/EmployeeMasterFile');
  *                 setEmployees(res.data.map((e: any) => ({
  *                     empCode: e.empCode,
  *                     name: `${e.lName}, ${e.fName} ${e.mName}`.trim(),
