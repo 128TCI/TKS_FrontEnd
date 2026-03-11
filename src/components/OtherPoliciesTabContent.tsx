@@ -1269,6 +1269,44 @@ export const OtherPoliciesTabContent = forwardRef<
       handleDelete,
     }));
 
+    useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (showTardBrackModal) {
+          setShowTardBrackModal(false);
+        } else if (showUnderTimeBrackModal) {
+          setShowUnderTimeBrackModal(false);
+        } else if (showAccumulateBrackModal) {
+          setShowAccumulateBrackModal(false);
+        } else if (showDailySchedModal) {
+          setShowDailySchedModal(false);
+        } else if (showEarningCodeModal) {
+          setShowEarningCodeModal(false);
+        } else if (showAllowPerClassModal) {
+          setShowAllowPerClassModal(false);
+        } else if (showAllowBracketCodeModal) {
+          setShowAllowBracketCodeModal(false);
+        } else if (showAllowBrackByEmpStatModal) {
+          setShowAllowBrackByEmpStatModal(false);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleEscKey);
+    return () => {
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [
+    showTardBrackModal,
+    showUnderTimeBrackModal,
+    showAccumulateBrackModal,
+    showDailySchedModal,
+    showEarningCodeModal,
+    showAllowPerClassModal,
+    showAllowBracketCodeModal,
+    showAllowBrackByEmpStatModal,
+  ]);
+
     return (
       <div className="space-y-6">
         {/* Group Code and Definition */}
@@ -1749,7 +1787,7 @@ export const OtherPoliciesTabContent = forwardRef<
                     value={calamYearsOfService}
                     onChange={(e) =>
                       isEditMode &&
-                      setCalamYearsOfService(Number(e.target.value))
+                      setCalamYearsOfService(parseFloat(e.target.value))
                     }
                     readOnly={!isEditMode}
                     className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
@@ -1777,7 +1815,7 @@ export const OtherPoliciesTabContent = forwardRef<
                     Allowance Amount
                   </label>
                   <input
-                    type="text"
+                    type="number"
                     value={calamAmount}
                     onChange={(e) =>
                       isEditMode && setCalamAmount(parseFloat(e.target.value))
