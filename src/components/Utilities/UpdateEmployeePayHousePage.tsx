@@ -228,7 +228,7 @@ export function UpdateEmployeePayHousePage() {
       setIsUpdating(true);
       const payload = {
         empCode:  selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        payHouse: payHouse,
+        lineCode: payHouse,
       };
       const res = await apiClient.post('/Utilities/UpdateEmployeesLine', payload);
       if (ApiService.isApiSuccess(res)) {

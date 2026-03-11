@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Check, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
+import { RefreshCw, Check, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box, Save } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
 
@@ -22,16 +23,11 @@ export function ProcessOvertime24HoursPage() {  const [activeTab,          setAc
   const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom,           setDateFrom]           = useState('');
   const [dateTo,             setDateTo]             = useState('');
+  const [overtimeDate,       setOvertimeDate]       = useState('');  
   const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [isUpdating,         setIsUpdating]         = useState(false);
   const itemsPerPage = 10;
-  const [year,          setYear]          = useState('');
-  const [month,         setMonth]         = useState('January');
-  const [noOfTardiness, setNoOfTardiness] = useState('');
-  const [gracePeriod,   setGracePeriod]   = useState('');
-  const [overtimeDate,  setOvertimeDate]  = useState('');
-  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
   const selectedGroups = selectedGroupsMap[activeTab] ?? [];
   const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) =>
@@ -156,21 +152,20 @@ export function ProcessOvertime24HoursPage() {  const [activeTab,          setAc
   const handleSelectAllGroups    = () => setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
-  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); setDateFrom(''); setDateTo('');     setYear(''); setMonth('January'); setNoOfTardiness(''); setGracePeriod(''); setOvertimeDate(''); };
-  const handleAction = async () => {
+  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); setOvertimeDate(''); };
+  const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
     if (!dateFrom || !dateTo)      { await showErrorModal('Please select Date From and Date To.'); return; }
     if (!overtimeDate)             { await showErrorModal('Please select Overtime Date.'); return; }
     try {
       setIsUpdating(true);
       const payload = {
-        empCodes:  selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        DateFrom:  new Date(dateFrom).toISOString(),
-        DateTo:    new Date(dateTo).toISOString(),
-        OTDate:    new Date(overtimeDate).toISOString(),
-        year, month, noOfTardiness, gracePeriod,
+        empCode: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
+        otDate:   toISO(overtimeDate),
       };
-      const res = await apiClient.post('/Utilities/ProcessOvertimeCutoff_Update', payload);
+      const res = await apiClient.post('/Utilities/ProcessOvertime24Hours_Update', payload);
       if (ApiService.isApiSuccess(res)) { await showSuccessModal('Process overtime 24hours rule successfully updated.'); resetForm(); }
     } catch { await showErrorModal('Failed to update records'); }
     finally { setIsUpdating(false); }
@@ -288,46 +283,34 @@ export function ProcessOvertime24HoursPage() {  const [activeTab,          setAc
                     ))}
                   </div>
                 </div>                
+                {/* Date Range */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Year:</label>
-                      <input type="text" value={year} onChange={e => setYear(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Month:</label>
-                      <select value={month} onChange={e => setMonth(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20 whitespace-nowrap">No. Of Tardiness:</label>
-                      <input type="text" value={noOfTardiness} onChange={e => setNoOfTardiness(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Grace Period:</label>
-                      <input type="text" value={gracePeriod} onChange={e => setGracePeriod(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                    </div>
-                  </div>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-20">Date From:</label>
-                    <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                    <label className="text-sm text-gray-700 w-32">Date From:</label>
+                    <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
                     <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-20">Date To:</label>
-                    <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                    <label className="text-sm text-gray-700 w-32">Date To:</label>
+                    <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
                     <CalendarPopover date={dateTo} onChange={setDateTo} />
                   </div>
+                </div>
+
+                {/* Overtime Date + Update */}
+                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-20">Overtime Date:</label>
-                    <input type="text" value={overtimeDate} onChange={e => setOvertimeDate(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                    <label className="text-sm text-gray-700 w-32">Overtime Date:</label>
+                    <input type="text" value={overtimeDate} onChange={e => setOvertimeDate(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
                     <CalendarPopover date={overtimeDate} onChange={setOvertimeDate} />
                   </div>
                   <div className="flex justify-end pt-4 border-t border-gray-200">
-                    <button onClick={handleAction} disabled={isUpdating}
-                      className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                      <RefreshCw className="w-4 h-4" />{isUpdating ? 'Updating…' : 'Update'}
+                    <button onClick={handleUpdate} disabled={isUpdating}
+                      className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Save className="w-4 h-4" />{isUpdating ? 'Updating…' : 'Update'}
                     </button>
                   </div>
                 </div>

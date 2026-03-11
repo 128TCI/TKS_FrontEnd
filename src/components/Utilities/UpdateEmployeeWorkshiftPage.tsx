@@ -147,7 +147,7 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length===filteredEmployees.length?[]:filteredEmployees.map(e=>e.id));
 
   const resetForm = () => { setSelectedGroupsMap({...EMPTY_SELECTION}); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); setWorkshiftType('fixed'); setWithDateRange(false); setDailySchedule(''); setWorkshift(''); setDeleteExisting(false); };
-  const handleAction = async () => {
+  const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
     if (workshiftType==='fixed'    && !dailySchedule) { await showErrorModal('Daily Time Schedule should not be empty.'); return; }
     if (workshiftType==='variable' && !workshift)     { await showErrorModal('Workshift should not be empty.'); return; }
@@ -309,7 +309,7 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
                       <input type="checkbox" checked={deleteExisting} onChange={e=>setDeleteExisting(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
                       <span className="text-sm text-gray-700">Delete Existing Workshift</span>
                     </label>
-                    <button onClick={handleAction} disabled={isUpdating} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
+                    <button onClick={handleUpdate} disabled={isUpdating} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
                       <RefreshCw className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
                     </button>
                   </div>

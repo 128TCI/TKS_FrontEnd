@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Users, Building2, Briefcase, CalendarClock, Wallet, Grid } from 'lucide-react';
+import { RefreshCw, Clock, Check, Users, Building2, Briefcase, CalendarClock, Wallet, Grid } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
@@ -17,7 +18,8 @@ const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
 const EMPTY_SELECTION: Record<TabName, number[]> = {
   'TK Group': [], 'Branch': [], 'Department': [], 'Group Schedule': [], 'Pay House': [], 'Section': [],
 };
-export function UpdateEmployeeOvertimeApplicationPage() {  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
+export function UpdateEmployeeOvertimeApplicationPage() {
+  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
   const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom,           setDateFrom]           = useState('');
   const [dateTo,             setDateTo]             = useState('');
@@ -133,19 +135,19 @@ export function UpdateEmployeeOvertimeApplicationPage() {  const [activeTab,    
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length===filteredEmployees.length?[]:filteredEmployees.map(e=>e.id));
 
   const resetForm = () => { setSelectedGroupsMap({...EMPTY_SELECTION}); setSelectedEmployees([]); setAllowedOTHours(''); setDate(''); setExcludeEmptRestDay(false); };
-  const handleAction = async () => {
+  const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
     if (!date)           { await showErrorModal('Please select Date.'); return; }
     if (!allowedOTHours) { await showErrorModal('Approved OT Hours cannot be empty.'); return; }
     try {
       setIsUpdating(true);
       const payload = {
-        EmpCode:           selectedEmployees.map(id=>employeeItems.find(e=>e.id===id)?.code??String(id)),
-        date:              new Date(date).toISOString(),
-        OTHours:           allowedOTHours ? parseFloat(allowedOTHours) : 0.00,
-        excludeEmptRestDay,
+        empCode: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        date:              toISO(date),
+        approvedOTHours:   allowedOTHours ? parseFloat(allowedOTHours) : 0.00,
+        excludeEmptRestDay: excludeEmptRestDay,
       };
-      const res = await apiClient.post('/Utilities/UpdateStatus_byDate', payload);
+      const res = await apiClient.post('/Utilities/UpdateEmployeeOTApplication', payload);
       if (ApiService.isApiSuccess(res)) { await showSuccessModal('Successfully updated Employees Overtime Application.'); resetForm(); }
       else { await showErrorModal('Failed to update Employees Overtime Application.'); }
     } catch { await showErrorModal('Failed to update records'); }
@@ -170,9 +172,44 @@ export function UpdateEmployeeOvertimeApplicationPage() {  const [activeTab,    
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
-            <h1 className="text-white">Update Employee Overtime Application</h1>
+            <h1 className="text-white">Update Overtime Application</h1>
           </div>
+          
           <div className="bg-white rounded-b-lg shadow-lg p-6">
+
+            {/* Information Frame */}
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-3">
+                    Update employee overtime application records. Select groups and employees, then set the allowed OT hours and date.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Select by TK Group, Branch, or Department</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Filter by employee status</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Set allowed OT hours and date</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Batch update overtime application records</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabs */}
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
               {TABS.map(tab => (
                 <button key={tab.name} onClick={()=>setActiveTab(tab.name)}
@@ -242,7 +279,9 @@ export function UpdateEmployeeOvertimeApplicationPage() {  const [activeTab,    
                       </label>
                     ))}
                   </div>
-                </div>                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
+                </div>
+
+                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
                   <div className="flex items-center gap-6 flex-wrap">
                     <div className="flex items-center gap-3">
                       <label className="text-sm text-gray-700">Allowed OT Hours:</label>
@@ -259,7 +298,7 @@ export function UpdateEmployeeOvertimeApplicationPage() {  const [activeTab,    
                     <span className="text-sm text-gray-700">Exclude Empty Rest Day</span>
                   </label>
                   <div className="flex justify-end pt-4 border-t border-gray-200">
-                    <button onClick={handleAction} disabled={isUpdating} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={handleUpdate} disabled={isUpdating} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                       <RefreshCw className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
                     </button>
                   </div>

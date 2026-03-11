@@ -244,11 +244,11 @@ export function UpdateAllowancePerBracketPage() {
       setIsUpdating(true);
       const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        DateFrom: toISO(dateFrom),
-        DateTo:   toISO(dateTo),
+        empCode: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
       };
-      const res = await apiClient.post('/Utilities/ApplyOTAllowances_Update', payload);
+      const res = await apiClient.post('/Utilities/UpdateAllowancePerBracket', payload);
       if (ApiService.isApiSuccess(res)) {
         await showSuccessModal('Allowance Per Bracket successfully updated.');
         setSelectedGroupsMap({ ...EMPTY_SELECTION });

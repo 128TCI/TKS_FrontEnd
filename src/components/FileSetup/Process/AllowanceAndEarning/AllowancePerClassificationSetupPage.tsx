@@ -4,6 +4,7 @@ import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
 import auditTrail from '../../../../services/auditTrail';
 import { decryptData } from '../../../../services/encryptionService';
+import Swal from 'sweetalert2';
 
 const formName = 'Allowance Per Classification SetUp';
 
@@ -257,95 +258,136 @@ export function AllowancePerClassificationSetupPage() {
     };
 
     const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this entry?')) {
-        try {
-        setLoading(true);
-        const response = await apiClient.delete(`${API_BASE_URL}/${id}`);
-        if (response.status === 200 || response.status === 204) {
-            try {
-            await auditTrail.log({
-                accessType: 'Delete',
-                trans: `Deleted allowance entry ID ${id}`,
-                messages: `Deleted entry ID: ${id}`,
-                formName: formName,
-            });
-            } catch (err) {
-            console.error('Audit trail failed:', err);
-            }
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: 'Do you want to delete this entry?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel',
+        });
 
-            await fetchAllowancePerClassification();
-            alert('Entry deleted successfully');
+        if (result.isConfirmed) {
+            try {
+                setLoading(true);
+                const response = await apiClient.delete(`${API_BASE_URL}/${id}`);
+                if (response.status === 200 || response.status === 204) {
+                    try {
+                        await auditTrail.log({
+                            accessType: 'Delete',
+                            trans: `Deleted allowance entry ID ${id}`,
+                            messages: `Deleted entry ID: ${id}`,
+                            formName: formName,
+                        });
+                    } catch (err) {
+                        console.error('Audit trail failed:', err);
+                    }
+
+                    await fetchAllowancePerClassification();
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: 'Entry deleted successfully.',
+                        icon: 'success',
+                        confirmButtonColor: '#2563eb',
+                    });
+                }
+            } catch (err: any) {
+                setError(err.message || 'Failed to delete entry');
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Failed to delete entry.',
+                    icon: 'error',
+                    confirmButtonColor: '#2563eb',
+                });
+            } finally {
+                setLoading(false);
+            }
         }
-        } catch (err: any) {
-        setError(err.message || 'Failed to delete entry');
-        alert('Failed to delete entry');
-        } finally {
-        setLoading(false);
-        }
-    }
     };
 
     const handleSubmitCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-        setLoading(true);
-        const payload = { ...formData, classificationCode: formData.classificationCode || null };
-        const response = await apiClient.post(API_BASE_URL, payload);
-        if (response.status === 200 || response.status === 201) {
+        e.preventDefault();
         try {
-            await auditTrail.log({
-            accessType: 'Add',
-            trans: `Created allowance entry ${payload.classificationCode ?? 'N/A'}`,
-            messages: `Created entry details: ${JSON.stringify(payload)}`,
-            formName: formName,
-            });
-        } catch (err) {
-            console.error('Audit trail failed:', err);
-        }
+            setLoading(true);
+            const payload = { ...formData, classificationCode: formData.classificationCode || null };
+            const response = await apiClient.post(API_BASE_URL, payload);
+            if (response.status === 200 || response.status === 201) {
+                try {
+                    await auditTrail.log({
+                        accessType: 'Add',
+                        trans: `Created allowance entry ${payload.classificationCode ?? 'N/A'}`,
+                        messages: `Created entry details: ${JSON.stringify(payload)}`,
+                        formName: formName,
+                    });
+                } catch (err) {
+                    console.error('Audit trail failed:', err);
+                }
 
-        await fetchAllowancePerClassification();
-        setShowCreateModal(false);
-        alert('Entry created successfully');
+                await fetchAllowancePerClassification();
+                setShowCreateModal(false);
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Entry created successfully.',
+                    icon: 'success',
+                    confirmButtonColor: '#2563eb',
+                });
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to create entry');
+            Swal.fire({
+                title: 'Error!',
+                text: 'Failed to create entry.',
+                icon: 'error',
+                confirmButtonColor: '#2563eb',
+            });
+        } finally {
+            setLoading(false);
         }
-    } catch (err: any) {
-        setError(err.message || 'Failed to create entry');
-        alert('Failed to create entry');
-    } finally {
-        setLoading(false);
-    }
     };
 
     const handleSubmitEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingItem) return;
+        e.preventDefault();
+        if (!editingItem) return;
 
-    try {
-        setLoading(true);
-        const payload = { ...formData, classificationCode: formData.classificationCode || null };
-        const response = await apiClient.put(`${API_BASE_URL}/${editingItem.id}`, payload);
-        if (response.status === 200) {
         try {
-            await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Updated allowance entry ID ${editingItem.id}`,
-            messages: `Updated entry details: ${JSON.stringify(payload)}`,
-            formName: formName,
-            });
-        } catch (err) {
-            console.error('Audit trail failed:', err);
-        }
+            setLoading(true);
+            const payload = { ...formData, classificationCode: formData.classificationCode || null };
+            const response = await apiClient.put(`${API_BASE_URL}/${editingItem.id}`, payload);
+            if (response.status === 200) {
+                try {
+                    await auditTrail.log({
+                        accessType: 'Edit',
+                        trans: `Updated allowance entry ID ${editingItem.id}`,
+                        messages: `Updated entry details: ${JSON.stringify(payload)}`,
+                        formName: formName,
+                    });
+                } catch (err) {
+                    console.error('Audit trail failed:', err);
+                }
 
-        await fetchAllowancePerClassification();
-        setShowEditModal(false);
-        setEditingItem(null);
-        alert('Entry updated successfully');
+                await fetchAllowancePerClassification();
+                setShowEditModal(false);
+                setEditingItem(null);
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Entry updated successfully.',
+                    icon: 'success',
+                    confirmButtonColor: '#2563eb',
+                });
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to update entry');
+            Swal.fire({
+                title: 'Error!',
+                text: 'Failed to update entry.',
+                icon: 'error',
+                confirmButtonColor: '#2563eb',
+            });
+        } finally {
+            setLoading(false);
         }
-    } catch (err: any) {
-        setError(err.message || 'Failed to update entry');
-        alert('Failed to update entry');
-    } finally {
-        setLoading(false);
-    }
     };
 
     const handleCloseModal = () => {

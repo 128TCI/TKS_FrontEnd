@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
@@ -159,9 +160,10 @@ export function DeductTardinessToOvertimePage() {
     try {
       setIsUpdating(true);
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        DateFrom: new Date(dateFrom).toISOString(),
-        DateTo:   new Date(dateTo).toISOString(),
+       dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
+        empCode: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+
       };
       const res = await apiClient.post('/Utilities/DeductTardinessToOvertime_DeleteOTRegday', payload);
       if (ApiService.isApiSuccess(res)) { await showSuccessModal('Tardiness to Overtime successfully updated.'); resetForm(); }

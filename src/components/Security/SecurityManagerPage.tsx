@@ -1111,6 +1111,16 @@ const handleEditUser = (user: User) => {
                         <h3 className="text-gray-900 mb-3">Forms</h3>
                         <div className="bg-white border border-gray-200 rounded-lg p-3 h-96 overflow-y-auto">
                           <div className="space-y-2">
+                            {/* Select All */}
+                            <label className="flex items-center gap-2 hover:bg-blue-50 p-2 rounded cursor-pointer border-b border-gray-200 mb-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedForms.length === forms.length && forms.length > 0}
+                                onChange={e => setSelectedForms(e.target.checked ? forms.map(f => f.formName) : [])}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span className="text-sm font-small text-gray-900">Select All</span>
+                            </label>
                             {forms.map((form) => (
                               <label key={form.id} className="flex items-center gap-2 hover:bg-gray-50 p-1 rounded cursor-pointer">
                                 <input type="checkbox" checked={selectedForms.includes(form.formName)}

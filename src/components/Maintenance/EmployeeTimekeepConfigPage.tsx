@@ -36,6 +36,8 @@ import { ClassificationVariableModal } from '../Modals/ClassificationVariableMod
 import { DailyScheduleSearchModal } from '../Modals/DailyScheduleSearchModal';
 import { WorkshiftCodeSearchModal } from '../Modals/WorkshiftCodeSearchModal';
 import { ClassificationCodeSearchModal } from '../Modals/ClassificationCodeSearchModal';
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
+
 
 
 type TabType = 'basic-config' | 'exemptions' | 'device-code' | 'rest-day' | 'workshift' | 'classification' | 'leave-applications' | 'overtime-applications' | 'contractual' | 'suspension';
@@ -505,22 +507,19 @@ const [overtimeIsOTBeforeShiftNextDay, setOvertimeIsOTBeforeShiftNextDay] = useS
   };
 
   // Fetch Employees for Search Modal
-  const fetchEmployees = async () => {
-    setEmployeeLoading(true);
-    setEmployeeError('');
-    try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-      if (response.status === 200 && response.data) {
-        setEmployees(response.data);
-      }
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-      setEmployeeError(errorMsg);
-    } finally {
-      setEmployeeLoading(false);
-    }
-  };
-
+const fetchEmployees = async () => {
+  setEmployeeLoading(true);
+  setEmployeeError('');
+  try {
+    const { employees } = await fetchEmployeesService();
+    setEmployees(employees);
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+    setEmployeeError(errorMsg);
+  } finally {
+    setEmployeeLoading(false);
+  }
+};
   // Fetch Workshift Codes
   const fetchWorkshiftCodes = async () => {
     setWorkshiftCodesLoading(true);
