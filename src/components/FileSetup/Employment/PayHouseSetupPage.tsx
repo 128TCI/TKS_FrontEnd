@@ -7,8 +7,10 @@ import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Pay House SetUp';
+
+// Form Name
+const formName = 'Pay House SetUp';
+
 export function PayHouseSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -67,7 +69,6 @@ export function PayHouseSetupPage() {
         (p) => decryptData(p.formName) === "LineSetUp",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -95,7 +96,6 @@ export function PayHouseSetupPage() {
   const [loadingPayHouses, setLoadingPayHouses] = useState(false);
   const [payHouseError, setPayHouseError] = useState("");
 
-  // Fetch pay house data from API
   useEffect(() => {
     fetchPayHouseData();
   }, []);
@@ -106,7 +106,6 @@ export function PayHouseSetupPage() {
     try {
       const response = await apiClient.get("/Fs/Employment/PayHouseSetUp");
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((payHouse: any) => ({
           id: payHouse.lineID || "",
           code: payHouse.lineCode || "",
@@ -130,7 +129,6 @@ export function PayHouseSetupPage() {
     }
   };
 
-  // Fetch employee data from API
   useEffect(() => {
     fetchEmployeeData();
   }, []);
@@ -141,7 +139,6 @@ export function PayHouseSetupPage() {
     try {
       const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((emp: any) => ({
           empCode: emp.empCode || emp.code || "",
           name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
@@ -161,7 +158,6 @@ export function PayHouseSetupPage() {
     }
   };
 
-  // Fetch device data from API
   useEffect(() => {
     fetchDeviceData();
   }, []);
@@ -174,7 +170,6 @@ export function PayHouseSetupPage() {
         "/Fs/Process/Device/BorrowedDeviceName",
       );
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((device: any) => ({
           id: device.id || "",
           code: device.code || "",
@@ -194,7 +189,6 @@ export function PayHouseSetupPage() {
     }
   };
 
-  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -211,11 +205,66 @@ export function PayHouseSetupPage() {
     };
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedPayHouseIndex(null);
     setPayHouseId(null);
-    // Clear form
     setCode("");
     setCodeError("");
     setDescription("");
@@ -241,6 +290,11 @@ export function PayHouseSetupPage() {
   };
 
   const handleDelete = async (payHouse: any) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
@@ -252,36 +306,36 @@ export function PayHouseSetupPage() {
       cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/Employment/PayHouseSetUp/${payHouse.id}`);
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted pay house ${payHouse.code}`,
-            messages: `Pay house deleted: ${payHouse.code} - ${payHouse.lineDesc}`,
-            formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Pay house deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the pay house list
-        await fetchPayHouseData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete pay house";
-        await Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: errorMsg,
-        });
-        console.error("Error deleting pay house:", error);
-      }
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/Employment/PayHouseSetUp/${payHouse.id}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted pay house ${payHouse.code}`,
+        messages: `Pay house deleted: ${payHouse.code} - ${payHouse.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Pay house deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchPayHouseData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete pay house";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting pay house:", error);
     }
   };
 
@@ -295,7 +349,7 @@ export function PayHouseSetupPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate code - must not be empty and must be max 10 characters
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!code.trim() || code.length > 10) {
       await Swal.fire({
         icon: "warning",
@@ -305,12 +359,13 @@ export function PayHouseSetupPage() {
       return;
     }
 
-    // Check for duplicate code (only when creating new or changing code during edit)
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
     const isDuplicate = payHouseList.some((payHouse, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedPayHouseIndex === index) {
-        return false;
-      }
+      if (isEditMode && selectedPayHouseIndex === index) return false;
       return payHouse.code.toLowerCase() === code.trim().toLowerCase();
     });
 
@@ -323,6 +378,7 @@ export function PayHouseSetupPage() {
       return;
     }
 
+    // ── 4. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -336,16 +392,15 @@ export function PayHouseSetupPage() {
       };
 
       if (isEditMode && payHouseId) {
-        // Update existing record via PUT
         await apiClient.put(
           `/Fs/Employment/PayHouseSetUp/${payHouseId}`,
           payload,
         );
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited pay house ${payload.lineCode}`,
-            messages: `Pay house updated: ${payload.lineCode} - ${payload.lineDesc}`,
-            formName,
+          accessType: 'Edit',
+          trans: `Edited pay house ${payload.lineCode}`,
+          messages: `Pay house updated: ${payload.lineCode} - ${payload.lineDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -354,16 +409,14 @@ export function PayHouseSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the pay house list
         await fetchPayHouseData();
       } else {
-        // Create new record via POST
         await apiClient.post("/Fs/Employment/PayHouseSetUp", payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added pay house ${payload.lineCode}`,
-            messages: `Pay house created: ${payload.lineCode} - ${payload.lineDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added pay house ${payload.lineCode}`,
+          messages: `Pay house created: ${payload.lineCode} - ${payload.lineDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -372,11 +425,9 @@ export function PayHouseSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the pay house list
         await fetchPayHouseData();
       }
 
-      // Close modal and reset form
       setShowCreateModal(false);
       setCode("");
       setCodeError("");
@@ -391,11 +442,7 @@ export function PayHouseSetupPage() {
     } catch (error: any) {
       const errorMsg =
         error.response?.data?.message || error.message || "An error occurred";
-      await Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: "error", title: "Error", text: errorMsg });
       console.error("Error submitting form:", error);
     } finally {
       setSubmitting(false);
@@ -428,24 +475,19 @@ export function PayHouseSetupPage() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedPayHouses = filteredPayHouses.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Pay House Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -661,16 +703,13 @@ export function PayHouseSetupPage() {
             {/* Create/Edit Modal */}
             {showCreateModal && (
               <>
-                {/* Modal Backdrop */}
                 <div
                   className="fixed inset-0 bg-black/30 z-10"
                   onClick={() => setShowCreateModal(false)}
                 ></div>
 
-                {/* Modal Dialog */}
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                    {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                       <h2 className="text-gray-800">
                         {isEditMode ? "Edit Pay House" : "Create New"}
@@ -683,11 +722,9 @@ export function PayHouseSetupPage() {
                       </button>
                     </div>
 
-                    {/* Modal Content */}
                     <div className="p-4">
                       <h3 className="text-blue-600 mb-3">Pay House Setup</h3>
 
-                      {/* Form Fields */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">
@@ -801,7 +838,6 @@ export function PayHouseSetupPage() {
                         </div>
                       </div>
 
-                      {/* Modal Actions */}
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
@@ -828,7 +864,6 @@ export function PayHouseSetupPage() {
               </>
             )}
 
-            {/* Employee Search Modal - Reusable Component */}
             <EmployeeSearchModal
               isOpen={showHeadModal}
               onClose={() => setShowHeadModal(false)}
@@ -838,7 +873,6 @@ export function PayHouseSetupPage() {
               error={employeeError}
             />
 
-            {/* Device Search Modal - Reusable Component */}
             <DeviceSearchModal
               isOpen={showDeviceNameModal}
               onClose={() => setShowDeviceNameModal(false)}
@@ -851,7 +885,6 @@ export function PayHouseSetupPage() {
         </div>
       </div>
 
-      {/* Footer */}
       <Footer />
     </div>
   );

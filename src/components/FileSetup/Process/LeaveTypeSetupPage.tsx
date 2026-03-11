@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
 import apiClient from '../../../services/apiClient';
@@ -29,7 +29,9 @@ interface LeaveType {
   exemptFromAllowDeduction: boolean;
 }
 
-const defaultForm: Omit<LeaveType, 'leaveID'> = {
+type FormData = Omit<LeaveType, 'leaveID'>;
+
+const defaultForm: FormData = {
   leaveCode: '',
   leaveDesc: '',
   chargeableTo: '',
@@ -48,6 +50,260 @@ const defaultForm: Omit<LeaveType, 'leaveID'> = {
   exemptFromAllowDeduction: false,
 };
 
+// ─── Chargeable-To Search Modal ───────────────────────────────────────────────
+interface SearchModalProps {
+  show: boolean;
+  onClose: () => void;
+  searchTerm: string;
+  onSearchChange: (v: string) => void;
+  data: LeaveType[];
+  onSelect: (code: string) => void;
+}
+
+const ChargeableSearchModal = memo(function ChargeableSearchModal({
+  show, onClose, searchTerm, onSearchChange, data, onSelect,
+}: SearchModalProps) {
+  if (!show) return null;
+  const filtered = data.filter(
+    (item) =>
+      item.leaveCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.leaveDesc.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+  return (
+    <div
+      className="fixed inset-0 bg-transparent flex items-center justify-center z-[100] p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto" style={{ width: '600px' }}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+          <h2 className="text-gray-900 font-semibold text-sm">Search</h2>
+          <button type="button" onClick={onClose} className="text-gray-600 hover:text-gray-800 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-4">
+          <h3 className="text-blue-600 mb-3 font-semibold text-sm">Leave Type</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <label className="text-gray-900 text-xs whitespace-nowrap">Search:</label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="flex-1 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              autoFocus
+            />
+          </div>
+          <div className="border border-gray-200 rounded overflow-hidden max-h-60 overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs text-gray-700">Code</th>
+                  <th className="px-3 py-2 text-left text-xs text-gray-700">Description</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filtered.length > 0 ? (
+                  filtered.map((item) => (
+                    <tr
+                      key={item.leaveID}
+                      className="hover:bg-blue-50 transition-colors cursor-pointer"
+                      onClick={() => onSelect(item.leaveCode)}
+                    >
+                      <td className="px-3 py-2 text-sm text-gray-900">{item.leaveCode}</td>
+                      <td className="px-3 py-2 text-sm text-gray-600">{item.leaveDesc}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={2} className="px-4 py-8 text-center text-gray-500 text-sm">No data available</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ─── Form Fields Component ────────────────────────────────────────────────────
+interface FormFieldsProps {
+  formData: FormData;
+  onChange: (updated: FormData) => void;
+  onOpenSearch: () => void;
+}
+
+const LeaveTypeFormFields = memo(function LeaveTypeFormFields({
+  formData, onChange, onOpenSearch,
+}: FormFieldsProps) {
+  const set = (key: keyof FormData, value: any) =>
+    onChange({ ...formData, [key]: value });
+
+  const checkboxRow = (key: keyof FormData, label: string) => (
+    <div key={key} className="flex items-center gap-3">
+      <label className="text-gray-700 text-sm w-56 flex-shrink-0">{label} :</label>
+      <input
+        type="checkbox"
+        checked={formData[key] as boolean}
+        onChange={(e) => set(key, e.target.checked)}
+        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      />
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Code :</label>
+        <input
+          type="text"
+          value={formData.leaveCode}
+          onChange={(e) => set('leaveCode', e.target.value)}
+          maxLength={10}
+          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          required
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Description :</label>
+        <input
+          type="text"
+          value={formData.leaveDesc}
+          onChange={(e) => set('leaveDesc', e.target.value)}
+          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Chargeable To :</label>
+        <div className="flex-1 flex items-center gap-2">
+          <input
+            type="text"
+            value={formData.chargeableTo}
+            onChange={(e) => set('chargeableTo', e.target.value)}
+            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            placeholder="Code"
+          />
+          <button type="button" onClick={onOpenSearch} className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+            <Search className="w-4 h-4" />
+          </button>
+          <button type="button" onClick={() => set('chargeableTo', '')} className="px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">With Pay :</label>
+        <input
+          type="text"
+          value={formData.withPay}
+          onChange={(e) => set('withPay', e.target.value)}
+          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          placeholder="e.g. Y / N"
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Previous Year Leave Code :</label>
+        <input
+          type="text"
+          value={formData.prevYrLvCode}
+          onChange={(e) => set('prevYrLvCode', e.target.value)}
+          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+      </div>
+
+      {checkboxRow('subTypeRequired', 'Sub-Type Required')}
+      {checkboxRow('basedOnTenure', 'Based on Tenure')}
+      {checkboxRow('withDateDuration', 'With Date Duration')}
+      {checkboxRow('noBalance', 'No Balance')}
+      {checkboxRow('requiredAdvanceFiling', 'Required Advanced Filing')}
+      {checkboxRow('exemptFromAllowDeduction', 'Exempted From Allowance Deduction')}
+      {checkboxRow('legalFileAsLeave', 'Legal Holiday Filed As Leave')}
+      {checkboxRow('sphFileAsLeave', 'Special Holiday Filed As Leave')}
+      {checkboxRow('sph2FileAsLeave', 'Special Holiday 2 Filed As Leave')}
+      {checkboxRow('dbleLegalFileAsLeave', 'Double Legal Holiday Filed As Leave')}
+      {checkboxRow('nwhFileAsLeave', 'Non-Working Holiday Filed As Leave')}
+    </div>
+  );
+});
+
+// ─── Modal Shell ──────────────────────────────────────────────────────────────
+interface ModalShellProps {
+  title: string;
+  onSubmit: (e: React.FormEvent) => void;
+  onClose: () => void;
+  submitLabel: string;
+  submitting: boolean;
+  formData: FormData;
+  onFormChange: (updated: FormData) => void;
+  onOpenSearch: () => void;
+  leaveTypes: LeaveType[];
+  showSearch: boolean;
+  onCloseSearch: () => void;
+  searchModalTerm: string;
+  onSearchModalTermChange: (v: string) => void;
+  onSelectChargeable: (code: string) => void;
+}
+
+const ModalShell = memo(function ModalShell({
+  title, onSubmit, onClose, submitLabel, submitting,
+  formData, onFormChange, onOpenSearch,
+  leaveTypes, showSearch, onCloseSearch,
+  searchModalTerm, onSearchModalTermChange, onSelectChargeable,
+}: ModalShellProps) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto" style={{ width: '600px' }}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-xl sticky top-0 z-10">
+          <h2 className="text-gray-900 font-semibold text-sm">{title}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="p-5">
+          <h3 className="text-blue-600 mb-3 font-semibold text-sm">Leave Type Setup</h3>
+          <LeaveTypeFormFields
+            formData={formData}
+            onChange={onFormChange}
+            onOpenSearch={onOpenSearch}
+          />
+          <div className="flex gap-3 mt-5 pt-4 border-t border-gray-200">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Saving...' : submitLabel}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-5 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Back to List
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <ChargeableSearchModal
+        show={showSearch}
+        onClose={onCloseSearch}
+        searchTerm={searchModalTerm}
+        onSearchChange={onSearchModalTermChange}
+        data={leaveTypes}
+        onSelect={onSelectChargeable}
+      />
+    </div>
+  );
+});
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export function LeaveTypeSetupPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,7 +314,7 @@ export function LeaveTypeSetupPage() {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchModalTerm, setSearchModalTerm] = useState('');
 
-  const [formData, setFormData] = useState<Omit<LeaveType, 'leaveID'>>(defaultForm);
+  const [formData, setFormData] = useState<FormData>(defaultForm);
   const [editingItem, setEditingItem] = useState<LeaveType | null>(null);
 
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -117,24 +373,47 @@ export function LeaveTypeSetupPage() {
     return () => document.removeEventListener('keydown', handleEscKey);
   }, [showSearchModal, showCreateModal, showEditModal]);
 
+  // ─── Company Info Validation (Payroll Path only per C# backend) ──────────────
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get('/Fs/System/CompanyInformation');
+      const companyInfo = Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Company Information is not properly set.' });
+        return false;
+      }
+
+      const payrollPath = (companyInfo.payrollPath ?? '').trim();
+      if (payrollPath !== '') {
+        await Swal.fire({ icon: 'error', title: 'Not Allowed', text: 'You are connected to Payroll. you are not allowed to do any transaction for this setup.' });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to retrieve company information.' });
+      return false;
+    }
+  };
+
   const filteredData = leaveTypes.filter((item) =>
     item.leaveCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.leaveDesc.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.chargeableTo ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+    (item.chargeableTo ?? '').toLowerCase().includes(searchTerm.toLowerCase()),
   );
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
-  const filteredSearchData = leaveTypes.filter((item) =>
-    item.leaveCode.toLowerCase().includes(searchModalTerm.toLowerCase()) ||
-    item.leaveDesc.toLowerCase().includes(searchModalTerm.toLowerCase())
-  );
 
   useEffect(() => { setCurrentPage(1); }, [searchTerm]);
 
-  const handleCreateNew = () => { setFormData(defaultForm); setShowCreateModal(true); };
+  const handleCreateNew = useCallback(() => {
+    setFormData(defaultForm);
+    setShowCreateModal(true);
+  }, []);
 
-  const handleEdit = (item: LeaveType) => {
+  const handleEdit = useCallback((item: LeaveType) => {
     setEditingItem(item);
     setFormData({
       leaveCode: item.leaveCode, leaveDesc: item.leaveDesc, chargeableTo: item.chargeableTo,
@@ -146,34 +425,57 @@ export function LeaveTypeSetupPage() {
       requiredAdvanceFiling: item.requiredAdvanceFiling, exemptFromAllowDeduction: item.exemptFromAllowDeduction,
     });
     setShowEditModal(true);
-  };
+  }, []);
 
   const handleDelete = async (item: LeaveType) => {
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
     const confirmed = await Swal.fire({
       icon: 'warning', title: 'Confirm Delete',
       text: `Are you sure you want to delete leave type "${item.leaveDesc}"?`,
       showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
       confirmButtonText: 'Delete', cancelButtonText: 'Cancel',
     });
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`${API_BASE}/${item.leaveID}`);
-        await auditTrail.log({ accessType: 'Delete', trans: `Deleted leave type "${item.leaveDesc}"`, messages: `Leave type "${item.leaveDesc}" removed`, formName });
-        await Swal.fire({ icon: 'success', title: 'Success', text: 'Leave type deleted successfully.', timer: 2000, showConfirmButton: false });
-        await fetchLeaveTypes();
-      } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete';
-        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-      }
+
+    if (!confirmed.isConfirmed) return;
+
+    try {
+      await apiClient.delete(`${API_BASE}/${item.leaveID}`);
+      await auditTrail.log({ accessType: 'Delete', trans: `Deleted leave type "${item.leaveDesc}"`, messages: `Leave type "${item.leaveDesc}" removed`, formName });
+      await Swal.fire({ icon: 'success', title: 'Success', text: 'Leave type deleted successfully.', timer: 2000, showConfirmButton: false });
+      await fetchLeaveTypes();
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete';
+      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
     }
   };
 
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.leaveCode) {
+    if (!formData.leaveCode.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a code.' });
       return;
     }
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    const isDuplicateCode = leaveTypes.some(
+      (lt) => lt.leaveCode.trim().toUpperCase() === formData.leaveCode.trim().toUpperCase(),
+    );
+    if (isDuplicateCode) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      return;
+    }
+
+    const isDuplicateDesc = leaveTypes.some(
+      (lt) => lt.leaveDesc.trim().toUpperCase() === formData.leaveDesc.trim().toUpperCase(),
+    );
+    if (isDuplicateDesc) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
+      return;
+    }
+
     setSubmitting(true);
     try {
       await apiClient.post(API_BASE, { leaveID: 0, ...formData });
@@ -192,10 +494,29 @@ export function LeaveTypeSetupPage() {
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
-    if (!formData.leaveCode) {
+    if (!formData.leaveCode.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a code.' });
       return;
     }
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    const isDuplicateCode = leaveTypes.some(
+      (lt) => lt.leaveID !== editingItem.leaveID && lt.leaveCode.trim().toUpperCase() === formData.leaveCode.trim().toUpperCase(),
+    );
+    if (isDuplicateCode) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      return;
+    }
+
+    const isDuplicateDesc = leaveTypes.some(
+      (lt) => lt.leaveID !== editingItem.leaveID && lt.leaveDesc.trim().toUpperCase() === formData.leaveDesc.trim().toUpperCase(),
+    );
+    if (isDuplicateDesc) {
+      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
+      return;
+    }
+
     setSubmitting(true);
     try {
       await apiClient.put(`${API_BASE}/${editingItem.leaveID}`, { leaveID: editingItem.leaveID, ...formData });
@@ -212,14 +533,19 @@ export function LeaveTypeSetupPage() {
     }
   };
 
-  const handleCloseModal = () => {
-    setShowCreateModal(false); setShowEditModal(false);
-    setEditingItem(null); setShowSearchModal(false);
-  };
+  const handleCloseModal = useCallback(() => {
+    setShowCreateModal(false);
+    setShowEditModal(false);
+    setEditingItem(null);
+    setShowSearchModal(false);
+  }, []);
 
-  const handleOpenSearchModal = () => { setSearchModalTerm(''); setShowSearchModal(true); };
+  const handleOpenSearchModal = useCallback(() => {
+    setSearchModalTerm('');
+    setShowSearchModal(true);
+  }, []);
 
-  const handleSelectLeaveType = (code: string) => {
+  const handleSelectChargeable = useCallback((code: string) => {
     setFormData((prev) => ({ ...prev, chargeableTo: code }));
     setShowSearchModal(false); setSearchModalTerm('');
   };
@@ -299,98 +625,10 @@ export function LeaveTypeSetupPage() {
     </div>
   );
 
-  const renderFormFields = () => (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Code :</label>
-        <input type="text" value={formData.leaveCode}
-          onChange={(e) => setFormData((p) => ({ ...p, leaveCode: e.target.value }))}
-          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" required />
-      </div>
+  const handleFormChange = useCallback((updated: FormData) => {
+    setFormData(updated);
+  }, []);
 
-      <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Description :</label>
-        <input type="text" value={formData.leaveDesc}
-          onChange={(e) => setFormData((p) => ({ ...p, leaveDesc: e.target.value }))}
-          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-      </div>
-
-      <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Chargeable To :</label>
-        <div className="flex-1 flex items-center gap-2">
-          <input type="text" value={formData.chargeableTo}
-            onChange={(e) => setFormData((p) => ({ ...p, chargeableTo: e.target.value }))}
-            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Code" />
-          <button type="button" onClick={handleOpenSearchModal} className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-            <Search className="w-4 h-4" />
-          </button>
-          <button type="button" onClick={() => setFormData((p) => ({ ...p, chargeableTo: '' }))} className="px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">With Pay :</label>
-        <input type="text" value={formData.withPay}
-          onChange={(e) => setFormData((p) => ({ ...p, withPay: e.target.value }))}
-          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="e.g. Y / N" />
-      </div>
-
-      <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Previous Year Leave Code :</label>
-        <input type="text" value={formData.prevYrLvCode}
-          onChange={(e) => setFormData((p) => ({ ...p, prevYrLvCode: e.target.value }))}
-          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-      </div>
-
-      {checkbox('subTypeRequired', 'Sub-Type Required')}
-      {checkbox('basedOnTenure', 'Based on Tenure')}
-      {checkbox('withDateDuration', 'With Date Duration')}
-      {checkbox('noBalance', 'No Balance')}
-      {checkbox('requiredAdvanceFiling', 'Required Advanced Filing')}
-      {checkbox('exemptFromAllowDeduction', 'Exempted From Allowance Deduction')}
-      {checkbox('legalFileAsLeave', 'Legal Holiday Filed As Leave')}
-      {checkbox('sphFileAsLeave', 'Special Holiday Filed As Leave')}
-      {checkbox('sph2FileAsLeave', 'Special Holiday 2 Filed As Leave')}
-      {checkbox('dbleLegalFileAsLeave', 'Double Legal Holiday Filed As Leave')}
-      {checkbox('nwhFileAsLeave', 'Non-Working Holiday Filed As Leave')}
-    </div>
-  );
-
-  // ── shared modal shell ─────────────────────────────────────────────────────
-  const ModalShell = ({ title, onSubmit, submitLabel, children }: {
-    title: string; onSubmit: (e: React.FormEvent) => void;
-    submitLabel: string; children?: React.ReactNode;
-  }) => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-     <div className="bg-white rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto" style={{ width: '600px' }}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-xl sticky top-0 z-10">
-          <h2 className="text-gray-900 font-semibold text-sm">{title}</h2>
-          <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <form onSubmit={onSubmit} className="p-5">
-          <h3 className="text-blue-600 mb-3 font-semibold text-sm">Leave Type Setup</h3>
-          {renderFormFields()}
-          <div className="flex gap-3 mt-5 pt-4 border-t border-gray-200">
-            <button type="submit" disabled={submitting}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-              {submitting ? 'Saving...' : submitLabel}
-            </button>
-            <button type="button" onClick={handleCloseModal} disabled={submitting}
-              className="px-5 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-              Back to List
-            </button>
-          </div>
-        </form>
-      </div>
-      {children}
-    </div>
-  );
-
-  // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -482,7 +720,9 @@ export function LeaveTypeSetupPage() {
                           </td>
                         );
                         const chargeableMatch = leaveTypes.find((lt) => lt.leaveCode === item.chargeableTo);
-                        const chargeableDisplay = chargeableMatch ? `${chargeableMatch.leaveCode} - ${chargeableMatch.leaveDesc}` : item.chargeableTo;
+                        const chargeableDisplay = chargeableMatch
+                          ? `${chargeableMatch.leaveCode} - ${chargeableMatch.leaveDesc}`
+                          : item.chargeableTo;
                         return (
                           <tr key={item.leaveID} className="hover:bg-gray-50 transition-colors">
                             <td className="px-3 py-4 text-sm text-gray-900">{item.leaveCode}</td>
@@ -562,16 +802,42 @@ export function LeaveTypeSetupPage() {
 
       {/* ── Create Modal ──────────────────────────────────────────────────────── */}
       {showCreateModal && (
-        <ModalShell title="Create New" onSubmit={handleSubmitCreate} submitLabel="Submit">
-          {renderSearchModal()}
-        </ModalShell>
+        <ModalShell
+          title="Create New"
+          onSubmit={handleSubmitCreate}
+          onClose={handleCloseModal}
+          submitLabel="Submit"
+          submitting={submitting}
+          formData={formData}
+          onFormChange={handleFormChange}
+          onOpenSearch={handleOpenSearchModal}
+          leaveTypes={leaveTypes}
+          showSearch={showSearchModal}
+          onCloseSearch={() => setShowSearchModal(false)}
+          searchModalTerm={searchModalTerm}
+          onSearchModalTermChange={setSearchModalTerm}
+          onSelectChargeable={handleSelectChargeable}
+        />
       )}
 
       {/* ── Edit Modal ────────────────────────────────────────────────────────── */}
       {showEditModal && editingItem && (
-        <ModalShell title="Edit Leave Type" onSubmit={handleSubmitEdit} submitLabel="Update">
-          {renderSearchModal()}
-        </ModalShell>
+        <ModalShell
+          title="Edit Leave Type"
+          onSubmit={handleSubmitEdit}
+          onClose={handleCloseModal}
+          submitLabel="Update"
+          submitting={submitting}
+          formData={formData}
+          onFormChange={handleFormChange}
+          onOpenSearch={handleOpenSearchModal}
+          leaveTypes={leaveTypes}
+          showSearch={showSearchModal}
+          onCloseSearch={() => setShowSearchModal(false)}
+          searchModalTerm={searchModalTerm}
+          onSearchModalTermChange={setSearchModalTerm}
+          onSelectChargeable={handleSelectChargeable}
+        />
       )}
 
       <Footer />

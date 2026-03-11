@@ -14,6 +14,8 @@ import { decryptData } from './encryptionService';
 
 
 const BASE_URL = 'https://localhost:7264/api';
+//server 2
+  // const BASE_URL = 'https://dev2svr.128techconsultinginc.com/128_TKS/api';
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 const TOKEN_KEY = '128bl3$$1ng$';
@@ -28,7 +30,7 @@ const apiClient = axios.create({
   //  baseURL: 'https://demo.128techconsultinginc.com/DEMO_128_TKS/api',
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30_000,
+  timeout: 0,
 });
 
 // ── Request interceptor — attach Bearer token ─────────────────────────────────
@@ -71,7 +73,7 @@ apiClient.interceptors.response.use(
 
     // Skip redirect for auth endpoints to prevent infinite loops
     const isAuthEndpoint =
-      originalRequest?.url?.includes('/Login') ||
+      originalRequest?.url?.includes('/128_TKS/Login') ||
       originalRequest?.url?.includes('/Auth/refresh-token');
 
     // ── 401 Unauthorized — attempt token refresh ──────────────────────────────
@@ -124,8 +126,8 @@ apiClient.interceptors.response.use(
 
 function redirectToLogin() {
   tokenStorage.clear();
-  if (window.location.pathname !== '/Login') {
-    window.location.href = '/Login';
+  if (window.location.pathname !== '/128_TKS/Login') {
+    window.location.href = '/128_TKS/Login';
   }
 }
 

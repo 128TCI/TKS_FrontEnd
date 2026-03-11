@@ -155,7 +155,8 @@ export function Process2ShiftsPayrollPage() {
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
-  const [dateApplied, setDateApplied] = useState('7/7/2021');
+const today = new Date();
+const [dateApplied, setDateApplied] = useState(`${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`);
   const [lateFiling, setLateFiling] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -440,10 +441,10 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
       setProcessOptions({
         tardiness: newValue,
         leaveAbsences: newValue,
-        allowances: newValue,
+        allowances: false,
         nightDifferentials: newValue,
         undertime: newValue,
-        regularWorking: newValue,
+        regularWorking: false,
         overtime: newValue,
         selectAll: newValue,
       });
@@ -1032,7 +1033,7 @@ const parseDateToISO = (dateStr: string): string => {
                   {/* Row 2 — 3 items + Select All */}
                   {([
                     ['undertime',     'Undertime'],
-                    ['regularWorking','Regular Working'],
+                    ['regularWorking','Regular Working Days/Hours'],
                     ['overtime',      'Overtime'],
                   ] as [keyof typeof processOptions, string][]).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2 cursor-pointer">

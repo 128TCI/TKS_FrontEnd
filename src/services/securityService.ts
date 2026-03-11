@@ -48,6 +48,7 @@ export const securityService = {
       suspended:        u.isSuspended       ?? u.suspended        ?? false,
       isWindowsAuth:    u.isWindowsAuthenticate                   ?? false,
       windowsLoginName: u.windowsLoginName                        ?? '',
+      emailAddress:     u.emailAddress                            ?? '',
     }));
 
     // Client-side pagination when API returns all records at once
@@ -59,30 +60,31 @@ export const securityService = {
     return { data: paged, totalCount: total, page, pageSize };
   },
 
-  async createUser(data: CreateUserRequest): Promise<User> {
+async createUser(data: CreateUserRequest): Promise<User> {
     const res = await apiClient.post(`${BASE}/SecurityManager/users`, {
-      Username:              data.username,
-      Password:              data.password,
-      Expiration:            data.expiration || null,
-      MachineName:           data.machineName,
-      Suspended:             data.suspended,
-      IsWindowsAuthenticate: data.isWindowsAuthenticate,
-      WindowsLoginName:      data.windowsLoginName,
+        Username:              data.username,
+        Password:              data.password,
+        Expiration:            data.expiration      ?? null,
+        MachineName:           data.machineName     ?? null,
+        Suspended:             data.suspended,
+        IsWindowsAuthenticate: data.isWindowsAuthenticate,
+        WindowsLoginName:      data.windowsLoginName ?? null,
+        EmailAddress:          data.emailAddress    ?? null,  // ← ADD
     });
     return res.data;
-  },
+},
 
-  async updateUser(username: string, data: UpdateUserRequest): Promise<User> {
+async updateUser(username: string, data: UpdateUserRequest): Promise<User> {
     const res = await apiClient.put(`${BASE}/SecurityManager/users/${username}`, {
-      UserName:              data.username,
-      Expiration:            data.expiration || null,
-      MachineName:           data.machineName,
-      Suspended:             data.suspended,
-      IsWindowsAuthenticate: data.isWindowsAuthenticate,
-      WindowsLoginName:      data.windowsLoginName,
+        Expiration:            data.expiration      ?? null,
+        MachineName:           data.machineName     ?? null,
+        Suspended:             data.suspended,
+        IsWindowsAuthenticate: data.isWindowsAuthenticate,
+        WindowsLoginName:      data.windowsLoginName ?? null,
+        EmailAddress:          data.emailAddress    ?? null,  // ← ADD
     });
     return res.data;
-  },
+},
 
   async changePassword(username: string, data: ChangePasswordRequest): Promise<ApiResult> {
     const res = await apiClient.put(
@@ -92,9 +94,10 @@ export const securityService = {
     return res.data;
   },
 
-  async resetPassword(username: string, newPassword: { newPassword: string; }): Promise<ApiResult> {
+  async resetPassword(username: string, newPassword: { newPassword: string }): Promise<ApiResult> {
     const res = await apiClient.put(
-      `${BASE}/SecurityManager/users/${username}/reset-password`, newPassword
+      `${BASE}/SecurityManager/users/${username}/reset-password`,
+      { NewPassword: newPassword.newPassword }  // ← PascalCase to match ResetPasswordDto
     );
     return res.data;
   },

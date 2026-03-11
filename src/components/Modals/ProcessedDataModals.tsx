@@ -44,6 +44,10 @@ export function NoOfHoursModal({
   const [showTimeInPicker,    setShowTimeInPicker]    = useState(false);
   const [showTimeOutPicker,   setShowTimeOutPicker]   = useState(false);
 
+  // ── Position state for portaled calendars (mirrors snippet 1) ──
+  const [dateInCalendarPos,  setDateInCalendarPos]  = useState({ top: 0, left: 0 });
+  const [dateOutCalendarPos, setDateOutCalendarPos] = useState({ top: 0, left: 0 });
+
   const splitDateTime = (value: string) => {
     const parts = value.trim().split(' ');
     return { datePart: parts[0] ?? '', timePart: parts.length > 1 ? parts.slice(1).join(' ') : '' };
@@ -105,16 +109,16 @@ export function NoOfHoursModal({
             <h3 className="text-blue-600 mb-3">Adjustments</h3>
             <div className="space-y-3">
 
-            {/* EmpCode */}
-            <div className="flex items-center gap-2">
-              <label className="w-40 text-gray-700">EmpCode :</label>
-              <input
-                type="text"
-                value={empCode}
-                readOnly
-                className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
-              />
-            </div>
+              {/* EmpCode */}
+              <div className="flex items-center gap-2">
+                <label className="w-40 text-gray-700">EmpCode :</label>
+                <input
+                  type="text"
+                  value={empCode}
+                  readOnly
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
+                />
+              </div>
 
               {/* Workshift */}
               <div className="flex items-center gap-2">
@@ -132,7 +136,6 @@ export function NoOfHoursModal({
               {/* Date In */}
               <div className="flex items-center gap-2">
                 <label className="w-40 text-gray-700">Date In :</label>
-
                 <input
                   type="text"
                   value={dateIn}
@@ -140,29 +143,22 @@ export function NoOfHoursModal({
                   placeholder="MM/DD/YYYY HH:MM AM"
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
-
-                {/* Calendar */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      closeAllPickers();
-                      setShowDateInCalendar(v => !v);
-                    }}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    <Calendar className="w-4 h-4" />
-                  </button>
-
-                  {showDateInCalendar && (
-                    <div className="absolute top-full left-0 mt-1 z-50">
-                      <CalendarPopup
-                        onDateSelect={handleDateInSelect}
-                        onClose={() => setShowDateInCalendar(false)}
-                      />
-                    </div>
-                  )}
-                </div>
-
+                {/* ── Calendar button: capture position, portal the popup (snippet 1 pattern) ── */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setDateInCalendarPos({
+                      top:  rect.bottom + window.scrollY + 4,
+                      left: rect.left   + window.scrollX,
+                    });
+                    closeAllPickers();
+                    setShowDateInCalendar(v => !v);
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Calendar className="w-4 h-4" />
+                </button>
                 {/* Time */}
                 <button
                   onClick={() => {
@@ -173,7 +169,6 @@ export function NoOfHoursModal({
                 >
                   <Clock className="w-4 h-4" />
                 </button>
-
                 <button
                   onClick={() => setDateIn('')}
                   className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700"
@@ -192,26 +187,22 @@ export function NoOfHoursModal({
                   placeholder="MM/DD/YYYY HH:MM AM"
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
-                {/* Calendar */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      closeAllPickers();
-                      setShowDateOutCalendar(v => !v);
-                    }}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    <Calendar className="w-4 h-4" />
-                  </button>
-                  {showDateOutCalendar && (
-                    <div className="absolute top-full left-0 mt-1 z-50">
-                      <CalendarPopup
-                        onDateSelect={handleDateOutSelect}
-                        onClose={() => setShowDateOutCalendar(false)}
-                      />
-                    </div>
-                  )}
-                </div>
+                {/* ── Calendar button: capture position, portal the popup (snippet 1 pattern) ── */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setDateOutCalendarPos({
+                      top:  rect.bottom + window.scrollY + 4,
+                      left: rect.left   + window.scrollX,
+                    });
+                    closeAllPickers();
+                    setShowDateOutCalendar(v => !v);
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Calendar className="w-4 h-4" />
+                </button>
                 {/* Time */}
                 <button
                   onClick={() => {
@@ -253,24 +244,47 @@ export function NoOfHoursModal({
         </div>
       </div>
 
+      {/* ── Date In Calendar portal — absolute position anchored to button (snippet 1 pattern) ── */}
       {showDateInCalendar && createPortal(
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
-          <CalendarPopup onDateSelect={handleDateInSelect} onClose={() => setShowDateInCalendar(false)} />
+        <div
+          style={{
+            position: 'absolute',
+            top:  dateInCalendarPos.top,
+            left: dateInCalendarPos.left,
+            zIndex: 9999,
+          }}
+        >
+          <CalendarPopup
+            onDateSelect={handleDateInSelect}
+            onClose={() => setShowDateInCalendar(false)}
+          />
         </div>,
         document.body
       )}
 
+      {/* ── Date Out Calendar portal — absolute position anchored to button (snippet 1 pattern) ── */}
+      {showDateOutCalendar && createPortal(
+        <div
+          style={{
+            position: 'absolute',
+            top:  dateOutCalendarPos.top,
+            left: dateOutCalendarPos.left,
+            zIndex: 9999,
+          }}
+        >
+          <CalendarPopup
+            onDateSelect={handleDateOutSelect}
+            onClose={() => setShowDateOutCalendar(false)}
+          />
+        </div>,
+        document.body
+      )}
+
+      {/* Time pickers remain centered (unchanged) */}
       {showTimeInPicker && createPortal(
         <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
           <TimePicker onTimeSelect={handleTimeInSelect} onClose={() => setShowTimeInPicker(false)}
             initialTime={splitDateTime(dateIn).timePart} />
-        </div>,
-        document.body
-      )}
-
-      {showDateOutCalendar && createPortal(
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
-          <CalendarPopup onDateSelect={handleDateOutSelect} onClose={() => setShowDateOutCalendar(false)} />
         </div>,
         document.body
       )}
@@ -355,6 +369,10 @@ export function TardinessModal({
     const [showTimeInPicker,     setShowTimeInPicker]     = useState(false);
     const [showTimeOutPicker,    setShowTimeOutPicker]    = useState(false);
 
+    // ── Position state anchored to each calendar button (snippet 1 pattern) ──
+    const [dateFromCalendarPos, setDateFromCalendarPos] = useState({ top: 0, left: 0 });
+    const [dateToCalendarPos,   setDateToCalendarPos]   = useState({ top: 0, left: 0 });
+
     const splitDateTime = (value: string) => {
         const parts = value.trim().split(' ');
         return { timePart: parts.length > 1 ? parts.slice(1).join(' ') : '' };
@@ -433,7 +451,18 @@ export function TardinessModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => { closeAllPickers(); setShowDateFromCalendar(v => !v); }}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateFromCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                closeAllPickers();
+                                                setShowDateFromCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -448,7 +477,18 @@ export function TardinessModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => { closeAllPickers(); setShowDateToCalendar(v => !v); }}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateToCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                closeAllPickers();
+                                                setShowDateToCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -531,7 +571,6 @@ export function TardinessModal({
                             </div>
 
                             <div className="grid grid-cols-3 gap-3">
-
                                 <div>
                                     <label className={lbl}>Grace Period HHMM :</label>
                                     <input type="text" value={tardinessWithinGracePeriodHHMM} onChange={e => setTardinessWithinGracePeriodHHMM(e.target.value)}
@@ -607,16 +646,33 @@ export function TardinessModal({
             </div>
 
             {/* ── Portals ── */}
+            {/* Date From — position-anchored to button */}
             {showDateFromCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateFromCalendarPos.top,
+                        left: dateFromCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateFromSelect} onClose={() => setShowDateFromCalendar(false)} />
                 </div>, document.body
             )}
+            {/* Date To — position-anchored to button */}
             {showDateToCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateToCalendarPos.top,
+                        left: dateToCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateToSelect} onClose={() => setShowDateToCalendar(false)} />
                 </div>, document.body
             )}
+            {/* Time pickers remain centered (unchanged) */}
             {showTimeInPicker && createPortal(
                 <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
                     <TimePicker onTimeSelect={handleTimeInSelect} onClose={() => setShowTimeInPicker(false)} initialTime={timeIn} />
@@ -679,6 +735,10 @@ export function UndertimeModal({
     const [showDateToCalendar,   setShowDateToCalendar]   = useState(false);
     const [showTimeInPicker,     setShowTimeInPicker]     = useState(false);
     const [showTimeOutPicker,    setShowTimeOutPicker]    = useState(false);
+
+    // ── Position state anchored to each calendar button (snippet 1 pattern) ──
+    const [dateFromCalendarPos, setDateFromCalendarPos] = useState({ top: 0, left: 0 });
+    const [dateToCalendarPos,   setDateToCalendarPos]   = useState({ top: 0, left: 0 });
 
     const splitDateTime = (value: string) => {
         const parts = value.trim().split(' ');
@@ -758,7 +818,18 @@ export function UndertimeModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => { closeAllPickers(); setShowDateFromCalendar(v => !v); }}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateFromCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                closeAllPickers();
+                                                setShowDateFromCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -773,7 +844,18 @@ export function UndertimeModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => { closeAllPickers(); setShowDateToCalendar(v => !v); }}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateToCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                closeAllPickers();
+                                                setShowDateToCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -879,16 +961,33 @@ export function UndertimeModal({
             </div>
 
             {/* ── Portals ── */}
+            {/* Date From — position-anchored to button */}
             {showDateFromCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateFromCalendarPos.top,
+                        left: dateFromCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateFromSelect} onClose={() => setShowDateFromCalendar(false)} />
                 </div>, document.body
             )}
+            {/* Date To — position-anchored to button */}
             {showDateToCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateToCalendarPos.top,
+                        left: dateToCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateToSelect} onClose={() => setShowDateToCalendar(false)} />
                 </div>, document.body
             )}
+            {/* Time pickers remain centered (unchanged) */}
             {showTimeInPicker && createPortal(
                 <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
                     <TimePicker onTimeSelect={handleTimeInSelect} onClose={() => setShowTimeInPicker(false)} initialTime={timeIn} />
@@ -946,6 +1045,9 @@ export function LeaveAbsencesModal({
 }: LeaveAbsencesModalProps) {
 
     const [showDateCalendar, setShowDateCalendar] = useState(false);
+
+    // ── Position state anchored to the calendar button (snippet 1 pattern) ──
+    const [dateCalendarPos, setDateCalendarPos] = useState({ top: 0, left: 0 });
 
     useEffect(() => { if (!show) setShowDateCalendar(false); }, [show]);
 
@@ -1005,7 +1107,17 @@ export function LeaveAbsencesModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={date} onChange={e => setDate(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => setShowDateCalendar(v => !v)}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                setShowDateCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -1087,9 +1199,16 @@ export function LeaveAbsencesModal({
                 </div>
             </div>
 
-            {/* ── Portal ── */}
+            {/* ── Portal — position-anchored to button ── */}
             {showDateCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateCalendarPos.top,
+                        left: dateCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateSelect} onClose={() => setShowDateCalendar(false)} />
                 </div>, document.body
             )}
@@ -1145,6 +1264,10 @@ export function OvertimeModal({
     const [showDateToCalendar,   setShowDateToCalendar]   = useState(false);
     const [showTimeInPicker,     setShowTimeInPicker]     = useState(false);
     const [showTimeOutPicker,    setShowTimeOutPicker]    = useState(false);
+
+    // ── Position state anchored to each calendar button (snippet 1 pattern) ──
+    const [dateFromCalendarPos, setDateFromCalendarPos] = useState({ top: 0, left: 0 });
+    const [dateToCalendarPos,   setDateToCalendarPos]   = useState({ top: 0, left: 0 });
 
     const splitDateTime = (value: string) => {
         const parts = value.trim().split(' ');
@@ -1224,7 +1347,18 @@ export function OvertimeModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => { closeAllPickers(); setShowDateFromCalendar(v => !v); }}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateFromCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                closeAllPickers();
+                                                setShowDateFromCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -1239,7 +1373,18 @@ export function OvertimeModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => { closeAllPickers(); setShowDateToCalendar(v => !v); }}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateToCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                closeAllPickers();
+                                                setShowDateToCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -1353,16 +1498,33 @@ export function OvertimeModal({
             </div>
 
             {/* ── Portals ── */}
+            {/* Date From — position-anchored to button */}
             {showDateFromCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateFromCalendarPos.top,
+                        left: dateFromCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateFromSelect} onClose={() => setShowDateFromCalendar(false)} />
                 </div>, document.body
             )}
+            {/* Date To — position-anchored to button */}
             {showDateToCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateToCalendarPos.top,
+                        left: dateToCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateToSelect} onClose={() => setShowDateToCalendar(false)} />
                 </div>, document.body
             )}
+            {/* Time pickers remain centered (unchanged) */}
             {showTimeInPicker && createPortal(
                 <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
                     <TimePicker onTimeSelect={handleTimeInSelect} onClose={() => setShowTimeInPicker(false)} initialTime={timeIn} />
@@ -1416,6 +1578,19 @@ export function OtherEarningsModal({
   onSubmit,
   onOpenAllowanceSearch,
 }: OtherEarningsModalProps) {
+
+  const [showDateCalendar, setShowDateCalendar] = useState(false);
+
+  // ── Position state anchored to the calendar button (snippet 1 pattern) ──
+  const [dateCalendarPos, setDateCalendarPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => { if (!show) setShowDateCalendar(false); }, [show]);
+
+  const handleDateSelect = (picked: string) => {
+    setDate(picked);
+    setShowDateCalendar(false);
+  };
+
   if (!show) return null;
 
   return (
@@ -1466,8 +1641,31 @@ export function OtherEarningsModal({
                   type="text"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
+                  placeholder="MM/DD/YYYY"
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
+                {/* ── Position-anchored calendar button ── */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setDateCalendarPos({
+                      top:  rect.bottom + window.scrollY + 4,
+                      left: rect.left   + window.scrollX,
+                    });
+                    setShowDateCalendar(v => !v);
+                  }}
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shrink-0"
+                >
+                  <Calendar className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDate('')}
+                  className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Allowance Code */}
@@ -1545,6 +1743,21 @@ export function OtherEarningsModal({
           </div>
         </div>
       </div>
+
+      {/* ── Portal — position-anchored to button ── */}
+      {showDateCalendar && createPortal(
+        <div
+          style={{
+            position: 'absolute',
+            top:  dateCalendarPos.top,
+            left: dateCalendarPos.left,
+            zIndex: 9999,
+          }}
+        >
+          <CalendarPopup onDateSelect={handleDateSelect} onClose={() => setShowDateCalendar(false)} />
+        </div>,
+        document.body
+      )}
     </>
   );
 }
@@ -1603,6 +1816,10 @@ export function AdjustmentModal({
     const [showDateCalendar,           setShowDateCalendar]           = useState(false);
     const [showLateFilingDateCalendar, setShowLateFilingDateCalendar] = useState(false);
 
+    // ── Position state anchored to each calendar button (snippet 1 pattern) ──
+    const [dateCalendarPos,           setDateCalendarPos]           = useState({ top: 0, left: 0 });
+    const [lateFilingDateCalendarPos, setLateFilingDateCalendarPos] = useState({ top: 0, left: 0 });
+
     const closeAllPickers = () => {
         setShowDateCalendar(false);
         setShowLateFilingDateCalendar(false);
@@ -1659,6 +1876,7 @@ export function AdjustmentModal({
                             className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                           />
                         </div>
+
                         {/* ── CARD 1: Transaction Info ── */}
                         <div className={card}>
                             <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide">Transaction Info</p>
@@ -1669,7 +1887,18 @@ export function AdjustmentModal({
                                     <div className="flex gap-1">
                                         <input type="text" value={transactionDate} onChange={e => setTransactionDate(e.target.value)}
                                             placeholder="MM/DD/YYYY" className={inp} />
-                                        <button onClick={() => { closeAllPickers(); setShowDateCalendar(v => !v); }}
+                                        {/* ── Position-anchored calendar button ── */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDateCalendarPos({
+                                                    top:  rect.bottom + window.scrollY + 4,
+                                                    left: rect.left   + window.scrollX,
+                                                });
+                                                closeAllPickers();
+                                                setShowDateCalendar(v => !v);
+                                            }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Calendar className="w-4 h-4" />
                                         </button>
@@ -1749,7 +1978,18 @@ export function AdjustmentModal({
                                 <div className="flex gap-1">
                                     <input type="text" value={isLateFilingActualDate} onChange={e => setIsLateFilingActualDate(e.target.value)}
                                         placeholder="MM/DD/YYYY" className={inp} />
-                                    <button onClick={() => { closeAllPickers(); setShowLateFilingDateCalendar(v => !v); }}
+                                    {/* ── Position-anchored calendar button ── */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                            setLateFilingDateCalendarPos({
+                                                top:  rect.bottom + window.scrollY + 4,
+                                                left: rect.left   + window.scrollX,
+                                            });
+                                            closeAllPickers();
+                                            setShowLateFilingDateCalendar(v => !v);
+                                        }}
                                         className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                         <Calendar className="w-4 h-4" />
                                     </button>
@@ -1802,13 +2042,29 @@ export function AdjustmentModal({
             </div>
 
             {/* ── Portals ── */}
+            {/* Transaction Date — position-anchored to button */}
             {showDateCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateCalendarPos.top,
+                        left: dateCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleTransactionDateSelect} onClose={() => setShowDateCalendar(false)} />
                 </div>, document.body
             )}
+            {/* Late Filing Date — position-anchored to button */}
             {showLateFilingDateCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  lateFilingDateCalendarPos.top,
+                        left: lateFilingDateCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleLateFilingDateSelect} onClose={() => setShowLateFilingDateCalendar(false)} />
                 </div>, document.body
             )}
@@ -1848,6 +2104,9 @@ export function AdvancedModal({
 }: AdvancedModalProps) {
 
     const [showDateCalendar, setShowDateCalendar] = useState(false);
+
+    // ── Position state anchored to the calendar button (snippet 1 pattern) ──
+    const [dateCalendarPos, setDateCalendarPos] = useState({ top: 0, left: 0 });
 
     useEffect(() => { if (!show) setShowDateCalendar(false); }, [show]);
 
@@ -1898,7 +2157,17 @@ export function AdvancedModal({
                                 <input type="text" value={transactionDate} onChange={e => setTransactionDate(e.target.value)}
                                     placeholder="MM/DD/YYYY"
                                     className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                                <button onClick={() => setShowDateCalendar(v => !v)}
+                                {/* ── Position-anchored calendar button ── */}
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                        setDateCalendarPos({
+                                            top:  rect.bottom + window.scrollY + 4,
+                                            left: rect.left   + window.scrollX,
+                                        });
+                                        setShowDateCalendar(v => !v);
+                                    }}
                                     className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shrink-0">
                                     <Calendar className="w-4 h-4" />
                                 </button>
@@ -1962,9 +2231,16 @@ export function AdvancedModal({
                 </div>
             </div>
 
-            {/* ── Portal ── */}
+            {/* ── Portal — position-anchored to button ── */}
             {showDateCalendar && createPortal(
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <div
+                    style={{
+                        position: 'absolute',
+                        top:  dateCalendarPos.top,
+                        left: dateCalendarPos.left,
+                        zIndex: 9999,
+                    }}
+                >
                     <CalendarPopup onDateSelect={handleDateSelect} onClose={() => setShowDateCalendar(false)} />
                 </div>, document.body
             )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, ArrowLeft, Edit, Trash2 } from "lucide-react";
 import apiClient from "../../../services/apiClient";
-import auditTrail from '../../../services/auditTrail'; 
+import auditTrail from '../../../services/auditTrail';
 import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
@@ -9,6 +9,7 @@ import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
 
 const formName = 'Area SetUp';
+
 export function AreaSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,7 +81,6 @@ export function AreaSetupPage() {
         (p) => decryptData(p.formName) === "AreaSetUp",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -93,7 +93,6 @@ export function AreaSetupPage() {
     }
   };
 
-  // Fetch area data from API
   useEffect(() => {
     fetchAreaData();
     fetchEmployeeData();
@@ -106,7 +105,6 @@ export function AreaSetupPage() {
     try {
       const response = await apiClient.get("/Fs/EmploymentAreaSetUp");
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((area: any) => ({
           id: area.id || area.ID || "",
           code: area.areaCode || area.AreaCode || "",
@@ -135,7 +133,6 @@ export function AreaSetupPage() {
     try {
       const response = await apiClient.get("/Maintenance/EmployeeMasterFile");
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((emp: any) => ({
           empCode: emp.empCode || emp.code || "",
           name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
@@ -163,7 +160,6 @@ export function AreaSetupPage() {
         "/Fs/Process/Device/BorrowedDeviceName",
       );
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((device: any) => ({
           id: device.id || "",
           code: device.code || "",
@@ -183,7 +179,6 @@ export function AreaSetupPage() {
     }
   };
 
-  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -200,11 +195,66 @@ export function AreaSetupPage() {
     };
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedAreaIndex(null);
     setAreaId(null);
-    // Clear form
     setAreaCode("");
     setAreaCodeError("");
     setDescription("");
@@ -228,6 +278,11 @@ export function AreaSetupPage() {
   };
 
   const handleDelete = async (area: any) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
@@ -239,36 +294,69 @@ export function AreaSetupPage() {
       cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/EmploymentAreaSetUp/${area.id}`);
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted area ${area.areaCode}`,
-            messages: `Area deleted: ${area.areaCode} - ${area.areaDesc}`,
-            formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Area deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the area list
-        await fetchAreaData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete area";
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Check if area is used in Employee Masterfile ──────────────────
+    try {
+      const empResponse = await apiClient.get('/Maintenance/EmployeeMasterFile');
+      const employees: any[] = Array.isArray(empResponse.data)
+        ? empResponse.data
+        : [];
+
+      const isUsedInMasterfile = employees.some(
+        (emp: any) =>
+          (emp.areaCode ?? "").trim().toUpperCase() ===
+          (area.code ?? "").trim().toUpperCase(),
+      );
+
+      if (isUsedInMasterfile) {
         await Swal.fire({
           icon: "error",
-          title: "Error",
-          text: errorMsg,
+          title: "Cannot Delete",
+          text: "This setup is already used in Employee Masterfile.",
         });
-        console.error("Error deleting area:", error);
+        return;
       }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate area usage.",
+      });
+      return;
+    }
+
+    // ── 4. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/EmploymentAreaSetUp/${area.id}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted area ${area.code}`,
+        messages: `Area deleted: ${area.code} - ${area.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Area deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchAreaData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete area";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting area:", error);
     }
   };
 
@@ -282,7 +370,7 @@ export function AreaSetupPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate area code - must not be empty and must be max 10 characters
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!areaCode.trim() || areaCode.length > 10) {
       await Swal.fire({
         icon: "warning",
@@ -291,23 +379,65 @@ export function AreaSetupPage() {
       });
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = areaList.some((area, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedAreaIndex === index) {
-        return false;
-      }
-      return area.code.toLowerCase() === areaCode.trim().toLowerCase();
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
+    const isDuplicateCode = areaList.some((area, index) => {
+      if (isEditMode && selectedAreaIndex === index) return false;
+      return area.code.trim().toUpperCase() === areaCode.trim().toUpperCase();
     });
 
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
         title: "Duplicate Code",
-        text: "This code is already in use. Please use a different code.",
+        text: "Code is already exist.",
       });
       return;
     }
+
+    // ── 4. Duplicate description check ──────────────────────────────────
+    const isDuplicateDesc = areaList.some((area, index) => {
+      if (isEditMode && selectedAreaIndex === index) return false;
+      return (
+        (area.description ?? "").trim().toUpperCase() ===
+        description.trim().toUpperCase()
+      );
+    });
+
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
+      return;
+    }
+
+    // ── 5. Duplicate device name check (skip when deviceName is empty) ───
+    if (deviceName.trim() !== "") {
+      const isDuplicateDevice = areaList.some((area, index) => {
+        if (isEditMode && selectedAreaIndex === index) return false;
+        return (
+          (area.deviceName ?? "").trim().toUpperCase() ===
+          deviceName.trim().toUpperCase()
+        );
+      });
+
+      if (isDuplicateDevice) {
+        await Swal.fire({
+          icon: "error",
+          title: "Duplicate Device",
+          text: "Device Name is already used.",
+        });
+        return;
+      }
+    }
+
+    // ── 6. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -320,13 +450,12 @@ export function AreaSetupPage() {
       };
 
       if (isEditMode && areaId) {
-        // Update existing record via PUT
         await apiClient.put(`/Fs/EmploymentAreaSetUp/${areaId}`, payload);
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited area ${payload.areaCode}`,
-            messages: `Area updated: ${payload.areaCode} - ${payload.areaDesc}`,
-            formName,
+          accessType: 'Edit',
+          trans: `Edited area ${payload.areaCode}`,
+          messages: `Area updated: ${payload.areaCode} - ${payload.areaDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -335,16 +464,14 @@ export function AreaSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the area list
         await fetchAreaData();
       } else {
-        // Create new record via POST
         await apiClient.post("/Fs/EmploymentAreaSetUp", payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added area ${payload.areaCode}`,
-            messages: `Area created: ${payload.areaCode} - ${payload.areaDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added area ${payload.areaCode}`,
+          messages: `Area created: ${payload.areaCode} - ${payload.areaDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -353,11 +480,9 @@ export function AreaSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the area list
         await fetchAreaData();
       }
 
-      // Close modal and reset form
       setShowCreateModal(false);
       setAreaCode("");
       setAreaCodeError("");
@@ -407,24 +532,19 @@ export function AreaSetupPage() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedAreas = filteredAreas.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Area Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -633,16 +753,13 @@ export function AreaSetupPage() {
             {/* Create/Edit Modal */}
             {showCreateModal && (
               <>
-                {/* Modal Backdrop */}
                 <div
                   className="fixed inset-0 bg-black/30 z-10"
                   onClick={() => setShowCreateModal(false)}
                 ></div>
 
-                {/* Modal Dialog */}
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                    {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                       <h2 className="text-gray-800">
                         {isEditMode ? "Edit Area" : "Create New"}
@@ -655,11 +772,9 @@ export function AreaSetupPage() {
                       </button>
                     </div>
 
-                    {/* Modal Content */}
                     <div className="p-4">
                       <h3 className="text-blue-600 mb-3">Area Setup</h3>
 
-                      {/* Form Fields */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">
@@ -764,7 +879,6 @@ export function AreaSetupPage() {
                         </div>
                       </div>
 
-                      {/* Modal Actions */}
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
@@ -790,7 +904,7 @@ export function AreaSetupPage() {
                 </div>
               </>
             )}
-            {/* Employee Search Modal - Reusable Component */}
+
             <EmployeeSearchModal
               isOpen={showHeadCodeModal}
               onClose={() => setShowHeadCodeModal(false)}
@@ -800,7 +914,6 @@ export function AreaSetupPage() {
               error={employeeError}
             />
 
-            {/* Device Search Modal - Reusable Component */}
             <DeviceSearchModal
               isOpen={showDeviceNameModal}
               onClose={() => setShowDeviceNameModal(false)}
