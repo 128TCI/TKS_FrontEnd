@@ -3,8 +3,7 @@ import { RotateCcw, Check, RefreshCw, Users, Building2, Briefcase, Network, Cale
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import { toISO } from '../../services/utilityService';
-import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+import apiClient from '../../services/apiClient';
 
 interface GroupItem {
   id: number;
@@ -287,6 +286,7 @@ export function UnpostTransactionPage() {
         dateTo:   toISO(dateTo),
         userName: getLoggedInUsername(),
         empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        userName: getLoggedInUsername(),
         updateOptions: {
           tardiness:        options.tardiness,
           otherEarnings:    options.otherEarnings,

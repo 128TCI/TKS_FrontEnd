@@ -113,6 +113,7 @@ import { UpdateEmployeePayHousePage } from '../components/Utilities/UpdateEmploy
 import { UpdateEmployeeClassificationPage } from '../components/Utilities/UpdateEmployeeClassificationPage';
 import { UpdateBatchRestDayPage } from '../components/Utilities/UpdateBatchRestDayPage';
 import { DeleteEmployeeTransactionsPage } from '../components/Utilities/DeleteEmployeeTransactionsPage';
+import { UpdateRawdataOnlinePage } from '../components/Utilities/UpdateRawdataOnlinePage';
 // Utilities – Rawdata
 import { UpdateDaytypeRawdataPage } from '../components/Utilities/UpdateDaytypeRawdataPage';
 import { UpdateWorkshiftRawdataPage } from '../components/Utilities/UpdateWorkshiftRawdataPage';
