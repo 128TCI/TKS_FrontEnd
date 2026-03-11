@@ -303,7 +303,11 @@ export function ImportLogsFromDeviceV2Page() {
     formData.append("file", xlsxFile, fileName)
     console.log(xlsxFile);
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData)
+      const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
         setImportDataResult(data.data.resultData);
         if (data.data.errors.length > 0){
           console.log(data.data.errors)

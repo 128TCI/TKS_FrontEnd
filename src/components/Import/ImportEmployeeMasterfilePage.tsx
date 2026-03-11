@@ -94,7 +94,7 @@ type ResponseResultDto<T> = {
 }
 
 export function ImportEmployeeMasterfilePage() {
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
@@ -139,7 +139,7 @@ export function ImportEmployeeMasterfilePage() {
         }
   };
 
-  const handleCodeToggle = (id: number) => {
+  const handleCodeToggle = (id: string) => {
     setSelectedCodes(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -149,7 +149,7 @@ export function ImportEmployeeMasterfilePage() {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupList.map(w => w.id));
+      setSelectedCodes(tksGroupList.map(w => w.groupCode));
     }
   };
   
@@ -222,11 +222,12 @@ const onClickImport = async ( ) => {
     const formData = new FormData();
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
-    console.log(deleteExisting);
-    console.log(xlsxFile);
-    console.log(formData instanceof FormData);
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Utilities/Import/ImportEmployeeMasterfile`, formData)
+      const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Utilities/Import/ImportEmployeeMasterfile`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
         setImportDataResult(data.data.resultData);
         if (data.data.errors.length > 0){
           console.log(data.data.errors)

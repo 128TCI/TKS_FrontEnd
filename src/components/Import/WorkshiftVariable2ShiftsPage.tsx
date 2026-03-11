@@ -32,7 +32,7 @@ type ResponseResultDto<T> = {
     messages: string
 }
 
-export function WorkshiftVariablePage() {
+export function WorkshiftVariable2ShiftsPage() {
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
@@ -124,20 +124,6 @@ export function WorkshiftVariablePage() {
           isProcessing;
      }
   }
-  const downloadRDTemplate = async () => {
-     setIsProcessing(true);
-     try {
-          const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportWorkshiftWithRestDay_Template.xlsx`, {
-               responseType: 'blob'
-          });
-          const mimeType = response.headers['content-type'];
-          const blob = new Blob([response.data], { type: mimeType });
-          fileLinkCreate(blob, `ImportWorkshiftWithRestDay_Template.xlsx`);
-     } finally {
-          setIsProcessing(false);
-     }
-  }
-
   const onClickImport = async ( ) => {
     if(!xlsxFile) {
         setError("Please select a file to import.");
@@ -184,9 +170,8 @@ export function WorkshiftVariablePage() {
 
     console.log(dateFrom, dateTo)
 
-    if(importType == "workshift-variable"){
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import/ImportWorkshiftVariable`, formData, {
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import2Shifts/ImportWorkshiftVariable2Shifts`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
@@ -219,40 +204,6 @@ export function WorkshiftVariablePage() {
           setIsProcessing(false);
           setFileLoaded(true);
         }
-    }
-    else if(importType == "workshift-restday"){
-    try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/ImportRestDay/ImportRestDay`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        })
-        setImportDataResult(data.data.resultData);
-        if(data.data.errors.length > 0){
-            setImportDataResult([]);
-            await Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: data.data.resultData[0].message,
-                            });
-            
-            setErrors(data.data.errors);
-        }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Import done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
-      } finally {
-          //setIsProcessing(false);
-          setFileLoaded(true);
-        }
-
-    }  
   }
 
   function addOneDay(dateStr: string) {
@@ -271,7 +222,7 @@ export function WorkshiftVariablePage() {
     }
     console.log(param, dateFrom, dateTo);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/ImportRestDay/UpdateWorkshiftRestDay`, param)
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import2Shifts/UpdateWorkshiftVariable2Shifts`, param)
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
             setImportDataResult([]);
@@ -449,7 +400,7 @@ export function WorkshiftVariablePage() {
                         />
                         <span className="text-sm text-gray-700">Workshift Variable</span>
                       </label>
-                      <label className="flex items-center gap-3 p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                      {/* <label className="flex items-center gap-3 p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
                         <input
                           type="radio"
                           name="importType"
@@ -459,7 +410,7 @@ export function WorkshiftVariablePage() {
                           className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                         />
                         <span className="text-sm text-gray-700">Workshift with Restday</span>
-                      </label>
+                      </label> */}
                     </div>
                   </div>
 
@@ -467,7 +418,7 @@ export function WorkshiftVariablePage() {
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start gap-2 mb-2">
                       <Download className="w-4 h-4 text-blue-600 mt-0.5" />
-                      <span className="text-sm text-gray-700">Download Templates:</span>
+                      <span className="text-sm text-gray-700">Download Template:</span>
                     </div>
                     <div className="ml-6 space-y-1">
                       <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
@@ -476,12 +427,12 @@ export function WorkshiftVariablePage() {
                         <Download className="w-3 h-3" onClick={downloadTemplate}/>
                         Download Template (Workshift Variable)
                       </a>
-                      <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+                      {/* <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
                         onClick={downloadRDTemplate}
                       >
                         <Download className="w-3 h-3" onClick={downloadRDTemplate}/>
                         Download Template (Workshift w/ Rest Day)
-                      </a>
+                      </a> */}
                     </div>
                   </div>
 
@@ -496,8 +447,8 @@ export function WorkshiftVariablePage() {
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
                       />
                       <div>
-                        <div className="text-sm text-gray-900">Delete Existing Workshift and RestDay</div>
-                        <div className="text-xs text-gray-600 mt-1">Remove all existing workshift and rest day records before importing new data</div>
+                        <div className="text-sm text-gray-900">Delete Existing Workshift Variable</div>
+                        <div className="text-xs text-gray-600 mt-1">Remove all existing workshift variable before importing new data</div>
                       </div>
                     </label>
                   </div>

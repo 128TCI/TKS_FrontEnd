@@ -50,7 +50,7 @@ export function OvertimeApplicationPage() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
@@ -99,7 +99,7 @@ export function OvertimeApplicationPage() {
         }
   };
 
-  const handleCodeToggle = (id: number) => {
+  const handleCodeToggle = (id: string) => {
     setSelectedCodes(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -109,7 +109,7 @@ export function OvertimeApplicationPage() {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupList.map(w => w.id));
+      setSelectedCodes(tksGroupList.map(w => w.groupCode));
     }
   };
 
@@ -252,7 +252,11 @@ const onClickImport = async ( ) => {
     formData.append("file", xlsxFile, fileName)
 
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportOvertimeApplicationDto[]>>(`/Utilities/Import/ImportOvertimeApplication`, formData)
+      const data = await apiClient.post<ResponseResultDto<ImportOvertimeApplicationDto[]>>(`/Utilities/Import/ImportOvertimeApplication`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
         setImportDataResult(data.data.resultData);
         if (data.data.errors.length > 0){
           console.log(data.data.errors)

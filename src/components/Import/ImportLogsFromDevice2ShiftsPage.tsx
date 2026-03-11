@@ -39,7 +39,7 @@ type ResponseResultDto<T> = {
     messages: string
 }
 
-export function UpdateRawDataPage() {
+export function ImportLogsFromDevice2ShiftsPage() {
   const [empCode, setEmpCode] = useState<string[]>([]);
   const [empName, setEmpName] = useState('');
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
