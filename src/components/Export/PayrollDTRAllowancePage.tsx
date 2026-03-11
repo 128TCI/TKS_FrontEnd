@@ -1,418 +1,606 @@
-import { useState, useRef, useEffect } from 'react';
-import { Check, Upload, Download, Calendar } from 'lucide-react';
-import { CalendarPopover } from '../Modals/CalendarPopover';
-import { Footer } from '../Footer/Footer';
-import apiClient from '../../services/apiClient';
+import { useState, useEffect } from 'react';
+import {
+  Calendar, Check, Upload, Download,
+  Users, Building2, Briefcase, Network,
+  CalendarClock, Wallet, Grid, Box, Search,
+} from 'lucide-react';
 import Swal from 'sweetalert2';
-
+import { CalendarPopup } from '../CalendarPopup';
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 interface GroupItem {
   id: number;
   code: string;
   description: string;
-  selected: boolean;
 }
 
 interface EmployeeItem {
   id: number;
   code: string;
   name: string;
+  isActive: boolean;
+  tkGroup: string;
+  branchCode: string;
+  departmentCode: string;
+  divisionCode: string;
+  groupScheduleCode: string;
+  payHouseCode: string;
+  sectionCode: string;
+  unitCode: string;
 }
 
-interface CalendarPopupProps {
+type ActiveFilter = 'all' | 'active' | 'inactive';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function safeId(...candidates: any[]): number {
+  for (const c of candidates) {
+    const n = Number(c);
+    if (c !== null && c !== undefined && c !== '' && !isNaN(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+const todayStr = () => {
+  const t = new Date();
+  return `${t.getMonth() + 1}/${t.getDate()}/${t.getFullYear()}`;
+};
+
+const ITEMS_PER_PAGE = 10;
+
+function parseDateStr(str: string): Date | null {
+  const p = str?.trim().split('/');
+  if (p?.length !== 3) return null;
+  const [m, d, y] = p.map(Number);
+  if (isNaN(m) || isNaN(d) || isNaN(y)) return null;
+  const dt = new Date(y, m - 1, d);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+function toDateString(dateStr: string): string {
+  const parts = dateStr.trim().split('/');
+  if (parts.length !== 3) return '';
+  const [m, d, y] = parts.map(Number);
+  if (isNaN(m) || isNaN(d) || isNaN(y)) return '';
+  return `${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}/${y}`;
+}
+
+function getPageNumbers(total: number, current: number): (number | string)[] {
+  const pages: (number | string)[] = [];
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i);
+  } else if (current <= 4) {
+    for (let i = 1; i <= 5; i++) pages.push(i);
+    pages.push('...'); pages.push(total);
+  } else if (current >= total - 3) {
+    pages.push(1); pages.push('...');
+    for (let i = total - 4; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1); pages.push('...');
+    for (let i = current - 1; i <= current + 1; i++) pages.push(i);
+    pages.push('...'); pages.push(total);
+  }
+  return pages;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DateInputField
+// ─────────────────────────────────────────────────────────────────────────────
+interface DateInputFieldProps {
+  label: string;
   value: string;
-  onChange: (date: string) => void;
-  onClose: () => void;
-  position: { top: number; left: number };
+  onChange: (d: string) => void;
 }
 
-function CalendarPopup({ value, onChange, onClose, position }: CalendarPopupProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const popupRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
-  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-  
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                     'July', 'August', 'September', 'October', 'November', 'December'];
-
-  const handlePrevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
-  };
-
-  const handleNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
-  };
-
-  const handleDateClick = (day: number) => {
-    const month = currentMonth.getMonth() + 1;
-    const year = currentMonth.getFullYear();
-    const formattedDate = `${month}/${day}/${year}`;
-    onChange(formattedDate);
-    onClose();
-  };
-
-  const renderDays = () => {
-    const days = [];
-    const prevMonthDays = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 0).getDate();
-    
-    // Previous month days
-    for (let i = firstDayOfMonth - 1; i >= 0; i--) {
-      days.push(
-        <div key={`prev-${i}`} className="text-center py-2 text-gray-400 text-sm">
-          {prevMonthDays - i}
-        </div>
-      );
-    }
-    
-    // Current month days
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(
-        <div
-          key={day}
-          onClick={() => handleDateClick(day)}
-          className="text-center py-2 text-sm cursor-pointer hover:bg-blue-100 rounded transition-colors"
-        >
-          {day}
-        </div>
-      );
-    }
-    
-    // Next month days to fill the grid
-    const remainingDays = 42 - days.length;
-    for (let day = 1; day <= remainingDays; day++) {
-      days.push(
-        <div key={`next-${day}`} className="text-center py-2 text-gray-400 text-sm">
-          {day}
-        </div>
-      );
-    }
-    
-    return days;
-  };
-
+function DateInputField({ label, value, onChange }: DateInputFieldProps) {
+  const [open, setOpen] = useState(false);
   return (
-    <div
-      ref={popupRef}
-      className="absolute bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-50"
-      style={{ top: position.top, left: position.left, width: '280px' }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+    <div>
+      <label className="block text-gray-700 text-sm mb-2">{label}</label>
+      <div className="relative">
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="MM/DD/YYYY"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9"
+        />
         <button
-          onClick={handlePrevMonth}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          <Calendar className="w-3.5 h-3.5" />
         </button>
-        <div className="font-medium">
-          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-        </div>
-        <button
-          onClick={handleNextMonth}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Day headers */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-          <div key={day} className="text-center text-xs text-gray-600 font-medium">
-            {day}
+        {open && (
+          <div className="absolute top-full left-0 mt-1 z-[9999]">
+            <CalendarPopup
+              onDateSelect={date => { onChange(date); setOpen(false); }}
+              onClose={() => setOpen(false)}
+            />
           </div>
-        ))}
-      </div>
-
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
-        {renderDays()}
+        )}
       </div>
     </div>
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PaginationRow
+// ─────────────────────────────────────────────────────────────────────────────
+function PaginationRow({ total, current, setPage, start, end, count }: {
+  total: number; current: number; setPage: (p: number) => void;
+  start: number; end: number; count: number;
+}) {
+  return (
+    <div className="flex items-center justify-between mt-3">
+      <div className="text-gray-600 text-xs">
+        Showing {count === 0 ? 0 : start + 1} to {Math.min(end, count)} of {count} entries
+      </div>
+      <div className="flex gap-1">
+        <button type="button" onClick={() => setPage(Math.max(current - 1, 1))} disabled={current === 1}
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50">
+          Previous
+        </button>
+        {getPageNumbers(total, current).map((page, idx) =>
+          page === '...'
+            ? <span key={`e${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+            : (
+              <button key={page} type="button" onClick={() => setPage(page as number)}
+                className={`px-2 py-1 rounded text-xs ${current === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                {page}
+              </button>
+            )
+        )}
+        <button type="button" onClick={() => setPage(Math.min(current + 1, total))} disabled={current === total || total === 0}
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50">
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Page
+// ─────────────────────────────────────────────────────────────────────────────
+type FilterTab = 'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit';
+
+const FILTER_TABS: { name: FilterTab; icon: React.ElementType }[] = [
+  { name: 'TK Group',       icon: Users        },
+  { name: 'Branch',         icon: Building2    },
+  { name: 'Department',     icon: Briefcase    },
+  { name: 'Division',       icon: Network      },
+  { name: 'Group Schedule', icon: CalendarClock },
+  { name: 'Pay House',      icon: Wallet       },
+  { name: 'Section',        icon: Grid         },
+  { name: 'Unit',           icon: Box          },
+];
+
 export function PayrollDTRAllowancePage() {
-  const [activeTab, setActiveTab] = useState<'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit'>('TK Group');
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
-  const [dateRangeFrom, setDateRangeFrom] = useState('5/5/2021');
-  const [dateRangeTo, setDateRangeTo] = useState('05/05/2021');
+
+  // ── Date fields ───────────────────────────────────────────────────────────
+  const [dateFrom,         setDateFrom]         = useState(todayStr);
+  const [dateTo,           setDateTo]           = useState(todayStr);
+  const [transactionDate,  setTransactionDate]  = useState(todayStr);
+  const [assumedDate,      setAssumedDate]      = useState('');
   const [applyTransaction, setApplyTransaction] = useState(false);
-  const [transactionDate, setTransactionDate] = useState('12/26/2025');
-  const [assumedDate, setAssumedDate] = useState('');
-  const [leaveWithoutPayAndAbsences, setLeaveWithoutPayAndAbsences] = useState(false);
-  const [showCalendar, setShowCalendar] = useState<'dateRangeFrom' | 'dateRangeTo' | 'transactionDate' | 'assumedDate' | null>(null);
-  const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [leaveWithoutPay,  setLeaveWithoutPay]  = useState(false);
+  const [isExporting,      setIsExporting]      = useState(false);
 
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<FilterTab>('TK Group');
+
+  // ── Group/Employee list states ────────────────────────────────────────────
+  const [tkGroupItems,       setTKGroupItems]       = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [divisionItems,      setDivisionItems]      = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
+  const [unitItems,          setUnitItems]          = useState<GroupItem[]>([]);
+  const [employeeItems,      setEmployeeItems]      = useState<EmployeeItem[]>([]);
+  const [loadingEmployees,   setLoadingEmployees]   = useState(false);
+
+  const [selectedGroups,    setSelectedGroups]    = useState<number[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+
+  const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);  
-  const [currentEmpPage, setCurrentEmpPage] = useState(1);
- 
-  const itemsPerPage = 10;
+  const [currentGroupPage,   setCurrentGroupPage]   = useState(1);
+  const [currentEmpPage,     setCurrentEmpPage]     = useState(1);
+  const [activeFilter,       setActiveFilter]       = useState<ActiveFilter>('active');
 
-   // TKSGroup List states
-   const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
-   const [tkGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
- 
-   // Employee List states
-   const [loadingEmployees, setLoadingEmployees] = useState(false);
-   const [employeeItems, setEmployeeItems] = useState<EmployeeItem[]>([]);
+  useEffect(() => { setCurrentGroupPage(1); setGroupSearchTerm(''); }, [activeTab]);
+  useEffect(() => { setCurrentEmpPage(1); }, [activeFilter, employeeSearchTerm]);
 
-   // Fetch TKSGroup data from API
-    const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
-    const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+  // ── Fetch helpers ─────────────────────────────────────────────────────────
+const fetchTKGroupData = async (): Promise<GroupItem[]> => {
+  const userName = getLoggedInUsername();
+  const url = userName && userName !== 'Guest'
+    ? `/Fs/Process/TimeKeepGroupSetUp/by-user?userName=${encodeURIComponent(userName)}`
+    : `/Fs/Process/TimeKeepGroupSetUp`;
 
-    return response.data.map((item: any) => ({
-      id: item.ID || item.id ,
-      code: item.groupCode || item.code,
-      description: item.groupDescription || item.description,
-    }));
+  const res = await apiClient.get(url);
+  return (res.data ?? []).map((i: any) => ({
+    id: safeId(i.ID, i.id, i.groupID),
+    code: i.groupCode ?? i.code ?? '',
+    description: i.groupDescription ?? i.description ?? '',
+  })).filter((i: GroupItem) => i.id !== 0);
+};
+
+  const fetchBranchData = async (): Promise<GroupItem[]> => {
+    const res = await apiClient.get('/Fs/Employment/BranchSetUp');
+    return (res.data ?? []).map((i: any) => ({
+      id: safeId(i.braID, i.ID, i.id),
+      code: i.braCode ?? i.code ?? '',
+      description: i.braDesc ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
   };
 
-  useEffect(() => {
-    const loadTKSGroup = async () => {
-        const items = await fetchTKSGroupData(); // ✅ array
-      setTKSGroupItems(items);
-    };
+  const fetchDepartmentData = async (): Promise<GroupItem[]> => {
+    const res = await apiClient.get('/Fs/Employment/DepartmentSetUp');
+    return (res.data ?? []).map((i: any) => ({
+      id: safeId(i.depID, i.ID, i.id),
+      code: i.depCode ?? i.code ?? '',
+      description: i.depDesc ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+  };
 
-      loadTKSGroup();
-  }, []); 
+  const fetchDivisionData = async (): Promise<GroupItem[]> => {
+    const res = await apiClient.get('/Fs/Employment/DivisionSetUp');
+    return (res.data ?? []).map((i: any) => ({
+      id: safeId(i.divID, i.ID, i.id),
+      code: i.divCode ?? i.code ?? '',
+      description: i.divDesc ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+  };
 
-    // Fetch employee data from API
-    const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
-        const response = await apiClient.get('/EmployeeMasterFile');
+  const fetchGroupScheduleData = async (): Promise<GroupItem[]> => {
+    const res = await apiClient.get('/Fs/Employment/GroupSetUp');
+    return (Array.isArray(res.data) ? res.data : []).map((i: any) => ({
+      id: safeId(i.grpSchID, i.id, i.ID),
+      code: i.grpCode ?? i.code ?? '',
+      description: i.grpDesc ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+  };
 
-        const list = Array.isArray(response.data) ? response.data : [];
+  const fetchPayHouseData = async (): Promise<GroupItem[]> => {
+    const res = await apiClient.get('/Fs/Employment/PayHouseSetUp');
+    return (Array.isArray(res.data) ? res.data : []).map((i: any) => ({
+      id: safeId(i.phID, i.payHouseID, i.payhouseID, i.PayHouseID, i.PhID, i.lineID, i.ID, i.id),
+      code: i.phCode ?? i.payHouseCode ?? i.payhouseCode ?? i.lineCode ?? i.code ?? '',
+      description: i.phDesc ?? i.payHouseDesc ?? i.payhouseDesc ?? i.phName ?? i.lineDesc ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+  };
 
-        return list.map((item: any): EmployeeItem => ({
-            id: item.empID ?? item.ID ?? item.id,
-            code: item.empCode || item.code || '',
-            name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
+  const fetchSectionData = async (): Promise<GroupItem[]> => {
+    const res = await apiClient.get('/Fs/Employment/SectionSetUp');
+    return (Array.isArray(res.data) ? res.data : []).map((i: any) => ({
+      id: safeId(i.secID, i.ID, i.id),
+      code: i.secCode ?? i.sectionCode ?? i.code ?? '',
+      description: i.secDesc ?? i.Description ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+  };
 
-        }));
-    };
+  const fetchUnitData = async (): Promise<GroupItem[]> => {
+    const res = await apiClient.get('/Fs/Employment/UnitSetUp');
+    return (res.data ?? []).map((i: any) => ({
+      id: safeId(i.unitID, i.ID, i.id),
+      code: i.unitCode ?? i.code ?? '',
+      description: i.unitDesc ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+  };
 
-    useEffect(() => {
-        const loadEmployees = async () => {
-            const items = await fetchEmployeeData(); // EmployeeItem[]
-            setEmployeeItems(items);
+const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
+    const [{ employees }, configRes] = await Promise.all([
+        fetchEmployeesService(),
+        apiClient.get('/Maintenance/EmployeeBasicConfiguration'),
+    ]);
+
+    const configItems = Array.isArray(configRes.data)
+        ? configRes.data
+        : Array.isArray(configRes.data?.items)
+            ? configRes.data.items
+            : [];
+
+    const activeMap = new Map<string, boolean>();
+    configItems.forEach((c: any) => {
+        const code = (c.empCode ?? c.code ?? '').toString().toLowerCase().trim();
+        if (code) activeMap.set(code, Boolean(c.active ?? c.isActive ?? true));
+    });
+
+    return employees.map((i: any): EmployeeItem => {
+        const empCode = (i.empCode ?? i.code ?? '').toString().trim();
+
+        const isActive = activeMap.has(empCode.toLowerCase())
+            ? activeMap.get(empCode.toLowerCase())!
+            : i.status !== undefined
+                ? (typeof i.status === 'string'
+                    ? i.status.toLowerCase() === 'active'
+                    : Boolean(i.status))
+                : Boolean(i.isActive ?? i.empStatus ?? true);
+
+        return {
+            id:                safeId(i.empID, i.ID, i.id),
+            code:              empCode,
+            name:              `${i.lName ?? ''}, ${i.fName ?? ''} ${i.mName ?? ''}`.trim().replace(/,\s*$/, ''),
+            tkGroup:           i.tkGroup        ?? i.tKGroup        ?? i.groupCode       ?? i.tkGroupCode ?? '',
+            branchCode:        i.braCode        ?? i.branchCode     ?? i.branch          ?? '',
+            departmentCode:    i.depCode        ?? i.departmentCode ?? i.department      ?? '',
+            divisionCode:      i.divCode        ?? i.divisionCode   ?? i.division        ?? '',
+            groupScheduleCode: i.grpCode        ?? i.groupSchedule  ?? i.grpSchCode      ?? '',
+            payHouseCode:      i.phCode         ?? i.lineCode       ?? i.payCode         ?? i.payHouseCode ?? i.payHouse ?? '',
+            sectionCode:       i.secCode        ?? i.sectionCode    ?? i.section         ?? '',
+            unitCode:          i.unitCode       ?? i.unit           ?? '',
+            isActive,
         };
+    });
+};
+  useEffect(() => { fetchTKGroupData().then(setTKGroupItems).catch(() => {}); }, []);
+  useEffect(() => { fetchBranchData().then(setBranchItems).catch(() => {}); }, []);
+  useEffect(() => { fetchDepartmentData().then(setDepartmentItems).catch(() => {}); }, []);
+  useEffect(() => { fetchDivisionData().then(setDivisionItems).catch(() => {}); }, []);
+  useEffect(() => { fetchGroupScheduleData().then(setGroupScheduleItems).catch(() => {}); }, []);
+  useEffect(() => { fetchPayHouseData().then(setPayHouseItems).catch(() => {}); }, []);
+  useEffect(() => { fetchSectionData().then(setSectionItems).catch(() => {}); }, []);
+  useEffect(() => { fetchUnitData().then(setUnitItems).catch(() => {}); }, []);
+  useEffect(() => {
+    setLoadingEmployees(true);
+    fetchEmployeeData().then(setEmployeeItems).catch(() => {}).finally(() => setLoadingEmployees(false));
+  }, []);
 
-        loadEmployees();
-    }, []
-    );  
-
-  const filteredGroups = tkGroupItems.filter(item =>
-    item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredEmployees = employeeItems.filter(emp =>
-    emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
-  );    
-
- // Pagination logic
-  const totalPages = Math.ceil(filteredGroups.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-
-  const paginatedItem = filteredGroups.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-      // Get visible page numbers
-      const getStatusPageNumbers = () => 
-      {
-        const pages = [];
-        if (totalPages <= 7) {
-          for (let i = 1; i <= totalPages; i++) {
-            pages.push(i);
-          }
-        } else {
-          if (currentPage <= 4) {
-            for (let i = 1; i <= 5; i++) pages.push(i);
-            pages.push('...');
-            pages.push(totalPages);
-          } else if (currentPage >= totalPages - 3) {
-            pages.push(1);
-            pages.push('...');
-            for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
-          } else {
-            pages.push(1);
-            pages.push('...');
-            for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-            pages.push('...');
-            pages.push(totalPages);
-          }
-        }
-        return pages;
-      };
-
-    // Employee Pagination logic
-    const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
-    const startEmployeeIndex = (currentEmpPage - 1) * itemsPerPage;
-    const endEmployeeIndex = startEmployeeIndex + itemsPerPage;
-
-    const paginatedEmployees = filteredEmployees.slice(
-        (currentEmpPage - 1) * itemsPerPage,
-        currentEmpPage * itemsPerPage
-    );
-    // Get visible page numbers
-    const getEmployeePageNumbers = () => {
-        const pages = [];
-        const maxVisible = 5;
-        if (totalEmployeePages <= maxVisible) {
-            return Array.from({ length: totalEmployeePages }, (_, i) => i + 1);
-        }
-        pages.push(1);
-        if (currentEmpPage > 3) pages.push('...');
-        const start = Math.max(2, currentEmpPage - 1);
-        const end = Math.min(totalEmployeePages - 1, currentEmpPage + 1);
-        for (let i = start; i <= end; i++) pages.push(i);
-        if (currentEmpPage < totalEmployeePages - 2) pages.push('...');
-        pages.push(totalEmployeePages);
-        return pages;
-    };
-          
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedItems(checked ? tkGroupItems.map(item => item.id) : []);
+  // ── Derived: active tab items ─────────────────────────────────────────────
+  const getCurrentData = (): GroupItem[] => {
+    switch (activeTab) {
+      case 'Branch':         return branchItems;
+      case 'Department':     return departmentItems;
+      case 'Division':       return divisionItems;
+      case 'Group Schedule': return groupScheduleItems;
+      case 'Pay House':      return payHouseItems;
+      case 'Section':        return sectionItems;
+      case 'Unit':           return unitItems;
+      default:               return tkGroupItems;
+    }
   };
 
-  const handleSelectItem = (id: number, checked: boolean) => {
-    setSelectedItems(prev =>
-      checked ? [...prev, id] : prev.filter(itemId => itemId !== id)
-    );
+  const getSelectionTitle = (): string => {
+    switch (activeTab) {
+      case 'TK Group':       return 'TK Group Selection';
+      case 'Branch':         return 'Branch Selection';
+      case 'Department':     return 'Department Selection';
+      case 'Division':       return 'Division Selection';
+      case 'Group Schedule': return 'Group Schedule Selection';
+      case 'Pay House':      return 'Pay House Selection';
+      case 'Section':        return 'Section Selection';
+      case 'Unit':           return 'Unit Selection';
+      default:               return 'Selection';
+    }
   };
 
+  const getOrgFieldForTab = (): keyof EmployeeItem | null => {
+    switch (activeTab) {
+      case 'TK Group':       return 'tkGroup';
+      case 'Branch':         return 'branchCode';
+      case 'Department':     return 'departmentCode';
+      case 'Division':       return 'divisionCode';
+      case 'Group Schedule': return 'groupScheduleCode';
+      case 'Pay House':      return 'payHouseCode';
+      case 'Section':        return 'sectionCode';
+      case 'Unit':           return 'unitCode';
+      default:               return null;
+    }
+  };
+
+  const currentItems = getCurrentData();
+
+  const selectedGroupCodes = new Set(
+    currentItems
+      .filter(item => selectedGroups.includes(item.id))
+      .map(item => item.code.trim().toLowerCase())
+  );
+
+  const filteredGroups = currentItems.filter(item =>
+    item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
+    item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
+  );
+
+  const filteredEmployees = employeeItems.filter(emp => {
+    if (activeFilter === 'active'   && !emp.isActive) return false;
+    if (activeFilter === 'inactive' &&  emp.isActive) return false;
+    const matchesSearch =
+      emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+      emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+    if (selectedGroupCodes.size === 0) return true;
+    const orgField = getOrgFieldForTab();
+    if (!orgField) return true;
+    const empOrgValue = (emp[orgField] as string | undefined)?.trim().toLowerCase() ?? '';
+    return selectedGroupCodes.has(empOrgValue);
+  });
+
+  const activeCount   = employeeItems.filter(e => e.isActive).length;
+  const inactiveCount = employeeItems.filter(e => !e.isActive).length;
+
+  // ── Group pagination ───────────────────────────────────────────────────────
+  const totalGroupPages  = Math.ceil(filteredGroups.length / ITEMS_PER_PAGE);
+  const startGroupIndex  = (currentGroupPage - 1) * ITEMS_PER_PAGE;
+  const endGroupIndex    = startGroupIndex + ITEMS_PER_PAGE;
+  const paginatedGroups  = filteredGroups.slice(startGroupIndex, endGroupIndex);
+
+  // ── Employee pagination ────────────────────────────────────────────────────
+  const totalEmployeePages  = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
+  const startEmployeeIndex  = (currentEmpPage - 1) * ITEMS_PER_PAGE;
+  const endEmployeeIndex    = startEmployeeIndex + ITEMS_PER_PAGE;
+  const paginatedEmployees  = filteredEmployees.slice(startEmployeeIndex, endEmployeeIndex);
+
+  // ── Selection handlers ────────────────────────────────────────────────────
   const handleGroupToggle = (id: number) => {
-    setSelectedItems(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    if (!id) return;
+    setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleSelectAllGroups = () => {
+    setSelectedGroups(
+      selectedGroups.length === filteredGroups.length
+        ? []
+        : filteredGroups.filter(g => g.id !== 0).map(g => g.id)
     );
   };
 
   const handleEmployeeToggle = (id: number) => {
-    setSelectedEmployees(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    if (!id) return;
+    setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleSelectAllEmployees = () => {
+    setSelectedEmployees(
+      selectedEmployees.length === filteredEmployees.length
+        ? []
+        : filteredEmployees.filter(e => e.id !== 0).map(e => e.id)
     );
   };
-    
-  const handleSelectAllEmployees = () => {
-    if (selectedEmployees.length === filteredEmployees.length) {
-      setSelectedEmployees([]);
-    } else {
-      setSelectedEmployees(filteredEmployees.map(e => e.id));
+
+  // ── Export — background job with progress polling ─────────────────────────
+  const handleExport = async () => {
+    if (selectedEmployees.length === 0) {
+      Swal.fire({ icon: 'warning', title: 'Validation', text: 'Please select at least one employee.' }); return;
+    }
+    if (!dateFrom) {
+      Swal.fire({ icon: 'warning', title: 'Validation', text: 'Please select Date From.' }); return;
+    }
+    if (!dateTo) {
+      Swal.fire({ icon: 'warning', title: 'Validation', text: 'Please select Date To.' }); return;
+    }
+    if (!leaveWithoutPay) {
+      Swal.fire({ icon: 'warning', title: 'Validation', text: 'Please check "Leave Without Pay And Absences" under Option to proceed.' }); return;
+    }
+    if (applyTransaction && !transactionDate) {
+      Swal.fire({ icon: 'warning', title: 'Validation', text: 'Transaction Date is required.' }); return;
+    }
+
+    const dfParsed = parseDateStr(dateFrom);
+    const dtParsed = parseDateStr(dateTo);
+    if (dfParsed && dtParsed && dfParsed > dtParsed) {
+      Swal.fire({ icon: 'warning', title: 'Validation', text: 'Date From cannot be greater than Date To.' }); return;
+    }
+
+    if (assumedDate) {
+      const dtAssumed = parseDateStr(assumedDate);
+      if (dtParsed && dtAssumed && dtParsed >= dtAssumed) {
+        Swal.fire({ icon: 'warning', title: 'Validation', text: 'Assumed Date should not be less than or equal to Date To.' }); return;
+      }
+    }
+
+    const empCodes = employeeItems
+      .filter(e => selectedEmployees.includes(e.id))
+      .map(e => e.code);
+
+    const requestBody = {
+      EmpCodes:             empCodes,
+      DateFrom:             toDateString(dateFrom),
+      DateTo:               toDateString(dateTo),
+      LeaveAndAbsences:     leaveWithoutPay,
+      ApplyTransactionDate: applyTransaction,
+      TransactionDate:      applyTransaction ? toDateString(transactionDate) : null,
+      AssumedDate:          assumedDate ? toDateString(assumedDate) : null,
+      ExportTo:             'SQL',
+    };
+
+    setIsExporting(true);
+
+    // Show initial progress Swal
+    Swal.fire({
+      title: 'Exporting...',
+      html: `
+        <p id="swal-msg" style="font-size:14px;color:#374151;margin-bottom:10px;">
+          Starting export for ${empCodes.length} employee(s)...
+        </p>
+        <div style="background:#e5e7eb;border-radius:9999px;height:10px;overflow:hidden;">
+          <div id="swal-bar"
+            style="background:#2563eb;height:10px;border-radius:9999px;width:0%;transition:width 0.4s ease;">
+          </div>
+        </div>
+        <p id="swal-pct" style="font-size:12px;color:#6b7280;margin-top:6px;">0%</p>
+      `,
+      allowOutsideClick: false,
+      allowEscapeKey:    false,
+      showConfirmButton: false,
+    });
+
+    try {
+      // ── Step 1: POST to start export → returns jobId INSTANTLY ───────────
+      const { data } = await apiClient.post('/ExportPayrollAllow/export', requestBody);
+      const jobId: string = data.jobId;
+
+      // ── Step 2: Poll GET /status/{jobId} every 2 seconds ─────────────────
+      await new Promise<void>((resolve, reject) => {
+        const interval = setInterval(async () => {
+          try {
+            const { data: status } = await apiClient.get(
+              `/ExportPayrollAllow/status/${jobId}`
+            );
+
+            // Update progress bar and message in the Swal
+            const msg = document.getElementById('swal-msg');
+            const bar = document.getElementById('swal-bar');
+            const pct = document.getElementById('swal-pct');
+            if (msg) msg.textContent = status.message;
+            if (bar) bar.style.width = `${status.percent}%`;
+            if (pct) pct.textContent = `${status.percent}%`;
+
+            if (status.status === 'done') {
+              clearInterval(interval);
+              resolve();
+            } else if (status.status === 'failed') {
+              clearInterval(interval);
+              reject(new Error(status.error ?? 'Export failed.'));
+            }
+          } catch (pollErr) {
+            clearInterval(interval);
+            reject(pollErr);
+          }
+        }, 2000); // poll every 2 seconds
+      });
+
+      // ── Done ─────────────────────────────────────────────────────────────
+      Swal.fire({
+        icon:              'success',
+        title:             'Export Successful',
+        text:              'DTR Allowance data has been exported successfully.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#2563eb',
+      });
+
+    } catch (error: any) {
+      const msg = error.response?.data?.message || error.message || 'An unexpected error occurred.';
+      Swal.fire({ icon: 'error', title: 'Export Failed', text: msg });
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  const handleDateChange = (date: string) => {
-    if (showCalendar === 'dateRangeFrom') {
-      setDateRangeFrom(date);
-    } else if (showCalendar === 'dateRangeTo') {
-      setDateRangeTo(date);
-    } else if (showCalendar === 'transactionDate') {
-      setTransactionDate(date);
-    } else if (showCalendar === 'assumedDate') {
-      setAssumedDate(date);
-    }
-  };
-
-  const renderPageNumbers = (total: number, current: number, setPage: (page: number) => void) => {
-    const pages = [];
-    const maxVisiblePages = 5;
-    
-    if (total <= maxVisiblePages) {
-      for (let i = 1; i <= total; i++) {
-        pages.push(
-          <button
-            key={i}
-            onClick={() => setPage(i)}
-            className={`px-3 py-1 rounded text-sm ${
-              current === i
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            {i}
-          </button>
-        );
-      }
-    } else {
-      for (let i = 1; i <= Math.min(5, total); i++) {
-        pages.push(
-          <button
-            key={i}
-            onClick={() => setPage(i)}
-            className={`px-3 py-1 rounded text-sm ${
-              current === i
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            {i}
-          </button>
-        );
-      }
-      
-      if (total > 6) {
-        pages.push(
-          <span key="ellipsis" className="px-2 text-gray-500">...</span>
-        );
-      }
-      
-      if (total > 5) {
-        pages.push(
-          <button
-            key={total}
-            onClick={() => setPage(total)}
-            className={`px-3 py-1 rounded text-sm ${
-              current === total
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            {total}
-          </button>
-        );
-      }
-    }
-    
-    return pages;
-  };
-
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 relative z-10 p-6">
         <div className="max-w-7xl mx-auto relative">
+
           {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Export DTR Allowance</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
+
+            {/* Info Banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -420,55 +608,68 @@ export function PayrollDTRAllowancePage() {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Export Daily Time Record (DTR) and allowance data for payroll processing. Select employees by group, filter by status, and configure transaction dates.
+                    Export Daily Time Record (DTR) and allowance data for payroll processing.
+                    Select employees using the filters below, configure date ranges, and set transaction options.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Export DTR and allowances</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Filter by employee status</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Configure date ranges</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Leave and absence options</span>
-                    </div>
+                    {[
+                      'Export DTR and allowances',
+                      'Filter by TK Group, Branch, Department, and more',
+                      'Configure date ranges and transaction options',
+                      'Leave and absence options',
+                    ].map(t => (
+                      <div key={t} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">{t}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Two Column Layout */}
+            {/* ── Tabs ── */}
+            <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
+              {FILTER_TABS.map(tab => (
+                <button
+                  key={tab.name}
+                  onClick={() => setActiveTab(tab.name)}
+                  className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${
+                    activeTab === tab.name
+                      ? 'font-medium bg-blue-600 text-white -mb-px'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.name}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Selection Grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* Left Column - Groups */}
+
+              {/* Group Selection */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                {/* Search */}
-                <div className="mb-4 flex items-center gap-3">
-                  <label className="text-sm text-gray-700">Search:</label>
+                <h3 className="text-gray-900 mb-4">{getSelectionTitle()}</h3>
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder=""
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Search..."
+                    value={groupSearchTerm}
+                    onChange={e => setGroupSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
-
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-gray-100 border-b border-gray-200">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.length === tkGroupItems.length}
-                            onChange={(e) => handleSelectAll(e.target.checked)}
+                          <input type="checkbox"
+                            checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0}
+                            onChange={handleSelectAllGroups}
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                           />
                         </th>
@@ -477,13 +678,15 @@ export function PayrollDTRAllowancePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {paginatedItem.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedItems.includes(item.id)}
-                              onChange={(e) => handleSelectItem(item.id, e.target.checked)}
+                      {paginatedGroups.length === 0 ? (
+                        <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No records found.</td></tr>
+                      ) : paginatedGroups.map(item => (
+                        <tr key={item.id} className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => handleGroupToggle(item.id)}>
+                          <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
+                            <input type="checkbox"
+                              checked={selectedGroups.includes(item.id)}
+                              onChange={() => handleGroupToggle(item.id)}
                               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
                           </td>
@@ -494,306 +697,180 @@ export function PayrollDTRAllowancePage() {
                     </tbody>
                   </table>
                 </div>
-                {/* Pagination */}
-                <div className="flex items-center justify-between mt-3">
-                  <div className="text-gray-600 text-xs">
-                    Showing {filteredGroups.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredGroups.length)} of {filteredGroups.length} entries
-                    </div>
-                    <div className="flex gap-1">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Previous
-                        </button>
-                        {getStatusPageNumbers().map((page, idx) => (
-                            page === '...' ? (
-                                <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-                            ) : (
-                                <button
-                                    key={page}
-                                    onClick={() => setCurrentPage(page as number)}
-                                    className={`px-2 py-1 rounded text-xs ${currentPage === page
-                                            ? 'bg-blue-600 text-white'
-                                            : 'border border-gray-300 hover:bg-gray-100'
-                                        }`}
-                                >
-                                    {page}
-                                </button>
-                            )
-                        ))}
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages || totalPages === 0}
-                            className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Next
-                        </button>
-                    </div>
-                </div>
+                <PaginationRow
+                  total={totalGroupPages} current={currentGroupPage} setPage={setCurrentGroupPage}
+                  start={startGroupIndex} end={endGroupIndex} count={filteredGroups.length}
+                />
               </div>
 
-              {/* Right Column - Employees */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <div className="mb-4 flex items-center gap-3">
-                    <label className="text-sm text-gray-700">Search:</label>
-                    <input
-                      type="text"
-                      value={employeeSearchTerm}
-                      onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
-                  </div>
+              {/* Employee Selection */}
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">Employees</h3>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">
+                    {selectedEmployees.length} selected
+                  </span>
+                </div>
 
-                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-gray-100 border-b border-gray-200">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs text-gray-600">
-                            <input
-                              type="checkbox"
-                              checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
-                              onChange={handleSelectAllEmployees}
+                {/* Active / Inactive filter toggle */}
+                <div className="flex items-center gap-1 mb-3 p-1 bg-gray-200 rounded-lg w-fit">
+                  {(
+                    [
+                      { key: 'all',      label: 'All',      count: employeeItems.length },
+                      { key: 'active',   label: 'Active',   count: activeCount          },
+                      { key: 'inactive', label: 'Inactive', count: inactiveCount        },
+                    ] as { key: ActiveFilter; label: string; count: number }[]
+                  ).map(opt => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setActiveFilter(opt.key)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                        activeFilter === opt.key
+                          ? opt.key === 'active'
+                            ? 'bg-green-500 text-white shadow-sm'
+                            : opt.key === 'inactive'
+                            ? 'bg-red-400 text-white shadow-sm'
+                            : 'bg-white text-gray-700 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {opt.label}
+                      <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                        activeFilter === opt.key
+                          ? 'bg-white bg-opacity-30 text-white'
+                          : 'bg-gray-300 text-gray-600'
+                      }`}>
+                        {opt.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search employees..."
+                    value={employeeSearchTerm}
+                    onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }}
+                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">
+                          <input type="checkbox"
+                            checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
+                            onChange={handleSelectAllEmployees}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {loadingEmployees ? (
+                        <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">
+                          <div className="flex items-center justify-center gap-2">
+                            <svg className="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                            Loading employees...
+                          </div>
+                        </td></tr>
+                      ) : paginatedEmployees.length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">No records found.</td></tr>
+                      ) : paginatedEmployees.map(item => (
+                        <tr key={item.id} className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => handleEmployeeToggle(item.id)}>
+                          <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
+                            <input type="checkbox"
+                              checked={selectedEmployees.includes(item.id)}
+                              onChange={() => handleEmployeeToggle(item.id)}
                               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
-                          <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              item.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full mr-1 ${
+                                item.isActive ? 'bg-green-500' : 'bg-red-400'
+                              }`} />
+                              {item.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {paginatedEmployees.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2">
-                              <input
-                                type="checkbox"
-                                checked={selectedEmployees.includes(item.id)}
-                                onChange={() => handleEmployeeToggle(item.id)}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                              />
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {/* Pagination */}
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
-                        disabled={currentEmpPage === 1}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
-                      {getEmployeePageNumbers().map((page, index) => (
-                        typeof page === 'number' ? (
-                          <button
-                            key={index}
-                            onClick={() => setCurrentEmpPage(page)}
-                            className={`px-2 py-1 rounded text-xs ${
-                              currentEmpPage === page
-                                ? 'bg-blue-500 text-white'
-                                : 'border border-gray-300 hover:bg-gray-100'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ) : (
-                          <span key={index} className="px-2">
-                            {page}
-                          </span>
-                        )
                       ))}
-                      <button
-                        onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
-                        disabled={currentEmpPage === totalEmployeePages}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="mt-4 flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="statusFilter"
-                        value="active"
-                        checked={statusFilter === 'active'}
-                        onChange={() => setStatusFilter('active')}
-                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">Active</span>
-                    </label>
-                    
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="statusFilter"
-                        value="inactive"
-                        checked={statusFilter === 'inactive'}
-                        onChange={() => setStatusFilter('inactive')}
-                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">In Active</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="statusFilter"
-                        value="all"
-                        checked={statusFilter === 'all'}
-                        onChange={() => setStatusFilter('all')}
-                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">All</span>
-                    </label>
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
+                <PaginationRow
+                  total={totalEmployeePages} current={currentEmpPage} setPage={setCurrentEmpPage}
+                  start={startEmployeeIndex} end={endEmployeeIndex} count={filteredEmployees.length}
+                />
+              </div>
             </div>
 
-            {/* Bottom Section - Date Options and Export */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column - Date Range and Transaction Details */}
-              <div className="space-y-6">
-                {/* Date Range */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-gray-900 mb-4">Date Range</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2">From:</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={dateRangeFrom}
-                          onChange={(e) => setDateRangeFrom(e.target.value)}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <CalendarPopover
-                          date={dateRangeFrom}
-                          onChange={setDateRangeFrom}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2">To:</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={dateRangeTo}
-                          onChange={(e) => setDateRangeTo(e.target.value)}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <CalendarPopover
-                          date={dateRangeTo}
-                          onChange={setDateRangeTo}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Transaction Date */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-gray-900 mb-4">Transaction Date</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={transactionDate}
-                        onChange={(e) => setTransactionDate(e.target.value)}
-                        className="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                      <CalendarPopover
-                        date={transactionDate}
-                        onChange={setDateRangeFrom}
-                      />
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={applyTransaction}
-                        onChange={(e) => setApplyTransaction(e.target.checked)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm text-gray-700">Apply</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Assumed Date */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-gray-900 mb-4">Assumed Date</h3>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={assumedDate}
-                      onChange={(e) => setAssumedDate(e.target.value)}
-                      className="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
-                      <CalendarPopover
-                        date={assumedDate}
-                        onChange={setAssumedDate}
-                      />
-                  </div>
-                </div>
+            {/* ── Export Options ── */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 mb-6">
+              <div className="p-4 border-b border-gray-200 mb-4">
+                <h2 className="text-gray-900">Export Options</h2>
               </div>
 
-              {/* Right Column - Options and Export */}
-              <div className="space-y-6">
-                {/* Option */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-gray-900 mb-4">Option</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <DateInputField label="Date From" value={dateFrom} onChange={setDateFrom} />
+                <DateInputField label="Date To"   value={dateTo}   onChange={setDateTo} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <DateInputField label="Transaction Date" value={transactionDate} onChange={setTransactionDate} />
+                <div className="flex items-end">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={leaveWithoutPayAndAbsences}
-                      onChange={(e) => setLeaveWithoutPayAndAbsences(e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-700">Leave WithOut Pay And Absences</span>
+                    <input type="checkbox" checked={applyTransaction}
+                      onChange={e => setApplyTransaction(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                    <span className="text-sm text-gray-700">Apply Transaction Date</span>
                   </label>
                 </div>
+                <DateInputField label="Assumed Date" value={assumedDate} onChange={setAssumedDate} />
+              </div>
 
-                {/* Export Button */}
-                <div className="flex justify-end">
-                  <button className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    Export
-                  </button>
-                </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Option</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={leaveWithoutPay}
+                    onChange={e => setLeaveWithoutPay(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                  <span className="text-sm text-gray-700">Leave Without Pay And Absences</span>
+                </label>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Upload className="w-4 h-4" />
+                  {isExporting ? 'Exporting...' : 'Export'}
+                </button>
               </div>
             </div>
+
           </div>
         </div>
       </div>
-
-      {/* Calendar Popup */}
-      {showCalendar && (
-        <CalendarPopup
-          value={
-            showCalendar === 'dateRangeFrom' ? dateRangeFrom :
-            showCalendar === 'dateRangeTo' ? dateRangeTo :
-            showCalendar === 'transactionDate' ? transactionDate :
-            assumedDate
-          }
-          onChange={handleDateChange}
-          onClose={() => setShowCalendar(null)}
-          position={calendarPosition}
-        />
-      )}
-
     </div>
   );
 }

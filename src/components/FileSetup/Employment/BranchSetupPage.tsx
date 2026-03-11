@@ -7,8 +7,11 @@ import apiClient from "../../../services/apiClient";
 import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Branch SetUp';
+import { fetchEmployees } from "../../../services/employeeService";
+
+// Form Name
+const formName = 'Branch SetUp';
+
 export function BranchSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,7 +64,6 @@ export function BranchSetupPage() {
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
 
-  // Fetch branch data from API
   useEffect(() => {
     getBranchPermissions();
     fetchBranchData();
@@ -117,26 +119,22 @@ export function BranchSetupPage() {
     }
   };
 
-  const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError("");
-    try {
-      const response = await apiClient.get("/Maintenance/EmployeeMasterFile");
-      if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((emp: any) => ({
-          empCode: emp.empCode || emp.code || "",
-          name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
-          groupCode: emp.grpCode || "",
-        }));
-        setEmployeeData(mappedData);
-      }
-    } catch (error: any) {
-      setEmployeeError("Failed to load employees");
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
-
+const fetchEmployeeData = async () => {
+  setLoadingEmployees(true);
+  setEmployeeError('');
+  try {
+    const { employees } = await fetchEmployees();
+    setEmployeeData(employees.map((emp) => ({
+      empCode: emp.empCode || '',
+      name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+      groupCode: emp.grpCode || '',
+    })));
+  } catch (error: any) {
+    setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+  } finally {
+    setLoadingEmployees(false);
+  }
+};
   const fetchDeviceData = async () => {
     setLoadingDevices(true);
     setDeviceError("");
@@ -167,9 +165,66 @@ export function BranchSetupPage() {
     return () => document.removeEventListener("keydown", handleEscKey);
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedBranchIndex(null);
+    setBranchId(null);
     setCode("");
     setDescription("");
     setBranchManagerCode("");
@@ -191,48 +246,90 @@ export function BranchSetupPage() {
   };
 
   const handleDelete = async (branch: any) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
       text: `Are you sure you want to delete branch ${branch.code}?`,
       showCancelButton: true,
       confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
       confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
     });
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/Employment/BranchSetUp/${branch.id}`);
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted branch ${branch.code}`,
-            messages: `Branch deleted: ${branch.code} - ${branch.description}`,
-            formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Branch deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the branch list
-        await fetchBranchData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete branch";
+
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Check if branch is used in Employee Masterfile ────────────────
+    try {
+      const empResponse = await apiClient.get('/Maintenance/EmployeeMasterFile');
+      const employees: any[] = Array.isArray(empResponse.data)
+        ? empResponse.data
+        : [];
+
+      const isUsedInMasterfile = employees.some(
+        (emp: any) =>
+          (emp.braCode ?? "").trim().toUpperCase() ===
+          (branch.code ?? "").trim().toUpperCase(),
+      );
+
+      if (isUsedInMasterfile) {
         await Swal.fire({
           icon: "error",
-          title: "Error",
-          text: errorMsg,
+          title: "Cannot Delete",
+          text: "This setup is already used in Employee Masterfile.",
         });
-        console.error("Error deleting branch:", error);
+        return;
       }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate branch usage.",
+      });
+      return;
+    }
+
+    // ── 4. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/Employment/BranchSetUp/${branch.id}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted branch ${branch.code}`,
+        messages: `Branch deleted: ${branch.code} - ${branch.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Branch deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchBranchData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete branch";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting branch:", error);
     }
   };
 
   const handleSubmit = async () => {
+    // ── 1. Basic required-field check ────────────────────────────────────
     if (!code.trim()) {
       await Swal.fire({
         icon: "warning",
@@ -241,23 +338,65 @@ export function BranchSetupPage() {
       });
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = branchList.some((branch, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedBranchIndex === index) {
-        return false;
-      }
-      return branch.code.toLowerCase() === code.trim().toLowerCase();
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
+    const isDuplicateCode = branchList.some((branch, index) => {
+      if (isEditMode && selectedBranchIndex === index) return false;
+      return branch.code.trim().toUpperCase() === code.trim().toUpperCase();
     });
 
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
         title: "Duplicate Code",
-        text: "This code is already in use. Please use a different code.",
+        text: "Code is already exist.",
       });
       return;
     }
+
+    // ── 4. Duplicate description check ──────────────────────────────────
+    const isDuplicateDesc = branchList.some((branch, index) => {
+      if (isEditMode && selectedBranchIndex === index) return false;
+      return (
+        (branch.description ?? "").trim().toUpperCase() ===
+        description.trim().toUpperCase()
+      );
+    });
+
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
+      return;
+    }
+
+    // ── 5. Duplicate device name check (skip when deviceName is empty) ───
+    if (deviceName.trim() !== "") {
+      const isDuplicateDevice = branchList.some((branch, index) => {
+        if (isEditMode && selectedBranchIndex === index) return false;
+        return (
+          (branch.deviceName ?? "").trim().toUpperCase() ===
+          deviceName.trim().toUpperCase()
+        );
+      });
+
+      if (isDuplicateDevice) {
+        await Swal.fire({
+          icon: "error",
+          title: "Duplicate Device",
+          text: "Device Name is already used.",
+        });
+        return;
+      }
+    }
+
+    // ── 6. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -272,18 +411,18 @@ export function BranchSetupPage() {
       if (isEditMode) {
         await apiClient.put(`/Fs/Employment/BranchSetUp/${branchId}`, payload);
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited branch ${payload.braCode}`,
-            messages: `Branch updated: ${payload.braCode} - ${payload.braDesc}`,
-            formName,
+          accessType: 'Edit',
+          trans: `Edited branch ${payload.braCode}`,
+          messages: `Branch updated: ${payload.braCode} - ${payload.braDesc}`,
+          formName,
         });
       } else {
         await apiClient.post('/Fs/Employment/BranchSetUp', payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added branch ${payload.braCode}`,
-            messages: `Branch created: ${payload.braCode} - ${payload.braDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added branch ${payload.braCode}`,
+          messages: `Branch created: ${payload.braCode} - ${payload.braDesc}`,
+          formName,
         });
       }
       await Swal.fire({
@@ -412,7 +551,7 @@ export function BranchSetupPage() {
               )}
             </div>
 
-            {/* Table Container - Scrollable on small screens */}
+            {/* Table */}
             <div className="overflow-x-auto border rounded-lg">
               {hasPermission("View") ? (
                 <table className="w-full border-collapse min-w-[700px]">
@@ -458,6 +597,10 @@ export function BranchSetupPage() {
                                   <Edit className="w-4 h-4" />
                                 </button>
                               )}
+                              {hasPermission("Edit") &&
+                                hasPermission("Delete") && (
+                                  <span className="text-gray-300">|</span>
+                                )}
                               {hasPermission("Delete") && (
                                 <button
                                   onClick={() => handleDelete(branch)}
@@ -480,7 +623,7 @@ export function BranchSetupPage() {
               )}
             </div>
 
-            {/* Pagination - Column on mobile */}
+            {/* Pagination */}
             {hasPermission("View") && (
               <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-4">
                 <div className="text-gray-600 text-sm">
@@ -500,7 +643,7 @@ export function BranchSetupPage() {
               </div>
             )}
 
-            {/* Modal - Better sizing for mobile */}
+            {/* Modal */}
             {showCreateModal && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 md:p-4">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col">
@@ -523,7 +666,6 @@ export function BranchSetupPage() {
                       Branch Setup
                     </h3>
 
-                    {/* Responsive Form Rows */}
                     <div className="grid gap-4">
                       {[
                         {
@@ -637,7 +779,8 @@ export function BranchSetupPage() {
                       </button>
                       <button
                         onClick={() => setShowCreateModal(false)}
-                        className="flex-1 min-w-[120px] px-6 py-2.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm"
+                        disabled={submitting}
+                        className="flex-1 min-w-[120px] px-6 py-2.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 text-sm"
                       >
                         Back to List
                       </button>

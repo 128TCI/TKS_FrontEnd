@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ChevronDown, Upload, Calendar, Search, Download, FileText, Check } from 'lucide-react';
-import { DatePickerWithButton } from './DateSetup/DatePickerWithButton';
-import { Footer } from './Footer/Footer';
-import { TKSGroupTable } from './TKSGroupTable';
+import { DatePickerWithButton } from '../components/DateSetup/DatePickerWithButton';
+import { Footer } from '../components/Footer/Footer';
+import { TKSGroupTable } from '../components/TKSGroupTable';
 import { tksGroupData } from '../data/tksGroupData';
 
 export function WorkshiftVariable2ShiftsPage() {

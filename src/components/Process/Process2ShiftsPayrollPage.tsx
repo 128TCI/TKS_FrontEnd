@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar, RotateCcw, Check, Users, Building2, Briefcase, CalendarClock, Clock, Search, Play, CheckCircle, Wallet, Grid, Network, Box, RefreshCw } from 'lucide-react';
 import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 import Swal from 'sweetalert2';
 
 interface GroupItem {
@@ -152,9 +153,11 @@ interface PopulateResult {
 
 export function Process2ShiftsPayrollPage() {
   const [activeTab, setActiveTab] = useState<'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit'>('TK Group');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
-  const [dateApplied, setDateApplied] = useState('7/7/2021');
+const today = new Date();
+const [dateApplied, setDateApplied] = useState(`${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`);
   const [lateFiling, setLateFiling] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -165,7 +168,17 @@ export function Process2ShiftsPayrollPage() {
   const resultPageSize = 50;
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
+  const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<string, number[]>>({
+    'TK Group': [], 'Branch': [], 'Department': [], 'Division': [],
+    'Group Schedule': [], 'Pay House': [], 'Section': [], 'Unit': [],
+  });
+  const selectedGroups = selectedGroupsMap[activeTab] ?? [];
+  const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) => {
+    setSelectedGroupsMap(prev => ({
+      ...prev,
+      [activeTab]: typeof updater === 'function' ? updater(prev[activeTab] ?? []) : updater,
+    }));
+  };
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
   const [currentEmpPage, setCurrentEmpPage] = useState(1);
@@ -202,16 +215,23 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
   const [sectionItems, setSectionItems] = useState<GroupItem[]>([]);
   const [unitItems, setUnitItems] = useState<GroupItem[]>([]);
   const [employeeItems, setEmployeeItems] = useState<EmployeeItem[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   // ── Fetch helpers ─────────────────────────────────────────────────────────
-  const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
-    const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
-    return response.data.map((item: any) => ({
-      id: item.ID || item.id,
-      code: item.groupCode || item.code,
-      description: item.groupDescription || item.description,
-    }));
-  };
+// ADD this
+const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
+  const userName = getLoggedInUsername();
+  const url = userName && userName !== 'Guest'
+    ? `/Fs/Process/TimeKeepGroupSetUp/by-user?userName=${encodeURIComponent(userName)}`
+    : `/Fs/Process/TimeKeepGroupSetUp`;
+
+  const response = await apiClient.get(url);
+  return (response.data ?? []).map((item: any) => ({
+    id: item.ID ?? item.id,
+    code: item.groupCode ?? item.code ?? '',
+    description: item.groupDescription ?? item.description ?? '',
+  })).filter((i: GroupItem) => i.id !== 0);
+};
 
   const fetchBranchData = async (): Promise<GroupItem[]> => {
     const response = await apiClient.get('/Fs/Employment/BranchSetUp');
@@ -279,23 +299,22 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
     }));
   };
 
-  const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
-    const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-    const list = Array.isArray(response.data) ? response.data : [];
-    return list.map((item: any): EmployeeItem => ({
-      id: item.empID ?? item.ID ?? item.id,
-      code: item.empCode || item.code || '',
-      name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
-      tkGroup:           item.tkGroup       ?? item.tKGroup       ?? item.groupCode      ?? item.tkGroupCode ?? '',
-      branchCode:        item.braCode       ?? item.branchCode    ?? item.branch         ?? '',
-      departmentCode:    item.depCode       ?? item.departmentCode?? item.department     ?? '',
-      divisionCode:      item.divCode       ?? item.divisionCode  ?? item.division       ?? '',
-      groupScheduleCode: item.grpCode       ?? item.groupSchedule ?? item.grpSchCode     ?? '',
-      payHouseCode:      item.lineCode      ?? item.payCode       ?? item.payHouseCode  ?? item.payHouse ?? '',
-      sectionCode:       item.secCode       ?? item.sectionCode   ?? item.section        ?? '',
-      unitCode:          item.unitCode      ?? item.unit          ?? '',
+const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
+    const { employees } = await fetchEmployeesService();
+    return employees.map((item: any): EmployeeItem => ({
+        id: item.empID ?? item.ID ?? item.id,
+        code: item.empCode || item.code || '',
+        name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
+        tkGroup:           item.tkGroup       ?? item.tKGroup       ?? item.groupCode      ?? item.tkGroupCode ?? '',
+        branchCode:        item.braCode       ?? item.branchCode    ?? item.branch         ?? '',
+        departmentCode:    item.depCode       ?? item.departmentCode?? item.department     ?? '',
+        divisionCode:      item.divCode       ?? item.divisionCode  ?? item.division       ?? '',
+        groupScheduleCode: item.grpCode       ?? item.groupSchedule ?? item.grpSchCode     ?? '',
+        payHouseCode:      item.lineCode      ?? item.payCode       ?? item.payHouseCode   ?? item.payHouse ?? '',
+        sectionCode:       item.secCode       ?? item.sectionCode   ?? item.section        ?? '',
+        unitCode:          item.unitCode      ?? item.unit          ?? '',
     }));
-  };
+};
 
   useEffect(() => { fetchTKSGroupData().then(setTKSGroupItems); }, []);
   useEffect(() => { fetchBranchData().then(setBranchItems); }, []);
@@ -308,18 +327,19 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
   useEffect(() => { fetchEmployeeData().then(setEmployeeItems); }, []);
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const getCurrentData = () => {
+  const getCurrentData = useCallback((): GroupItem[] => {
     switch (activeTab) {
-      case 'Branch': return branchItems;
-      case 'Department': return departmentItems;
-      case 'Division': return divisionItems;
+      case 'Branch':         return branchItems;
+      case 'Department':     return departmentItems;
+      case 'Division':       return divisionItems;
       case 'Group Schedule': return groupScheduleItems;
-      case 'Pay House': return payHouseItems;
-      case 'Section': return sectionItems;
-      case 'Unit': return unitItems;
-      default: return tkGroupItems;
+      case 'Pay House':      return payHouseItems;
+      case 'Section':        return sectionItems;
+      case 'Unit':           return unitItems;
+      default:               return tkGroupItems;
     }
-  };
+  }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems,
+      groupScheduleItems, payHouseItems, sectionItems, unitItems]);
 
   const currentItems = getCurrentData();
 
@@ -337,42 +357,24 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
     }
   };
 
+  // Re-fetch employees whenever tab, group selection, or status changes
+  useEffect(() => {
+    const allItems = getCurrentData();
+    fetchFilteredEmployees(activeTab, selectedGroups, allItems, statusFilter);
+    setSelectedEmployees([]);
+  }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
+
   const filteredGroups = currentItems.filter(item =>
     item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
 
-  const getOrgFieldForTab = (): keyof EmployeeItem | null => {
-    switch (activeTab) {
-      case 'TK Group':       return 'tkGroup';
-      case 'Branch':         return 'branchCode';
-      case 'Department':     return 'departmentCode';
-      case 'Division':       return 'divisionCode';
-      case 'Group Schedule': return 'groupScheduleCode';
-      case 'Pay House':      return 'payHouseCode';
-      case 'Section':        return 'sectionCode';
-      case 'Unit':           return 'unitCode';
-      default:               return null;
-    }
-  };
-
-  const selectedGroupCodes = new Set(
-    currentItems
-      .filter(item => selectedGroups.includes(item.id))
-      .map(item => item.code.trim().toLowerCase())
+  // Employee list is already filtered by the SP via fetchFilteredEmployees;
+  // apply local text search on top
+  const filteredEmployees = employeeItems.filter(emp =>
+    emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
-
-  const filteredEmployees = employeeItems.filter(emp => {
-    const matchesSearch =
-      emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-      emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase());
-    if (!matchesSearch) return false;
-    if (selectedGroupCodes.size === 0) return true;
-    const orgField = getOrgFieldForTab();
-    if (!orgField) return true;
-    const empOrgValue = (emp[orgField] as string | undefined)?.trim().toLowerCase() ?? '';
-    return selectedGroupCodes.has(empOrgValue);
-  });
 
   // Group Pagination
   const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
@@ -449,10 +451,10 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
       setProcessOptions({
         tardiness: newValue,
         leaveAbsences: newValue,
-        allowances: newValue,
+        allowances: false,
         nightDifferentials: newValue,
         undertime: newValue,
-        regularWorking: newValue,
+        regularWorking: false,
         overtime: newValue,
         selectAll: newValue,
       });
@@ -761,7 +763,10 @@ const parseDateToISO = (dateStr: string): string => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Group Selection */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                <h3 className="text-gray-900 mb-4">{getSelectionTitle()}</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">{getSelectionTitle()}</h3>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
+                </div> 
                 <div className="relative mb-4">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -854,7 +859,15 @@ const parseDateToISO = (dateStr: string): string => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {paginatedEmployees.map((item) => (
+                      {loadingEmployees ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td>
+                        </tr>
+                      ) : paginatedEmployees.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td>
+                        </tr>
+                      ) : paginatedEmployees.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="px-4 py-2">
                             <input type="checkbox"
@@ -871,7 +884,7 @@ const parseDateToISO = (dateStr: string): string => {
                   </table>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                  <span>Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries</span>
+                  <span>Showing {filteredEmployees.length === 0 ? 0 : startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries</span>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))} disabled={currentEmpPage === 1}
                       className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50">Previous</button>
@@ -886,6 +899,20 @@ const parseDateToISO = (dateStr: string): string => {
                     <button onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))} disabled={currentEmpPage === totalEmployeePages}
                       className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50">Next</button>
                   </div>
+                </div>
+                {/* Status filter */}
+                <div className="mt-4 flex items-center gap-6">
+                  {(['active', 'inactive', 'all'] as const).map(s => (
+                    <label key={s} className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="statusFilter2" value={s}
+                        checked={statusFilter === s}
+                        onChange={() => setStatusFilter(s)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                      <span className="text-sm text-gray-700 capitalize">
+                        {s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1016,7 +1043,7 @@ const parseDateToISO = (dateStr: string): string => {
                   {/* Row 2 — 3 items + Select All */}
                   {([
                     ['undertime',     'Undertime'],
-                    ['regularWorking','Regular Working'],
+                    ['regularWorking','Regular Working Days/Hours'],
                     ['overtime',      'Overtime'],
                   ] as [keyof typeof processOptions, string][]).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2 cursor-pointer">

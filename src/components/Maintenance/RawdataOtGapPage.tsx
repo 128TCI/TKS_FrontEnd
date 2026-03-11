@@ -6,7 +6,8 @@ import { Footer } from '../Footer/Footer';
 import apiClient from '../../services/apiClient';
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
 import { TimePicker } from '../Modals/TimePickerModal';
-
+import Swal from 'sweetalert2';
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -241,27 +242,24 @@ export function RawdataOtGapPage() {
         }
     }, [dateFrom, dateTo, incompleteLogs, filterType, specificEmpCode]);
 
-    const fetchEmployeeData = async () => {
-        setLoadingEmployees(true);
-        setEmployeeError('');
-        try {
-            const response = await apiClient.get(EMPLOYEE_MASTER_URL);
-            if (response.status === 200 && response.data) {
-                const mappedData = response.data.map((emp: any) => ({
-                    empCode:   emp.empCode || emp.code || '',
-                    name:      `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-                    groupCode: emp.grpCode || '',
-                }));
-                setEmployeeData(mappedData);
-            }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-            setEmployeeError(errorMsg);
-            console.error('Error fetching employees:', error);
-        } finally {
-            setLoadingEmployees(false);
-        }
-    };
+ const fetchEmployeeData = async () => {
+    setLoadingEmployees(true);
+    setEmployeeError('');
+    try {
+        const { employees } = await fetchEmployeesService();
+        setEmployeeData(employees.map((emp) => ({
+            empCode: emp.empCode || '',
+            name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+            groupCode: emp.grpCode || '',
+        })));
+    } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+        setEmployeeError(errorMsg);
+        console.error('Error fetching employees:', error);
+    } finally {
+        setLoadingEmployees(false);
+    }
+};
 
     const fetchWorkshifts = useCallback(async () => {
         setLoadingWorkshifts(true);
@@ -289,43 +287,95 @@ export function RawdataOtGapPage() {
     // CRUD
     // ─────────────────────────────────────────────────────────────────────────
 
-    const handleSubmit = async () => {
-        if (!empCode.trim()) { setFormError('Please select an Employee Code.'); return; }
-        if (!dateIn.trim())  { setFormError('Date In is required.'); return; }
-        setFormError('');
-        setSubmitLoading(true);
+ const handleSubmit = async () => {
+    if (!empCode.trim()) { setFormError('Please select an Employee Code.'); return; }
+    if (!dateIn.trim())  { setFormError('Date In is required.'); return; }
 
-        const payload = {
-            empCode,
-            actualDateIn: toISODate(actualDateIn || dateIn),
-            dateIn:       toISODate(dateIn),
-            timeIn:       toISODateTime(dateIn, timeIn),
-            dateOut:      toISODate(dateOut || dateIn),
-            timeOut:      toISODateTime(dateOut || dateIn, timeOut),
-            workShiftCode: workshiftCode,
-            dayType:      '',
-            otGap,
-            isLateFilingProcessed,
-        };
-
-        try {
-            if (editingId !== null) {
-                await apiClient.put(`${OT_GAP_BASE_URL}/${editingId}`, { ...payload, id: editingId });
-            } else {
-                await apiClient.post(OT_GAP_BASE_URL, payload);
-            }
-            setShowCreateModal(false);
-            setEditingId(null);
-            await fetchRecords();
-        } catch (error: any) {
-            const msg = error.response?.data?.message || error.message || 'Failed to save record';
-            setFormError(msg);
-            console.error('Error saving OT gap record:', error);
-        } finally {
-            setSubmitLoading(false);
+    // Validate: Date In must not be greater than Date Out
+    if (dateOut.trim() && timeOut.trim()) {
+        const dtIn  = new Date(toISODateTime(dateIn, timeIn));
+        const dtOut = new Date(toISODateTime(dateOut, timeOut));
+        if (dtIn > dtOut) {
+            setFormError("Invalid DateTime 'In' and DateTime 'Out'. Date In must not be later than Date Out.");
+            return;
         }
+    }
+
+    // Validate: Duplicate Date In (same empCode + same date) — skips current record when editing
+    const dateInDateOnly = toISODate(dateIn).slice(0, 10);
+    const duplicate = recordList.find(entry => {
+        if (editingId !== null && entry.id === editingId) return false;
+        const existingDate = entry.dateIn
+            ? new Date(entry.dateIn).toISOString().slice(0, 10)
+            : '';
+        return entry.empCode === empCode && existingDate === dateInDateOnly;
+    });
+    if (duplicate) {
+        setFormError('Date In already exists for this employee.');
+        return;
+    }
+
+    setFormError('');
+    setSubmitLoading(true);
+
+    const payload = {
+        empCode,
+        actualDateIn:         toISODate(actualDateIn || dateIn),
+        dateIn:               toISODate(dateIn),
+        timeIn:               toISODateTime(dateIn, timeIn),
+        dateOut:              toISODate(dateOut || dateIn),
+        timeOut:              toISODateTime(dateOut || dateIn, timeOut),
+        workShiftCode:        workshiftCode,
+        dayType:              '',
+        otGap,
+        isLateFilingProcessed,
     };
 
+    try {
+        if (editingId !== null) {
+
+            // Null check — verify record still exists
+            const existingRecord = recordList.find(e => e.id === editingId);
+            if (!existingRecord) {
+                setFormError('Something is wrong with your transaction. Please refresh the page and try again.');
+                setSubmitLoading(false);
+                return;
+            }
+
+            await apiClient.put(`${OT_GAP_BASE_URL}/${editingId}`, { ...payload, id: editingId });
+
+        } else {
+            await apiClient.post(OT_GAP_BASE_URL, payload);
+        }
+
+        await Swal.fire({
+            icon:            'success',
+            title:           editingId !== null ? 'Updated Successfully' : 'Created Successfully',
+            text:            editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
+            timer:           2000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+        });
+
+        setShowCreateModal(false);
+        setEditingId(null);
+        await fetchRecords();
+
+    } catch (error: any) {
+        const msg = error.response?.data?.message || error.message || 'Failed to save record';
+        await Swal.fire({
+            icon:               'error',
+            title:              editingId !== null ? 'Update Failed' : 'Create Failed',
+            text:               msg,
+            confirmButtonColor: '#d33',
+            confirmButtonText:  'Close',
+        });
+        setFormError(msg);
+        console.error('Error saving OT gap record:', error);
+    } finally {
+        setSubmitLoading(false);
+    }
+};
     const handleEdit = (record: OTGapRecord) => {
         setEditingId(record.id);
         setEmpCode(record.empCode);
@@ -352,18 +402,55 @@ export function RawdataOtGapPage() {
         setShowCreateModal(true);
     };
 
-    const handleDelete = async (id: number) => {
-        if (!window.confirm('Are you sure you want to delete this record?')) return;
-        try {
-            await apiClient.delete(`${OT_GAP_BASE_URL}/${id}`);
-            setRecordList(prev => prev.filter(r => r.id !== id));
-        } catch (error: any) {
-            const msg = error.response?.data?.message || error.message || 'Failed to delete record';
-            alert(msg);
-            console.error('Error deleting OT gap record:', error);
-        }
-    };
+ const handleDelete = async (id: number) => {
 
+    // Null check — verify record exists locally
+    const record = recordList.find(e => e.id === id);
+    if (!record) {
+        await Swal.fire({
+            icon:  'error',
+            title: 'Error',
+            text:  'Something is wrong with your transaction. Please refresh the page and try again.',
+        });
+        return;
+    }
+
+    const result = await Swal.fire({
+        icon:               'warning',
+        title:              'Are you sure?',
+        text:               'This entry will be permanently deleted.',
+        showCancelButton:   true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor:  '#6c757d',
+        confirmButtonText:  'Yes, delete it',
+        cancelButtonText:   'Cancel',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        await apiClient.delete(`${OT_GAP_BASE_URL}/${id}`);
+        setRecordList(prev => prev.filter(r => r.id !== id));
+
+        await Swal.fire({
+            icon:             'success',
+            title:            'Deleted',
+            text:             'The entry has been deleted.',
+            timer:            1500,
+            timerProgressBar: true,
+            showConfirmButton: false,
+        });
+    } catch (error: any) {
+        const msg = error.response?.data?.message || error.message || 'Failed to delete record';
+        await Swal.fire({
+            icon:               'error',
+            title:              'Delete Failed',
+            text:               msg,
+            confirmButtonColor: '#d33',
+        });
+        console.error('Error deleting OT gap record:', error);
+    }
+};
     const handleCreateNew = () => {
         setEditingId(null);
         setEmpCode(''); setEmpName(''); setWorkshiftCode('');

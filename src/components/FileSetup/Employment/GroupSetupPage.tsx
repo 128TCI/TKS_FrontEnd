@@ -6,8 +6,11 @@ import { Footer } from "../../Footer/Footer";
 import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Group SetUp';
+import { fetchEmployees } from "../../../services/employeeService";
+
+// Form Name
+const formName = 'Group SetUp';
+
 export function GroupSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -71,7 +74,6 @@ export function GroupSetupPage() {
         (p) => decryptData(p.formName) === "GroupScheduleSetUp",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -84,7 +86,6 @@ export function GroupSetupPage() {
     }
   };
 
-  // Fetch group data from API
   useEffect(() => {
     fetchGroupData();
   }, []);
@@ -95,7 +96,6 @@ export function GroupSetupPage() {
     try {
       const response = await apiClient.get("/Fs/Employment/GroupSetUp");
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((group: any) => ({
           id: group.id || "",
           code: group.grpCode || "",
@@ -117,38 +117,27 @@ export function GroupSetupPage() {
     }
   };
 
-  // Fetch employee data from API
   useEffect(() => {
     fetchEmployeeData();
   }, []);
 
-  const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError("");
-    try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-      if (response.status === 200 && response.data) {
-        // Map API response to expected format
-        const mappedData = response.data.map((emp: any) => ({
-          empCode: emp.empCode || emp.code || "",
-          name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
-          groupCode: emp.grpCode || "",
-        }));
-        setEmployeeData(mappedData);
-      }
-    } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to load employees";
-      setEmployeeError(errorMsg);
-      console.error("Error fetching employees:", error);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
+const fetchEmployeeData = async () => {
+  setLoadingEmployees(true);
+  setEmployeeError('');
+  try {
+    const { employees } = await fetchEmployees();
+    setEmployeeData(employees.map((emp) => ({
+      empCode: emp.empCode || '',
+      name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+      groupCode: emp.grpCode || '',
+    })));
+  } catch (error: any) {
+    setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+  } finally {
+    setLoadingEmployees(false);
+  }
+};
 
-  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -165,11 +154,66 @@ export function GroupSetupPage() {
     };
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedGroupIndex(null);
     setGroupId(null);
-    // Clear form
     setCode("");
     setCodeError("");
     setDescription("");
@@ -191,6 +235,11 @@ export function GroupSetupPage() {
   };
 
   const handleDelete = async (group: any) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
@@ -202,36 +251,69 @@ export function GroupSetupPage() {
       cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/Employment/GroupSetUp/${group.id}`);
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted group ${group.code}`,
-            messages: `Group deleted: ${group.code} - ${group.description}`,
-            formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Group deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the group list
-        await fetchGroupData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete group";
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Check if group is used in Employee Masterfile ─────────────────
+    try {
+      const empResponse = await apiClient.get('/Maintenance/EmployeeMasterFile');
+      const employees: any[] = Array.isArray(empResponse.data)
+        ? empResponse.data
+        : [];
+
+      const isUsedInMasterfile = employees.some(
+        (emp: any) =>
+          (emp.grpCode ?? "").trim().toUpperCase() ===
+          (group.code ?? "").trim().toUpperCase(),
+      );
+
+      if (isUsedInMasterfile) {
         await Swal.fire({
           icon: "error",
-          title: "Error",
-          text: errorMsg,
+          title: "Cannot Delete",
+          text: "This setup is already used in Employee Masterfile.",
         });
-        console.error("Error deleting group:", error);
+        return;
       }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate group usage.",
+      });
+      return;
+    }
+
+    // ── 4. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/Employment/GroupSetUp/${group.id}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted group ${group.code}`,
+        messages: `Group deleted: ${group.code} - ${group.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Group deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchGroupData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete group";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting group:", error);
     }
   };
 
@@ -245,7 +327,7 @@ export function GroupSetupPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate code - must not be empty and must be max 10 characters
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!code.trim() || code.length > 10) {
       await Swal.fire({
         icon: "warning",
@@ -254,23 +336,45 @@ export function GroupSetupPage() {
       });
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = groupList.some((group, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedGroupIndex === index) {
-        return false;
-      }
-      return group.code.toLowerCase() === code.trim().toLowerCase();
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
+    const isDuplicateCode = groupList.some((group, index) => {
+      if (isEditMode && selectedGroupIndex === index) return false;
+      return group.code.trim().toUpperCase() === code.trim().toUpperCase();
     });
 
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
         title: "Duplicate Code",
-        text: "This code is already in use. Please use a different code.",
+        text: "Code is already exist.",
       });
       return;
     }
+
+    // ── 4. Duplicate description check ──────────────────────────────────
+    const isDuplicateDesc = groupList.some((group, index) => {
+      if (isEditMode && selectedGroupIndex === index) return false;
+      return (
+        (group.description ?? "").trim().toUpperCase() ===
+        description.trim().toUpperCase()
+      );
+    });
+
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
+      return;
+    }
+
+    // ── 5. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -280,15 +384,14 @@ export function GroupSetupPage() {
         grpHead: head,
         grpHeadCode: headCode,
       };
-      console.log("Submitting payload:", payload);
+
       if (isEditMode && groupId) {
-        // Update existing record via PUT
         await apiClient.put(`/Fs/Employment/GroupSetUp/${groupId}`, payload);
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited group ${payload.grpCode}`,
-            messages: `Group updated: ${payload.grpCode} - ${payload.grpDesc}`,
-            formName,
+          accessType: 'Edit',
+          trans: `Edited group ${payload.grpCode}`,
+          messages: `Group updated: ${payload.grpCode} - ${payload.grpDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -297,16 +400,14 @@ export function GroupSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the group list
         await fetchGroupData();
       } else {
-        // Create new record via POST
         await apiClient.post("/Fs/Employment/GroupSetUp", payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added group ${payload.grpCode}`,
-            messages: `Group created: ${payload.grpCode} - ${payload.grpDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added group ${payload.grpCode}`,
+          messages: `Group created: ${payload.grpCode} - ${payload.grpDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -315,11 +416,9 @@ export function GroupSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the group list
         await fetchGroupData();
       }
 
-      // Close modal and reset form
       setShowCreateModal(false);
       setCode("");
       setCodeError("");
@@ -362,24 +461,19 @@ export function GroupSetupPage() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedGroups = filteredGroups.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Group Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -585,16 +679,13 @@ export function GroupSetupPage() {
             {/* Create/Edit Modal */}
             {showCreateModal && (
               <>
-                {/* Modal Backdrop */}
                 <div
                   className="fixed inset-0 bg-black/30 z-10"
                   onClick={() => setShowCreateModal(false)}
                 ></div>
 
-                {/* Modal Dialog */}
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                    {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                       <h2 className="text-gray-800">
                         {isEditMode ? "Edit Group" : "Create New"}
@@ -607,11 +698,9 @@ export function GroupSetupPage() {
                       </button>
                     </div>
 
-                    {/* Modal Content */}
                     <div className="p-4">
                       <h3 className="text-blue-600 mb-3">Group Setup</h3>
 
-                      {/* Form Fields */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">
@@ -688,7 +777,6 @@ export function GroupSetupPage() {
                         </div>
                       </div>
 
-                      {/* Modal Actions */}
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
@@ -715,7 +803,6 @@ export function GroupSetupPage() {
               </>
             )}
 
-            {/* Employee Search Modal - Reusable Component */}
             <EmployeeSearchModal
               isOpen={showHeadModal}
               onClose={() => setShowHeadModal(false)}
@@ -728,7 +815,6 @@ export function GroupSetupPage() {
         </div>
       </div>
 
-      {/* Footer */}
       <Footer />
     </div>
   );

@@ -7,10 +7,22 @@ import apiClient from '../../services/apiClient';
 import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
 import { TimePicker } from '../Modals/TimePickerModal';
 import Swal from 'sweetalert2';
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
+interface WorkShift {
+    code: string;
+    description: string;
+    timeIn?: string;
+    timeOut?: string;
+    break1Out?: string;
+    break1In?: string;
+    break2Out?: string;
+    break2In?: string;
+    break3Out?: string;
+    break3In?: string;
+}
 interface RawDataEntry {
     id: number;
     empCode: string;
@@ -323,68 +335,126 @@ export function RawDataPage() {
         }
     }, []);
 
-  const fetchWorkshifts = useCallback(async () => {
+ const fetchWorkshifts = useCallback(async () => {
     setLoadingWorkshifts(true);
-    setWorkshiftError(''); // Clear previous errors
-    
+    setWorkshiftError('');
     try {
-      const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
-      
-      if (response.status === 200 && response.data) {
-        // Accessing the nested 'data' property per your requirement
-        const workshifts = response.data.data || []; 
-        
-        const mappedData = workshifts.map((w: any) => ({
-          code: w.code || '',
-          description: w.description || '',
-        }));
-
-        setWorkshifts(mappedData);
-      }
-    } catch (error: any) {
-      // Keep the user-friendly error message logic
-      const msg = error.response?.data?.message || error.message || 'Failed to load workshifts';
-      setWorkshiftError(msg);
-      console.error('Error fetching workshift codes:', error);
-    } finally {
-      setLoadingWorkshifts(false);
-    }
-  }, []); // Memoized with empty dependency array
-    const fetchEmployeeData = async () => {
-        setLoadingEmployees(true);
-        setEmployeeError('');
-        try {
-            const response = await apiClient.get(EMPLOYEE_MASTER_URL);
-            if (response.status === 200 && response.data) {
-                const mappedData = response.data.map((emp: any) => ({
-                    empCode: emp.empCode || emp.code || '',
-                    name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-                    groupCode: emp.grpCode || '',
-                }));
-                setEmployeeData(mappedData);
-            }
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-            setEmployeeError(errorMsg);
-            console.error('Error fetching employees:', error);
-        } finally {
-            setLoadingEmployees(false);
+        const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
+        if (response.status === 200 && response.data) {
+            const list = response.data.data || [];
+            console.log('[fetchWorkshifts] sample:', list[0]);
+            const mappedData = list.map((w: any) => ({
+                code: w.code || '',
+                description: w.description || '',
+                timeIn:    w.timeIn    || w.shiftTimeIn  || w.startTime   || w.inTime    || '',
+                timeOut:   w.timeOut   || w.shiftTimeOut || w.endTime     || w.outTime   || '',
+                break1Out: w.break1Out || w.breakOut1    || w.lunchOut    || w.break1TimeOut || '',
+                break1In:  w.break1In  || w.breakIn1     || w.lunchIn     || w.break1TimeIn  || '',
+                break2Out: w.break2Out || w.breakOut2    || w.break2TimeOut || w.lunchOut2  || w.mealOut || '',
+                break2In:  w.break2In  || w.breakIn2     || w.break2TimeIn  || w.lunchIn2   || w.mealIn  || '',
+                break3Out: w.break3Out || w.breakOut3    || w.break3TimeOut || w.dinnerOut  || '',
+                break3In:  w.break3In  || w.breakIn3     || w.break3TimeIn  || w.dinnerIn   || '',
+            }));
+            setWorkshifts(mappedData);
         }
-    };
+    } catch (error: any) {
+        const msg = error.response?.data?.message || error.message || 'Failed to load workshifts';
+        setWorkshiftError(msg);
+    } finally {
+        setLoadingWorkshifts(false);
+    }
+}, []); // Memoized with empty dependency array
+const fetchEmployeeData = async () => {
+    setLoadingEmployees(true);
+    setEmployeeError('');
+    try {
+        const { employees } = await fetchEmployeesService();
+        setEmployeeData(employees.map((emp) => ({
+            empCode: emp.empCode || '',
+            name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+            groupCode: emp.grpCode || '',
+        })));
+    } catch (error: any) {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+        setEmployeeError(errorMsg);
+        console.error('Error fetching employees:', error);
+    } finally {
+        setLoadingEmployees(false);
+    }
+};
 
     // ─────────────────────────────────────────────────────────────────────────
     // CRUD
     // ─────────────────────────────────────────────────────────────────────────
 
 const handleSubmit = async () => {
+    // ── 1. Required: Emp Code ──
     if (!empCode.trim()) {
-        setFormError('Please select an Employee Code.');
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code.' });
         return;
     }
+
+    // ── 2. Required: Date In ──
     if (!dateIn.trim()) {
-        setFormError('Date In is required.');
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In is required.' });
         return;
     }
+
+    // ── 3. Fetch ALL raw data for this empCode + dateIn for duplicate check ──
+    let allRawList: RawDataEntry[] = [];
+    try {
+        const checkResponse = await apiClient.get(RAW_DATA_BASE_URL, {
+            params: {
+                dateFrom: toISOSafe(dateIn),
+                dateTo:   toISOSafe(dateIn),
+                empCode:  empCode.trim(),
+            },
+        });
+        allRawList = Array.isArray(checkResponse.data) ? checkResponse.data : [];
+        console.log('[handleSubmit] allRawList count:', allRawList.length);
+        console.log('[handleSubmit] allRawList:', JSON.stringify(allRawList, null, 2));
+    } catch (fetchError: any) {
+        console.warn('[handleSubmit] Could not fetch all raw list for duplicate check:', fetchError.message);
+    }
+
+    // ── 4. Duplicate Date In check against fresh full list ──
+    const targetDateMs_from = new Date(toISOSafe(dateIn)).setUTCHours(0, 0, 0, 0);
+    const targetDateMs_to   = new Date(toISOSafe(dateIn)).setUTCHours(23, 59, 59, 999);
+
+    const isDuplicate = allRawList.some(entry => {
+        // For Edit: exclude the current record (mirrors i.ID != model.ID)
+        if (editingId !== null && entry.id === editingId) return false;
+
+        // Same EmpCode (mirrors EmpCode.Trim().ToUpper() == model.EmpCode.Trim().ToUpper())
+        if (entry.empCode.trim().toUpperCase() !== empCode.trim().toUpperCase()) return false;
+
+        // Same date (mirrors DbFunctions.TruncateTime comparison)
+        if (!entry.rawDateIn) return false;
+        const entryDateMs = new Date(entry.rawDateIn).getTime();
+        return entryDateMs >= targetDateMs_from && entryDateMs <= targetDateMs_to;
+    });
+
+    if (isDuplicate) {
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In already exist.' });
+        return;
+    }
+
+    // ── 5. DateTime In must not be greater than DateTime Out ──
+    if (dateOut.trim() && timeIn.trim() && timeOut.trim()) {
+        const dtIn  = new Date(toISOSafe(dateIn, timeIn));
+        const dtOut = new Date(toISOSafe(dateOut, timeOut));
+
+        if (!isNaN(dtIn.getTime()) && !isNaN(dtOut.getTime()) && dtIn > dtOut) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Validation Error',
+                text: "Invalid DateTime 'In' and DateTime 'Out'",
+            });
+            return;
+        }
+    }
+
+    // ── Past validations done — proceed with save ──
     setFormError('');
     setSubmitLoading(true);
 
@@ -441,13 +511,11 @@ const handleSubmit = async () => {
 
     try {
         if (editingId !== null) {
-            // UPDATE — no wrapper, flat payload
             await apiClient.put(`${RAW_DATA_BASE_URL}/${editingId}`, {
                 ...dtoPayload,
                 id: editingId,
             });
         } else {
-            // CREATE — no wrapper, flat payload
             await apiClient.post(RAW_DATA_BASE_URL, dtoPayload);
         }
 
@@ -560,7 +628,81 @@ const handleDelete = async (id: number) => {
         console.error('Error deleting raw data:', error);
     }
 };
+const handleGetShift = async () => {
+    if (!empCode.trim()) {
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code first.' });
+        return;
+    }
+    if (!dateIn.trim()) {
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please enter Date In first.' });
+        return;
+    }
+    if (!workshiftCode.trim()) {
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select a Workshift Code first.' });
+        return;
+    }
+resetShiftTimes();
+    const isoToAmPm = (raw: string): string => {
+        if (!raw) return '';
+        try {
+            const timeMatch = raw.match(/T?(\d{1,2}):(\d{2})(?::\d{2})?/);
+            if (!timeMatch) return '';
+            let hours = parseInt(timeMatch[1]);
+            const mins = parseInt(timeMatch[2]);
+            const period = hours >= 12 ? 'PM' : 'AM';
+            if (hours > 12) hours -= 12;
+            if (hours === 0) hours = 12;
+            return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${period}`;
+        } catch {
+            return '';
+        }
+    };
 
+    let list = workshifts;
+    if (list.length === 0) {
+        try {
+            const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
+            if (response.status === 200 && response.data) {
+                const raw = response.data.data || [];
+                list = raw.map((w: any) => ({
+                    code: w.code || '',
+                    description: w.description || '',
+                    timeIn:    w.timeIn    || w.shiftTimeIn  || w.startTime   || w.inTime    || '',
+                    timeOut:   w.timeOut   || w.shiftTimeOut || w.endTime     || w.outTime   || '',
+                    break1Out: w.break1Out || w.breakOut1    || w.lunchOut    || w.break1TimeOut || '',
+                    break1In:  w.break1In  || w.breakIn1     || w.lunchIn     || w.break1TimeIn  || '',
+                    break2Out: w.break2Out || w.breakOut2    || w.break2TimeOut || w.lunchOut2  || w.mealOut || '',
+                    break2In:  w.break2In  || w.breakIn2     || w.break2TimeIn  || w.lunchIn2   || w.mealIn  || '',
+                    break3Out: w.break3Out || w.breakOut3    || w.break3TimeOut || w.dinnerOut  || '',
+                    break3In:  w.break3In  || w.breakIn3     || w.break3TimeIn  || w.dinnerIn   || '',
+                }));
+                setWorkshifts(list);
+            }
+        } catch {
+            await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load workshifts. Please try again.' });
+            return;
+        }
+    }
+
+    const found = list.find(ws => ws.code === workshiftCode);
+    console.log('[handleGetShift] raw found:', JSON.stringify(found, null, 2));
+
+    if (!found) {
+        await Swal.fire({ icon: 'error', title: 'Not Found', text: `Workshift "${workshiftCode}" not found.` });
+        return;
+    }
+
+    if (found.timeIn)    setTimeIn(isoToAmPm(found.timeIn));
+    if (found.timeOut)   setTimeOut(isoToAmPm(found.timeOut));
+    if (found.break1Out) setBreak1Out(isoToAmPm(found.break1Out));
+    if (found.break1In)  setBreak1In(isoToAmPm(found.break1In));
+    if (found.break2Out) setBreak2Out(isoToAmPm(found.break2Out));
+    if (found.break2In)  setBreak2In(isoToAmPm(found.break2In));
+    if (found.break3Out) setBreak3Out(isoToAmPm(found.break3Out));
+    if (found.break3In)  setBreak3In(isoToAmPm(found.break3In));
+
+    if (dateIn) setDateOut(dateIn);
+};
     const handleCreateNew = () => {
         setEditingId(null);
         setEmpCode(''); setEmpName(''); setWorkshiftCode('');
@@ -590,8 +732,18 @@ const handleDelete = async (id: number) => {
         setSpecificEmpName(name);
         setShowSpecificEmpModal(false);
     };
-
-    const handleWorkshiftSelect = (code: string) => {
+const resetShiftTimes = () => {
+        setTimeIn('');
+        setTimeOut('');
+        setBreak1Out('');
+        setBreak1In('');
+        setBreak2Out('');
+        setBreak2In('');
+        setBreak3Out('');
+        setBreak3In('');
+    };
+ const handleWorkshiftSelect = (code: string) => {
+        resetShiftTimes();
         setWorkshiftCode(code);
         setShowWorkshiftModal(false);
         setWorkshiftSearchTerm('');
@@ -1134,15 +1286,21 @@ const handleDelete = async (id: number) => {
                                                 >
                                                     <Search className="w-4 h-4" />
                                                 </button>
-                                                <button
-                                                    onClick={() => setWorkshiftCode('')}
-                                                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                                <button className="px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex-shrink-0">
-                                                    Get Shift
-                                                </button>
+                                               
+                                                {/* X / Clear button */}
+<button
+    onClick={() => { setWorkshiftCode(''); resetShiftTimes(); }}
+    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
+>
+    <X className="w-4 h-4" />
+</button>
+                                               <button 
+    type="button"
+    onClick={handleGetShift}
+    className="px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex-shrink-0"
+>
+    Get Shift
+</button>
                                             </div>
 
                                             {/* ── Date In / Time In ── */}

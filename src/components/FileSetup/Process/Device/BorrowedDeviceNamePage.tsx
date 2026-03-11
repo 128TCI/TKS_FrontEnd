@@ -209,6 +209,12 @@ export function BorrowedDeviceNamePage() {
       if (isEditMode && deviceId) {
         // Update existing record via PUT
         await apiClient.put(`${API_BASE_URL}/${deviceId}`, payload);
+        await auditTrail.log({
+          accessType: 'Edit',
+          trans: `Device ${deviceId} updated successfully`,
+          messages: `Device ${deviceId} updated`,
+          formName: formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -221,6 +227,12 @@ export function BorrowedDeviceNamePage() {
       } else {
         // Create new record via POST
         await apiClient.post(API_BASE_URL, payload);
+        await auditTrail.log({
+          accessType: 'Add',
+          trans: `Device ${deviceId} created successfully`,
+          messages: `Device ${deviceId} created`,
+          formName: formName,
+        });
         await Swal.fire({
           icon: 'success',
           title: 'Success',

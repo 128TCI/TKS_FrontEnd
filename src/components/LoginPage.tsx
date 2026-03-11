@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Lock } from 'lucide-react';
+import { Building2, User, Lock, Eye, EyeOff } from 'lucide-react';
 import apiClient from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
 import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
 import CryptoJS from 'crypto-js';
+import { decryptData } from '../services/encryptionService';
 
 // ─── Encryption Helpers ────────────────────────────────────────────────────────
 
 const SECRET_KEY = "128bl3$$1ng$";
 const SALT       = "bl3$$1ng$128";
-
+const KeySize    = 256 / 8; 
 let cached: { key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray } | null = null;
 
 function getKeyAndIV() {
@@ -18,7 +19,7 @@ function getKeyAndIV() {
   const saltBytes = CryptoJS.enc.Utf16LE.parse(SALT);
 
   const derived = CryptoJS.PBKDF2(SECRET_KEY, saltBytes, {
-    keySize:    12,
+    keySize:    KeySize,
     iterations: 1000,
     hasher:     CryptoJS.algo.SHA1,
   });
@@ -67,12 +68,13 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   const [windowsAuth, setWindowsAuth] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // ─── Fetch companies from API on mount ──────────────────────────────────────
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await apiClient.get('Security/DatabaseConfiguration/databases');
+        const response = await apiClient.get('/Security/DatabaseConfiguration/databases');
         console.log("API response:", response);
         
         // Convert response to boolean
@@ -115,7 +117,8 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
         company:     encryptedCompany,
         windowsAuth,
       }, );
-
+      const decryptedUsername = decryptData(response.data.user?.username) || username;
+      
       if (response.status === 200) {
         if (response.data.token) {
           localStorage.setItem('authToken',      response.data.token);
@@ -128,6 +131,17 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
 
         if (response.data.user) {
           localStorage.setItem('userData', JSON.stringify(response.data.user));
+        }
+
+        try {
+          await auditTrail.log({
+            trans:      `Employee ${decryptedUsername} logged in.`,
+            messages:   `Employee ${decryptedUsername} logged in.`,
+            formName:   'LogIn',
+            accessType: 'LogIn',
+          });
+        } catch (err) {
+          console.error('Audit trail login failed:', err);
         }
 
         await showSuccessModal('Login Successful');
@@ -186,7 +200,8 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
               <h2 className="text-gray-900 text-center">Login</h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            {/* autoComplete="off" disables form-level autocomplete */}
+            <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-red-700 text-sm">{error}</p>
@@ -199,11 +214,14 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="text"
+                  type="text" 
                   value={username}
+                  autoComplete='username'
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Username"
+                  autoComplete="off"
+                  name="username-no-autofill"
                 />
               </div>
 
@@ -213,12 +231,28 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
+                  autoComplete='new-password'
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
+                  className="w-full pl-10 pr-11 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Password"
+                  autoComplete="new-password"
+                  name="password-no-autofill"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
 
               {/* Company Name — dynamically populated */}

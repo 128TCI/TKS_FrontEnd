@@ -1,4 +1,4 @@
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   X,
@@ -20,17 +20,21 @@ import {
 } from "lucide-react";
 import { DatePicker } from "../../DateSetup/DatePicker";
 import { OvertimeRatesTabContent } from "../../OvertimeRatesTabContent";
-import { OtherPoliciesTabContent } from "../../OtherPoliciesTabContent";
+import {
+  OtherPoliciesTabContent,
+  OtherPoliciesTabContentHandle,
+} from "../../OtherPoliciesTabContent";
 import { Footer } from "../../Footer/Footer";
 import apiClient from "../../../services/apiClient";
 import { useTablePagination } from "../../../hooks/useTablePagination";
 
 import Swal from "sweetalert2";
 
+
 interface GroupItem {
   id: number;
-  tksGroupCode: string;
-  description: string;
+  groupCode: string;
+  groupDescription: string; 
   payrollGroup: string;
   cutOffDateFrom: string;
   cutOffDateTo: string;
@@ -46,7 +50,7 @@ interface GroupItem {
   notedByPosition: string | null;
   approvedBy: string | null;
   approvedByPosition: string | null;
-  terminalID: string | null; //
+  terminalID: string | null;
   autoPairLogsDateFrom: string;
   autoPairLogsDateTo: string;
 }
@@ -188,17 +192,17 @@ interface OTBreakItem {
   id: number;
   regDay: boolean;
   restDay: boolean;
-  legalHoliday: boolean;
-  specialHoliday: boolean;
-  legalHolidayRest: boolean;
-  specialHolidayRest: boolean;
+  lHoliday: boolean;
+  sHoliday: boolean;
+  lHolidayRest: boolean;
+  sHolidayRest: boolean;
   groupCode: string;
   doubleHoliday: boolean;
   doubleHolidayRest: boolean;
-  specialHoliday2: boolean;
-  specialHoliday2Rest: boolean;
-  nonWorkingHoliday: boolean;
-  nonWorkingHolidayRest: boolean;
+  s2Holiday: boolean;
+  s2HolidayRest: boolean;
+  nonWorkHoliday: boolean;
+  nonWorkHolidayRest: boolean;
 }
 
 interface OvertimeFileSetupItem {
@@ -236,11 +240,11 @@ interface OTAllowancesItem {
 interface SystemConfigItem {
   id: number;
   groupCode: string;
-  numOfMinBeforeTheShift: string;
-  numOfMinToIgnoreMultipleOutInBreak: string;
-  numOfMinBeforeMidnightShift: string;
+  numOfMinBeforeTheShift: number;
+  numOfMinToIgnoreMultipleOutInBreak: number;
+  numOfMinBeforeMidnightShift: number;
   devicePolicy: string;
-  noOfMinToConsiderBrk2In: string;
+  noOfMinToConsiderBrk2In: number;
   useTKSystemConfig: boolean;
 }
 
@@ -251,13 +255,21 @@ export function TimeKeepGroupPage() {
   const [showTksGroupModal, setShowTksGroupModal] = useState(false);
   const [tksGroupSearchTerm, setTksGroupSearchTerm] = useState("");
   const [tksGroupCode, setTksGroupCode] = useState("1");
+  const [currentOTRatesID, setCurrentOTRateID] = useState(0);
   const [tksGroupDescription, setTksGroupDescription] = useState("");
-  const [showPayrollLocationModal, setShowPayrollLocationModal] =useState(false);
-  const [payrollLocationSearchTerm, setPayrollLocationSearchTerm] =useState("");
+  const [showPayrollLocationModal, setShowPayrollLocationModal] =
+    useState(false);
+  const [payrollLocationSearchTerm, setPayrollLocationSearchTerm] =
+    useState("");
   const [payrollLocationCode, setPayrollLocationCode] = useState("");
   const [payrollDescription, setPayrollDescription] = useState("");
+
+  // Time Keep Cut Off Dates
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  // Auto Pairing Logs Cut-Off Dates
+  const [autoPairingFrom, setAutoPairingFrom] = useState("");
+  const [autoPairingTo, setAutoPairingTo] = useState("");
   const [cutOffMonth, setCutOffMonth] = useState("");
   const [cutOffPeriod, setcutOffPeriod] = useState("");
   const [terminalId, setTerminalId] = useState("");
@@ -274,28 +286,25 @@ export function TimeKeepGroupPage() {
   const [showForNoBreak2OutModal, setShowForNoBreak2OutModal] = useState(false);
   const [forNoBreak2OutSearchTerm, setForNoBreak2OutSearchTerm] = useState("");
 
-
   // Modals for Supervisory GroupCode and OT Code Per Week
-  const [showSupervisoryGroupModal, setShowSupervisoryGroupModal] = useState(false);
-  const [supervisoryGroupSearchTerm, setSupervisoryGroupSearchTerm] = useState("");
+  const [showSupervisoryGroupModal, setShowSupervisoryGroupModal] =
+    useState(false);
+  const [supervisoryGroupSearchTerm, setSupervisoryGroupSearchTerm] =
+    useState("");
   const [showOtCodeModal, setShowOtCodeModal] = useState(false);
   const [otCodeSearchTerm, setOtCodeSearchTerm] = useState("");
   const [isEditOTRates, setIsEditOTRates] = useState(false);
   const [isEditOTRatesFor2Shifts, setIsEditOTRatesFor2Shifts] = useState(false);
   const [isEditBirthDayPay, setIsEditBirthDayPay] = useState(false);
 
-  
-
-  // Auto Pairing Logs Cut-Off Dates
-  const [autoPairingFrom, setAutoPairingFrom] = useState("09/29/2025");
-  const [autoPairingTo, setAutoPairingTo] = useState("09/29/2025");
-
-  // Login Policy StateF
+  // Login Policy State
   const [gracePeriodSemiAnnual, setGracePeriodSemiAnnual] = useState(false);
   const [gracePeriodPerDay, setGracePeriodPerDay] = useState("");
-  const [gracePeriodIncludeTardiness, setGracePeriodIncludeTardiness] =useState(false);
+  const [gracePeriodIncludeTardiness, setGracePeriodIncludeTardiness] =
+    useState(false);
   const [includeBreak2InGrace, setIncludeBreak2InGrace] = useState(false);
-  const [deductibleEvenWithinGrace, setDeductibleEvenWithinGrace] =useState(false);
+  const [deductibleEvenWithinGrace, setDeductibleEvenWithinGrace] =
+    useState(false);
   const [gracePeriodPerSemiAnnual, setGracePeriodPerSemiAnnual] = useState("");
   const [firstHalfDateFrom, setFirstHalfDateFrom] = useState("");
   const [firstHalfDateTo, setFirstHalfDateTo] = useState("");
@@ -303,24 +312,30 @@ export function TimeKeepGroupPage() {
   const [secondHalfDateTo, setSecondHalfDateTo] = useState("");
   const [deductOverBreak, setDeductOverBreak] = useState(true);
   const [gracePeriodCalamity2, setGracePeriodCalamity2] = useState("");
-  const [combineTardinessTimeInBreak2, setCombineTardinessTimeInBreak2] = useState(false);
-  const [computeTardinessNoLogout, setComputeTardinessNoLogout] = useState(false);
+  const [combineTardinessTimeInBreak2, setCombineTardinessTimeInBreak2] =
+    useState(false);
+  const [computeTardinessNoLogout, setComputeTardinessNoLogout] =
+    useState(false);
 
   const [nightDiffStartTime, setNightDiffStartTime] = useState("10:00 PM");
   const [nightDiffEndTime, setNightDiffEndTime] = useState("6:00 AM");
   const [deductMealBreakND, setDeductMealBreakND] = useState(false);
   const [twoShiftsInDay, setTwoShiftsInDay] = useState(true);
   const [hoursIntervalTwoShifts, setHoursIntervalTwoShifts] = useState("2.00");
-  const [allowableGracePeriodMonth, setAllowableGracePeriodMonth] = useState("3");
-  const [excludeAllowableGraceBracket, setExcludeAllowableGraceBracket] = useState(false);
-  const [allowableGraceActualMonth, setAllowableGraceActualMonth] = useState(true);
+  const [allowableGracePeriodMonth, setAllowableGracePeriodMonth] =
+    useState("3");
+  const [excludeAllowableGraceBracket, setExcludeAllowableGraceBracket] =
+    useState(false);
+  const [allowableGraceActualMonth, setAllowableGraceActualMonth] =
+    useState(true);
   const [considerSaturdayPaid, setConsiderSaturdayPaid] = useState(true);
   const [maxDaysPerWeekSaturday, setMaxDaysPerWeekSaturday] = useState("3.00");
   const [allowableTardyExcess, setAllowableTardyExcess] = useState("");
   const [excludeTardinessInGrace, setExcludeTardinessInGrace] = useState(false);
   const [supervisoryGroupCode, setSupervisoryGroupCode] = useState("");
   const [applyOccurancesBreak, setApplyOccurancesBreak] = useState(false);
-  const [maxOccurancesNoDeduction, setMaxOccurancesNoDeduction] = useState("12");
+  const [maxOccurancesNoDeduction, setMaxOccurancesNoDeduction] =
+    useState("12");
   const [gracePeriodOccurance, setGracePeriodOccurance] = useState("");
   const [hoursRequiredPerWeek, setHoursRequiredPerWeek] = useState("");
   const [startOfWeek, setStartOfWeek] = useState("");
@@ -339,27 +354,33 @@ export function TimeKeepGroupPage() {
   const [legalHolidayOT, setLegalHolidayOT] = useState("");
   const [specialHolidayOT, setSpecialHolidayOT] = useState("");
   const [doubleLegalHolidayOT, setDoubleLegalHolidayOT] = useState("");
-  const [specialHolidayOT2, setSpecialHolidayOT2] = useState("")
+  const [specialHolidayOT2, setSpecialHolidayOT2] = useState("");
   const [nonWorkingHolidayOT, setNonWorkingHolidayOT] = useState("");
 
   // Late Filing
   const [regularDayOTLateFiling, setRegularDayOTLateFiling] = useState("");
   const [restDayOTLateFiling, setRestDayOTLateFiling] = useState("");
   const [legalHolidayOTLateFiling, setLegalHolidayOTLateFiling] = useState("");
-  const [specialHolidayOTLateFiling, setSpecialHolidayOTLateFiling] = useState("");
-  const [doubleLegalHolidayOTLateFiling, setDoubleLegalHolidayOTLateFiling] = useState("");
-  const [specialHoliday2OTLateFiling, setSpecialHoliday2OTLateFiling] = useState("")
-  const [nonWorkingHolidayOTLateFiling, setNonWorkingHolidayOTLateFiling] = useState("");
+  const [specialHolidayOTLateFiling, setSpecialHolidayOTLateFiling] =
+    useState("");
+  const [doubleLegalHolidayOTLateFiling, setDoubleLegalHolidayOTLateFiling] =
+    useState("");
+  const [specialHoliday2OTLateFiling, setSpecialHoliday2OTLateFiling] =
+    useState("");
+  const [nonWorkingHolidayOTLateFiling, setNonWorkingHolidayOTLateFiling] =
+    useState("");
 
-  // 
+  //
   const [useOTPremium, setUseOTPremium] = useState(false);
   const [useActualDayType, setUseActualDayType] = useState(false);
   const [holidayWithWorkshift, setHolidayWithWorkshift] = useState(false);
   const [deductMealBreakFromOT, setDeductMealBreakFromOT] = useState(false);
   const [computeOTForBreak2, setComputeOTForBreak2] = useState(false);
   const [enable24HourOT, setEnable24HourOT] = useState(false);
-  const [includeUnworkedHolidayInRegular, setIncludeUnworkedHolidayInRegular] = useState(false);
-  const [sundayOTIfWorkedSaturday, setSundayOTIfWorkedSaturday] = useState(false);
+  const [includeUnworkedHolidayInRegular, setIncludeUnworkedHolidayInRegular] =
+    useState(false);
+  const [sundayOTIfWorkedSaturday, setSundayOTIfWorkedSaturday] =
+    useState(false);
 
   // OT Break
   const [otBreakMinHours, setOtBreakMinHours] = useState(0);
@@ -367,89 +388,139 @@ export function TimeKeepGroupPage() {
   const [oTBreakAppliesToRegDay, setOTBreakAppliesToRegDay] = useState(false);
   const [oTBreakAppliesToLegHol, setOTBreakAppliesToLegHol] = useState(false);
   const [oTBreakAppliesToSHol, setOTBreakAppliesToSHol] = useState(false);
-  const [oTBreakAppliesToDoubleLegHol, setOTBreakAppliesToDoubleLegHol] = useState(false);
+  const [oTBreakAppliesToDoubleLegHol, setOTBreakAppliesToDoubleLegHol] =
+    useState(false);
   const [oTBreakAppliesToS2Hol, setOTBreakAppliesToS2Hol] = useState(false);
-  const [oTBreakAppliesToNonWorkHol, setOTBreakAppliesToNonWorkHol] = useState(false);
+  const [oTBreakAppliesToNonWorkHol, setOTBreakAppliesToNonWorkHol] =
+    useState(false);
   const [oTBreakAppliesToRestDay, setOTBreakAppliesToRestDay] = useState(false);
-  const [oTBreakAppliesToLegHolRest, setOTBreakAppliesToLegHolRest] = useState(false);
-  const [oTBreakAppliesToSHolRest, setOTBreakAppliesToSHolRest] = useState(false);
-  const [oTBreakAppliesToDoubleLegHolRest, setOTBreakAppliesToDoubleLegHolRest] = useState(false);
-  const [oTBreakAppliesToS2HolRest, setOTBreakAppliesToS2HolRest] = useState(false);
-  const [oTBreakAppliesToNonWorkRest, setOTBreakAppliesToNonWorkRest] = useState(false);
+  const [oTBreakAppliesToLegHolRest, setOTBreakAppliesToLegHolRest] =
+    useState(false);
+  const [oTBreakAppliesToSHolRest, setOTBreakAppliesToSHolRest] =
+    useState(false);
+  const [
+    oTBreakAppliesToDoubleLegHolRest,
+    setOTBreakAppliesToDoubleLegHolRest,
+  ] = useState(false);
+  const [oTBreakAppliesToS2HolRest, setOTBreakAppliesToS2HolRest] =
+    useState(false);
+  const [oTBreakAppliesToNonWorkRest, setOTBreakAppliesToNonWorkRest] =
+    useState(false);
 
   // Minimum Hrs To Compute OT
   const [regDayMinHrsToCompOT, setRegDayMinHrsToCompOT] = useState("");
   const [restDayMinHrsToCompOT, setRestDayMinHrsToCompOT] = useState("");
-  const [legalHolidayMinHrsToCompOT, setLegalHolidayMinHrsToCompOT] = useState("");
-  const [specialHolidayMinHrsToCompOT, setSpecialHolidayMinHrsToCompOT] = useState("");
-  const [specialHoliday2MinHrsToCompOT, setSpecialHoliday2MinHrsToCompOT] = useState("");
-  const [doubleLegalHolidayMinHrsToCompOT, setDoubleLegalHolidayMinHrsToCompOT] = useState("");
-  const [nonWorkingHolidayMinHrsToCompOT, setNonWorkingHolidayMinHrsToCompOT] = useState("");
+  const [legalHolidayMinHrsToCompOT, setLegalHolidayMinHrsToCompOT] =
+    useState("");
+  const [specialHolidayMinHrsToCompOT, setSpecialHolidayMinHrsToCompOT] =
+    useState("");
+  const [specialHoliday2MinHrsToCompOT, setSpecialHoliday2MinHrsToCompOT] =
+    useState("");
+  const [
+    doubleLegalHolidayMinHrsToCompOT,
+    setDoubleLegalHolidayMinHrsToCompOT,
+  ] = useState("");
+  const [nonWorkingHolidayMinHrsToCompOT, setNonWorkingHolidayMinHrsToCompOT] =
+    useState("");
 
-  const [restDayToBeComputedAsOtherRate, setRestDayToBeComputedAsOtherRate] = useState("");
+  const [restDayToBeComputedAsOtherRate, setRestDayToBeComputedAsOtherRate] =
+    useState("");
   const [restDayOtherRate, setRestDayOtherRate] = useState("");
   const [isOverTimeCutOffFlag, setIsOverTimeCutoffFlag] = useState(false);
-  const [overTimeCode, setOverTimeCode] = useState(""); 
+  const [overTimeCode, setOverTimeCode] = useState("");
   const [requiredHours, setRequiredHours] = useState("");
-  const [overTimeCodeFor2ShiftsDay, setOverTimeCodeFor2ShiftsDay] = useState("");
-  const [oTRoundingToTheNearestHourMin, setOTRoundingToTheNearestHourMin] = useState("");
+  const [overTimeCodeFor2ShiftsDay, setOverTimeCodeFor2ShiftsDay] =
+    useState("");
+  const [oTRoundingToTheNearestHourMin, setOTRoundingToTheNearestHourMin] =
+    useState("");
   const [birthdayPay, setBirthdayPay] = useState("");
-  const [nDBasicRoundingToTheNearestHourMin, setNDBasicRoundingToTheNearestHourMin] = useState("");
-  const [useOverTimeAuthorization, setUseOverTimeAuthorization] = useState(false);
+  const [
+    nDBasicRoundingToTheNearestHourMin,
+    setNDBasicRoundingToTheNearestHourMin,
+  ] = useState("");
+  const [useOverTimeAuthorization, setUseOverTimeAuthorization] =
+    useState(false);
   const [isSpecialOTCompFlag, setIsSpecialOTCompFlag] = useState(false);
   const [isHolPayLegalFlag, setIsHolPayLegalFlag] = useState(false);
-  const [isHolPaySpecialFlag, setIsHolPaySpecialFlag] = useState(false)
+  const [isHolPaySpecialFlag, setIsHolPaySpecialFlag] = useState(false);
   const [compHolPayForMonth, setCompHolPayForMonth] = useState(false);
-  const [compHolPayIfWorkBeforeHolidayRestDay, setCompHolPayIfWorkBeforeHolidayRestDay] = useState(false);
-  const [compHolPayIfWorkBeforeHolidayLegalHoliday, setCompHolPayIfWorkBeforeHolidayLegalHoliday] = useState(false);
-  const [compHolPayIfWorkBeforeHolidaySpecialHoliday, setCompHolPayIfWorkBeforeHolidaySpecialHoliday] = useState(false);
-  const [noPayIfAbsentBeforeHoliday, setNoPayIfAbsentBeforeHoliday] = useState(false);
-  const [noPayIfAbsentAfterHoliday, setNoPayIfAbsentAfterHoliday] = useState(false);
-  const [compHolidayWithPaidLeave, setCompHolidayWithPaidLeave ] = useState(false);
-  const [minimumNoOfHrsRequiredToCompHol, setMinimumNoOfHrsRequiredToCompHol] = useState('');
+  const [
+    compHolPayIfWorkBeforeHolidayRestDay,
+    setCompHolPayIfWorkBeforeHolidayRestDay,
+  ] = useState(false);
+  const [
+    compHolPayIfWorkBeforeHolidayLegalHoliday,
+    setCompHolPayIfWorkBeforeHolidayLegalHoliday,
+  ] = useState(false);
+  const [
+    compHolPayIfWorkBeforeHolidaySpecialHoliday,
+    setCompHolPayIfWorkBeforeHolidaySpecialHoliday,
+  ] = useState(false);
+  const [noPayIfAbsentBeforeHoliday, setNoPayIfAbsentBeforeHoliday] =
+    useState(false);
+  const [noPayIfAbsentAfterHoliday, setNoPayIfAbsentAfterHoliday] =
+    useState(false);
+  const [compHolidayWithPaidLeave, setCompHolidayWithPaidLeave] =
+    useState(false);
+  const [minimumNoOfHrsRequiredToCompHol, setMinimumNoOfHrsRequiredToCompHol] =
+    useState("");
   const [compFirstRestdayHoliday, setCompFirstRestdayHoliday] = useState(false);
 
-  // OT Allowances States
-  const [oTAllowanceseID, setOTAllowancesID] = useState(0)
-  const [oTAllowancesGroupCode, setOTAllowancesGroupCode] = useState('');
-  const [minOTHrs, setMinOTHrs] = useState('');
-  const [accumOTHrsToEarnMealAllow, setAccumOTHrsToEarnMealAllow] = useState('');
-  const [dayType, setDayType] = useState('')
-  const [amount, setAmount] = useState('');
-  const [earningCode, setEarningCode] = useState('');
-
-  // Other Policies State
-  const [useDefaultRestday, setUseDefaultRestday] = useState(false);
-  const [restdayWithWorkshift, setRestdayWithWorkshift] = useState(false);
-  const [useTardinessBracket, setUseTardinessBracket] = useState(false);
-  const [computeUndertimeToAbsences, setComputeUndertimeToAbsences] =
-    useState("3.00");
+  // Fs States
+  const [oTAllowanceseID, setOTAllowancesID] = useState(0);
+  const [oTAllowancesGroupCode, setOTAllowancesGroupCode] = useState("");
+  const [minOTHrs, setMinOTHrs] = useState("");
+  const [accumOTHrsToEarnMealAllow, setAccumOTHrsToEarnMealAllow] =
+    useState("");
+  const [dayType, setDayType] = useState("");
+  const [amount, setAmount] = useState("");
+  const [earningCode, setEarningCode] = useState("");
 
   // System Configuration State
-  const [showSystemConfigModal, setShowSystemConfigModal] = useState(false);
-  const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] = useState(false);
-  const [minBeforeShift, setMinBeforeShift] = useState("0");
-  const [minIgnoreMultipleBreak, setMinIgnoreMultipleBreak] = useState("0");
-  const [minBeforeMidnightShift, setMinBeforeMidnightShift] = useState("0");
-  const [minConsiderBreak2In, setMinConsiderBreak2In] = useState("0");
+  const [useTimekeepingSystemConfig, setUseTimekeepingSystemConfig] =
+    useState(false);
+  const [minBeforeShift, setMinBeforeShift] = useState(0);
+  const [minIgnoreMultipleBreak, setMinIgnoreMultipleBreak] = useState(0);
+  const [minBeforeMidnightShift, setMinBeforeMidnightShift] = useState(0);
+  const [minConsiderBreak2In, setMinConsiderBreak2In] = useState(0);
   const [devicePolicy, setDevicePolicy] = useState("");
 
   // Global Edit Mode
   const [isEditMode, setIsEditMode] = useState(false);
-
-  // Values Before Editing (for Cancel action)
-  const [snapshot, setSnapshot] = useState<Record<string, any>>({});
+  const [isCreateNew, setIsCreateNew] = useState(false);
 
   // TKSGroup List states
-  const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
   const [tksGroupItems, setTKSGroupItems] = useState<GroupItem[]>([]);
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
 
-  // Payroll Location List 
-  const [payrollLocationList, setPayrollLocationList] = useState<PayrollLocationItem[]>([]);
+  // Loading States
+  const [loadingLoginPolicy, setLoadingLoginPolicy] = useState(false);
+  const [loadingTKSGroup, setLoadingTKSGroup] = useState(false);
+  const [loadingOTRates, setLoadingOTRates] = useState(false);
+  const [loadingOTBreak, setLoadingOTBreak] = useState(false);
+  const [loadingOvertimeSetup, setLoadingOvertimeSetup] = useState(false);
+  const [loadingPayrollLocation, setLoadingPayrollLocation] = useState(false);
+  const [loadingEquivDay, setLoadingEquivDay] = useState(false);
+  const isLoading =
+    loadingTKSGroup ||
+    loadingLoginPolicy ||
+    loadingOTRates ||
+    loadingOTBreak ||
+    loadingOvertimeSetup ||
+    loadingPayrollLocation ||
+    loadingEquivDay;
+  // Update States
+  const [currentGroupId, setCurrentGroupId] = useState<number>(0);
+
+  // Payroll Location List
+  const [payrollLocationList, setPayrollLocationList] = useState<
+    PayrollLocationItem[]
+  >([]);
 
   // Group Login Policy List
-  const [groupLoginPolicyItems, setGroupLoginPolicyItems] = useState<LoginPolicyItem[]>([]);
+  const [groupLoginPolicyItems, setGroupLoginPolicyItems] = useState<
+    LoginPolicyItem[]
+  >([]);
 
   // Overtime Rates List
   const [overTimeRates, setOverTimeRates] = useState<OverTimeRatesItem[]>([]);
@@ -457,42 +528,64 @@ export function TimeKeepGroupPage() {
   // Overtime Break List
   const [oTBreakList, setOTBreakList] = useState<OTBreakItem[]>([]);
 
-  //  GroupSetup Overtime Allowancs List 
-  const [oTAllowancesList, setOTAllowancesList] = useState<OTAllowancesItem[]>([]);
+  //  GroupSetup Overtime Allowancs List
+  const [oTAllowancesList, setOTAllowancesList] = useState<OTAllowancesItem[]>(
+    [],
+  );
+  const [originalOTAllowances, setOriginalOTAllowances] = useState<
+    OTAllowancesItem[]
+  >([]);
 
   // System Config List
-  const [systemConfigList, setSystemConfigList] = useState<SystemConfigItem[]>([])
+  const [systemConfigList, setSystemConfigList] = useState<SystemConfigItem[]>(
+    [],
+  );
 
   // Cutoff Group States
   const [cutOffTableSearchTerm, setCutOffTableSearchTerm] = useState("");
   const [selectedCutOffRows, setSelectedCutOffRows] = useState<string[]>([]);
 
   //Supervisory Group states
-  const [supervisoryGroupsList, setSupervisoryGroupsList] = useState<GroupItem[]>([]);
-  const [otCodePerWeekList, setOtCodePerWeekList] = useState<OvertimeFileSetupItem[]>([]);
-  const [equivDayAbsentList, setEquivDayAbsentList] = useState<EquivDayItem[]>([],);
-  const [equivDayNoLoginList, setEquivDayNoLoginList] = useState<EquivDayItem[]>([]);
-  const [equivDayNoLogoutList, setEquivDayNoLogoutList] = useState<EquivDayItem[]>([],);
-  const [equivDayForNoBreak2InList, setEquivDayForNoBreak2InList] = useState<EquivDayItem[]>([],);
-  const [equivDayForNoBreak2OutList, setEquivDayForNoBreak2OutList] = useState<EquivDayItem[]>([],);
- 
+  const [supervisoryGroupsList, setSupervisoryGroupsList] = useState<
+    GroupItem[]
+  >([]);
+  const [otCodePerWeekList, setOtCodePerWeekList] = useState<
+    OvertimeFileSetupItem[]
+  >([]);
+  const [equivDayAbsentList, setEquivDayAbsentList] = useState<EquivDayItem[]>(
+    [],
+  );
+  const [equivDayNoLoginList, setEquivDayNoLoginList] = useState<
+    EquivDayItem[]
+  >([]);
+  const [equivDayNoLogoutList, setEquivDayNoLogoutList] = useState<
+    EquivDayItem[]
+  >([]);
+  const [equivDayForNoBreak2InList, setEquivDayForNoBreak2InList] = useState<
+    EquivDayItem[]
+  >([]);
+  const [equivDayForNoBreak2OutList, setEquivDayForNoBreak2OutList] = useState<
+    EquivDayItem[]
+  >([]);
 
   // Pagination Numbers of Page
   const itemsPerPage = 10;
 
-  
-  const [autoPairingTableSearchTerm, setAutoPairingTableSearchTerm] =useState("");
-  const [selectedAutoPairingRows, setSelectedAutoPairingRows] = useState<string[]>([]);
+  const [autoPairingTableSearchTerm, setAutoPairingTableSearchTerm] =
+    useState("");
+  const [selectedAutoPairingRows, setSelectedAutoPairingRows] = useState<
+    string[]
+  >([]);
   const [autoPairingCurrentPage, setAutoPairingCurrentPage] = useState(1);
   const autoPairingPageSize = 10;
 
   const autoPairingFilteredData = tksGroupItems.filter(
     (item: GroupItem) =>
       autoPairingTableSearchTerm === "" ||
-      item.tksGroupCode
+      item.groupCode
         .toLowerCase()
         .includes(autoPairingTableSearchTerm.toLowerCase()) ||
-      item.description
+      item.groupDescription
         .toLowerCase()
         .includes(autoPairingTableSearchTerm.toLowerCase()),
   );
@@ -512,7 +605,6 @@ export function TimeKeepGroupPage() {
   useEffect(() => {
     setAutoPairingCurrentPage(1);
   }, [autoPairingTableSearchTerm]);
-
   const getAutoPairingPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     if (autoPairingTotalPages <= 7) {
@@ -561,14 +653,25 @@ export function TimeKeepGroupPage() {
     "December",
   ];
 
+  const otherPoliciesRef = useRef<OtherPoliciesTabContentHandle>(null);
+
+  const handleParentSave = async () => {
+    if (!otherPoliciesRef.current) return;
+    if (isCreateNew) {
+      await otherPoliciesRef.current.handleSaveNew();
+    } else {
+      await otherPoliciesRef.current.handleSave();
+    }
+  };
+
   // Filter Groups
   const filteredGroups = tksGroupItems.filter(
     (item) =>
-      (item.tksGroupCode
+      (item.groupCode
         ?.toLowerCase()
         .includes(tksGroupSearchTerm.toLowerCase()) ??
         false) ||
-      (item.description
+      (item.groupDescription
         ?.toLowerCase()
         .includes(tksGroupSearchTerm.toLowerCase()) ??
         false),
@@ -590,8 +693,7 @@ export function TimeKeepGroupPage() {
       if (
         i === 1 ||
         i === totalGroupPages ||
-        (i >= currentGroupPage - 1 &&
-          i <= currentGroupPage + 1)
+        (i >= currentGroupPage - 1 && i <= currentGroupPage + 1)
       ) {
         pages.push(i);
       } else if (pages[pages.length - 1] !== "...") {
@@ -603,24 +705,23 @@ export function TimeKeepGroupPage() {
 
   // CuttOff Group Pagination and Search
   const {
+    filteredData: cutOffTotalData,
     paginatedData: filteredCutOffData,
     totalPages: cutOffTotalPages,
     currentPage: cutOffCurrentPage,
     setCurrentPage: setCutOffCurrentPage,
-    getPageNumbers: getCutOffPageNumbers
+    getPageNumbers: getCutOffPageNumbers,
   } = useTablePagination(
     tksGroupItems,
     cutOffTableSearchTerm,
     (item, search) =>
-      item.tksGroupCode?.toLowerCase().includes(search) ||
-      item.description?.toLowerCase().includes(search),
-    itemsPerPage
+      item.groupCode?.toLowerCase().includes(search) ||
+      item.groupDescription?.toLowerCase().includes(search),
+    itemsPerPage,
   );
 
   const cutOffStartIndex = (cutOffCurrentPage - 1) * itemsPerPage;
   const cutOffEndIndex = cutOffStartIndex + itemsPerPage;
-
-
 
   useEffect(() => {
     setCutOffCurrentPage(1);
@@ -628,6 +729,7 @@ export function TimeKeepGroupPage() {
 
   // For Supervisory Groups
   const {
+    filteredData: supervisoryGroupsTotolData,
     paginatedData: filteredSupervisoryGroups,
     totalPages: totalSupervisoryPages,
     currentPage: currentSupervisoryPage,
@@ -636,9 +738,9 @@ export function TimeKeepGroupPage() {
     supervisoryGroupsList,
     supervisoryGroupSearchTerm,
     (item, search) =>
-      item.tksGroupCode?.toLowerCase().includes(search) ||
-      item.description?.toLowerCase().includes(search),
-    itemsPerPage
+      item.groupCode?.toLowerCase().includes(search) ||
+      item.groupDescription?.toLowerCase().includes(search),
+    itemsPerPage,
   );
 
   const getSupervisoryPageNumbers = (): number[] => {
@@ -648,7 +750,6 @@ export function TimeKeepGroupPage() {
     }
     return pages;
   };
-
 
   const startSupervisoryIndex = (currentSupervisoryPage - 1) * itemsPerPage;
   const endSupervisoryIndex = startSupervisoryIndex + itemsPerPage;
@@ -668,11 +769,9 @@ export function TimeKeepGroupPage() {
       item.oTFileSetupCode.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
   const startOtCodesIndex = (currentOtCodePerWeekPage - 1) * itemsPerPage;
@@ -693,14 +792,13 @@ export function TimeKeepGroupPage() {
       item.locationCode.toLowerCase().includes(search) ||
       item.locationName.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startPayrollLocationsIndex = (currentPayrollLocationsPage - 1) * itemsPerPage;
+  const startPayrollLocationsIndex =
+    (currentPayrollLocationsPage - 1) * itemsPerPage;
   const endPayrollLocationsIndex = startPayrollLocationsIndex + itemsPerPage;
 
   useEffect(() => {
@@ -722,14 +820,13 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayAbsentIndex = (currentEquivDayAbsentPage - 1) * itemsPerPage;
+  const startEquivDayAbsentIndex =
+    (currentEquivDayAbsentPage - 1) * itemsPerPage;
   const endEquivDayAbsentIndex = startEquivDayAbsentIndex + itemsPerPage;
 
   // For No Login Pagination and Search
@@ -747,16 +844,14 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoLoginIndex = (currentEquivDayNoLoginPage - 1) * itemsPerPage;
+  const startEquivDayNoLoginIndex =
+    (currentEquivDayNoLoginPage - 1) * itemsPerPage;
   const endEquivDayNoLoginIndex = startEquivDayNoLoginIndex + itemsPerPage;
-
 
   // For No Logout Pagination and Search
   const {
@@ -773,14 +868,13 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoLogoutIndex = (currentEquivDayNoLogoutPage - 1) * itemsPerPage;
+  const startEquivDayNoLogoutIndex =
+    (currentEquivDayNoLogoutPage - 1) * itemsPerPage;
   const endEquivDayNoLogoutIndex = startEquivDayNoLogoutIndex + itemsPerPage;
 
   // For No Break 2 In Pagination and Search
@@ -798,16 +892,15 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoBreak2InIndex = (currentEquivDayForNoBreak2InPage - 1) * itemsPerPage;
-  const endEquivDayNoBreak2InIndex = startEquivDayNoBreak2InIndex + itemsPerPage;
-
+  const startEquivDayNoBreak2InIndex =
+    (currentEquivDayForNoBreak2InPage - 1) * itemsPerPage;
+  const endEquivDayNoBreak2InIndex =
+    startEquivDayNoBreak2InIndex + itemsPerPage;
 
   // For No Break 2 OutPagination and Search
   const {
@@ -824,16 +917,16 @@ export function TimeKeepGroupPage() {
       item.code.toLowerCase().includes(search) ||
       item.description.toLowerCase().includes(search) ||
       Object.values(item).some(
-        (val) =>
-          typeof val === "number" &&
-          val.toFixed(2).includes(search)
+        (val) => typeof val === "number" && val.toFixed(2).includes(search),
       ),
-    itemsPerPage
+    itemsPerPage,
   );
 
-  const startEquivDayNoBreak2OutIndex = (currentEquivDayForNoBreak2OutPage - 1) * itemsPerPage;
-  const endEquivDayNoBreak2OutIndex = startEquivDayNoBreak2OutIndex + itemsPerPage;
-  
+  const startEquivDayNoBreak2OutIndex =
+    (currentEquivDayForNoBreak2OutPage - 1) * itemsPerPage;
+  const endEquivDayNoBreak2OutIndex =
+    startEquivDayNoBreak2OutIndex + itemsPerPage;
+
   // Converts "2021-05-05T00:00:00" → "05/05/2021"
   const formatApiDate = (apiDate: string | null | undefined) => {
     if (!apiDate) return "";
@@ -845,14 +938,23 @@ export function TimeKeepGroupPage() {
     return `${month}/${day}/${year}`;
   };
 
+  function uncheckedGracePeriodSemiAnnual() {
+    setGracePeriodPerSemiAnnual("");
+    setFirstHalfDateFrom("");
+    setFirstHalfDateTo("");
+    setSecondHalfDateFrom("");
+    setSecondHalfDateTo("");
+  }
+
   // Fetch TKSGroup data from API
   const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     const response = await apiClient.get("/Fs/Process/TimeKeepGroupSetUp");
-
     return response.data.map((item: any) => ({
       id: item.ID || item.id,
-      tksGroupCode: item.groupCode ?? "",
+      groupCode: item.groupCode ?? "",
       description: item.groupDescription ?? "",
+      groupDescription: item.groupDescription ?? "",
+      payrollGroup: item.payrollGroup ?? "",
       cutOffDateMonth: item.cutOffDateMonth ?? "",
       cutOffDateFrom: item.cutOffDateFrom ?? "",
       cutOffDateTo: item.cutOffDateTo ?? "",
@@ -861,6 +963,774 @@ export function TimeKeepGroupPage() {
       autoPairLogsDateFrom: item.autoPairLogsDateFrom ?? "",
       autoPairLogsDateTo: item.autoPairLogsDateTo ?? "",
     }));
+  };
+
+  const monthNameToStringNumber = (monthName: string): string => {
+    const monthMap: Record<string, string> = {
+      january: "1",
+      february: "2",
+      march: "3",
+      april: "4",
+      may: "5",
+      june: "6",
+      july: "7",
+      august: "8",
+      september: "9",
+      october: "10",
+      november: "11",
+      december: "12",
+    };
+    return monthMap[monthName.toLowerCase()] ?? "0"; // fallback "0" if invalid
+  };
+
+  const convertTimeToISOString = (timeStr: string): string => {
+    if (!timeStr) return "";
+
+    const [hoursStr, minutesStr] = timeStr
+      .toUpperCase()
+      .replace("AM", "")
+      .replace("PM", "")
+      .trim()
+      .split(":");
+
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+
+    if (timeStr.includes("PM") && hours < 12) hours += 12;
+    if (timeStr.includes("AM") && hours === 12) hours = 0;
+
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    return (
+      `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}` +
+      `T${pad(hours)}:${pad(minutes)}:00`
+    );
+  };
+
+  const normalizeDateValue = (val: any): string | null => {
+    if (val === null || val === undefined || val === "") return null;
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString().slice(0, 10);
+  };
+
+  const toLocalISOString = (val: string | Date): string => {
+    if (!val || val === "") return "";
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return (
+      `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+      `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    );
+  };
+
+  const isPayloadDifferent = (payload: any, current: any) => {
+    return Object.keys(payload).some((key) => {
+      const pVal = payload[key];
+      const cVal = current[key];
+
+      if (
+        (pVal === null || pVal === undefined || pVal === "") &&
+        (cVal === null || cVal === undefined || cVal === "")
+      ) {
+        return false;
+      }
+
+      const normalizeBool = (v: any): boolean | null => {
+        if (v === true || v === 1 || v === "true" || v === "1") return true;
+        if (v === false || v === 0 || v === "false" || v === "0") return false;
+        return null;
+      };
+      const pBool = normalizeBool(pVal);
+      const cBool = normalizeBool(cVal);
+      if (pBool !== null && cBool !== null) {
+        return pBool !== cBool;
+      }
+
+      const extractTime = (v: any): string | null => {
+        if (!v) return null;
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return null;
+        return `${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
+      };
+
+      const looksLikeISO = (v: any) =>
+        typeof v === "string" && v.includes("T") && !isNaN(Date.parse(v));
+
+      if (looksLikeISO(pVal) || looksLikeISO(cVal)) {
+        return extractTime(pVal) !== extractTime(cVal);
+      }
+
+      const looksLikeDate = (v: any) =>
+        typeof v === "string" && !isNaN(Date.parse(v)) && v.includes("-");
+      if (looksLikeDate(pVal) || looksLikeDate(cVal)) {
+        const normalizeDate = (v: any) => {
+          if (v === null || v === undefined || v === "") return null;
+          const d = new Date(v);
+          return isNaN(d.getTime()) ? String(v) : d.toISOString().slice(0, 10);
+        };
+        return normalizeDate(pVal) !== normalizeDate(cVal);
+      }
+
+      if (
+        pVal !== "" &&
+        cVal !== "" &&
+        !isNaN(Number(pVal)) &&
+        !isNaN(Number(cVal))
+      ) {
+        return Number(pVal) !== Number(cVal);
+      }
+
+      return pVal !== cVal;
+    });
+  };
+
+  const updateGroupById = async (
+    id: number,
+    updatedFields: Partial<GroupItem>,
+  ) => {
+    const { data: currentGroup } = await apiClient.get<GroupItem>(
+      `/Fs/Process/TimeKeepGroupSetUp/${id}`,
+    );
+
+    const merged: GroupItem = {
+      ...currentGroup,
+      ...updatedFields,
+      groupCode: currentGroup.groupCode, // preserve original groupCode
+    };
+
+    const dateFields = [
+      "cutOffDateFrom",
+      "cutOffDateTo",
+      "autoPairLogsDateFrom",
+      "autoPairLogsDateTo",
+    ];
+
+    const sanitized = Object.fromEntries(
+      Object.entries(merged).map(([k, v]) => [
+        k,
+        dateFields.includes(k) && (v === "" || v === undefined) ? null : v,
+      ]),
+    );
+
+    await apiClient.put(`/Fs/Process/TimeKeepGroupSetUp/${id}`, sanitized, {
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  const handleSaveGroupSetUpDefinition = async () => {
+    try {
+      if (!currentGroupId) return;
+
+      const activeId = currentGroupId; // capture before async ops
+
+      const mainPayload: Partial<GroupItem> = {
+        id: currentGroupId,
+        groupCode: tksGroupCode,
+        groupDescription: tksGroupDescription,
+        payrollGroup: payrollLocationCode,
+        cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+        cutOffDatePeriod: cutOffPeriod,
+        cutOffDateFrom: toLocalISOString(dateFrom),
+        cutOffDateTo: toLocalISOString(dateTo),
+        autoPairLogsDateFrom: toLocalISOString(autoPairingFrom),
+        autoPairLogsDateTo: toLocalISOString(autoPairingTo),
+        terminalID: terminalId,
+      };
+
+      const currentGroup = tksGroupItems.find((g) => g.id === activeId);
+      if (!currentGroup) return;
+      if (
+        !isPayloadDifferent(mainPayload, currentGroup) &&
+        selectedCutOffRows.length === 0 &&
+        selectedAutoPairingRows.length === 0
+      )
+        return;
+
+      await updateGroupById(activeId, mainPayload);
+
+      if (selectedCutOffRows.length > 0) {
+        const selectedIds = selectedCutOffRows
+          .map(Number)
+          .filter((id) => id !== activeId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+              cutOffDatePeriod: cutOffPeriod,
+              cutOffDateFrom: toLocalISOString(dateFrom),
+              cutOffDateTo: toLocalISOString(dateTo),
+            }),
+          ),
+        );
+      }
+
+      if (selectedAutoPairingRows.length > 0) {
+        const selectedIds = selectedAutoPairingRows
+          .map(Number)
+          .filter((id) => id !== activeId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+              cutOffDatePeriod: cutOffPeriod,
+              autoPairLogsDateFrom: toLocalISOString(autoPairingFrom),
+              autoPairLogsDateTo: toLocalISOString(autoPairingTo),
+            }),
+          ),
+        );
+      }
+      await Swal.fire({
+        icon: "success",
+        title: "Update Successful",
+        text: "Group setup definition has been updated successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Update failed:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Update failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
+    }
+    setIsEditMode(false);
+    setSelectedCutOffRows([]);
+    setSelectedAutoPairingRows([]);
+  };
+
+  const updateLoginPolicyById = async (
+    id: number,
+    payload: Partial<LoginPolicyItem>,
+  ) => {
+    try {
+      const sanitized = Object.fromEntries(
+        Object.entries(payload).map(([k, v]) => [
+          k,
+          v === undefined || v === "" ? null : v,
+        ]),
+      );
+
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy/${id}`,
+        sanitized, // no dto wrapper
+        { headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error(`Failed to update login policy for id ${id}`, error);
+      throw error;
+    }
+  };
+
+  const handleSaveLoginPolicy = async () => {
+    try {
+      if (!currentGroupId || !tksGroupCode) return;
+
+      // Find login policy by groupCode
+      const currentPolicy = (await fetchGroupSetupLoginPolicyData(
+        tksGroupCode,
+      )) as LoginPolicyItem | null;
+
+      if (!currentPolicy || !currentPolicy.id) {
+        console.warn("No login policy found for groupCode:", tksGroupCode);
+        return;
+      }
+
+      // Build payload using the login policy's OWN id, not currentGroupId
+      const buildLoginPolicyPayload = (): Partial<LoginPolicyItem> => ({
+        id: currentPolicy.id, // login policy's own id
+        groupCode: tksGroupCode,
+        gracePeriod: Number(gracePeriodPerDay),
+        gracePeriodIncTard: gracePeriodIncludeTardiness,
+        incldBrk2: includeBreak2InGrace,
+        dedEvnWGrace: deductibleEvenWithinGrace,
+        computeShrtBrkTardy: applyOccurancesBreak,
+        maxTimePerMonth: Number(maxOccurancesNoDeduction),
+        shrtBrkGracePeriod: Number(gracePeriodOccurance),
+        hrsCompleteWeek: Number(hoursRequiredPerWeek),
+        startWkToComplete: startOfWeek,
+        compAsPerWeek: computeType,
+        nightDiffStartTime: convertTimeToISOString(nightDiffStartTime) ?? null,
+        nightDiffEndTime: convertTimeToISOString(nightDiffEndTime) ?? null,
+        dedForAbsent: forAbsent,
+        dedForNoLogin: forNoLogin,
+        dedForNoLogout: forNoLogout,
+        deductMealBreakinNDComput: deductMealBreakND,
+        deductOverbreak: deductOverBreak,
+        gracePerSemiAnnualFlag: gracePeriodSemiAnnual,
+        graceSemiNoofHours: Number(gracePeriodPerSemiAnnual),
+        firstHalfFrom: firstHalfDateFrom,
+        firstHalfTo: firstHalfDateTo,
+        secondHalfFrom: secondHalfDateFrom,
+        secondHalfTo: secondHalfDateTo,
+        dedForNoBrk2out: forNoBreak2Out,
+        dedForNoBrk2In: forNoBreak2In,
+        otCodePerWeek: otCodePerWeek,
+        combineTardiOfTimeInBrk2: combineTardinessTimeInBreak2,
+        compTardinessForNoLogout: computeTardinessNoLogout,
+        twoShiftsInADay: twoShiftsInDay,
+        twoShiftsInADayInterval: Number(hoursIntervalTwoShifts),
+        numberAllowGracePrdInAMonth: Number(allowableGracePeriodMonth),
+        maxDaysPerWeekSatWrk: Number(maxDaysPerWeekSaturday),
+        saturdayPdRegHrsFlag: considerSaturdayPaid,
+        excludeAllowGracePrdFlag: excludeAllowableGraceBracket,
+        allowableGracePrdInAMonthBasedActualMonthFlag:
+          allowableGraceActualMonth,
+        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag:
+          excludeTardinessInGrace,
+        numberAllowTardyExcessGracePrd: Number(allowableTardyExcess),
+        supGroupCode: supervisoryGroupCode,
+      });
+
+      const payload = buildLoginPolicyPayload();
+
+      if (!isPayloadDifferent(payload, currentPolicy)) {
+        return; // no changes, skip update
+      }
+
+      // Use login policy's own id, not currentGroupId
+      await updateLoginPolicyById(currentPolicy.id, payload);
+
+      await Swal.fire({
+        icon: "success",
+        title: "Login Policy Updated",
+        text: "Login policy updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Login policy update failed", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Update failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
+    }
+    setIsEditMode(false);
+  };
+
+  const updateOTRateById = async (
+    id: number,
+    updatedFields: Partial<OverTimeRatesItem>,
+  ) => {
+    try {
+      const { data: currentOTRate } = await apiClient.get<OverTimeRatesItem>(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${id}`,
+      );
+
+      const merged: OverTimeRatesItem = {
+        ...currentOTRate,
+        ...updatedFields,
+        groupCode: currentOTRate.groupCode, // always preserve original groupCode
+      };
+
+      const decimalFields = [
+        "roundOfftHourMin",
+        "roundOffNDBasicHourMin",
+        "minHoursOTBreak",
+        "hoursOTBreakDeduction",
+        "minHrsToCompOTRegDay",
+        "minHrsToCompOTRestDay",
+        "minHrsToCompOTLegal",
+        "minHrsToCompOTSpecial",
+        "minHrsToCompOTSpecial2",
+        "minHrsToCompOTDoubleLegal",
+        "minHrsToCompOTNWH",
+        "otCutOffHours",
+        "minimumNoOfHrsRequiredToCompHol",
+      ];
+
+      const sanitized = Object.fromEntries(
+        Object.entries(merged).map(([k, v]) => [
+          k,
+          decimalFields.includes(k) && (v === "" || v === undefined) ? null : v,
+        ]),
+      );
+
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${id}`,
+        sanitized,
+        { headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error(`Failed to update OT Rate for id ${id}`, error);
+      throw error;
+    }
+  };
+
+  const handleSaveOTRates = async () => {
+    try {
+      if (!overTimeRates || overTimeRates.length === 0) return;
+
+      // Find the OT rate for the current group specifically
+      const freshOTRates = await fetchOverTimeRates();
+
+      const currentRate = freshOTRates.find(
+        (r) => r.groupCode === tksGroupCode && r.id === currentOTRatesID,
+      );
+      if (!currentRate) return;
+
+      const payload: Partial<OverTimeRatesItem> = {
+        id: currentOTRatesID,
+        groupCode: tksGroupCode,
+        regDayOT: regularDayOT,
+        restDayOT: restDayOT,
+        legalHolidayOT: legalHolidayOT,
+        specHolidayOT: specialHolidayOT,
+        doubleLegalHolidayOT: doubleLegalHolidayOT,
+        specialHoliday2: specialHolidayOT2,
+        nonWrkHolidayOT: nonWorkingHolidayOT,
+        regDayOTAdj: regularDayOTLateFiling,
+        restDayOTAdj: restDayOTLateFiling,
+        legalHolidayOTAdj: legalHolidayOTLateFiling,
+        specHolidayOTAdj: specialHolidayOTLateFiling,
+        doubleLegalHolidayOTAdj: doubleLegalHolidayOTLateFiling,
+        specialHoliday2Adj: specialHoliday2OTLateFiling,
+        nonWrkHolidayOTAdj: nonWorkingHolidayOTLateFiling,
+        minHoursOTBreak: otBreakMinHours,
+        hoursOTBreakDeduction: oTBreakNoOfHrsDed,
+        useOTPremiumBreakdown: useOTPremium,
+        useDayType2: useActualDayType,
+        holidayWithWorkShift: holidayWithWorkshift,
+        deductMealBreakOTComputation: deductMealBreakFromOT,
+        computeBrk2OI: computeOTForBreak2,
+        enable24HrOTFlag: enable24HourOT,
+        includeUnWorkHolInRegDay: includeUnworkedHolidayInRegular,
+        sundayWrkOTIfWrkSaturday: sundayOTIfWorkedSaturday,
+        minHrsToCompOTRegDay: regDayMinHrsToCompOT ?? null,
+        minHrsToCompOTRestDay: restDayMinHrsToCompOT ?? null,
+        minHrsToCompOTLegal: legalHolidayMinHrsToCompOT ?? null,
+        minHrsToCompOTSpecial: specialHolidayMinHrsToCompOT ?? null,
+        minHrsToCompOTSpecial2: specialHoliday2MinHrsToCompOT ?? null,
+        minHrsToCompOTDoubleLegal: doubleLegalHolidayMinHrsToCompOT ?? null,
+        minHrsToCompOTNWH: nonWorkingHolidayMinHrsToCompOT ?? null,
+        spRDDay: restDayToBeComputedAsOtherRate,
+        spRDDayOT: restDayOtherRate,
+        otCutOffFlag: isOverTimeCutOffFlag,
+        otCutOffOTCode: overTimeCode,
+        otCutOffHours: requiredHours ?? null,
+        otCode2ShiftsInADay: overTimeCodeFor2ShiftsDay,
+        roundOfftHourMin: oTRoundingToTheNearestHourMin ?? null,
+        birthDayPayOT: birthdayPay,
+        roundOffNDBasicHourMin: nDBasicRoundingToTheNearestHourMin ?? null,
+        useOTAuthorization: useOverTimeAuthorization,
+        holidayPayLegal: isHolPayLegalFlag,
+        holidayPaySpecial: isHolPaySpecialFlag,
+        compHolPayMonth: compHolPayForMonth,
+        compHolPayIfWorkBeforeHolidayRestDay:
+          compHolPayIfWorkBeforeHolidayRestDay,
+        compHolPayIfWorkBeforeHolidayLegalHoliday:
+          compHolPayIfWorkBeforeHolidayLegalHoliday,
+        compHolPayIfWorkBeforeHolidaySpecialHoliday:
+          compHolPayIfWorkBeforeHolidaySpecialHoliday,
+        noPayIfAbsentBeforeHoliday: noPayIfAbsentBeforeHoliday,
+        noPayIfAbsentAfterHoliday: noPayIfAbsentAfterHoliday,
+        compHolidayWithPaidLeave: compHolidayWithPaidLeave,
+        minimumNoOfHrsRequiredToCompHol:
+          minimumNoOfHrsRequiredToCompHol ?? null,
+        compFirstRestdayHoliday: compFirstRestdayHoliday,
+      };
+
+      if (!isPayloadDifferent(payload, currentRate)) return;
+
+      await updateOTRateById(currentRate.id, payload);
+
+      await Swal.fire({
+        icon: "success",
+        title: "OT Rate Updated",
+        text: "OT Rate updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to save OT Rate", error);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "OT Rate save failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
+    }
+    setIsEditMode(false);
+  };
+
+  const handleSaveOTBreak = async () => {
+    try {
+      const freshOTBreakList = await fetchOTBreakData();
+      setOTBreakList(freshOTBreakList);
+
+      const selectedOTBreak = freshOTBreakList.find(
+        (item) => item.groupCode === tksGroupCode,
+      );
+      if (!selectedOTBreak || !tksGroupCode) return;
+
+      const payload = {
+        id: selectedOTBreak.id,
+        groupCode: tksGroupCode,
+        regDay: oTBreakAppliesToRegDay,
+        restDay: oTBreakAppliesToRestDay,
+        lHoliday: oTBreakAppliesToLegHol,
+        sHoliday: oTBreakAppliesToSHol,
+        doubleHoliday: oTBreakAppliesToDoubleLegHol,
+        s2Holiday: oTBreakAppliesToS2Hol,
+        nonWorkHoliday: oTBreakAppliesToNonWorkHol,
+        lHolidayRest: oTBreakAppliesToLegHolRest,
+        sHolidayRest: oTBreakAppliesToSHolRest,
+        doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest,
+        s2HolidayRest: oTBreakAppliesToS2HolRest,
+        nonWorkHolidayRest: oTBreakAppliesToNonWorkRest,
+      };
+
+      if (!isPayloadDifferent(payload, selectedOTBreak)) return;
+
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupOTBreak/${selectedOTBreak.id}`,
+        payload,
+        { headers: { "Content-Type": "application/json" } },
+      );
+
+      const refreshed = await fetchOTBreakData();
+      setOTBreakList(refreshed);
+
+      const updatedItem = refreshed.find(
+        (item) => item.groupCode === tksGroupCode,
+      );
+      if (updatedItem) populateFromOTBreak(updatedItem);
+
+      await Swal.fire({
+        icon: "success",
+        title: "OT Break Updated",
+        text: "OT Break updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to save OT Break", error);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "OT Break save failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
+    }
+    setIsEditMode(false);
+  };
+
+  const hasDuplicateDayType = () => {
+    const seen = new Set<string>();
+
+    for (const item of oTAllowancesList) {
+      // Use the value that will actually be saved
+      const finalDayType = item.dayType || "Any";
+      const key = `${tksGroupCode}_${finalDayType}`;
+
+      if (seen.has(key)) {
+        return true;
+      }
+
+      seen.add(key);
+    }
+
+    return false;
+  };
+
+  const handleSaveOTAllowances = async () => {
+    try {
+      if (!tksGroupCode) return;
+      if (hasDuplicateDayType()) return;
+
+      // Check for deleted, new, or updated items
+      const deletedItems = originalOTAllowances.filter(
+        (original) =>
+          !oTAllowancesList.some((current) => current.id === original.id),
+      );
+
+      const newItems = oTAllowancesList.filter((i) => i.id === 0);
+
+      const updatedItems = oTAllowancesList.filter((i) => i.id !== 0);
+
+      // If nothing to change, exit early
+      if (
+        deletedItems.length === 0 &&
+        newItems.length === 0 &&
+        updatedItems.every((item) => {
+          const original = originalOTAllowances.find((o) => o.id === item.id);
+          if (!original) return false;
+          return (
+            original.minimumOTHours === item.minimumOTHours &&
+            original.accumOTHrsToEarnMealAllow ===
+              item.accumOTHrsToEarnMealAllow &&
+            original.earningCode === item.earningCode &&
+            original.amount === item.amount
+          );
+        })
+      ) {
+        return;
+      }
+
+      // Delete removed items
+      for (const item of deletedItems) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/${item.id}`,
+        );
+      }
+
+      // Add new items
+      for (const item of newItems) {
+        const payload = {
+          id: 0,
+          groupCode: tksGroupCode,
+          minimumOTHrs:
+            item.minimumOTHours === "" ? 0 : Number(item.minimumOTHours),
+          accumOTHrsToEarnMealAllow:
+            item.accumOTHrsToEarnMealAllow === ""
+              ? 0
+              : Number(item.accumOTHrsToEarnMealAllow),
+          dayType: "Any",
+          earningCode: item.earningCode,
+          amount: item.amount === "" ? 0 : Number(item.amount),
+        };
+
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances",
+          payload,
+        );
+      }
+
+      // Update existing items
+      for (const item of updatedItems) {
+        const payload = {
+          id: item.id,
+          groupCode: tksGroupCode,
+          minimumOTHrs:
+            item.minimumOTHours === "" ? 0 : Number(item.minimumOTHours),
+          accumOTHrsToEarnMealAllow:
+            item.accumOTHrsToEarnMealAllow === ""
+              ? 0
+              : Number(item.accumOTHrsToEarnMealAllow),
+          dayType: "Any",
+          earningCode: item.earningCode,
+          amount: item.amount === "" ? 0 : Number(item.amount),
+        };
+
+        await apiClient.put(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/${item.id}`,
+          payload,
+        );
+      }
+
+      // Success notification
+      await Swal.fire({
+        icon: "success",
+        title: "OT Allowances Saved",
+        text: "OT Allowances saved successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      setOriginalOTAllowances(oTAllowancesList);
+    } catch (error: any) {
+      console.error("Failed to save OT Allowances:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Save failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: errorMsg,
+      });
+    }
+    setIsEditMode(false);
+  };
+
+  // Function to update system config by ID
+  const updateSystemConfigById = async (
+    id: number,
+    payload: Partial<SystemConfigItem>,
+  ) => {
+    try {
+      await apiClient.put(
+        `/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig/${id}`,
+        payload,
+        { headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error(`Failed to update system config for id ${id}`, error);
+      throw error;
+    }
+  };
+
+  const handleSaveSystemConfig = async () => {
+    try {
+      // Fetch fresh data instead of stale state
+      const freshConfigs = await fetchGroupSystemConfig();
+      const currentItem = freshConfigs.find(
+        (s) => s.groupCode === tksGroupCode,
+      );
+
+      if (!currentItem) {
+        await Swal.fire({
+          icon: "warning",
+          title: "No System Configuration",
+          text: "No system configuration found.",
+        });
+        return;
+      }
+
+      const buildSystemConfigPayload = (): Partial<SystemConfigItem> => ({
+        id: currentItem.id,
+        groupCode: currentItem.groupCode,
+        numOfMinBeforeTheShift: Number(minBeforeShift ?? 0),
+        numOfMinToIgnoreMultipleOutInBreak: Number(minIgnoreMultipleBreak ?? 0),
+        numOfMinBeforeMidnightShift: Number(minBeforeMidnightShift ?? 0),
+        noOfMinToConsiderBrk2In: Number(minConsiderBreak2In ?? 0),
+        devicePolicy: devicePolicy ?? "",
+        useTKSystemConfig: useTimekeepingSystemConfig ?? false,
+      });
+
+      const payload = buildSystemConfigPayload();
+      if (!isPayloadDifferent(payload, currentItem)) return;
+
+      await updateSystemConfigById(currentItem.id, payload);
+
+      // Refresh and populate correct group
+      const updatedConfig = await fetchGroupSystemConfig();
+      setSystemConfigList(updatedConfig);
+      const updatedItem = updatedConfig.find(
+        (s) => s.groupCode === tksGroupCode,
+      );
+      if (updatedItem) populateSystemConfigStates(updatedItem);
+
+      await Swal.fire({
+        icon: "success",
+        title: "System Configuration Updated",
+        text: "System Configuration updated successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("System Configuration update failed", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Update failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: errorMsg,
+      });
+    }
+    setIsEditMode(false);
   };
 
   // Fetch OvertimeFileSetup data from API
@@ -879,7 +1749,7 @@ export function TimeKeepGroupPage() {
     }));
   };
 
- // Fetch Group System Config data from API
+  // Fetch Group System Config data from API
   const fetchGroupSystemConfig = async (): Promise<SystemConfigItem[]> => {
     const response = await apiClient.get(
       "/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig",
@@ -889,49 +1759,78 @@ export function TimeKeepGroupPage() {
       id: item.id,
       groupCode: item.groupCode,
       numOfMinBeforeTheShift: item.numOfMinBeforeTheShift?.toString() ?? "0",
-      numOfMinToIgnoreMultipleOutInBreak: item.numOfMinToIgnoreMultipleOutInBreak?.toString() ?? "0",
-      numOfMinBeforeMidnightShift: item.numOfMinBeforeMidnightShift?.toString() ?? "0",
+      numOfMinToIgnoreMultipleOutInBreak:
+        item.numOfMinToIgnoreMultipleOutInBreak?.toString() ?? "0",
+      numOfMinBeforeMidnightShift:
+        item.numOfMinBeforeMidnightShift?.toString() ?? "0",
       devicePolicy: item.devicePolicy ?? "",
       noOfMinToConsiderBrk2In: item.noOfMinToConsiderBrk2In?.toString() ?? "0",
       useTKSystemConfig: item.useTKSystemConfig ?? false,
     }));
   };
 
-  // Fetch 
-  const fetchOTAllowancesData = async (): Promise<OTAllowancesItem[]> => {
-    const response = await apiClient.get(
-      `Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/ByGroupCode/${tksGroupCode}`,
-    );
+  const fetchOTAllowancesData = async (
+    groupCode: string,
+  ): Promise<OTAllowancesItem[]> => {
+    if (!groupCode || groupCode === "") return [];
 
-    return response.data.map((item: any) => ({
-      id: item.id,
-      groupCode: item.groupCode,
-      minimumOTHours: item.minimumOTHrs,
-      accumOTHrsToEarnMealAllow: item.accumOTHrsToEarnMealAllow,
-      dayType: item.dayType,
-      earningCode: item.earningCode,
-      amount: item.amount
-    }));
+    try {
+      const response = await apiClient.get(
+        `Fs/Process/TimeKeepGroup/GroupSetUpOTAllowances/ByGroupCode/${groupCode}`,
+      );
+
+      return response.data.map((item: any) => ({
+        id: item.id,
+        groupCode: item.groupCode,
+        minimumOTHours: item.minimumOTHrs,
+        accumOTHrsToEarnMealAllow: item.accumOTHrsToEarnMealAllow,
+        dayType: item.dayType,
+        earningCode: item.earningCode,
+        amount: item.amount,
+      }));
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.warn(`No OT Allowances found for groupCode: ${groupCode}`);
+        return [];
+      }
+      console.error("Error fetching OT Allowances:", error);
+      return [];
+    }
   };
 
   useEffect(() => {
-    const loadOvertimeFileSetup = async () => {
-      const items = await fetchOvertimeFileSetup();
-      setOtCodePerWeekList(items);
+    const loadAll = async () => {
+      if (!isCreateNew) {
+        setLoadingOvertimeSetup(true);
+        try {
+          const [overtimeItems, allowancesItems, systemConfigItems] =
+            await Promise.all([
+              fetchOvertimeFileSetup(),
+              fetchOTAllowancesData(tksGroupCode),
+              fetchGroupSystemConfig(),
+            ]);
+
+          setOtCodePerWeekList(overtimeItems);
+
+          setOTAllowancesList(allowancesItems);
+          setOriginalOTAllowances(allowancesItems);
+
+          setSystemConfigList(systemConfigItems);
+          const selectedSystemConfig = systemConfigItems.find(
+            (item) => item.groupCode === tksGroupCode,
+          );
+          if (selectedSystemConfig)
+            populateSystemConfigStates(selectedSystemConfig);
+        } catch (error) {
+          console.error("Failed to load overtime/system config data:", error);
+        } finally {
+          setLoadingOvertimeSetup(false);
+        }
+      }
     };
-    const loadAllowancesData =  async () => {
-      const items = await fetchOTAllowancesData();
-      setOTAllowancesList(items);
-    };
-    const loadSystemConfig = async () =>  {
-      const items = await fetchGroupSystemConfig();
-      setSystemConfigList(items);
-      populateSystemConfigStates(items[0]);
-    }
-    loadOvertimeFileSetup();
-    loadAllowancesData();
-    loadSystemConfig();
-  }, []);
+
+    loadAll();
+  }, [tksGroupCode]);
 
   const fetchPayrollLocationData = async (): Promise<PayrollLocationItem[]> => {
     const response = await apiClient.get("/Fs/Process/PayrollLocationSetUp");
@@ -945,17 +1844,25 @@ export function TimeKeepGroupPage() {
 
   useEffect(() => {
     const loadPayrollLocation = async () => {
-      const items = await fetchPayrollLocationData();
-      setPayrollLocationList(items);
+      setLoadingPayrollLocation(true);
+      try {
+        const items = await fetchPayrollLocationData();
+        setPayrollLocationList(items);
+      } catch (error) {
+        console.error("Failed to load payroll location:", error);
+      } finally {
+        setLoadingPayrollLocation(false);
+      }
     };
 
     loadPayrollLocation();
   }, []);
 
-
   // Fetch Over Time Rates
   const fetchOverTimeRates = async (): Promise<OverTimeRatesItem[]> => {
-    const response = await apiClient.get("/Fs/Process/TimeKeepGroup/GroupSetUpOTRates");
+    const response = await apiClient.get(
+      "/Fs/Process/TimeKeepGroup/GroupSetUpOTRates",
+    );
 
     return response.data.map((item: any) => ({
       id: item.id,
@@ -1000,9 +1907,12 @@ export function TimeKeepGroupPage() {
       compHolPayMonth: item.compHolPayMonth,
       nonWrkHolidayOT: item.nonWrkHolidayOT,
       minimumNoOfHrsRequiredToCompHol: item.minimumNoOfHrsRequiredToCompHol,
-      compHolPayIfWorkBeforeHolidayRestDay: item.compHolPayIfWorkBeforeHolidayRestDay,
-      compHolPayIfWorkBeforeHolidaySpecialHoliday: item.compHolPayIfWorkBeforeHolidaySpecialHoliday,
-      compHolPayIfWorkBeforeHolidayLegalHoliday: item.compHolPayIfWorkBeforeHolidayLegalHoliday,
+      compHolPayIfWorkBeforeHolidayRestDay:
+        item.compHolPayIfWorkBeforeHolidayRestDay,
+      compHolPayIfWorkBeforeHolidaySpecialHoliday:
+        item.compHolPayIfWorkBeforeHolidaySpecialHoliday,
+      compHolPayIfWorkBeforeHolidayLegalHoliday:
+        item.compHolPayIfWorkBeforeHolidayLegalHoliday,
       minHrsToCompOTRegDay: item.minHrsToCompOTRegDay,
       minHrsToCompOTRestDay: item.minHrsToCompOTRestDay,
       minHrsToCompOTLegal: item.minHrsToCompOTLegal,
@@ -1025,135 +1935,160 @@ export function TimeKeepGroupPage() {
       roundOffNDBasicHourMin: item.roundOffNDBasicHourMin,
       includeUnWorkHolInRegDay: item.includeUnWorkHolInRegDay,
       sundayWrkOTIfWrkSaturday: item.sundayWrkOTIfWrkSaturday,
-      otCode2ShiftsInADay: item.otCode2ShiftsInADay
+      otCode2ShiftsInADay: item.otCode2ShiftsInADay,
     }));
   };
 
   const populateFromOTBreak = (item: OTBreakItem) => {
     setOTBreakAppliesToRegDay(item.regDay ?? false);
-    setOTBreakAppliesToLegHol(item.doubleHoliday ?? false);
-    setOTBreakAppliesToSHol(item.specialHoliday ?? false);
-    setOTBreakAppliesToDoubleLegHol(item.doubleHoliday ?? false);
-    setOTBreakAppliesToS2Hol(item.specialHoliday2 ?? false);
-    setOTBreakAppliesToNonWorkHol(item.nonWorkingHoliday ?? false);
     setOTBreakAppliesToRestDay(item.restDay ?? false);
-    setOTBreakAppliesToLegHolRest(item.legalHolidayRest ?? false);
-    setOTBreakAppliesToSHolRest(item.specialHolidayRest ?? false)
+    setOTBreakAppliesToLegHol(item.lHoliday ?? false);
+    setOTBreakAppliesToSHol(item.sHoliday ?? false);
+    setOTBreakAppliesToDoubleLegHol(item.doubleHoliday ?? false);
+    setOTBreakAppliesToS2Hol(item.s2Holiday ?? false);
+    setOTBreakAppliesToNonWorkHol(item.nonWorkHoliday ?? false);
+    setOTBreakAppliesToLegHolRest(item.lHolidayRest ?? false);
+    setOTBreakAppliesToSHolRest(item.sHolidayRest ?? false);
     setOTBreakAppliesToDoubleLegHolRest(item.doubleHolidayRest ?? false);
-    setOTBreakAppliesToS2HolRest(item.specialHoliday2Rest ?? false);
-    setOTBreakAppliesToNonWorkRest(item.nonWorkingHolidayRest ?? false);
+    setOTBreakAppliesToS2HolRest(item.s2HolidayRest ?? false);
+    setOTBreakAppliesToNonWorkRest(item.nonWorkHolidayRest ?? false);
   };
 
   const populateSystemConfigStates = (item: SystemConfigItem) => {
-    setUseTimekeepingSystemConfig(item.useTKSystemConfig);
-    setMinBeforeShift(item.numOfMinBeforeTheShift);
-    setMinIgnoreMultipleBreak(item.numOfMinToIgnoreMultipleOutInBreak);
-    setMinBeforeMidnightShift(item.numOfMinBeforeMidnightShift);
-    setMinConsiderBreak2In(item.noOfMinToConsiderBrk2In);
-    setDevicePolicy(item.devicePolicy);
+    setUseTimekeepingSystemConfig(item.useTKSystemConfig ?? false);
+    setMinBeforeShift(item.numOfMinBeforeTheShift ?? 0);
+    setMinIgnoreMultipleBreak(item.numOfMinToIgnoreMultipleOutInBreak ?? 0);
+    setMinBeforeMidnightShift(item.numOfMinBeforeMidnightShift ?? 0);
+    setMinConsiderBreak2In(item.noOfMinToConsiderBrk2In ?? 0);
+    setDevicePolicy(item.devicePolicy ?? "");
   };
 
   const populateFromOTRates = (item: OverTimeRatesItem) => {
-    setRegularDayOT(item.regDayOT ?? '');
-    setRestDayOT(item.restDayOT ?? '');
-    setLegalHolidayOT(item.legalHolidayOT ?? '');
-    setSpecialHolidayOT(item.specHolidayOT ?? '');
-    setDoubleLegalHolidayOT(item.doubleLegalHolidayOT ?? '')
-    setSpecialHolidayOT2(item.specialHoliday2 ?? '');
-    setNonWorkingHolidayOT(item.nonWrkHolidayOT ?? '');
+    setCurrentOTRateID(item.id);
+    setRegularDayOT(item.regDayOT ?? "");
+    setRestDayOT(item.restDayOT ?? "");
+    setLegalHolidayOT(item.legalHolidayOT ?? "");
+    setSpecialHolidayOT(item.specHolidayOT ?? "");
+    setDoubleLegalHolidayOT(item.doubleLegalHolidayOT ?? "");
+    setSpecialHolidayOT2(item.specialHoliday2 ?? "");
+    setNonWorkingHolidayOT(item.nonWrkHolidayOT ?? "");
 
-    setRegularDayOTLateFiling(item.regDayOTAdj ?? '');
-    setRestDayOTLateFiling(item.restDayOTAdj ?? '');
-    setLegalHolidayOTLateFiling(item.legalHolidayOTAdj ?? '');
-    setSpecialHolidayOTLateFiling(item.legalHolidayOTAdj ?? '');
-    setDoubleLegalHolidayOTLateFiling(item.doubleLegalHolidayOTAdj ?? '');
-    setSpecialHoliday2OTLateFiling(item.specialHoliday2Adj ?? '');
-    setNonWorkingHolidayOTLateFiling(item.nonWrkHolidayOTAdj ?? '');
-    
-    setOtBreakMinHours(item.minHoursOTBreak ?? 0)
-    setOTBreakNoOfHrsDed(item.hoursOTBreakDeduction ?? 0)
+    setRegularDayOTLateFiling(item.regDayOTAdj ?? "");
+    setRestDayOTLateFiling(item.restDayOTAdj ?? "");
+    setLegalHolidayOTLateFiling(item.legalHolidayOTAdj ?? "");
+    setSpecialHolidayOTLateFiling(item.legalHolidayOTAdj ?? "");
+    setDoubleLegalHolidayOTLateFiling(item.doubleLegalHolidayOTAdj ?? "");
+    setSpecialHoliday2OTLateFiling(item.specialHoliday2Adj ?? "");
+    setNonWorkingHolidayOTLateFiling(item.nonWrkHolidayOTAdj ?? "");
+
+    setOtBreakMinHours(item.minHoursOTBreak ?? 0);
+    setOTBreakNoOfHrsDed(item.hoursOTBreakDeduction ?? 0);
     setUseOTPremium(item.useOTPremiumBreakdown ?? false);
     setUseActualDayType(item.useDayType2 ?? false);
-    setHolidayWithWorkshift(item.holidayWithWorkShift ?? false)
-    setDeductMealBreakFromOT(item.deductMealBreakOTComputation ?? false); 
+    setHolidayWithWorkshift(item.holidayWithWorkShift ?? false);
+    setDeductMealBreakFromOT(item.deductMealBreakOTComputation ?? false);
     setComputeOTForBreak2(item.computeBrk2OI ?? false);
     setEnable24HourOT(item.enable24HrOTFlag ?? false);
     setIncludeUnworkedHolidayInRegular(item.includeUnWorkHolInRegDay ?? false);
     setSundayOTIfWorkedSaturday(item.sundayWrkOTIfWrkSaturday ?? false);
 
-    setRegDayMinHrsToCompOT(item.minHrsToCompOTRegDay ?? '');
-    setRestDayMinHrsToCompOT(item.minHrsToCompOTRestDay ?? '');
-    setLegalHolidayMinHrsToCompOT(item.minHrsToCompOTLegal ?? '');
-    setSpecialHolidayMinHrsToCompOT(item.minHrsToCompOTSpecial ?? '');
-    setSpecialHoliday2MinHrsToCompOT(item.minHrsToCompOTSpecial2 ?? '');
-    setDoubleLegalHolidayMinHrsToCompOT(item.minHrsToCompOTDoubleLegal ?? '');
-    setNonWorkingHolidayMinHrsToCompOT(item.minHrsToCompOTNWH ?? '');
+    setRegDayMinHrsToCompOT(item.minHrsToCompOTRegDay ?? "");
+    setRestDayMinHrsToCompOT(item.minHrsToCompOTRestDay ?? "");
+    setLegalHolidayMinHrsToCompOT(item.minHrsToCompOTLegal ?? "");
+    setSpecialHolidayMinHrsToCompOT(item.minHrsToCompOTSpecial ?? "");
+    setSpecialHoliday2MinHrsToCompOT(item.minHrsToCompOTSpecial2 ?? "");
+    setDoubleLegalHolidayMinHrsToCompOT(item.minHrsToCompOTDoubleLegal ?? "");
+    setNonWorkingHolidayMinHrsToCompOT(item.minHrsToCompOTNWH ?? "");
 
-    setRestDayToBeComputedAsOtherRate(item.spRDDay ?? '');
-    setRestDayOtherRate(item.spRDDayOT ?? '');
-    setIsOverTimeCutoffFlag(item.otCutOffFlag ?? false)
-    setOverTimeCode(item.otCutOffOTCode ?? '');
-    setRequiredHours(item.otCutOffHours ?? '');
-    setOverTimeCodeFor2ShiftsDay(item.otCode2ShiftsInADay?? '');
-    setOTRoundingToTheNearestHourMin(item.roundOfftHourMin ?? '')
-    setBirthdayPay(item.birthDayPayOT ?? '');
-    setNDBasicRoundingToTheNearestHourMin(item.roundOffNDBasicHourMin ?? '');
+    setRestDayToBeComputedAsOtherRate(item.spRDDay ?? "");
+    setRestDayOtherRate(item.spRDDayOT ?? "");
+    setIsOverTimeCutoffFlag(item.otCutOffFlag ?? false);
+    setOverTimeCode(item.otCutOffOTCode ?? "");
+    setRequiredHours(item.otCutOffHours ?? "");
+    setOverTimeCodeFor2ShiftsDay(item.otCode2ShiftsInADay ?? "");
+    setOTRoundingToTheNearestHourMin(item.roundOfftHourMin ?? "");
+    setBirthdayPay(item.birthDayPayOT ?? "");
+    setNDBasicRoundingToTheNearestHourMin(item.roundOffNDBasicHourMin ?? "");
     setUseOverTimeAuthorization(item.useOTAuthorization ?? false);
     setIsSpecialOTCompFlag(item.useDayType2 ?? false);
     setIsHolPayLegalFlag(item.holidayPayLegal ?? false);
     setIsHolPaySpecialFlag(item.holidayPaySpecial ?? false);
     setCompHolPayForMonth(item.compHolPayMonth ?? false);
-    setCompHolPayIfWorkBeforeHolidayRestDay(item.compHolPayIfWorkBeforeHolidayRestDay ?? false);
-    setCompHolPayIfWorkBeforeHolidayLegalHoliday(item.compHolPayIfWorkBeforeHolidayLegalHoliday ?? false);
-    setCompHolPayIfWorkBeforeHolidaySpecialHoliday(item.compHolPayIfWorkBeforeHolidaySpecialHoliday ?? false);
+    setCompHolPayIfWorkBeforeHolidayRestDay(
+      item.compHolPayIfWorkBeforeHolidayRestDay ?? false,
+    );
+    setCompHolPayIfWorkBeforeHolidayLegalHoliday(
+      item.compHolPayIfWorkBeforeHolidayLegalHoliday ?? false,
+    );
+    setCompHolPayIfWorkBeforeHolidaySpecialHoliday(
+      item.compHolPayIfWorkBeforeHolidaySpecialHoliday ?? false,
+    );
     setNoPayIfAbsentBeforeHoliday(item.noPayIfAbsentBeforeHoliday ?? false);
     setNoPayIfAbsentAfterHoliday(item.noPayIfAbsentAfterHoliday ?? false);
-    setCompHolidayWithPaidLeave(item.compHolidayWithPaidLeave ?? false );
-    setMinimumNoOfHrsRequiredToCompHol(item.minimumNoOfHrsRequiredToCompHol ?? '')
+    setCompHolidayWithPaidLeave(item.compHolidayWithPaidLeave ?? false);
+    setMinimumNoOfHrsRequiredToCompHol(
+      item.minimumNoOfHrsRequiredToCompHol ?? "",
+    );
     setCompFirstRestdayHoliday(item.compFirstRestdayHoliday ?? false);
   };
-  
-
 
   const fetchOTBreakData = async (): Promise<OTBreakItem[]> => {
     const response = await apiClient.get(
-      "/Fs/Process/TimeKeepGroup/GroupOTBreak"
+      "/Fs/Process/TimeKeepGroup/GroupOTBreak",
     );
 
-    return response.data.map((item: any): OTBreakItem => ({
-      id: item.id,
-      regDay: item.regDay,
-      restDay: item.restDay,
-      legalHoliday: item.lHoliday,
-      specialHoliday: item.sHoliday,
-      legalHolidayRest: item.lHolidayRest,
-      specialHolidayRest: item.sHolidayRest,
-      groupCode: item.groupCode,
-      doubleHoliday: item.doubleHoliday,
-      doubleHolidayRest: item.doubleHolidayRest,
-      specialHoliday2: item.s2Holiday,
-      specialHoliday2Rest: item.s2HolidayRest,
-      nonWorkingHoliday: item.nonWorkHoliday,
-      nonWorkingHolidayRest: item.nonWorkHolidayRest,
-    }));
+    return response.data.map(
+      (item: any): OTBreakItem => ({
+        id: item.id,
+        regDay: item.regDay,
+        restDay: item.restDay,
+        lHoliday: item.lHoliday,
+        sHoliday: item.sHoliday,
+        lHolidayRest: item.lHolidayRest,
+        sHolidayRest: item.sHolidayRest,
+        groupCode: item.groupCode,
+        doubleHoliday: item.doubleHoliday,
+        doubleHolidayRest: item.doubleHolidayRest,
+        s2Holiday: item.s2Holiday,
+        s2HolidayRest: item.s2HolidayRest,
+        nonWorkHoliday: item.nonWorkHoliday,
+        nonWorkHolidayRest: item.nonWorkHolidayRest,
+      }),
+    );
   };
 
   useEffect(() => {
-    const loadOverTimeRates = async () => {
-      const items = await fetchOverTimeRates();
-      setOverTimeRates(items);
-      populateFromOTRates(items[0]);
+    const loadAll = async () => {
+      setLoadingOTRates(true);
+      setLoadingOTBreak(true);
+      try {
+        const [otRates, otBreaks] = await Promise.all([
+          fetchOverTimeRates(),
+          fetchOTBreakData(),
+        ]);
+
+        setOverTimeRates(otRates);
+        const selectedOTRate = otRates.find(
+          (item) => item.groupCode === tksGroupCode,
+        );
+        if (selectedOTRate) populateFromOTRates(selectedOTRate);
+
+        setOTBreakList(otBreaks);
+        const selectedOTBreak = otBreaks.find(
+          (item) => item.groupCode === tksGroupCode,
+        );
+        if (selectedOTBreak) populateFromOTBreak(selectedOTBreak);
+      } catch (error) {
+        console.error("Failed to load OT data:", error);
+      } finally {
+        setLoadingOTRates(false);
+        setLoadingOTBreak(false);
+      }
     };
-    const loadOTBreakData = async () => {
-      const items = await fetchOTBreakData();
-      setOTBreakList(items);
-      populateFromOTBreak(items[0]);
-    };
-    loadOverTimeRates();
-    loadOTBreakData();
+
+    loadAll();
   }, []);
 
-  // Generic fetch function
   const fetchEquivDayData = async (
     endpoint: string,
   ): Promise<EquivDayItem[]> => {
@@ -1174,66 +2109,99 @@ export function TimeKeepGroupPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const forAbsentItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForAbsent",
-      );
-      setEquivDayAbsentList(forAbsentItems);
+      setLoadingEquivDay(true);
+      try {
+        const [
+          forAbsentItems,
+          forNoLoginItems,
+          forNoLogoutItems,
+          forNoBreak2InItems,
+          forNoBreak2OutItems,
+        ] = await Promise.all([
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForAbsent",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogin",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogout",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2In",
+          ),
+          fetchEquivDayData(
+            "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2Out",
+          ),
+        ]);
 
-      const forNoLoginItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogin",
-      );
-      setEquivDayNoLoginList(forNoLoginItems);
-
-      const forNoLogoutItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoLogout",
-      );
-      setEquivDayNoLogoutList(forNoLogoutItems);
-
-      const forNoBreak2InItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2In",
-      );
-      setEquivDayForNoBreak2InList(forNoBreak2InItems);
-
-      const forNoBreak2OutItems = await fetchEquivDayData(
-        "/Fs/Process/Device/EquivHoursDeductionSetUp/ForNoBreak2Out",
-      );
-      setEquivDayForNoBreak2OutList(forNoBreak2OutItems);
+        setEquivDayAbsentList(forAbsentItems);
+        setEquivDayNoLoginList(forNoLoginItems);
+        setEquivDayNoLogoutList(forNoLogoutItems);
+        setEquivDayForNoBreak2InList(forNoBreak2InItems);
+        setEquivDayForNoBreak2OutList(forNoBreak2OutItems);
+      } catch (error) {
+        console.error("Failed to load equiv day data:", error);
+      } finally {
+        setLoadingEquivDay(false);
+      }
     };
 
     loadData();
   }, []);
 
-
-  
-
-  const populateFromGroup = (firstGroup: GroupItem) => {
-    setTksGroupCode(firstGroup.tksGroupCode ?? "");
-    setTksGroupDescription(firstGroup.description ?? "");
-    setPayrollLocationCode(firstGroup.tksGroupCode ?? "");
-    setPayrollDescription(firstGroup.description ?? "");
-    setDateFrom(formatApiDate(firstGroup.cutOffDateFrom) ?? "");
-    setDateTo(formatApiDate(firstGroup.cutOffDateTo) ?? "");
-    const monthIndex = parseInt(firstGroup.cutOffDateMonth ?? "0", 10) - 1;
+  const populateFromGroup = async (item: GroupItem) => {
+    setCurrentGroupId(item.id);
+    setTksGroupCode(item.groupCode);
+    setTksGroupDescription(item.groupDescription || "");
+    setPayrollLocationCode(item.payrollGroup ?? "");
+    let locations = payrollLocationList;
+    if (locations.length === 0) {
+      locations = await fetchPayrollLocationData();
+      setPayrollLocationList(locations);
+    }
+    const matchedLocation = locations.find(
+      (loc) => loc.locationCode === item.payrollGroup,
+    );
+    setPayrollDescription(matchedLocation?.locationName ?? "");
+    setDateFrom(formatApiDate(item.cutOffDateFrom) ?? "");
+    setDateTo(formatApiDate(item.cutOffDateTo) ?? "");
+    const monthIndex = parseInt(item.cutOffDateMonth ?? "0", 10) - 1;
     setCutOffMonth(months[monthIndex] || "");
-    setcutOffPeriod(firstGroup.cutOffDatePeriod ?? "");
-    setTerminalId(firstGroup.terminalID ?? "");
-    setAutoPairingFrom(formatApiDate(firstGroup.autoPairLogsDateFrom) ?? "");
-    setAutoPairingTo(formatApiDate(firstGroup.autoPairLogsDateTo) ?? "");
+    setcutOffPeriod(item.cutOffDatePeriod ?? "");
+    setTerminalId(item.terminalID ?? "");
+    setAutoPairingFrom(formatApiDate(item.autoPairLogsDateFrom) ?? "");
+    setAutoPairingTo(formatApiDate(item.autoPairLogsDateTo) ?? "");
+  };
+
+  const loadTKSGroup = async (activeGroupId?: number) => {
+    const items = await fetchTKSGroupData();
+    setTKSGroupItems(items);
+    setSupervisoryGroupsList(items);
+    if (items.length > 0) {
+      const targetId = activeGroupId ?? currentGroupId;
+      const current = targetId
+        ? (items.find((g: GroupItem) => g.id === targetId) ?? items[0])
+        : items[0];
+      populateFromGroup(current);
+    }
+    return items;
   };
 
   useEffect(() => {
-    const loadTKSGroup = async () => {
-      const items = await fetchTKSGroupData();
-      setTKSGroupItems(items); // Set TKSGroup items to state
-      setSupervisoryGroupsList(items); // Set Supervisory Groups
-      if (items.length > 0) {
-        populateFromGroup(items[0]);
+    const load = async () => {
+      setLoadingTKSGroup(true);
+      try {
+        await loadTKSGroup();
+      } catch (error) {
+        console.error("Failed to load TKS Group:", error);
+      } finally {
+        setLoadingTKSGroup(false);
       }
     };
-    loadTKSGroup();
+
+    load();
   }, []);
-
-
   const formatTimeTo12Hour = (isoString: string | null): string => {
     if (!isoString) return "";
     const date = new Date(isoString);
@@ -1265,13 +2233,21 @@ export function TimeKeepGroupPage() {
     setDeductMealBreakND(item.deductMealBreakinNDComput ?? false);
     setTwoShiftsInDay(item.twoShiftsInADay ?? false);
     setHoursIntervalTwoShifts(item.twoShiftsInADayInterval?.toString() ?? "");
-    setAllowableGracePeriodMonth(item.numberAllowGracePrdInAMonth?.toString() ?? "",);
+    setAllowableGracePeriodMonth(
+      item.numberAllowGracePrdInAMonth?.toString() ?? "",
+    );
     setExcludeAllowableGraceBracket(item.excludeAllowGracePrdFlag ?? false);
-    setAllowableGraceActualMonth(item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,);
+    setAllowableGraceActualMonth(
+      item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
+    );
     setConsiderSaturdayPaid(item.saturdayPdRegHrsFlag ?? false);
     setMaxDaysPerWeekSaturday(item.maxDaysPerWeekSatWrk?.toString() ?? "");
-    setAllowableTardyExcess(item.numberAllowTardyExcessGracePrd?.toString() ?? "",);
-    setExcludeTardinessInGrace(item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,);
+    setAllowableTardyExcess(
+      item.numberAllowTardyExcessGracePrd?.toString() ?? "",
+    );
+    setExcludeTardinessInGrace(
+      item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,
+    );
     setSupervisoryGroupCode(item.supGroupCode ?? "");
     setApplyOccurancesBreak(item.computeShrtBrkTardy ?? false);
     setMaxOccurancesNoDeduction(item.maxTimePerMonth?.toString() ?? "");
@@ -1314,8 +2290,10 @@ export function TimeKeepGroupPage() {
         deductMealBreakinNDComput: item.deductMealBreakinNDComput ?? false,
         incRestdayinNDComput: item.incRestdayinNDComput ?? false,
         incHolidayinNDComput: item.incHolidayinNDComput ?? false,
-        restdayNDComputBasedOnDateIn: item.restdayNDComputBasedOnDateIn ?? false,
-        holidayNDComputbasedOnDateIn: item.holidayNDComputbasedOnDateIn ?? false,
+        restdayNDComputBasedOnDateIn:
+          item.restdayNDComputBasedOnDateIn ?? false,
+        holidayNDComputbasedOnDateIn:
+          item.holidayNDComputbasedOnDateIn ?? false,
         tardinessMaxHours: item.tardinessMaxHours ?? null,
         undertimeMaxHours: item.undertimeMaxHours ?? null,
         undertimeHoursFromTardy: item.undertimeHoursFromTardy ?? null,
@@ -1347,9 +2325,13 @@ export function TimeKeepGroupPage() {
         maxDaysPerWeekSatWrk: item.maxDaysPerWeekSatWrk ?? null,
         saturdayPdRegHrsFlag: item.saturdayPdRegHrsFlag ?? false,
         excludeAllowGracePrdFlag: item.excludeAllowGracePrdFlag ?? false,
-        allowableGracePrdInAMonthBasedActualMonthFlag: item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
-        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag: item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ?? false,
-        numberAllowTardyExcessGracePrd: item.numberAllowTardyExcessGracePrd ?? null,
+        allowableGracePrdInAMonthBasedActualMonthFlag:
+          item.allowableGracePrdInAMonthBasedActualMonthFlag ?? false,
+        excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag:
+          item.excludeTardywGracePrdInCountAllowableGracePrdInAMonthFlag ??
+          false,
+        numberAllowTardyExcessGracePrd:
+          item.numberAllowTardyExcessGracePrd ?? null,
         supGroupCode: item.supGroupCode ?? "",
       }));
 
@@ -1367,15 +2349,25 @@ export function TimeKeepGroupPage() {
 
   useEffect(() => {
     const loadGroupLoginSetupPolicy = async () => {
-      const items =
-        (await fetchGroupSetupLoginPolicyData()) as LoginPolicyItem[];
-      setGroupLoginPolicyItems(items);
-      if (items.length > 0) populateFromGroupSetupLoginPolicy(items[0]);
+      setLoadingLoginPolicy(true);
+      try {
+        const items =
+          (await fetchGroupSetupLoginPolicyData()) as LoginPolicyItem[];
+        setGroupLoginPolicyItems(items);
+        if (items.length > 0) {
+          const current =
+            items.find((p) => p.groupCode === tksGroupCode) ?? items[0];
+          populateFromGroupSetupLoginPolicy(current);
+        }
+      } catch (error) {
+        console.error("Failed to load login policy:", error);
+      } finally {
+        setLoadingLoginPolicy(false);
+      }
     };
+
     loadGroupLoginSetupPolicy();
   }, []);
-
-
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -1391,6 +2383,10 @@ export function TimeKeepGroupPage() {
           setShowForNoLoginModal(false);
         } else if (showForNoLogoutModal) {
           setShowForNoLogoutModal(false);
+        } else if (showForNoBreak2InModal) {
+          setShowForNoBreak2InModal(false);
+        } else if (showForNoBreak2OutModal) {
+          setShowForNoBreak2OutModal(false);
         } else if (showSupervisoryGroupModal) {
           setShowSupervisoryGroupModal(false);
         } else if (showOtCodeModal) {
@@ -1409,13 +2405,14 @@ export function TimeKeepGroupPage() {
     showForAbsentModal,
     showForNoLoginModal,
     showForNoLogoutModal,
+    showForNoBreak2InModal,
+    showForNoBreak2OutModal,
     showSupervisoryGroupModal,
     showOtCodeModal,
   ]);
 
   // Function to create new record - clears all fields
   const handleCreateNew = () => {
-    console.log("Creating new record...");
     // TKS Group Definition
     setTksGroupCode("");
     setTksGroupDescription("");
@@ -1477,29 +2474,607 @@ export function TimeKeepGroupPage() {
     setRestDayOT("");
     setLegalHolidayOT("");
     setSpecialHolidayOT("");
+    setDoubleLegalHolidayOT("");
+    setSpecialHolidayOT2("");
+    setNonWorkingHolidayOT("");
+    setRegularDayOTLateFiling("");
+    setRestDayOTLateFiling("");
+    setLegalHolidayOTLateFiling("");
+    setSpecialHolidayOTLateFiling("");
+    setDoubleLegalHolidayOTLateFiling("");
+    setSpecialHoliday2OTLateFiling("");
+    setNonWorkingHolidayOTLateFiling("");
+    setRegDayMinHrsToCompOT("");
+    setRestDayMinHrsToCompOT("");
+    setLegalHolidayMinHrsToCompOT("");
+    setSpecialHolidayMinHrsToCompOT("");
+    setSpecialHoliday2MinHrsToCompOT("");
+    setDoubleLegalHolidayMinHrsToCompOT("");
+    setNonWorkingHolidayMinHrsToCompOT("");
+    setOtBreakMinHours(0);
+    setOTBreakNoOfHrsDed(0);
+    setOTBreakAppliesToRegDay(false);
+    setOTBreakAppliesToLegHol(false);
+    setOTBreakAppliesToSHol(false);
+    setOTBreakAppliesToDoubleLegHol(false);
+    setOTBreakAppliesToS2Hol(false);
+    setOTBreakAppliesToNonWorkHol(false);
+    setOTBreakAppliesToRestDay(false);
+    setOTBreakAppliesToLegHolRest(false);
+    setOTBreakAppliesToSHolRest(false);
+    setOTBreakAppliesToDoubleLegHolRest(false);
+    setOTBreakAppliesToS2HolRest(false);
+    setOTBreakAppliesToNonWorkRest(false);
     setUseOTPremium(false);
     setUseActualDayType(false);
     setHolidayWithWorkshift(false);
-    setOtBreakMinHours(0);
+    setUseActualDayType(false);
+    setDeductMealBreakFromOT(false);
+    setComputeOTForBreak2(false);
+    setEnable24HourOT(false);
+    setIncludeUnworkedHolidayInRegular(false);
+    setSundayOTIfWorkedSaturday(false);
 
-    // Other Policies
-    setUseDefaultRestday(false);
-    setRestdayWithWorkshift(false);
-    setUseTardinessBracket(false);
-    setComputeUndertimeToAbsences("");
+    setRestDayToBeComputedAsOtherRate("");
+    setRestDayOtherRate("");
+    setIsOverTimeCutoffFlag(false);
+    setOverTimeCode("");
+    setRequiredHours("");
+    setOverTimeCodeFor2ShiftsDay("");
+    setOTRoundingToTheNearestHourMin("");
+    setBirthdayPay("");
+    setNDBasicRoundingToTheNearestHourMin("");
+
+    setUseOverTimeAuthorization(false);
+    setIsSpecialOTCompFlag(false);
+
+    setIsHolPayLegalFlag(false);
+    setIsHolPaySpecialFlag(false);
+    setCompHolPayForMonth(false);
+    setCompHolPayIfWorkBeforeHolidayRestDay(false);
+    setCompHolPayIfWorkBeforeHolidayLegalHoliday(false);
+    setCompHolPayIfWorkBeforeHolidaySpecialHoliday(false);
+    setNoPayIfAbsentBeforeHoliday(false);
+    setNoPayIfAbsentAfterHoliday(false);
+    setCompHolidayWithPaidLeave(false);
+    setMinimumNoOfHrsRequiredToCompHol("");
+    setCompFirstRestdayHoliday(false);
 
     // System Configuration
     setUseTimekeepingSystemConfig(false);
-    setMinBeforeShift("");
-    setMinIgnoreMultipleBreak("");
-    setMinBeforeMidnightShift("");
-    setMinConsiderBreak2In("");
+    setMinBeforeShift(0);
+    setMinIgnoreMultipleBreak(0);
+    setMinBeforeMidnightShift(0);
+    setMinConsiderBreak2In(0);
     setDevicePolicy("");
 
     // Enable edit mode and switch to definition tab
     setIsEditMode(true);
     setActiveTab("definition");
   };
+
+  const handleSaveNew = async () => {
+    try {
+      const missingFields: string[] = [];
+      if (!tksGroupCode) missingFields.push("Group Code");
+      if (!payrollDescription) missingFields.push("Group Description");
+      if (!payrollLocationCode) missingFields.push("Payroll Group");
+      if (!dateFrom) missingFields.push("Cut-Off Date From");
+      if (!dateTo) missingFields.push("Cut-Off Date To");
+      if (!autoPairingFrom) missingFields.push("Auto Pair Logs Date From");
+      if (!autoPairingTo) missingFields.push("Auto Pair Logs Date To");
+
+      if (missingFields.length > 0) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Required Fields Missing",
+          text: `Please fill in: ${missingFields.join(", ")}`,
+        });
+        return; 
+      }
+
+      // Check if group code already exists
+      const existingGroup = tksGroupItems.find(
+        (g) => g.groupCode === tksGroupCode,
+      );
+      if (existingGroup) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Group Code Already In Use",
+          text: `Group Code "${tksGroupCode}" is already taken. Please use a different code.`,
+        });
+        return; 
+      }
+      // Create Group Definition
+      const groupPayload = {
+        id: 0,
+        groupCode: tksGroupCode,
+        groupDescription: payrollDescription,
+        payrollGroup: payrollLocationCode,
+        cutOffDateFrom: toLocalISOString(dateFrom) || null,
+        cutOffDateTo: toLocalISOString(dateTo) || null,
+        cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+        cutOffDatePeriod: cutOffPeriod,
+        autoPairLogsDateFrom: toLocalISOString(autoPairingFrom) || null,
+        autoPairLogsDateTo: toLocalISOString(autoPairingTo) || null,
+        terminalID: terminalId || null,
+      };
+
+      const groupResponse = await apiClient.post(
+        "/Fs/Process/TimeKeepGroupSetUp",
+        groupPayload,
+      );
+      const newGroupCode = groupResponse.data.groupCode ?? tksGroupCode;
+      const newGroupId = groupResponse.data.id;
+
+      await Swal.fire({
+        icon: "success",
+        title: "Group Definition Created",
+        text: `Group "${newGroupCode}" has been created. Setting up remaining configurations...`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      // Fetch current child configs to avoid duplicates
+      const [
+        freshLoginPolicies,
+        freshOTRates,
+        freshOTBreaks,
+        freshSystemConfigs,
+      ] = await Promise.all([
+        fetchGroupSetupLoginPolicyData() as Promise<LoginPolicyItem[]>,
+        fetchOverTimeRates(),
+        fetchOTBreakData(),
+        fetchGroupSystemConfig(),
+      ]);
+
+      // Check if child configs exist
+      const loginPolicyExists = freshLoginPolicies.some(
+        (p) => p.groupCode === newGroupCode,
+      );
+      const otRateExists = freshOTRates.some(
+        (r) => r.groupCode === newGroupCode,
+      );
+      const otBreakExists = freshOTBreaks.some(
+        (b) => b.groupCode === newGroupCode,
+      );
+      const systemConfigExists = freshSystemConfigs.some(
+        (s) => s.groupCode === newGroupCode,
+      );
+
+      // Create Login Policy if not exists
+      if (!loginPolicyExists) {
+        const loginPolicyPayload = {
+          id: 0,
+          groupCode: newGroupCode,
+          gracePeriod: Number(gracePeriodPerDay) || 0,
+          gracePeriodIncTard: gracePeriodIncludeTardiness,
+          // ... all other LoginPolicy fields
+        };
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy",
+          loginPolicyPayload,
+        );
+      }
+      // Create OT Rates if not exists
+      if (!otRateExists) {
+        const otRatesPayload = {
+          id: 0,
+          groupCode: newGroupCode,
+          regDayOT: regularDayOT || null,
+          restDayOT: restDayOT || null,
+          // ... all other OT Rates fields
+        };
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetUpOTRates",
+          otRatesPayload,
+        );
+      }
+
+      // Create OT Break if not exists
+      if (!otBreakExists) {
+        await apiClient.post("/Fs/Process/TimeKeepGroup/GroupOTBreak", {
+          id: 0,
+          groupCode: newGroupCode,
+          regDay: oTBreakAppliesToRegDay,
+          restDay: oTBreakAppliesToRestDay,
+          lHoliday: oTBreakAppliesToLegHol,
+          sHoliday: oTBreakAppliesToSHol,
+          lHolidayRest: oTBreakAppliesToLegHolRest,
+          sHolidayRest: oTBreakAppliesToSHolRest,
+          doubleHoliday: oTBreakAppliesToDoubleLegHol,
+          doubleHolidayRest: oTBreakAppliesToDoubleLegHolRest,
+          s2Holiday: oTBreakAppliesToS2Hol,
+          s2HolidayRest: oTBreakAppliesToS2HolRest,
+          nonWorkHoliday: oTBreakAppliesToNonWorkHol,
+          nonWorkHolidayRest: oTBreakAppliesToNonWorkRest,
+        });
+      }
+
+      // Create System Config if not exists
+      if (!systemConfigExists) {
+        const systemConfigPayload = {
+          id: 0,
+          groupCode: newGroupCode,
+          numOfMinBeforeTheShift: Number(minBeforeShift) || 0,
+          numOfMinToIgnoreMultipleOutInBreak:
+            Number(minIgnoreMultipleBreak) || 0,
+          devicePolicy: devicePolicy || null,
+          useTKSystemConfig: useTimekeepingSystemConfig,
+        };
+        await apiClient.post(
+          "/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig",
+          systemConfigPayload,
+        );
+      }
+
+      // Update selected CutOff rows if any
+
+      if (selectedCutOffRows.length > 0) {
+        const selectedIds = selectedCutOffRows
+          .map(Number)
+          .filter((id) => id !== newGroupId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+              cutOffDatePeriod: cutOffPeriod,
+              cutOffDateFrom: toLocalISOString(dateFrom),
+              cutOffDateTo: toLocalISOString(dateTo),
+            }),
+          ),
+        );
+      }
+
+      // Update selected AutoPairing rows if any
+      if (selectedAutoPairingRows.length > 0) {
+        const selectedIds = selectedAutoPairingRows
+          .map(Number)
+          .filter((id) => id !== newGroupId);
+        await Promise.all(
+          selectedIds.map((id) =>
+            updateGroupById(id, {
+              cutOffDateMonth: monthNameToStringNumber(cutOffMonth),
+              cutOffDatePeriod: cutOffPeriod,
+              autoPairLogsDateFrom: toLocalISOString(autoPairingFrom),
+              autoPairLogsDateTo: toLocalISOString(autoPairingTo),
+            }),
+          ),
+        );
+      }
+
+      setIsEditMode(false);
+      setIsCreateNew(false);
+
+      // Load new group
+      await loadTKSGroup(newGroupId);
+
+      await Swal.fire({
+        icon: "success",
+        title: "Created Successfully",
+        text: "New group setup has been created successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      setIsCreateNew(false);
+      setIsEditMode(false);
+    } catch (error: any) {
+      console.error("Failed to create new group setup:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Create failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Create Failed",
+        text: errorMsg,
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!currentGroupId) return;
+
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Delete Group",
+      text: `Are you sure you want to delete Group Code "${tksGroupCode}"? This cannot be undone.`,
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const [
+        freshLoginPolicies,
+        freshOTRates,
+        freshOTBreaks,
+        freshSystemConfigs,
+      ] = await Promise.all([
+        fetchGroupSetupLoginPolicyData(),
+        fetchOverTimeRates(),
+        fetchOTBreakData(),
+        fetchGroupSystemConfig(),
+      ]);
+
+      let loginPolicy: LoginPolicyItem | null = null;
+      if (Array.isArray(freshLoginPolicies)) {
+        loginPolicy =
+          freshLoginPolicies.find((p) => p.groupCode === tksGroupCode) ?? null;
+      } else {
+        loginPolicy = freshLoginPolicies ?? null;
+      }
+      const otRate = freshOTRates.find((r) => r.groupCode === tksGroupCode);
+      const otBreak = freshOTBreaks.find((b) => b.groupCode === tksGroupCode);
+      const systemConfig = freshSystemConfigs.find(
+        (s) => s.groupCode === tksGroupCode,
+      );
+
+      if (loginPolicy?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetupLoginPolicy/${loginPolicy.id}`,
+        );
+      }
+
+      if (otRate?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOTRates/${otRate.id}`,
+        );
+      }
+
+      if (otBreak?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupOTBreak/${otBreak.id}`,
+        );
+      }
+
+      if (systemConfig?.id) {
+        await apiClient.delete(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpSystemConfig/${systemConfig.id}`,
+        );
+      }
+
+      // --- Delete Other Policies ---
+      if (otherPoliciesRef.current) {
+        await otherPoliciesRef.current.handleDelete();
+      } else {
+        const freshOtherPolicies = await apiClient.get(
+          `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies`,
+        );
+        const otherPolicy = freshOtherPolicies.data?.find(
+          (item: any) => item.groupCode === tksGroupCode,
+        );
+        if (otherPolicy?.id) {
+          await apiClient.delete(
+            `/Fs/Process/TimeKeepGroup/GroupSetUpOtherPolicies/${otherPolicy.id}`,
+          );
+        }
+      }
+
+      await apiClient.delete(
+        `/Fs/Process/TimeKeepGroupSetUp/${currentGroupId}`,
+      );
+
+      const updatedItems = await fetchTKSGroupData();
+      setTKSGroupItems(updatedItems);
+      setSupervisoryGroupsList(updatedItems);
+
+      if (updatedItems.length > 0) {
+        await handleGroupRowClick(updatedItems[0]);
+      } else {
+        handleCreateNew();
+      }
+
+      await Swal.fire({
+        icon: "success",
+        title: "Deleted Successfully",
+        text: `Group "${tksGroupCode}" has been deleted.`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to delete group:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Delete failed.";
+      await Swal.fire({
+        icon: "error",
+        title: "Delete Failed",
+        text: errorMsg,
+      });
+    }
+  };
+  const handleGroupRowClick = async (item: GroupItem | null) => {
+    if (!item) return;
+
+    const groupCode = item.groupCode;
+
+    // Use populateFromGroup instead of manual state sets
+    populateFromGroup(item);
+
+    const latestPolicy = (await fetchGroupSetupLoginPolicyData(
+      item.groupCode,
+    )) as LoginPolicyItem;
+    if (latestPolicy) {
+      setGroupLoginPolicyItems((prev) =>
+        prev.map((p) => (p.groupCode === item.groupCode ? latestPolicy : p)),
+      );
+      populateFromGroupSetupLoginPolicy(latestPolicy);
+    }
+
+    const allOTRates = await fetchOverTimeRates();
+    const groupOTRates = allOTRates.find((r) => r.groupCode === item.groupCode);
+    if (groupOTRates) populateFromOTRates(groupOTRates);
+
+    const allOTBreaks = await fetchOTBreakData();
+    const groupOTBreak = allOTBreaks.find(
+      (b) => b.groupCode === item.groupCode,
+    );
+    if (groupOTBreak) populateFromOTBreak(groupOTBreak);
+
+    const allowances = await fetchOTAllowancesData(groupCode);
+    setOTAllowancesList(allowances);
+
+    const systemConfigs = await fetchGroupSystemConfig();
+    const groupSystemConfig = systemConfigs.find(
+      (s) => s.groupCode === groupCode,
+    );
+    if (groupSystemConfig) populateSystemConfigStates(groupSystemConfig);
+
+    setShowTksGroupModal(false);
+  };
+  function TimeInput({
+    value,
+    onChange,
+    readOnly,
+    isEditMode,
+  }: {
+    value: string;
+    onChange?: (val: string) => void;
+    readOnly: boolean;
+    isEditMode: boolean;
+  }) {
+    const [hh, setHh] = useState("__");
+    const [mm, setMm] = useState("__");
+    const [period, setPeriod] = useState("AM");
+
+    const hhRef = useRef<HTMLInputElement>(null);
+    const mmRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      if (value) {
+        const match = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+        if (match) {
+          setHh(match[1].padStart(2, "0"));
+          setMm(match[2]);
+          if (match[3]) setPeriod(match[3].toUpperCase());
+        }
+      }
+    }, []);
+
+    const emit = (newHh: string, newMm: string, newPeriod: string) => {
+      if (newHh !== "__" && newMm !== "__") {
+        onChange?.(`${newHh}:${newMm} ${newPeriod}`);
+      }
+    };
+
+    const handleHhChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let val = e.target.value.replace(/\D/g, "");
+      if (val.length > 2) val = val.slice(-1);
+
+      const num = parseInt(val, 10);
+      if (val === "") {
+        setHh("__");
+        return;
+      }
+
+      if (val.length === 1 && num > 1) {
+        const padded = `0${val}`;
+        setHh(padded);
+        emit(padded, mm, period);
+        mmRef.current?.focus();
+        mmRef.current?.select();
+        return;
+      }
+
+      if (val.length === 2) {
+        const clamped = Math.min(12, Math.max(1, num));
+        const padded = String(clamped).padStart(2, "0");
+        setHh(padded);
+        emit(padded, mm, period);
+        mmRef.current?.focus();
+        mmRef.current?.select();
+        return;
+      }
+
+      setHh(val);
+    };
+
+    const handleMmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let val = e.target.value.replace(/\D/g, "");
+      if (val.length > 2) val = val.slice(-1);
+
+      if (val === "") {
+        setMm("__");
+        return;
+      }
+
+      const num = parseInt(val, 10);
+
+      if (val.length === 1 && num > 5) {
+        const padded = `0${val}`;
+        setMm(padded);
+        emit(hh, padded, period);
+        return;
+      }
+
+      if (val.length === 2) {
+        const clamped = Math.min(59, Math.max(0, num));
+        const padded = String(clamped).padStart(2, "0");
+        setMm(padded);
+        emit(hh, padded, period);
+        return;
+      }
+
+      setMm(val);
+    };
+
+    const togglePeriod = () => {
+      if (readOnly) return;
+      const next = period === "AM" ? "PM" : "AM";
+      setPeriod(next);
+      emit(hh, mm, next);
+    };
+
+    const inputBase = `w-8 text-center bg-transparent border-none outline-none text-sm font-mono text-gray-800 focus:bg-blue-50 rounded px-0`;
+
+    return (
+      <div
+        className={`inline-flex items-center gap-0.5 px-3 py-2 border border-gray-300 rounded focus-within:ring-2 focus-within:ring-blue-500 text-sm ${
+          !isEditMode ? "bg-gray-50" : "bg-white"
+        }`}
+      >
+        <input
+          ref={hhRef}
+          type="text"
+          inputMode="numeric"
+          value={hh}
+          onChange={handleHhChange}
+          onFocus={(e) => e.target.select()}
+          readOnly={readOnly}
+          placeholder="HH"
+          maxLength={2}
+          className={inputBase}
+        />
+        <span className="text-gray-400 font-mono select-none">:</span>
+        <input
+          ref={mmRef}
+          type="text"
+          inputMode="numeric"
+          value={mm}
+          onChange={handleMmChange}
+          onFocus={(e) => e.target.select()}
+          readOnly={readOnly}
+          placeholder="MM"
+          maxLength={2}
+          className={inputBase}
+        />
+        <button
+          type="button"
+          onClick={togglePeriod}
+          disabled={readOnly}
+          className={`ml-1.5 w-8 text-xs font-semibold rounded px-1 py-0.5 transition-colors ${
+            readOnly
+              ? "text-gray-400 cursor-default"
+              : "text-blue-600 hover:bg-blue-50 cursor-pointer"
+          }`}
+        >
+          {period}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -1573,26 +3148,16 @@ export function TimeKeepGroupPage() {
                 <>
                   <button
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                    onClick={handleCreateNew}
+                    onClick={() => {
+                      handleCreateNew();
+                      setIsCreateNew(true);
+                    }}
                   >
                     <Plus className="w-4 h-4" />
                     Create New
                   </button>
                   <button
                     onClick={() => {
-                      setSnapshot({
-                        payrollLocationCode,
-                        payrollDescription,
-                        tksGroupCode,
-                        tksGroupDescription,
-                        dateFrom,
-                        dateTo,
-                        cutOffMonth,
-                        cutOffPeriod,
-                        terminalId,
-                        autoPairingFrom,
-                        autoPairingTo,
-                      });
                       setIsEditMode(true);
                     }}
                     className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm"
@@ -1600,7 +3165,12 @@ export function TimeKeepGroupPage() {
                     <Pencil className="w-4 h-4" />
                     Edit
                   </button>
-                  <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm">
+                  <button
+                    onClick={async () => {
+                      await handleDelete();
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
+                  >
                     <Trash2 className="w-4 h-4" />
                     Delete
                   </button>
@@ -1615,9 +3185,49 @@ export function TimeKeepGroupPage() {
               ) : (
                 <>
                   <button
-                    onClick={() => {
-                      // Save logic would go here
-                      setIsEditMode(false);
+                    onClick={async () => {
+                      try {
+                        if (isCreateNew) {
+                          await handleSaveNew();
+                          await handleParentSave();
+                        } else {
+                          await handleParentSave();
+                          await handleSaveSystemConfig();
+                          await handleSaveGroupSetUpDefinition();
+                          await handleSaveLoginPolicy();
+                          await handleSaveOTRates();
+                          await handleSaveOTBreak();
+                          await handleSaveOTAllowances();
+
+                          const activeId = currentGroupId;
+                          const { data: updatedGroup } =
+                            await apiClient.get<GroupItem>(
+                              `/Fs/Process/TimeKeepGroupSetUp/${activeId}`,
+                            );
+                          await loadTKSGroup(activeId);
+                          populateFromGroup(updatedGroup);
+
+                          const updatedPolicy =
+                            (await fetchGroupSetupLoginPolicyData(
+                              tksGroupCode,
+                            )) as LoginPolicyItem;
+                          if (updatedPolicy) {
+                            setGroupLoginPolicyItems((prev) =>
+                              prev.map((p) =>
+                                p.groupCode === tksGroupCode
+                                  ? updatedPolicy
+                                  : p,
+                              ),
+                            );
+                            populateFromGroupSetupLoginPolicy(updatedPolicy);
+                          }
+                        }
+
+                        
+                      } catch (error) {
+                        console.error("Error saving all:", error);
+                        alert("Some saves failed. Check console.");
+                      }
                     }}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                   >
@@ -1625,24 +3235,18 @@ export function TimeKeepGroupPage() {
                     Save
                   </button>
                   <button
-                    onClick={() => {
-                      // Restore all values from snapshot
-                      setPayrollLocationCode(
-                        snapshot.payrollLocationCode ?? "",
-                      );
-                      setPayrollDescription(snapshot.payrollDescription ?? "");
-                      setTksGroupCode(snapshot.tksGroupCode ?? "");
-                      setTksGroupDescription(
-                        snapshot.tksGroupDescription ?? "",
-                      );
-                      setDateFrom(snapshot.dateFrom ?? "");
-                      setDateTo(snapshot.dateTo ?? "");
-                      setCutOffMonth(snapshot.cutOffMonth ?? "");
-                      setcutOffPeriod(snapshot.cutOffPeriod ?? "");
-                      setTerminalId(snapshot.terminalId ?? "");
-                      setAutoPairingFrom(snapshot.autoPairingFrom ?? "");
-                      setAutoPairingTo(snapshot.autoPairingTo ?? "");
+                    onClick={async () => {
                       setIsEditMode(false);
+                      setIsCreateNew(false);
+                      setTksGroupCode("1");
+
+                      const item = tksGroupItems.find(
+                        (i) => i.groupCode === "1",
+                      );
+
+                      if (item) {
+                        await handleGroupRowClick(item);
+                      }
                     }}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
                   >
@@ -1676,140 +3280,253 @@ export function TimeKeepGroupPage() {
 
             {/* Tab Content - Definition */}
             {activeTab === "definition" && (
-              <div className="space-y-6">
-                {/* Form Fields - Single Column Layout */}
-                <div className="space-y-4 max-w-full">
-                  {/* Row 1: TKS Group Code and Description */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        TKS Group Code
-                      </label>
-                      <input
-                        type="text"
-                        value={tksGroupCode}
-                        onChange={(e) => setTksGroupCode(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        TKS Group Description
-                      </label>
-                      <input
-                        type="text"
-                        value={tksGroupDescription}
-                        onChange={(e) => setTksGroupDescription(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
+              <div className="relative">
+                {/* Loading Overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
                     </div>
                   </div>
-
-                  {/* Row 2: Payroll Location Code and Description */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        Payroll Location Code
-                      </label>
-                      <div className="flex-1 min-w-0 flex gap-2">
+                )}
+                <div
+                  className={`space-y-6 ${isLoading ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  {/* Form Fields - Single Column Layout */}
+                  <div className="space-y-4 max-w-full">
+                    {/* Row 1: TKS Group Code and Description */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          TKS Group Code
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
+                        </label>
                         <input
                           type="text"
-                          value={payrollLocationCode}
+                          value={tksGroupCode}
+                          onChange={(e) => setTksGroupCode(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          TKS Group Description
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={tksGroupDescription}
                           onChange={(e) =>
-                            setPayrollLocationCode(e.target.value)
+                            setTksGroupDescription(e.target.value)
                           }
                           readOnly={!isEditMode}
                           className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                         />
-                        {isEditMode && (
-                          <>
-                            <button
-                              onClick={() => setShowPayrollLocationModal(true)}
-                              className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95"
-                            >
-                              <Search className="w-4 h-4" />
-                            </button>
-                            <button className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        Payroll Description
-                      </label>
-                      <input
-                        type="text"
-                        value={payrollDescription}
-                        onChange={(e) => setPayrollDescription(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Time Keep Cut Off Dates Section */}
-                  <div className="border-t pt-4">
-                    <div className="flex items-center mb-3">
-                      <h3 className="text-gray-700">Time Keep Cut Off Dates</h3>
-                      {isEditMode && (
-                        <div className="flex items-center gap-2 ml-auto">
-                          <label className="text-sm text-gray-700">
-                            Search:
-                          </label>
+                    {/* Row 2: Payroll Location Code and Description */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          Payroll Location Code
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
+                        </label>
+                        <div className="flex-1 min-w-0 flex gap-2">
                           <input
                             type="text"
-                            value={cutOffTableSearchTerm}
+                            value={payrollLocationCode}
                             onChange={(e) =>
-                              setCutOffTableSearchTerm(e.target.value)
+                              setPayrollLocationCode(e.target.value)
                             }
-                            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
+                            readOnly={!isEditMode}
+                            disabled={true}
+                            className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                           />
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Left Column - Form Fields */}
-                      <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                        <div className="space-y-3">
-                          {/* Month and Period */}
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-3">
-                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                                Month
-                              </label>
-                              <select
-                                value={cutOffMonth}
-                                onChange={(e) => setCutOffMonth(e.target.value)}
-                                disabled={!isEditMode}
-                                className={`w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                                  !isEditMode ? "bg-gray-50" : "bg-white"
-                                }`}
+                          {isEditMode && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  setShowPayrollLocationModal(true)
+                                }
+                                className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95"
                               >
-                                {months.map((m) => (
-                                  <option key={m} value={m}>
-                                    {m}
-                                  </option>
-                                ))}
-                              </select>
+                                <Search className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPayrollLocationCode("");
+                                  setPayrollDescription("");
+                                }}
+                                className="px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 shadow-sm bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          Payroll Description
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={payrollDescription}
+                          onChange={(e) =>
+                            setPayrollDescription(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          disabled={true}
+                          className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Time Keep Cut Off Dates Section */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center mb-3">
+                        <h3 className="text-gray-700">
+                          Time Keep Cut Off Dates
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          )}
+                        </h3>
+                        {isEditMode && (
+                          <div className="flex items-center gap-2 ml-auto">
+                            <label className="text-sm text-gray-700">
+                              Search:
+                            </label>
+                            <input
+                              type="text"
+                              value={cutOffTableSearchTerm}
+                              onChange={(e) =>
+                                setCutOffTableSearchTerm(e.target.value)
+                              }
+                              className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Left Column - Form Fields */}
+                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          <div className="space-y-3">
+                            {/* Month and Period */}
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3">
+                                <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                  Month
+                                </label>
+                                <select
+                                  value={cutOffMonth}
+                                  onChange={(e) =>
+                                    setCutOffMonth(e.target.value)
+                                  }
+                                  disabled={!isEditMode}
+                                  className={`w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                                    !isEditMode ? "bg-gray-50" : "bg-white"
+                                  }`}
+                                >
+                                  {months.map((m) => (
+                                    <option key={m} value={m}>
+                                      {m}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                  Period
+                                </label>
+                                <input
+                                  type="text"
+                                  value={cutOffPeriod}
+                                  onChange={(e) =>
+                                    setcutOffPeriod(e.target.value)
+                                  }
+                                  readOnly={!isEditMode}
+                                  className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                                    !isEditMode ? "bg-gray-50" : ""
+                                  }`}
+                                />
+                              </div>
                             </div>
 
+                            {/* Date From */}
                             <div className="flex items-center gap-3">
-                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                                Period
+                              <label className="w-20 text-gray-700 text-sm flex-shrink-0">
+                                Date From
+                              </label>
+                              <DatePicker
+                                value={dateFrom}
+                                onChange={(date) => {
+                                  setDateFrom(date);
+                                  // ✅ If dateFrom is set after dateTo, clear dateTo
+                                  if (
+                                    dateTo &&
+                                    new Date(date) > new Date(dateTo)
+                                  ) {
+                                    setDateTo("");
+                                  }
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
+                            </div>
+
+                            {/* Date To */}
+                            <div className="flex items-center gap-3">
+                              <label className="w-20 text-gray-700 text-sm flex-shrink-0">
+                                Date To
+                              </label>
+                              <DatePicker
+                                value={dateTo}
+                                onChange={(date) => {
+                                  // ✅ Prevent selecting a date before dateFrom
+                                  if (
+                                    dateFrom &&
+                                    new Date(date) < new Date(dateFrom)
+                                  ) {
+                                    Swal.fire({
+                                      icon: "warning",
+                                      title: "Invalid Date",
+                                      text: "Date To cannot be earlier than Date From.",
+                                    });
+                                    return;
+                                  }
+                                  setDateTo(date);
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
+                            </div>
+
+                            {/* Terminal ID */}
+                            <div className="flex items-center gap-3">
+                              <label className="w-20 text-gray-700 text-sm flex-shrink-0">
+                                Terminal ID
                               </label>
                               <input
                                 type="text"
-                                value={cutOffPeriod}
-                                onChange={(e) =>
-                                  setcutOffPeriod(e.target.value)
-                                }
+                                value={terminalId}
+                                onChange={(e) => setTerminalId(e.target.value)}
                                 readOnly={!isEditMode}
                                 className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                                   !isEditMode ? "bg-gray-50" : ""
@@ -1817,362 +3534,95 @@ export function TimeKeepGroupPage() {
                               />
                             </div>
                           </div>
-
-                          {/* Date From */}
-                          <div className="flex items-center gap-3">
-                            <label className="w-20 text-gray-700 text-sm flex-shrink-0">
-                              Date From
-                            </label>
-                            <DatePicker
-                              value={dateFrom}
-                              onChange={(date) => setDateFrom(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-
-                          {/* Date To */}
-                          <div className="flex items-center gap-3">
-                            <label className="w-20 text-gray-700 text-sm flex-shrink-0">
-                              Date To
-                            </label>
-                            <DatePicker
-                              value={dateTo}
-                              onChange={(date) => setDateTo(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-
-                          {/* Terminal ID */}
-                          <div className="flex items-center gap-3">
-                            <label className="w-20 text-gray-700 text-sm flex-shrink-0">
-                              Terminal ID
-                            </label>
-                            <input
-                              type="text"
-                              value={terminalId}
-                              onChange={(e) => setTerminalId(e.target.value)}
-                              readOnly={!isEditMode}
-                              className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                                !isEditMode ? "bg-gray-50" : ""
-                              }`}
-                            />
-                          </div>
                         </div>
-                      </div>
 
-                      {/* Right Column - TKS Group Table (edit mode only) */}
-                      {isEditMode && (
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
-                          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
-                            <div
-                              className="overflow-y-auto"
-                              style={{ maxHeight: "180px" }}
-                            >
-                              <table className="w-full">
-                                <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
-                                      <input
-                                        type="checkbox"
-                                        checked={
-                                          filteredCutOffData.length > 0 &&
-                                          filteredCutOffData.every(
-                                            (item: GroupItem) =>
-                                              selectedCutOffRows.includes(
-                                                item.id.toString(),
-                                              ),
-                                              
-                                          )
-                                        }
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setSelectedCutOffRows(
-                                              filteredCutOffData.map(
-                                                (i: GroupItem) =>
-                                                  i.id.toString(),
-                                              ),
-                                            );
-                                          } else {
-                                            setSelectedCutOffRows([]);
-                                          }
-                                        }}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                      />
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      <div className="flex items-center gap-1">
-                                        Code{" "}
-                                        <span className="text-blue-600">▲</span>
-                                      </div>
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      Description
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  {filteredCutOffData.map(
-                                    (item: GroupItem, index: number) => (
-                                      <tr
-                                        key={item.id}
-                                        className={`hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
-                                      >
-                                        <td className="px-4 py-2">
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedCutOffRows.includes(
-                                              item.id.toString(),
-                                            )}
-                                            onChange={() => {
-                                              setSelectedCutOffRows((prev) =>
-                                                prev.includes(
-                                                  item.id.toString(),
-                                                )
-                                                  ? prev.filter(
-                                                      (id) =>
-                                                        id !==
-                                                        item.id.toString(),
-                                                    )
-                                                  : [
-                                                      ...prev,
-                                                      item.id.toString(),
-                                                    ],
-                                              );
-                                            }}
-                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                          />
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-900">
-                                          {item.tksGroupCode}
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-600">
-                                          {item.description}
-                                        </td>
-                                      </tr>
-                                    ),
-                                  )}
-
-                                  {filteredCutOffData.length === 0 && (
+                        {/* Right Column - TKS Group Table (edit mode only) */}
+                        {isEditMode && (
+                          <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
+                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
+                              <div
+                                className="overflow-y-auto"
+                                style={{ maxHeight: "180px" }}
+                              >
+                                <table className="w-full">
+                                  <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
                                     <tr>
-                                      <td
-                                        colSpan={3}
-                                        className="px-4 py-6 text-center text-sm text-gray-400"
-                                      >
-                                        No records found.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-
-                          {/* Pagination */}
-                          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                            <span>
-                              Showing{" "}
-                              {filteredCutOffData.length === 0
-                                ? 0
-                                : cutOffStartIndex + 1}{" "}
-                              to{" "}
-                              {Math.min(
-                                cutOffEndIndex,
-                                filteredCutOffData.length,
-                              )}{" "}
-                              of {filteredCutOffData.length} entries
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() =>
-                                  setCutOffCurrentPage((p) =>
-                                    Math.max(1, p - 1),
-                                  )
-                                }
-                                disabled={cutOffCurrentPage === 1}
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Previous
-                              </button>
-                              {getCutOffPageNumbers().map((page, idx) =>
-                                page === "..." ? (
-                                  <span
-                                    key={`e-${idx}`}
-                                    className="px-1 text-gray-500 text-xs"
-                                  >
-                                    ...
-                                  </span>
-                                ) : (
-                                  <button
-                                    key={page}
-                                    onClick={() =>
-                                      setCutOffCurrentPage(page as number)
-                                    }
-                                    className={`px-2 py-1 rounded text-xs ${
-                                      cutOffCurrentPage === page
-                                        ? "bg-blue-600 text-white"
-                                        : "border border-gray-300 hover:bg-gray-100"
-                                    }`}
-                                  >
-                                    {page}
-                                  </button>
-                                ),
-                              )}
-                              <button
-                                onClick={() =>
-                                  setCutOffCurrentPage((p) =>
-                                    Math.min(cutOffTotalPages, p + 1),
-                                  )
-                                }
-                                disabled={
-                                  cutOffCurrentPage === cutOffTotalPages ||
-                                  cutOffTotalPages === 0
-                                }
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Next
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Selected count */}
-                          {selectedCutOffRows.length > 0 && (
-                            <p className="mt-1.5 text-xs text-blue-600">
-                              {selectedCutOffRows.length} row
-                              {selectedCutOffRows.length > 1 ? "s" : ""}{" "}
-                              selected
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Auto Pairing Logs Cut-Off Dates */}
-                  <div className="border-t pt-4">
-                    <div className="flex items-center mb-3">
-                      <h3 className="text-gray-700">
-                        Auto Pairing Logs Cut-Off Dates
-                      </h3>
-                      {isEditMode && (
-                        <div className="flex items-center gap-2 ml-auto">
-                          <label className="text-sm text-gray-700">
-                            Search:
-                          </label>
-                          <input
-                            type="text"
-                            value={autoPairingTableSearchTerm}
-                            onChange={(e) =>
-                              setAutoPairingTableSearchTerm(e.target.value)
-                            }
-                            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Left Column - Date Pickers */}
-                      <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3">
-                            <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                              From:
-                            </label>
-                            <DatePicker
-                              value={autoPairingFrom}
-                              onChange={(date) => setAutoPairingFrom(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <label className="w-16 text-gray-700 text-sm flex-shrink-0">
-                              To:
-                            </label>
-                            <DatePicker
-                              value={autoPairingTo}
-                              onChange={(date) => setAutoPairingTo(date)}
-                              disabled={!isEditMode}
-                              className="w-52"
-                              placeholder="MM/DD/YYYY"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right Column - TKS Group Table (edit mode only) */}
-                      {isEditMode && (
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
-                          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
-                            <div
-                              className="overflow-y-auto"
-                              style={{ maxHeight: "180px" }}
-                            >
-                              <table className="w-full">
-                                <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
-                                      <input
-                                        type="checkbox"
-                                        checked={
-                                          autoPairingFilteredData.length > 0 &&
-                                          autoPairingFilteredData.every(
-                                            (item: GroupItem) =>
-                                              selectedAutoPairingRows.includes(
-                                                item.id.toString(),
-                                              ),
-                                          )
-                                        }
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setSelectedAutoPairingRows(
-                                              autoPairingFilteredData.map(
-                                                (i: GroupItem) =>
-                                                  i.id.toString(),
-                                              ),
-                                            );
-                                          } else {
-                                            setSelectedAutoPairingRows([]);
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
+                                        <input
+                                          type="checkbox"
+                                          checked={
+                                            cutOffTotalData.filter(
+                                              (item) =>
+                                                item.groupCode !== tksGroupCode,
+                                            ).length > 0 &&
+                                            cutOffTotalData
+                                              .filter(
+                                                (item) =>
+                                                  item.groupCode !==
+                                                  tksGroupCode,
+                                              )
+                                              .every((item: GroupItem) =>
+                                                selectedCutOffRows.includes(
+                                                  item.id.toString(),
+                                                ),
+                                              )
                                           }
-                                        }}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                      />
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      <div className="flex items-center gap-1">
-                                        Code{" "}
-                                        <span className="text-blue-600">▲</span>
-                                      </div>
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
-                                      Description
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  {autoPairingPaginatedData.map(
-                                    (item: GroupItem, index: number) => (
-                                      <tr
-                                        key={item.id}
-                                        className={`hover:bg-gray-50 ${
-                                          index % 2 === 0
-                                            ? "bg-white"
-                                            : "bg-gray-50"
-                                        }`}
-                                      >
-                                        <td className="px-4 py-2">
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedAutoPairingRows.includes(
-                                              item.id.toString(),
-                                            )}
-                                            onChange={() => {
-                                              setSelectedAutoPairingRows(
-                                                (prev) =>
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setSelectedCutOffRows(
+                                                cutOffTotalData
+                                                  .filter(
+                                                    (item) =>
+                                                      item.groupCode !==
+                                                      tksGroupCode,
+                                                  )
+                                                  .map((i: GroupItem) =>
+                                                    i.id.toString(),
+                                                  ),
+                                              );
+                                            } else {
+                                              setSelectedCutOffRows([]);
+                                            }
+                                          }}
+                                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        <div className="flex items-center gap-1">
+                                          Code{" "}
+                                          <span className="text-blue-600">
+                                            ▲
+                                          </span>
+                                        </div>
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        Description
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {filteredCutOffData
+                                      .filter(
+                                        (item) =>
+                                          item.groupCode !== tksGroupCode,
+                                      ) // exclude current group
+                                      .map((item: GroupItem, index: number) => (
+                                        <tr
+                                          key={item.id}
+                                          className={`hover:bg-gray-50 ${
+                                            index % 2 === 0
+                                              ? "bg-white"
+                                              : "bg-gray-50"
+                                          }`}
+                                        >
+                                          <td className="px-4 py-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedCutOffRows.includes(
+                                                item.id.toString(),
+                                              )}
+                                              onChange={() => {
+                                                setSelectedCutOffRows((prev) =>
                                                   prev.includes(
                                                     item.id.toString(),
                                                   )
@@ -2185,116 +3635,395 @@ export function TimeKeepGroupPage() {
                                                         ...prev,
                                                         item.id.toString(),
                                                       ],
-                                              );
-                                            }}
-                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                          />
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-900">
-                                          {item.tksGroupCode}
-                                        </td>
-                                        <td className="px-4 py-2 text-sm text-gray-600">
-                                          {item.description}
+                                                );
+                                              }}
+                                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-900">
+                                            {item.groupCode}
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-600">
+                                            {item.groupDescription}
+                                          </td>
+                                        </tr>
+                                      ))}
+
+                                    {filteredCutOffData.filter(
+                                      (item) => item.groupCode !== tksGroupCode,
+                                    ).length === 0 && (
+                                      <tr>
+                                        <td
+                                          colSpan={3}
+                                          className="px-4 py-6 text-center text-sm text-gray-400"
+                                        >
+                                          No records found.
                                         </td>
                                       </tr>
-                                    ),
-                                  )}
-
-                                  {autoPairingPaginatedData.length === 0 && (
-                                    <tr>
-                                      <td
-                                        colSpan={3}
-                                        className="px-4 py-6 text-center text-sm text-gray-400"
-                                      >
-                                        No records found.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Pagination */}
-                          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                            <span>
-                              Showing{" "}
-                              {autoPairingFilteredData.length === 0
-                                ? 0
-                                : autoPairingStartIndex + 1}{" "}
-                              to{" "}
-                              {Math.min(
-                                autoPairingEndIndex,
-                                autoPairingFilteredData.length,
-                              )}{" "}
-                              of {autoPairingFilteredData.length} entries
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() =>
-                                  setAutoPairingCurrentPage((p) =>
-                                    Math.max(1, p - 1),
-                                  )
-                                }
-                                disabled={autoPairingCurrentPage === 1}
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Previous
-                              </button>
-                              {getAutoPairingPageNumbers().map((page, idx) =>
-                                page === "..." ? (
-                                  <span
-                                    key={`e-${idx}`}
-                                    className="px-1 text-gray-500 text-xs"
-                                  >
-                                    ...
-                                  </span>
-                                ) : (
-                                  <button
-                                    key={page}
-                                    onClick={() =>
-                                      setAutoPairingCurrentPage(page as number)
-                                    }
-                                    className={`px-2 py-1 rounded text-xs ${
-                                      autoPairingCurrentPage === page
-                                        ? "bg-blue-600 text-white"
-                                        : "border border-gray-300 hover:bg-gray-100"
-                                    }`}
-                                  >
-                                    {page}
-                                  </button>
-                                ),
-                              )}
-                              <button
-                                onClick={() =>
-                                  setAutoPairingCurrentPage((p) =>
-                                    Math.min(autoPairingTotalPages, p + 1),
-                                  )
-                                }
-                                disabled={
-                                  autoPairingCurrentPage ===
-                                    autoPairingTotalPages ||
-                                  autoPairingTotalPages === 0
-                                }
-                                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Next
-                              </button>
+                            {/* Pagination */}
+                            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                              <span>
+                                Showing{" "}
+                                {filteredCutOffData.length === 0
+                                  ? 0
+                                  : cutOffStartIndex + 1}{" "}
+                                to{" "}
+                                {Math.min(
+                                  cutOffEndIndex,
+                                  filteredCutOffData.length,
+                                )}{" "}
+                                of {cutOffTotalData.length} entries
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() =>
+                                    setCutOffCurrentPage((p) =>
+                                      Math.max(1, p - 1),
+                                    )
+                                  }
+                                  disabled={cutOffCurrentPage === 1}
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Previous
+                                </button>
+                                {getCutOffPageNumbers().map((page, idx) =>
+                                  page === "..." ? (
+                                    <span
+                                      key={`e-${idx}`}
+                                      className="px-1 text-gray-500 text-xs"
+                                    >
+                                      ...
+                                    </span>
+                                  ) : (
+                                    <button
+                                      key={page}
+                                      onClick={() =>
+                                        setCutOffCurrentPage(page as number)
+                                      }
+                                      className={`px-2 py-1 rounded text-xs ${
+                                        cutOffCurrentPage === page
+                                          ? "bg-blue-600 text-white"
+                                          : "border border-gray-300 hover:bg-gray-100"
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  ),
+                                )}
+                                <button
+                                  onClick={() =>
+                                    setCutOffCurrentPage((p) =>
+                                      Math.min(cutOffTotalPages, p + 1),
+                                    )
+                                  }
+                                  disabled={
+                                    cutOffCurrentPage === cutOffTotalPages ||
+                                    cutOffTotalPages === 0
+                                  }
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Next
+                                </button>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Selected count */}
-                          {selectedAutoPairingRows.length > 0 && (
-                            <p className="mt-1.5 text-xs text-blue-600">
-                              {selectedAutoPairingRows.length} row
-                              {selectedAutoPairingRows.length > 1
-                                ? "s"
-                                : ""}{" "}
-                              selected
-                            </p>
+                            {/* Selected count */}
+                            {selectedCutOffRows.length > 0 && (
+                              <p className="mt-1.5 text-xs text-blue-600">
+                                {selectedCutOffRows.length} row
+                                {selectedCutOffRows.length > 1 ? "s" : ""}{" "}
+                                selected
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Auto Pairing Logs Cut-Off Dates */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center mb-3">
+                        <h3 className="text-gray-700">
+                          Auto Pairing Logs Cut-Off Dates
+                          {isCreateNew && (
+                            <span className="text-red-500 ml-0.5">*</span>
                           )}
+                        </h3>
+                        {isEditMode && (
+                          <div className="flex items-center gap-2 ml-auto">
+                            <label className="text-sm text-gray-700">
+                              Search:
+                            </label>
+                            <input
+                              type="text"
+                              value={autoPairingTableSearchTerm}
+                              onChange={(e) =>
+                                setAutoPairingTableSearchTerm(e.target.value)
+                              }
+                              className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-48"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Left Column - Date Pickers */}
+                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                From:
+                              </label>
+                              <DatePicker
+                                value={autoPairingFrom}
+                                onChange={(date) => {
+                                  setAutoPairingFrom(date);
+                                  if (
+                                    autoPairingTo &&
+                                    new Date(date) > new Date(autoPairingTo)
+                                  ) {
+                                    setAutoPairingTo("");
+                                  }
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <label className="w-16 text-gray-700 text-sm flex-shrink-0">
+                                To:
+                              </label>
+                              <DatePicker
+                                value={autoPairingTo}
+                                onChange={(date) => {
+                                  if (
+                                    autoPairingFrom &&
+                                    new Date(date) < new Date(autoPairingFrom)
+                                  ) {
+                                    Swal.fire({
+                                      icon: "warning",
+                                      title: "Invalid Date",
+                                      text: "Date To cannot be earlier than Date From.",
+                                    });
+                                    return;
+                                  }
+                                  setAutoPairingTo(date);
+                                }}
+                                disabled={!isEditMode}
+                                className="w-52"
+                                placeholder="MM/DD/YYYY"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      )}
+                        {/* Right Column - TKS Group Table (edit mode only) */}
+                        {isEditMode && (
+                          <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 flex flex-col">
+                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1">
+                              <div
+                                className="overflow-y-auto"
+                                style={{ maxHeight: "180px" }}
+                              >
+                                <table className="w-full">
+                                  <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
+                                        <input
+                                          type="checkbox"
+                                          checked={
+                                            autoPairingFilteredData.length >
+                                              0 &&
+                                            autoPairingFilteredData.every(
+                                              (item: GroupItem) =>
+                                                selectedAutoPairingRows.includes(
+                                                  item.id.toString(),
+                                                ),
+                                            )
+                                          }
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setSelectedAutoPairingRows(
+                                                autoPairingFilteredData.map(
+                                                  (i: GroupItem) =>
+                                                    i.id.toString(),
+                                                ),
+                                              );
+                                            } else {
+                                              setSelectedAutoPairingRows([]);
+                                            }
+                                          }}
+                                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        <div className="flex items-center gap-1">
+                                          Code{" "}
+                                          <span className="text-blue-600">
+                                            ▲
+                                          </span>
+                                        </div>
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-gray-600 font-semibold">
+                                        Description
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {autoPairingPaginatedData
+                                      .filter(
+                                        (item) =>
+                                          item.groupCode !== tksGroupCode,
+                                      ) // exclude current group
+                                      .map((item: GroupItem, index: number) => (
+                                        <tr
+                                          key={item.id}
+                                          className={`hover:bg-gray-50 ${
+                                            index % 2 === 0
+                                              ? "bg-white"
+                                              : "bg-gray-50"
+                                          }`}
+                                        >
+                                          <td className="px-4 py-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedAutoPairingRows.includes(
+                                                item.id.toString(),
+                                              )}
+                                              onChange={() => {
+                                                setSelectedAutoPairingRows(
+                                                  (prev) =>
+                                                    prev.includes(
+                                                      item.id.toString(),
+                                                    )
+                                                      ? prev.filter(
+                                                          (id) =>
+                                                            id !==
+                                                            item.id.toString(),
+                                                        )
+                                                      : [
+                                                          ...prev,
+                                                          item.id.toString(),
+                                                        ],
+                                                );
+                                              }}
+                                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-900">
+                                            {item.groupCode}
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-gray-600">
+                                            {item.groupDescription}
+                                          </td>
+                                        </tr>
+                                      ))}
+
+                                    {autoPairingPaginatedData.filter(
+                                      (item) => item.groupCode !== tksGroupCode,
+                                    ).length === 0 && (
+                                      <tr>
+                                        <td
+                                          colSpan={3}
+                                          className="px-4 py-6 text-center text-sm text-gray-400"
+                                        >
+                                          No records found.
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Pagination */}
+                            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                              <span>
+                                Showing{" "}
+                                {autoPairingFilteredData.length === 0
+                                  ? 0
+                                  : autoPairingStartIndex + 1}{" "}
+                                to{" "}
+                                {Math.min(
+                                  autoPairingEndIndex,
+                                  autoPairingFilteredData.length,
+                                )}{" "}
+                                of {autoPairingFilteredData.length} entries
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() =>
+                                    setAutoPairingCurrentPage((p) =>
+                                      Math.max(1, p - 1),
+                                    )
+                                  }
+                                  disabled={autoPairingCurrentPage === 1}
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Previous
+                                </button>
+                                {getAutoPairingPageNumbers().map((page, idx) =>
+                                  page === "..." ? (
+                                    <span
+                                      key={`e-${idx}`}
+                                      className="px-1 text-gray-500 text-xs"
+                                    >
+                                      ...
+                                    </span>
+                                  ) : (
+                                    <button
+                                      key={page}
+                                      onClick={() =>
+                                        setAutoPairingCurrentPage(
+                                          page as number,
+                                        )
+                                      }
+                                      className={`px-2 py-1 rounded text-xs ${
+                                        autoPairingCurrentPage === page
+                                          ? "bg-blue-600 text-white"
+                                          : "border border-gray-300 hover:bg-gray-100"
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  ),
+                                )}
+                                <button
+                                  onClick={() =>
+                                    setAutoPairingCurrentPage((p) =>
+                                      Math.min(autoPairingTotalPages, p + 1),
+                                    )
+                                  }
+                                  disabled={
+                                    autoPairingCurrentPage ===
+                                      autoPairingTotalPages ||
+                                    autoPairingTotalPages === 0
+                                  }
+                                  className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Selected count */}
+                            {selectedAutoPairingRows.length > 0 && (
+                              <p className="mt-1.5 text-xs text-blue-600">
+                                {selectedAutoPairingRows.length} row
+                                {selectedAutoPairingRows.length > 1
+                                  ? "s"
+                                  : ""}{" "}
+                                selected
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2303,470 +4032,354 @@ export function TimeKeepGroupPage() {
 
             {/* Tab Content - Login Policy */}
             {activeTab === "login-policy" && (
-              <div className="space-y-6">
-                {/* Group Code and Definition */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                      TKS Group Code
-                    </label>
-                    <input
-                      type="text"
-                      value={tksGroupCode}
-                      disabled
-                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
-                    />
+              <div className="relative">
+                {/* Loading overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <label className="w-48 text-gray-700 text-sm flex-shrink-0">
-                      TKS Group Definition
-                    </label>
-                    <input
-                      type="text"
-                      value={tksGroupDescription}
-                      disabled
-                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
-                    />
-                  </div>
-                </div>
-
-                {/* Two Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column */}
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Semi-Annual
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={gracePeriodSemiAnnual}
-                        onChange={(e) =>
-                          setGracePeriodSemiAnnual(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
+                )}
+                <div
+                  className={`space-y-6 ${isLoading ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  {/* Group Code and Definition */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Per Day
+                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                        TKS Group Code
                       </label>
                       <input
                         type="text"
-                        value={gracePeriodPerDay}
-                        onChange={(e) => setGracePeriodPerDay(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:mm]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Include in Tardiness
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={gracePeriodIncludeTardiness}
-                        onChange={(e) =>
-                          setGracePeriodIncludeTardiness(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
+                        value={tksGroupCode}
+                        disabled
+                        className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
                       />
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Include Break 2 in Grace Period
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={includeBreak2InGrace}
-                        onChange={(e) =>
-                          setIncludeBreak2InGrace(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Deductible even within grace period
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={deductibleEvenWithinGrace}
-                        onChange={(e) =>
-                          setDeductibleEvenWithinGrace(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period Per Semi-Annual
+                      <label className="w-48 text-gray-700 text-sm flex-shrink-0">
+                        TKS Group Definition
                       </label>
                       <input
                         type="text"
-                        value={gracePeriodPerSemiAnnual}
-                        onChange={(e) =>
-                          setGracePeriodPerSemiAnnual(e.target.value)
-                        }
-                        readOnly={!isEditMode}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:hh]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        1st Half Semi-Annual Date From
-                      </label>
-                      <DatePicker
-                        value={firstHalfDateFrom}
-                        onChange={(date) => setFirstHalfDateFrom(date)}
-                        disabled={!isEditMode}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        1st Half Semi-Annual Date To
-                      </label>
-                      <DatePicker
-                        value={firstHalfDateTo}
-                        onChange={(date) => setFirstHalfDateTo(date)}
-                        disabled={!isEditMode}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        2nd Half Semi-Annual Date From
-                      </label>
-                      <DatePicker
-                        value={secondHalfDateFrom}
-                        onChange={(date) => setSecondHalfDateFrom(date)}
-                        disabled={!isEditMode}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        2nd Half Semi-Annual Date To
-                      </label>
-                      <DatePicker
-                        value={secondHalfDateTo}
-                        onChange={(date) => setSecondHalfDateTo(date)}
-                        disabled={!isEditMode}
-                        className="w-52"
-                        placeholder="MM/DD/YYYY"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Deduct Over Break
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={deductOverBreak}
-                        onChange={(e) => setDeductOverBreak(e.target.checked)}
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Grace Period for Calamity 2
-                      </label>
-                      <input
-                        type="text"
-                        value={gracePeriodCalamity2}
-                        onChange={(e) =>
-                          setGracePeriodCalamity2(e.target.value)
-                        }
-                        className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        disabled={!isEditMode}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Combine Tardiness for TimeIn and Break2
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={combineTardinessTimeInBreak2}
-                        onChange={(e) =>
-                          setCombineTardinessTimeInBreak2(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-56 text-gray-700 text-sm flex-shrink-0">
-                        Compute Tardiness For No Logout
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={computeTardinessNoLogout}
-                        onChange={(e) =>
-                          setComputeTardinessNoLogout(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
+                        value={tksGroupDescription}
+                        disabled
+                        className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none text-sm bg-gray-100"
                       />
                     </div>
                   </div>
 
-                  {/* Right Column */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        Night Diff. Start Time
-                      </label>
-                      <input
-                        type="text"
-                        value={nightDiffStartTime}
-                        onChange={(e) => setNightDiffStartTime(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:mm]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        Night Diff. End Time
-                      </label>
-                      <input
-                        type="text"
-                        value={nightDiffEndTime}
-                        onChange={(e) => setNightDiffEndTime(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm">[hh:mm]</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        Deduct Meal Break in ND Comp.
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={deductMealBreakND}
-                        onChange={(e) => setDeductMealBreakND(e.target.checked)}
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                        2 Shifts In A Day
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={twoShiftsInDay}
-                        onChange={(e) => setTwoShiftsInDay(e.target.checked)}
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        No. of Hours Interval for 2 Shifts in A Day
-                      </label>
-                      <input
-                        type="text"
-                        value={hoursIntervalTwoShifts}
-                        onChange={(e) =>
-                          setHoursIntervalTwoShifts(e.target.value)
-                        }
-                        readOnly={!isEditMode}
-                        className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      <span className="text-gray-500 text-sm pt-1">
-                        [hh:hh]
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        No. of Allowable Grace Period in a Month
-                      </label>
-                      <input
-                        type="text"
-                        value={allowableGracePeriodMonth}
-                        onChange={(e) =>
-                          setAllowableGracePeriodMonth(e.target.value)
-                        }
-                        readOnly={!isEditMode}
-                        className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        Exclude the no. of Allowable Grace Period in Bracket
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={excludeAllowableGraceBracket}
-                        onChange={(e) =>
-                          setExcludeAllowableGraceBracket(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        Allowable Grace Period in a Month Based on Actual Month
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={allowableGraceActualMonth}
-                        onChange={(e) =>
-                          setAllowableGraceActualMonth(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                        Consider Saturday as Paid Regular Hours
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={considerSaturdayPaid}
-                        onChange={(e) =>
-                          setConsiderSaturdayPaid(e.target.checked)
-                        }
-                        disabled={!isEditMode}
-                        className="w-4 h-4 mt-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-60 text-gray-700 text-sm break-words">
-                        Max. Days Per Week to Consider UnWorked Saturday As Paid
-                        <br />
-                        Regular Hours
-                      </label>
-                      <input
-                        type="text"
-                        value={maxDaysPerWeekSaturday}
-                        onChange={(e) =>
-                          setMaxDaysPerWeekSaturday(e.target.value)
-                        }
-                        disabled={!isEditMode}
-                        className="w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                    </div>
-
-                    {/* Group 1: Tardy and Supervisory */}
-                    <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                  {/* Two Column Layout */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Column */}
+                    <div className="space-y-3">
                       <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          No. of Allowable Tardy in Excess of Grace Period in a
-                          Month
-                        </label>
-                        <input
-                          type="text"
-                          value={allowableTardyExcess}
-                          onChange={(e) =>
-                            setAllowableTardyExcess(e.target.value)
-                          }
-                          disabled={!isEditMode}
-                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-
-                      <div className="flex gap-3 items-center">
-                        <label className="w-60 text-gray-700 text-sm leading-snug">
-                          Exclude Tardiness Within Grace Period in Count for
-                          <br />
-                          Allowable Tardy in Excess of Grace Period in a Month
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Semi-Annual
                         </label>
                         <input
                           type="checkbox"
-                          checked={excludeTardinessInGrace}
+                          checked={gracePeriodSemiAnnual}
+                          onChange={(e) => {
+                            setGracePeriodSemiAnnual(e.target.checked);
+                            uncheckedGracePeriodSemiAnnual();
+                            if (e.target.checked) {
+                              setGracePeriodPerDay("");
+                            }
+                          }}
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Per Day
+                        </label>
+                        <input
+                          type="number"
+                          value={gracePeriodPerDay}
+                          onChange={(e) => setGracePeriodPerDay(e.target.value)}
+                          readOnly={!isEditMode && gracePeriodSemiAnnual}
+                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:mm]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Include in Tardiness
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={gracePeriodIncludeTardiness}
+                          onChange={(e) => {
+                            setGracePeriodIncludeTardiness(e.target.checked);
+                          }}
+                          disabled={!isEditMode || gracePeriodSemiAnnual}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Include Break 2 in Grace Period
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={includeBreak2InGrace}
                           onChange={(e) =>
-                            setExcludeTardinessInGrace(e.target.checked)
+                            setIncludeBreak2InGrace(e.target.checked)
                           }
                           disabled={!isEditMode}
-                          className="w-4 h-4 self-start mt-1"
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Deductible even within grace period
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={deductibleEvenWithinGrace}
+                          onChange={(e) =>
+                            setDeductibleEvenWithinGrace(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period Per Semi-Annual
+                        </label>
+                        <input
+                          type="number"
+                          value={gracePeriodPerSemiAnnual}
+                          onChange={(e) =>
+                            setGracePeriodPerSemiAnnual(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          disabled={!gracePeriodSemiAnnual}
+                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:hh]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          1st Half Semi-Annual Date From
+                        </label>
+                        <DatePicker
+                          value={firstHalfDateFrom}
+                          onChange={(date) => setFirstHalfDateFrom(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          1st Half Semi-Annual Date To
+                        </label>
+                        <DatePicker
+                          value={firstHalfDateTo}
+                          onChange={(date) => setFirstHalfDateTo(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          2nd Half Semi-Annual Date From
+                        </label>
+                        <DatePicker
+                          value={secondHalfDateFrom}
+                          onChange={(date) => setSecondHalfDateFrom(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          2nd Half Semi-Annual Date To
+                        </label>
+                        <DatePicker
+                          value={secondHalfDateTo}
+                          onChange={(date) => setSecondHalfDateTo(date)}
+                          disabled={!isEditMode || !gracePeriodSemiAnnual}
+                          className="w-52"
+                          placeholder="MM/DD/YYYY"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Deduct Over Break
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={deductOverBreak}
+                          onChange={(e) => setDeductOverBreak(e.target.checked)}
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Grace Period for Calamity 2
+                        </label>
+                        <input
+                          type="text"
+                          value={gracePeriodCalamity2}
+                          onChange={(e) =>
+                            setGracePeriodCalamity2(e.target.value)
+                          }
+                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          disabled={!isEditMode}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Combine Tardiness for TimeIn and Break2
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={combineTardinessTimeInBreak2}
+                          onChange={(e) =>
+                            setCombineTardinessTimeInBreak2(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-56 text-gray-700 text-sm flex-shrink-0">
+                          Compute Tardiness For No Logout
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={computeTardinessNoLogout}
+                          onChange={(e) =>
+                            setComputeTardinessNoLogout(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                          Night Diff. Start Time
+                        </label>
+                        <TimeInput
+                          value={nightDiffStartTime}
+                          onChange={setNightDiffStartTime}
+                          readOnly={!isEditMode}
+                          isEditMode={isEditMode}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:mm]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                          Night Diff. End Time
+                        </label>
+                        <TimeInput
+                          value={nightDiffEndTime}
+                          onChange={setNightDiffEndTime}
+                          readOnly={!isEditMode}
+                          isEditMode={isEditMode}
+                        />
+                        <span className="text-gray-500 text-sm">[hh:mm]</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                          Deduct Meal Break in ND Comp.
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={deductMealBreakND}
+                          onChange={(e) =>
+                            setDeductMealBreakND(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
                         />
                       </div>
 
                       <div className="flex items-center gap-3">
                         <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          Supervisory GroupCode
-                        </label>
-                        <input
-                          type="text"
-                          value={supervisoryGroupCode}
-                          onChange={(e) =>
-                            setSupervisoryGroupCode(e.target.value)
-                          }
-                          readOnly={true} // always read-only
-                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                            !isEditMode ? "bg-gray-50" : ""
-                          }`}
-                        />
-                        {isEditMode && (
-                          <>
-                            <button
-                              onClick={() => setShowSupervisoryGroupModal(true)}
-                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                              <Search className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setSupervisoryGroupCode("")}
-                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Group 2: Occurances */}
-                    <div className="border border-gray-300 rounded-lg p-4 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          Apply Occurances to Break1 and Break3
+                          2 Shifts In A Day
                         </label>
                         <input
                           type="checkbox"
-                          checked={applyOccurancesBreak}
+                          checked={twoShiftsInDay}
+                          onChange={(e) => setTwoShiftsInDay(e.target.checked)}
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          No. of Hours Interval for 2 Shifts in A Day
+                        </label>
+                        <input
+                          type="text"
+                          value={hoursIntervalTwoShifts}
                           onChange={(e) =>
-                            setApplyOccurancesBreak(e.target.checked)
+                            setHoursIntervalTwoShifts(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        <span className="text-gray-500 text-sm pt-1">
+                          [hh:hh]
+                        </span>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          No. of Allowable Grace Period in a Month
+                        </label>
+                        <input
+                          type="text"
+                          value={allowableGracePeriodMonth}
+                          onChange={(e) =>
+                            setAllowableGracePeriodMonth(e.target.value)
+                          }
+                          readOnly={!isEditMode}
+                          className={`w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          Exclude the no. of Allowable Grace Period in Bracket
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={excludeAllowableGraceBracket}
+                          onChange={(e) =>
+                            setExcludeAllowableGraceBracket(e.target.checked)
                           }
                           disabled={!isEditMode}
                           className="w-4 h-4 mt-1"
@@ -2775,132 +4388,425 @@ export function TimeKeepGroupPage() {
 
                       <div className="flex items-start gap-3">
                         <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          Max No. of Occurances for no deduction
+                          Allowable Grace Period in a Month Based on Actual
+                          Month
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={allowableGraceActualMonth}
+                          onChange={(e) =>
+                            setAllowableGraceActualMonth(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                          Consider Saturday as Paid Regular Hours
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={considerSaturdayPaid}
+                          onChange={(e) =>
+                            setConsiderSaturdayPaid(e.target.checked)
+                          }
+                          disabled={!isEditMode}
+                          className="w-4 h-4 mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-60 text-gray-700 text-sm break-words">
+                          Max. Days Per Week to Consider UnWorked Saturday As
+                          Paid
+                          <br />
+                          Regular Hours
                         </label>
                         <input
                           type="text"
-                          value={maxOccurancesNoDeduction}
+                          value={maxDaysPerWeekSaturday}
                           onChange={(e) =>
-                            setMaxOccurancesNoDeduction(e.target.value)
+                            setMaxDaysPerWeekSaturday(e.target.value)
                           }
                           disabled={!isEditMode}
                           className="w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          Grace Period
-                        </label>
-                        <input
-                          type="text"
-                          value={gracePeriodOccurance}
-                          onChange={(e) =>
-                            setGracePeriodOccurance(e.target.value)
-                          }
-                          disabled={!isEditMode}
-                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <span className="text-gray-500 text-sm">[hh:mm]</span>
-                      </div>
-                    </div>
-
-                    {/* Group 3: Weekly Computation */}
-                    <div className="border border-gray-300 rounded-lg p-4 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
-                          No of Hrs Required to Complete Per Week
-                        </label>
-                        <input
-                          type="text"
-                          value={hoursRequiredPerWeek}
-                          onChange={(e) =>
-                            setHoursRequiredPerWeek(e.target.value)
-                          }
-                          disabled={!isEditMode}
-                          className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <span className="text-gray-500 text-sm pt-1">
-                          [hh:hh]
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          Start of Week
-                        </label>
-                        <select
-                          value={startOfWeek}
-                          onChange={(e) => setStartOfWeek(e.target.value)}
-                          disabled={!isEditMode}
-                          className="w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-50"
-                        >
-                          <option value="">Select a day</option>
-                          <option value="Monday">Monday</option>
-                          <option value="Tuesday">Tuesday</option>
-                          <option value="Wednesday">Wednesday</option>
-                          <option value="Thursday">Thursday</option>
-                          <option value="Friday">Friday</option>
-                          <option value="Saturday">Saturday</option>
-                          <option value="Sunday">Sunday</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1"></label>
-                        <div className="flex flex-col gap-2">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="computeType"
-                              value="tardiness"
-                              checked={computeType === "tardiness"}
-                              onChange={(e) => setComputeType(e.target.value)}
-                              className="w-4 h-4"
-                              disabled={!isEditMode}
-                            />
-                            <span className="text-gray-700 text-sm">
-                              Compute as Tardiness
-                            </span>
+                      {/* Group 1: Tardy and Supervisory */}
+                      <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            No. of Allowable Tardy in Excess of Grace Period in
+                            a Month
                           </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="computeType"
-                              value="undertime"
-                              checked={computeType === "undertime"}
-                              onChange={(e) => setComputeType(e.target.value)}
-                              className="w-4 h-4"
-                              disabled={!isEditMode}
-                            />
-                            <span className="text-gray-700 text-sm">
-                              Compute as Undertime
-                            </span>
+                          <input
+                            type="text"
+                            value={allowableTardyExcess}
+                            onChange={(e) =>
+                              setAllowableTardyExcess(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+
+                        <div className="flex gap-3 items-center">
+                          <label className="w-60 text-gray-700 text-sm leading-snug">
+                            Exclude Tardiness Within Grace Period in Count for
+                            <br />
+                            Allowable Tardy in Excess of Grace Period in a Month
                           </label>
+                          <input
+                            type="checkbox"
+                            checked={excludeTardinessInGrace}
+                            onChange={(e) =>
+                              setExcludeTardinessInGrace(e.target.checked)
+                            }
+                            disabled={!isEditMode}
+                            className="w-4 h-4 self-start mt-1"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            Supervisory GroupCode
+                          </label>
+                          <input
+                            type="text"
+                            value={supervisoryGroupCode}
+                            onChange={(e) =>
+                              setSupervisoryGroupCode(e.target.value)
+                            }
+                            readOnly={true} // always read-only
+                            className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                              !isEditMode ? "bg-gray-50" : ""
+                            }`}
+                          />
+                          {isEditMode && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  setShowSupervisoryGroupModal(true)
+                                }
+                                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              >
+                                <Search className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setSupervisoryGroupCode("")}
+                                className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
 
+                      {/* Group 2: Occurances */}
+                      <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            Apply Occurances to Break1 and Break3
+                          </label>
+                          <input
+                            type="checkbox"
+                            checked={applyOccurancesBreak}
+                            onChange={(e) =>
+                              setApplyOccurancesBreak(e.target.checked)
+                            }
+                            disabled={!isEditMode}
+                            className="w-4 h-4 mt-1"
+                          />
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            Max No. of Occurances for no deduction
+                          </label>
+                          <input
+                            type="text"
+                            value={maxOccurancesNoDeduction}
+                            onChange={(e) =>
+                              setMaxOccurancesNoDeduction(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            Grace Period
+                          </label>
+                          <input
+                            type="text"
+                            value={gracePeriodOccurance}
+                            onChange={(e) =>
+                              setGracePeriodOccurance(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                          <span className="text-gray-500 text-sm">[hh:mm]</span>
+                        </div>
+                      </div>
+
+                      {/* Group 3: Weekly Computation */}
+                      <div className="border border-gray-300 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1">
+                            No of Hrs Required to Complete Per Week
+                          </label>
+                          <input
+                            type="text"
+                            value={hoursRequiredPerWeek}
+                            onChange={(e) =>
+                              setHoursRequiredPerWeek(e.target.value)
+                            }
+                            disabled={!isEditMode}
+                            className="w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                          <span className="text-gray-500 text-sm pt-1">
+                            [hh:hh]
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            Start of Week
+                          </label>
+                          <select
+                            value={startOfWeek}
+                            onChange={(e) => setStartOfWeek(e.target.value)}
+                            disabled={!isEditMode}
+                            className="w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-50"
+                          >
+                            <option value="">Select a day</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0 pt-1"></label>
+                          <div className="flex flex-col gap-2">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="computeType"
+                                value="tardiness"
+                                checked={computeType === "tardiness"}
+                                onChange={(e) => setComputeType(e.target.value)}
+                                className="w-4 h-4"
+                                disabled={!isEditMode}
+                              />
+                              <span className="text-gray-700 text-sm">
+                                Compute as Tardiness
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="computeType"
+                                value="undertime"
+                                checked={computeType === "undertime"}
+                                onChange={(e) => setComputeType(e.target.value)}
+                                className="w-4 h-4"
+                                disabled={!isEditMode}
+                              />
+                              <span className="text-gray-700 text-sm">
+                                Compute as Undertime
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="w-60 text-gray-700 text-sm flex-shrink-0">
+                            OT Code Per Week
+                          </label>
+                          <input
+                            type="text"
+                            value={otCodePerWeek}
+                            onChange={(e) => setOtCodePerWeek(e.target.value)}
+                            readOnly={!isEditMode}
+                            className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                          />
+                          {isEditMode && (
+                            <>
+                              <button
+                                onClick={() => setShowOtCodeModal(true)}
+                                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              >
+                                <Search className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setOtCodePerWeek("")}
+                                className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Section - Default Equivalent Hours */}
+                  <div className="border-t pt-6 mt-6">
+                    <h3 className="text-gray-700 mb-4">
+                      Default Equivalent Hours To Be Deducted for Absent, No
+                      Login, and No Logout if No Shift Defined
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex items-center gap-3">
-                        <label className="w-60 text-gray-700 text-sm flex-shrink-0">
-                          OT Code Per Week
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For Absent
                         </label>
                         <input
                           type="text"
-                          value={otCodePerWeek}
-                          onChange={(e) => setOtCodePerWeek(e.target.value)}
+                          value={forAbsent}
+                          onChange={(e) => setForAbsent(e.target.value)}
                           readOnly={!isEditMode}
-                          className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                         />
                         {isEditMode && (
                           <>
                             <button
-                              onClick={() => setShowOtCodeModal(true)}
+                              onClick={() => setShowForAbsentModal(true)}
                               className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                             >
                               <Search className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => setOtCodePerWeek("")}
+                              onClick={() => setForAbsent("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Break 2 Out
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoBreak2Out}
+                          onChange={(e) => setForNoBreak2Out(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              onClick={() => setShowForNoBreak2OutModal(true)}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoBreak2Out("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Login
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoLogin}
+                          onChange={(e) => setForNoLogin(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              onClick={() => setShowForNoLoginModal(true)}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoLogin("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Break 2 In
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoBreak2In}
+                          onChange={(e) => setForNoBreak2In(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              onClick={() => setShowForNoBreak2InModal(true)}
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoBreak2In("")}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="w-40 text-gray-700 text-sm flex-shrink-0">
+                          For No Logout
+                        </label>
+                        <input
+                          type="text"
+                          value={forNoLogout}
+                          onChange={(e) => setForNoLogout(e.target.value)}
+                          readOnly={!isEditMode}
+                          className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                        />
+                        {isEditMode && (
+                          <>
+                            <button
+                              onClick={() => setShowForNoLogoutModal(true)}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setForNoLogout("")}
                               className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                             >
                               <X className="w-4 h-4" />
@@ -2911,568 +4817,551 @@ export function TimeKeepGroupPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Bottom Section - Default Equivalent Hours */}
-                <div className="border-t pt-6 mt-6">
-                  <h3 className="text-gray-700 mb-4">
-                    Default Equivalent Hours To Be Deducted for Absent, No
-                    Login, and No Logout if No Shift Defined
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For Absent
-                      </label>
-                      <input
-                        type="text"
-                        value={forAbsent}
-                        onChange={(e) => setForAbsent(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            onClick={() => setShowForAbsentModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForAbsent("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Break 2 Out
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoBreak2Out}
-                        onChange={(e) => setForNoBreak2Out(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button 
-                            onClick={() => setShowForNoBreak2OutModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => setForNoBreak2Out("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Login
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoLogin}
-                        onChange={(e) => setForNoLogin(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            onClick={() => setShowForNoLoginModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForNoLogin("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Break 2 In
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoBreak2In}
-                        onChange={(e) => setForNoBreak2In(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            onClick={() => setShowForNoBreak2InModal(true)}>
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => setForNoBreak2In("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="w-40 text-gray-700 text-sm flex-shrink-0">
-                        For No Logout
-                      </label>
-                      <input
-                        type="text"
-                        value={forNoLogout}
-                        onChange={(e) => setForNoLogout(e.target.value)}
-                        readOnly={!isEditMode}
-                        className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                      />
-                      {isEditMode && (
-                        <>
-                          <button
-                            onClick={() => setShowForNoLogoutModal(true)}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setForNoLogout("")}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
+            {activeTab === "overtime" && (
+              <div className="relative">
+                {/* Loading overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
                     </div>
                   </div>
+                )}
+
+                <div
+                  className={isLoading ? "pointer-events-none opacity-50" : ""}
+                >
+                  <OvertimeRatesTabContent
+                    tksGroupCode={tksGroupCode}
+                    tksGroupDescription={tksGroupDescription}
+                    isEditMode={isEditMode}
+                    isEditOTRates={isEditOTRates}
+                    isCreateNew={isCreateNew}
+                    setIsEditOTRates={setIsEditOTRates}
+                    showOtCodeModal={showOtCodeModal}
+                    setShowOtCodeModal={setShowOtCodeModal}
+                    isEditOTRatesFor2Shifts={isEditOTRatesFor2Shifts}
+                    setIsEditOTRatesFor2Shifts={setIsEditOTRatesFor2Shifts}
+                    isEditBirthDayPay={isEditBirthDayPay}
+                    setIsEditBirthDayPay={setIsEditBirthDayPay}
+                    regularDayOT={regularDayOT}
+                    setRegularDayOT={setRegularDayOT}
+                    restDayOT={restDayOT}
+                    setRestDayOT={setRestDayOT}
+                    legalHolidayOT={legalHolidayOT}
+                    setLegalHolidayOT={setLegalHolidayOT}
+                    specialHolidayOT={specialHolidayOT}
+                    setSpecialHolidayOT={setSpecialHolidayOT}
+                    doubleLegalHolidayOT={doubleLegalHolidayOT}
+                    setDoubleLegalHolidayOT={setDoubleLegalHolidayOT}
+                    specialHolidayOT2={specialHolidayOT2}
+                    setSpecialHolidayOT2={setSpecialHolidayOT2}
+                    nonWorkingHolidayOT={nonWorkingHolidayOT}
+                    setNonWorkingHolidayOT={setNonWorkingHolidayOT}
+                    regularDayOTLateFiling={regularDayOTLateFiling}
+                    setRegularDayOTLateFiling={setRegularDayOTLateFiling}
+                    restDayOTLateFiling={restDayOTLateFiling}
+                    setRestDayOTLateFiling={setRestDayOTLateFiling}
+                    legalHolidayOTLateFiling={legalHolidayOTLateFiling}
+                    setLegalHolidayOTLateFiling={setLegalHolidayOTLateFiling}
+                    specialHolidayOTLateFiling={specialHolidayOTLateFiling}
+                    setSpecialHolidayOTLateFiling={
+                      setSpecialHolidayOTLateFiling
+                    }
+                    doubleLegalHolidayOTLateFiling={
+                      doubleLegalHolidayOTLateFiling
+                    }
+                    setDoubleLegalHolidayOTLateFiling={
+                      setDoubleLegalHolidayOTLateFiling
+                    }
+                    specialHoliday2OTLateFiling={specialHoliday2OTLateFiling}
+                    setSpecialHoliday2OTLateFiling={
+                      setSpecialHoliday2OTLateFiling
+                    }
+                    nonWorkingHolidayOTLateFiling={
+                      nonWorkingHolidayOTLateFiling
+                    }
+                    setNonWorkingHolidayOTLateFiling={
+                      setNonWorkingHolidayOTLateFiling
+                    }
+                    regDayMinHrsToCompOT={regDayMinHrsToCompOT}
+                    setRegDayMinHrsToCompOT={setRegDayMinHrsToCompOT}
+                    restDayMinHrsToCompOT={restDayMinHrsToCompOT}
+                    setRestDayMinHrsToCompOT={setRestDayMinHrsToCompOT}
+                    legalHolidayMinHrsToCompOT={legalHolidayMinHrsToCompOT}
+                    setLegalHolidayMinHrsToCompOT={
+                      setLegalHolidayMinHrsToCompOT
+                    }
+                    specialHolidayMinHrsToCompOT={specialHolidayMinHrsToCompOT}
+                    setSpecialHolidayMinHrsToCompOT={
+                      setSpecialHolidayMinHrsToCompOT
+                    }
+                    specialHoliday2MinHrsToCompOT={
+                      specialHoliday2MinHrsToCompOT
+                    }
+                    setSpecialHoliday2MinHrsToCompOT={
+                      setSpecialHoliday2MinHrsToCompOT
+                    }
+                    doubleLegalHolidayMinHrsToCompOT={
+                      doubleLegalHolidayMinHrsToCompOT
+                    }
+                    setDoubleLegalHolidayMinHrsToCompOT={
+                      setDoubleLegalHolidayMinHrsToCompOT
+                    }
+                    nonWorkingHolidayMinHrsToCompOT={
+                      nonWorkingHolidayMinHrsToCompOT
+                    }
+                    setNonWorkingHolidayMinHrsToCompOT={
+                      setNonWorkingHolidayMinHrsToCompOT
+                    }
+                    otBreakMinHours={otBreakMinHours}
+                    setOtBreakMinHours={setOtBreakMinHours}
+                    oTBreakNoOfHrsDed={oTBreakNoOfHrsDed}
+                    setOTBreakNoOfHrsDed={setOTBreakNoOfHrsDed}
+                    oTBreakAppliesToRegDay={oTBreakAppliesToRegDay}
+                    setOTBreakAppliesToRegDay={setOTBreakAppliesToRegDay}
+                    oTBreakAppliesToLegHol={oTBreakAppliesToLegHol}
+                    setOTBreakAppliesToLegHol={setOTBreakAppliesToLegHol}
+                    oTBreakAppliesToSHol={oTBreakAppliesToSHol}
+                    setOTBreakAppliesToSHol={setOTBreakAppliesToSHol}
+                    oTBreakAppliesToDoubleLegHol={oTBreakAppliesToDoubleLegHol}
+                    setOTBreakAppliesToDoubleLegHol={
+                      setOTBreakAppliesToDoubleLegHol
+                    }
+                    oTBreakAppliesToS2Hol={oTBreakAppliesToS2Hol}
+                    setOTBreakAppliesToS2Hol={setOTBreakAppliesToS2Hol}
+                    oTBreakAppliesToNonWorkHol={oTBreakAppliesToNonWorkHol}
+                    setOTBreakAppliesToNonWorkHol={
+                      setOTBreakAppliesToNonWorkHol
+                    }
+                    oTBreakAppliesToRestDay={oTBreakAppliesToRestDay}
+                    setOTBreakAppliesToRestDay={setOTBreakAppliesToRestDay}
+                    oTBreakAppliesToLegHolRest={oTBreakAppliesToLegHolRest}
+                    setOTBreakAppliesToLegHolRest={
+                      setOTBreakAppliesToLegHolRest
+                    }
+                    oTBreakAppliesToSHolRest={oTBreakAppliesToSHolRest}
+                    setOTBreakAppliesToSHolRest={setOTBreakAppliesToSHolRest}
+                    oTBreakAppliesToDoubleLegHolRest={
+                      oTBreakAppliesToDoubleLegHolRest
+                    }
+                    setOTBreakAppliesToDoubleLegHolRest={
+                      setOTBreakAppliesToDoubleLegHolRest
+                    }
+                    oTBreakAppliesToS2HolRest={oTBreakAppliesToS2HolRest}
+                    setOTBreakAppliesToS2HolRest={setOTBreakAppliesToS2HolRest}
+                    oTBreakAppliesToNonWorkRest={oTBreakAppliesToNonWorkRest}
+                    setOTBreakAppliesToNonWorkRest={
+                      setOTBreakAppliesToNonWorkRest
+                    }
+                    useOTPremiumBreakDwn={useOTPremium}
+                    setOTPremiumBreakDwn={setUseOTPremium}
+                    useActualDayType={useActualDayType}
+                    setUseActualDayType={setUseActualDayType}
+                    holidayWithWorkShift={holidayWithWorkshift}
+                    setHolidayWithWorkShift={setHolidayWithWorkshift}
+                    deductMealBreakFromOT={deductMealBreakFromOT}
+                    setDeductMealBreakFromOT={setDeductMealBreakFromOT}
+                    computeOTForBreak2={computeOTForBreak2}
+                    setComputeOTForBreak2={setComputeOTForBreak2}
+                    enable24HourOT={enable24HourOT}
+                    setEnable24HourOT={setEnable24HourOT}
+                    includeUnworkedHolidayInRegular={
+                      includeUnworkedHolidayInRegular
+                    }
+                    setIncludeUnworkedHolidayInRegular={
+                      setIncludeUnworkedHolidayInRegular
+                    }
+                    sundayOTIfWorkedSaturday={sundayOTIfWorkedSaturday}
+                    setSundayOTIfWorkedSaturday={setSundayOTIfWorkedSaturday}
+                    restDayToBeComputedAsOtherRate={
+                      restDayToBeComputedAsOtherRate
+                    }
+                    setRestDayToBeComputedAsOtherRate={
+                      setRestDayToBeComputedAsOtherRate
+                    }
+                    restDayOtherRate={restDayOtherRate}
+                    setRestDayOtherRate={setRestDayOtherRate}
+                    isOverTimeCutOffFlag={isOverTimeCutOffFlag}
+                    setIsOverTimeCutoffFlag={setIsOverTimeCutoffFlag}
+                    overTimeCode={overTimeCode}
+                    setOverTimeCode={setOverTimeCode}
+                    requiredHours={requiredHours}
+                    setRequiredHours={setRequiredHours}
+                    overTimeCodeFor2ShiftsDay={overTimeCodeFor2ShiftsDay}
+                    setOverTimeCodeFor2ShiftsDay={setOverTimeCodeFor2ShiftsDay}
+                    oTRoundingToTheNearestHourMin={
+                      oTRoundingToTheNearestHourMin
+                    }
+                    setOTRoundingToTheNearestHourMin={
+                      setOTRoundingToTheNearestHourMin
+                    }
+                    birthdayPay={birthdayPay}
+                    setBirthdayPay={setBirthdayPay}
+                    nDBasicRoundingToTheNearestHourMin={
+                      nDBasicRoundingToTheNearestHourMin
+                    }
+                    setNDBasicRoundingToTheNearestHourMin={
+                      setNDBasicRoundingToTheNearestHourMin
+                    }
+                    useOverTimeAuthorization={useOverTimeAuthorization}
+                    setUseOverTimeAuthorization={setUseOverTimeAuthorization}
+                    isSpecialOTCompFlag={isSpecialOTCompFlag}
+                    setIsSpecialOTCompFlag={setIsSpecialOTCompFlag}
+                    isHolPayLegalFlag={isHolPayLegalFlag}
+                    setIsHolPayLegalFlag={setIsHolPayLegalFlag}
+                    isHolPaySpecialFlag={isHolPaySpecialFlag}
+                    setIsHolPaySpecialFlag={setIsHolPaySpecialFlag}
+                    compHolPayForMonth={compHolPayForMonth}
+                    setCompHolPayForMonth={setCompHolPayForMonth}
+                    compHolPayIfWorkBeforeHolidayRestDay={
+                      compHolPayIfWorkBeforeHolidayRestDay
+                    }
+                    setCompHolPayIfWorkBeforeHolidayRestDay={
+                      setCompHolPayIfWorkBeforeHolidayRestDay
+                    }
+                    compHolPayIfWorkBeforeHolidayLegalHoliday={
+                      compHolPayIfWorkBeforeHolidayLegalHoliday
+                    }
+                    setCompHolPayIfWorkBeforeHolidayLegalHoliday={
+                      setCompHolPayIfWorkBeforeHolidayLegalHoliday
+                    }
+                    compHolPayIfWorkBeforeHolidaySpecialHoliday={
+                      compHolPayIfWorkBeforeHolidaySpecialHoliday
+                    }
+                    setCompHolPayIfWorkBeforeHolidaySpecialHoliday={
+                      setCompHolPayIfWorkBeforeHolidaySpecialHoliday
+                    }
+                    noPayIfAbsentBeforeHoliday={noPayIfAbsentBeforeHoliday}
+                    setNoPayIfAbsentBeforeHoliday={
+                      setNoPayIfAbsentBeforeHoliday
+                    }
+                    noPayIfAbsentAfterHoliday={noPayIfAbsentAfterHoliday}
+                    setNoPayIfAbsentAfterHoliday={setNoPayIfAbsentAfterHoliday}
+                    compHolidayWithPaidLeave={compHolidayWithPaidLeave}
+                    setCompHolidayWithPaidLeave={setCompHolidayWithPaidLeave}
+                    minimumNoOfHrsRequiredToCompHol={
+                      minimumNoOfHrsRequiredToCompHol
+                    }
+                    setMinimumNoOfHrsRequiredToCompHol={
+                      setMinimumNoOfHrsRequiredToCompHol
+                    }
+                    compFirstRestdayHoliday={compFirstRestdayHoliday}
+                    setCompFirstRestdayHoliday={setCompFirstRestdayHoliday}
+                    minimumOTHours={minOTHrs}
+                    setMinimumOTHours={setMinOTHrs}
+                    accumOTHrsToEarnMealAllow={accumOTHrsToEarnMealAllow}
+                    setAccumOTHrsToEarnMealAllow={setAccumOTHrsToEarnMealAllow}
+                    dayType={dayType}
+                    setDayType={setDayType}
+                    amount={amount}
+                    setAmount={setAmount}
+                    earningCode={earningCode}
+                    setEarningCode={setEarningCode}
+                    oTAllowancesList={oTAllowancesList}
+                    setOTAllowancesList={setOTAllowancesList}
+                    id={oTAllowanceseID}
+                    setID={setOTAllowancesID}
+                    groupCode={oTAllowancesGroupCode}
+                    setGroupCode={setOTAllowancesGroupCode}
+                  />
                 </div>
               </div>
             )}
 
-            {/* Tab Content - Overtime Rates */}
-            {activeTab === "overtime" && (
-              <OvertimeRatesTabContent
-                tksGroupCode={tksGroupCode}
-                tksGroupDescription={tksGroupDescription}
-                isEditMode={isEditMode}
-                isEditOTRates={isEditOTRates}
-                setIsEditOTRates={setIsEditOTRates}
-                showOtCodeModal={showOtCodeModal}
-                setShowOtCodeModal={setShowOtCodeModal}
-                isEditOTRatesFor2Shifts={isEditOTRatesFor2Shifts}
-                setIsEditOTRatesFor2Shifts={setIsEditOTRatesFor2Shifts}
-                isEditBirthDayPay={isEditBirthDayPay}
-                setIsEditBirthDayPay={setIsEditBirthDayPay}
-
-                regularDayOT={regularDayOT}
-                setRegularDayOT={setRegularDayOT}
-                restDayOT={restDayOT}
-                setRestDayOT={setRestDayOT}
-                legalHolidayOT={legalHolidayOT}
-                setLegalHolidayOT={setLegalHolidayOT}
-                specialHolidayOT={specialHolidayOT}
-                setSpecialHolidayOT={setSpecialHolidayOT}
-                doubleLegalHolidayOT={doubleLegalHolidayOT}
-                setDoubleLegalHolidayOT={setDoubleLegalHolidayOT}
-                specialHolidayOT2={specialHolidayOT2}
-                setSpecialHolidayOT2={setSpecialHolidayOT2}
-                nonWorkingHolidayOT={nonWorkingHolidayOT}
-                setNonWorkingHolidayOT={setNonWorkingHolidayOT}
-
-                regularDayOTLateFiling={regularDayOTLateFiling}
-                setRegularDayOTLateFiling={setRegularDayOTLateFiling}
-                restDayOTLateFiling={restDayOTLateFiling}
-                setRestDayOTLateFiling={setRestDayOTLateFiling}
-                legalHolidayOTLateFiling={legalHolidayOTLateFiling}
-                setLegalHolidayOTLateFiling={setLegalHolidayOTLateFiling}
-                specialHolidayOTLateFiling={specialHolidayOTLateFiling}
-                setSpecialHolidayOTLateFiling={setSpecialHolidayOTLateFiling}
-                doubleLegalHolidayOTLateFiling={doubleLegalHolidayOTLateFiling}
-                setDoubleLegalHolidayOTLateFiling={setDoubleLegalHolidayOTLateFiling}
-                specialHoliday2OTLateFiling={specialHoliday2OTLateFiling}
-                setSpecialHoliday2OTLateFiling={setSpecialHoliday2OTLateFiling}
-                nonWorkingHolidayOTLateFiling={nonWorkingHolidayOTLateFiling}
-                setNonWorkingHolidayOTLateFiling={setNonWorkingHolidayOTLateFiling}
-
-                regDayMinHrsToCompOT={regDayMinHrsToCompOT}
-                setRegDayMinHrsToCompOT={setRegDayMinHrsToCompOT}
-                restDayMinHrsToCompOT={restDayMinHrsToCompOT}
-                setRestDayMinHrsToCompOT={setRestDayMinHrsToCompOT}
-                legalHolidayMinHrsToCompOT={legalHolidayMinHrsToCompOT}
-                setLegalHolidayMinHrsToCompOT={setLegalHolidayMinHrsToCompOT}
-                specialHolidayMinHrsToCompOT={specialHolidayMinHrsToCompOT}
-                setSpecialHolidayMinHrsToCompOT={setSpecialHolidayMinHrsToCompOT}
-                specialHoliday2MinHrsToCompOT={specialHoliday2MinHrsToCompOT}
-                setSpecialHoliday2MinHrsToCompOT={setSpecialHoliday2MinHrsToCompOT}
-                doubleLegalHolidayMinHrsToCompOT={doubleLegalHolidayMinHrsToCompOT}
-                setDoubleLegalHolidayMinHrsToCompOT={setDoubleLegalHolidayMinHrsToCompOT}
-                nonWorkingHolidayMinHrsToCompOT={nonWorkingHolidayMinHrsToCompOT}
-                setNonWorkingHolidayMinHrsToCompOT={setNonWorkingHolidayMinHrsToCompOT}
-
-                otBreakMinHours={otBreakMinHours}
-                setOtBreakMinHours={setOtBreakMinHours}
-                oTBreakNoOfHrsDed={oTBreakNoOfHrsDed}
-                setOTBreakNoOfHrsDed={setOTBreakNoOfHrsDed}
-
-                oTBreakAppliesToRegDay={oTBreakAppliesToRegDay}
-                setOTBreakAppliesToRegDay={setOTBreakAppliesToRegDay}
-                oTBreakAppliesToLegHol={oTBreakAppliesToLegHol}
-                setOTBreakAppliesToLegHol={setOTBreakAppliesToLegHol}
-                oTBreakAppliesToSHol={oTBreakAppliesToSHol}
-                setOTBreakAppliesToSHol={setOTBreakAppliesToSHol}
-                oTBreakAppliesToDoubleLegHol={oTBreakAppliesToDoubleLegHol}
-                setOTBreakAppliesToDoubleLegHol={setOTBreakAppliesToDoubleLegHol}
-                oTBreakAppliesToS2Hol={oTBreakAppliesToS2Hol}
-                setOTBreakAppliesToS2Hol={setOTBreakAppliesToS2Hol}
-                oTBreakAppliesToNonWorkHol={oTBreakAppliesToNonWorkHol}
-                setOTBreakAppliesToNonWorkHol={setOTBreakAppliesToNonWorkHol}
-                oTBreakAppliesToRestDay={oTBreakAppliesToRestDay}
-                setOTBreakAppliesToRestDay={setOTBreakAppliesToRestDay}
-                oTBreakAppliesToLegHolRest={oTBreakAppliesToLegHolRest}
-                setOTBreakAppliesToLegHolRest={setOTBreakAppliesToLegHolRest}
-                oTBreakAppliesToSHolRest={oTBreakAppliesToSHolRest}
-                setOTBreakAppliesToSHolRest={setOTBreakAppliesToSHolRest}
-                oTBreakAppliesToDoubleLegHolRest={oTBreakAppliesToDoubleLegHolRest}
-                setOTBreakAppliesToDoubleLegHolRest={setOTBreakAppliesToDoubleLegHolRest}
-                oTBreakAppliesToS2HolRest={oTBreakAppliesToS2HolRest}
-                setOTBreakAppliesToS2HolRest={setOTBreakAppliesToS2HolRest}
-                oTBreakAppliesToNonWorkRest={oTBreakAppliesToNonWorkRest}
-                setOTBreakAppliesToNonWorkRest={setOTBreakAppliesToNonWorkRest}
-
-                useOTPremiumBreakDwn={useOTPremium}
-                setOTPremiumBreakDwn={setUseOTPremium}
-                useActualDayType={useActualDayType}
-                setUseActualDayType={setUseActualDayType}
-                holidayWithWorkShift={holidayWithWorkshift}
-                setHolidayWithWorkShift={setHolidayWithWorkshift}
-                deductMealBreakFromOT={deductMealBreakFromOT}
-                setDeductMealBreakFromOT={setDeductMealBreakFromOT}
-                computeOTForBreak2={computeOTForBreak2}
-                setComputeOTForBreak2={setComputeOTForBreak2}
-                enable24HourOT={enable24HourOT}
-                setEnable24HourOT={setEnable24HourOT}
-                includeUnworkedHolidayInRegular={includeUnworkedHolidayInRegular}
-                setIncludeUnworkedHolidayInRegular={setIncludeUnworkedHolidayInRegular}
-                sundayOTIfWorkedSaturday={sundayOTIfWorkedSaturday}
-                setSundayOTIfWorkedSaturday={setSundayOTIfWorkedSaturday}
-
-                restDayToBeComputedAsOtherRate={restDayToBeComputedAsOtherRate}
-                setRestDayToBeComputedAsOtherRate={setRestDayToBeComputedAsOtherRate}
-                restDayOtherRate={restDayOtherRate}
-                setRestDayOtherRate={setRestDayOtherRate}
-                isOverTimeCutOffFlag={isOverTimeCutOffFlag}
-                setIsOverTimeCutoffFlag={setIsOverTimeCutoffFlag}
-                overTimeCode={overTimeCode}
-                setOverTimeCode={setOverTimeCode}
-                requiredHours={requiredHours}
-                setRequiredHours={setRequiredHours}
-                overTimeCodeFor2ShiftsDay={overTimeCodeFor2ShiftsDay}
-                setOverTimeCodeFor2ShiftsDay={setOverTimeCodeFor2ShiftsDay}
-                oTRoundingToTheNearestHourMin={oTRoundingToTheNearestHourMin}
-                setOTRoundingToTheNearestHourMin={setOTRoundingToTheNearestHourMin}
-                birthdayPay={birthdayPay}
-                setBirthdayPay={setBirthdayPay}
-                nDBasicRoundingToTheNearestHourMin={nDBasicRoundingToTheNearestHourMin}
-                setNDBasicRoundingToTheNearestHourMin={setNDBasicRoundingToTheNearestHourMin}
-                useOverTimeAuthorization={useOverTimeAuthorization}
-                setUseOverTimeAuthorization={setUseOverTimeAuthorization}
-                isSpecialOTCompFlag={isSpecialOTCompFlag}
-                setIsSpecialOTCompFlag={setIsSpecialOTCompFlag}
-                isHolPayLegalFlag={isHolPayLegalFlag}
-                setIsHolPayLegalFlag={setIsHolPayLegalFlag}
-                isHolPaySpecialFlag={isHolPaySpecialFlag}
-                setIsHolPaySpecialFlag={setIsHolPaySpecialFlag}
-                compHolPayForMonth={compHolPayForMonth}
-                setCompHolPayForMonth={setCompHolPayForMonth}
-                compHolPayIfWorkBeforeHolidayRestDay={compHolPayIfWorkBeforeHolidayRestDay}
-                setCompHolPayIfWorkBeforeHolidayRestDay={setCompHolPayIfWorkBeforeHolidayRestDay}
-                compHolPayIfWorkBeforeHolidayLegalHoliday={compHolPayIfWorkBeforeHolidayLegalHoliday}
-                setCompHolPayIfWorkBeforeHolidayLegalHoliday={setCompHolPayIfWorkBeforeHolidayLegalHoliday}
-                compHolPayIfWorkBeforeHolidaySpecialHoliday={compHolPayIfWorkBeforeHolidaySpecialHoliday}
-                setCompHolPayIfWorkBeforeHolidaySpecialHoliday={setCompHolPayIfWorkBeforeHolidaySpecialHoliday}
-                noPayIfAbsentBeforeHoliday={noPayIfAbsentBeforeHoliday}
-                setNoPayIfAbsentBeforeHoliday={setNoPayIfAbsentBeforeHoliday}
-                noPayIfAbsentAfterHoliday={noPayIfAbsentAfterHoliday}
-                setNoPayIfAbsentAfterHoliday={setNoPayIfAbsentAfterHoliday}
-                compHolidayWithPaidLeave={compHolidayWithPaidLeave}
-                setCompHolidayWithPaidLeave={setCompHolidayWithPaidLeave}
-                minimumNoOfHrsRequiredToCompHol={minimumNoOfHrsRequiredToCompHol}
-                setMinimumNoOfHrsRequiredToCompHol={setMinimumNoOfHrsRequiredToCompHol}
-                compFirstRestdayHoliday={compFirstRestdayHoliday}
-                setCompFirstRestdayHoliday={setCompFirstRestdayHoliday}
-
-                minimumOTHours={minOTHrs}
-                setMinimumOTHours={setMinOTHrs}
-                accumOTHrsToEarnMealAllow={accumOTHrsToEarnMealAllow}
-                setAccumOTHrsToEarnMealAllow={setAccumOTHrsToEarnMealAllow}
-                dayType={dayType}
-                setDayType={setDayType}
-                amount={amount}
-                setAmount={setAmount}
-                earningCode={earningCode}
-                setEarningCode={setEarningCode}
-                oTAllowancesList={oTAllowancesList}
-                setOTAllowancesList={setOTAllowancesList}
-                id={oTAllowanceseID}
-                setID={setOTAllowancesID}
-                groupCode={oTAllowancesGroupCode}
-                setGroupCode={setOTAllowancesGroupCode}
-              />
-            )}
-
             {/* Tab Content - Other Policies */}
-            {activeTab === "other" && (
-              <OtherPoliciesTabContent
-                tksGroupCode={tksGroupCode}
-                tksGroupDescription={tksGroupDescription}
-                isEditMode={isEditMode}
-              />
-            )}
-
-            {activeTab === "system" && (
-              <div className="space-y-6">
-                {/* Use Timekeeping System Config */}
-                <div className="flex items-start gap-3">
-                  <label className="text-gray-700 text-sm">
-                    Use Timekeeping System Config :
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={useTimekeepingSystemConfig}
-                    onChange={(e) =>
-                      setUseTimekeepingSystemConfig(e.target.checked)
-                    }
-                    disabled={!isEditMode}
-                    className="w-4 h-4 mt-1"
+            <div style={{ display: activeTab === "other" ? "block" : "none" }}>
+              <div className="relative">
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
+                    </div>
+                  </div>
+                )}
+                <div
+                  className={isLoading ? "pointer-events-none opacity-50" : ""}
+                >
+                  <OtherPoliciesTabContent
+                    ref={otherPoliciesRef}
+                    tksGroupCode={tksGroupCode}
+                    tksGroupDescription={tksGroupDescription}
+                    isEditMode={isEditMode}
+                    isCreateNew={isCreateNew}
+                    setIsEditMode={setIsEditMode}
                   />
                 </div>
+              </div>
+            </div>
 
-                {/* No. of Min. Before the Shift */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      No. of Min. Before the Shift :
-                    </label>
-                    <input
-                      type="number"
-                      value={minBeforeShift}
-                      onChange={(e) => setMinBeforeShift(e.target.value)}
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • Used in Validate Logs in Import {">"} Update Raw Data
-                    </li>
-                  </ul>
-                </div>
-
-                {/* No. of Min. to Ignore Multiple Break Out/In */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      No. of Min. to Ignore Multiple Break Out/In :
-                    </label>
-                    <input
-                      type="number"
-                      value={minIgnoreMultipleBreak}
-                      onChange={(e) => setMinIgnoreMultipleBreak(e.target.value)}
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • This will be triggered when your Device Policy is Device
-                      4
-                    </li>
-                    <li className="text-green-600 text-sm">
-                      During pairing of Breaks The system will ignore Multiple
-                      breaks when the difference of break is equal or less than
-                      to defined policy.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* No. of Min. Before Midnight Shift */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      No. of Min. Before Midnight Shift :
-                    </label>
-                    <input
-                      type="text"
-                      value={minBeforeMidnightShift}
-                      onChange={(e) => setMinBeforeMidnightShift(e.target.value)}
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • This will be triggered when Midnight Shift is check in
-                      workshift.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* No of Min. to Consider Break2 In */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      No of Min. to Consider Break2 In :
-                    </label>
-                    <input
-                      type="text"
-                      value={minConsiderBreak2In}
-                      onChange={(e) => setMinConsiderBreak2In(e.target.value)}
-                      readOnly={!isEditMode}
-                      className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • This is the number of minutes to consider as the pair of
-                      Break 2 Out, this is used in Device 5.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Device Policy */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-gray-700 text-sm">
-                      Device Policy :
-                    </label>
-                    <input
-                      type="text"
-                      value={devicePolicy}
-                      onChange={(e) => setDevicePolicy(e.target.value)}
-                      readOnly={!isEditMode}
-                      className={`w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
-                    />
-                  </div>
-                  <ul className="ml-6 space-y-1">
-                    <li className="text-green-600 text-sm">
-                      • Leave blank if you want the default pairing of logs.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Device Policy Descriptions */}
-                <div className="ml-6 space-y-3 text-sm">
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 1</strong> - First In Last Out Regardless
-                      of flagging
+            {activeTab === "system" && (
+              <div className="relative">
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center rounded">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
                     </div>
                   </div>
+                )}
+                <div
+                  className={`space-y-6 ${isLoading ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  {/* Use Timekeeping System Config */}
+                  <div className="flex items-start gap-3">
+                    <label className="text-gray-700 text-sm">
+                      Use Timekeeping System Config :
+                    </label>
+                    <input
+                      type="checkbox"
+                      checked={useTimekeepingSystemConfig}
+                      onChange={(e) =>
+                        setUseTimekeepingSystemConfig(e.target.checked)
+                      }
+                      disabled={!isEditMode}
+                      className="w-4 h-4 mt-1"
+                    />
+                  </div>
 
-                  <div>
-                    <div className="text-green-600 mb-1">
-                      <strong>Device 2</strong>
+                  {/* No. of Min. Before the Shift */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No. of Min. Before the Shift :
+                      </label>
+                      <input
+                        type="number"
+                        value={minBeforeShift}
+                        onChange={(e) =>
+                          setMinBeforeShift(parseFloat(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
                     </div>
-                    <div className="ml-4 space-y-1 text-green-600">
-                      <div>First In = Time In</div>
-                      <div>Second In = Break2 In</div>
-                      <div>First Out = Break2 Out</div>
-                      <div>
-                        Second Out = Time Out (if no second out First Out will
-                        become Time Out)
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • Used in Validate Logs in Import {">"} Update Raw Data
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* No. of Min. to Ignore Multiple Break Out/In */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No. of Min. to Ignore Multiple Break Out/In :
+                      </label>
+                      <input
+                        type="number"
+                        value={minIgnoreMultipleBreak}
+                        onChange={(e) =>
+                          setMinIgnoreMultipleBreak(parseFloat(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
+                    </div>
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • This will be triggered when your Device Policy is
+                        Device 4
+                      </li>
+                      <li className="text-green-600 text-sm">
+                        During pairing of Breaks The system will ignore Multiple
+                        breaks when the difference of break is equal or less
+                        than to defined policy.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* No. of Min. Before Midnight Shift */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No. of Min. Before Midnight Shift :
+                      </label>
+                      <input
+                        type="number"
+                        value={minBeforeMidnightShift}
+                        onChange={(e) =>
+                          setMinBeforeMidnightShift(parseFloat(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
+                    </div>
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • This will be triggered when Midnight Shift is check in
+                        workshift.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* No of Min. to Consider Break2 In */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        No of Min. to Consider Break2 In :
+                      </label>
+                      <input
+                        type="number"
+                        value={minConsiderBreak2In}
+                        onChange={(e) =>
+                          setMinConsiderBreak2In(parseFloat(e.target.value))
+                        }
+                        readOnly={!isEditMode}
+                        className={`w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
+                      />
+                    </div>
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • This is the number of minutes to consider as the pair
+                        of Break 2 Out, this is used in Device 5.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Device Policy */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-gray-700 text-sm">
+                        Device Policy :
+                      </label>
+
+                      <select
+                        value={devicePolicy}
+                        onChange={(e) => setDevicePolicy(e.target.value)}
+                        disabled={!isEditMode}
+                        className={`w-48 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                          !isEditMode ? "bg-gray-50" : ""
+                        }`}
+                      >
+                        <option value="">-- Select Device --</option>
+
+                        {Array.from({ length: 10 }, (_, i) => {
+                          const device = `Device${i + 1}`;
+                          return (
+                            <option key={device} value={device}>
+                              {device}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    <ul className="ml-6 space-y-1">
+                      <li className="text-green-600 text-sm">
+                        • Leave blank if you want the default pairing of logs.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Device Policy Descriptions */}
+                  <div className="ml-6 space-y-3 text-sm">
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 1</strong> - First In Last Out Regardless
+                        of flagging
                       </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600 mb-1">
-                      <strong>Device 3</strong>
+                    <div>
+                      <div className="text-green-600 mb-1">
+                        <strong>Device 2</strong>
+                      </div>
+                      <div className="ml-4 space-y-1 text-green-600">
+                        <div>First In = Time In</div>
+                        <div>Second In = Break2 In</div>
+                        <div>First Out = Break2 Out</div>
+                        <div>
+                          Second Out = Time Out (if no second out First Out will
+                          become Time Out)
+                        </div>
+                      </div>
                     </div>
-                    <div className="ml-4 space-y-1 text-green-600">
-                      <div>First Flag for Break1Out = Break1Out</div>
-                      <div>Second Flag for Break1Out = Break3Out</div>
-                      <div>First flag for Break1In = Break1In</div>
-                      <div>Last flag for break1In = Break3In</div>
-                    </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600 mb-1">
-                      <strong>Device 4</strong>
+                    <div>
+                      <div className="text-green-600 mb-1">
+                        <strong>Device 3</strong>
+                      </div>
+                      <div className="ml-4 space-y-1 text-green-600">
+                        <div>First Flag for Break1Out = Break1Out</div>
+                        <div>Second Flag for Break1Out = Break3Out</div>
+                        <div>First flag for Break1In = Break1In</div>
+                        <div>Last flag for break1In = Break3In</div>
+                      </div>
                     </div>
-                    <div className="ml-4 space-y-1 text-green-600">
-                      <div>First Flag for BreakIn = Break1In</div>
-                      <div>Second Flag for BreakIn = Break2In</div>
-                      <div>Third Flag for BreakIn = Break3In</div>
-                      <div>First Flag for BreakOut = Break1Out</div>
-                      <div>Second Flag for BreakOut = Break2Out</div>
-                      <div>Third Flag for BreakOut = Break3Out</div>
-                    </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 5</strong>
-                      <br />
-                      If there is First Flag of any Break before Any flag of
-                      In/Out, Flagging of In/Out will always be Out.
+                    <div>
+                      <div className="text-green-600 mb-1">
+                        <strong>Device 4</strong>
+                      </div>
+                      <div className="ml-4 space-y-1 text-green-600">
+                        <div>First Flag for BreakIn = Break1In</div>
+                        <div>Second Flag for BreakIn = Break2In</div>
+                        <div>Third Flag for BreakIn = Break3In</div>
+                        <div>First Flag for BreakOut = Break1Out</div>
+                        <div>Second Flag for BreakOut = Break2Out</div>
+                        <div>Third Flag for BreakOut = Break3Out</div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 6</strong>
-                      <br />
-                      From Windows Validation.
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 5</strong>
+                        <br />
+                        If there is First Flag of any Break before Any flag of
+                        In/Out, Flagging of In/Out will always be Out.
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 7</strong>
-                      <br />
-                      All Logs that falls on 6:00am Current Date to 5:59am the
-                      next day will be paired to Current Date
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 6</strong>
+                        <br />
+                        From Windows Validation.
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 8</strong>
-                      <br />
-                      24 Hours Pairing
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 7</strong>
+                        <br />
+                        All Logs that falls on 6:00am Current Date to 5:59am the
+                        next day will be paired to Current Date
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 9</strong>
-                      <br />
-                      Standard pairing but First Time Out will pair
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 8</strong>
+                        <br />
+                        24 Hours Pairing
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-green-600">
-                      <strong>Device 10</strong>
-                      <br />
-                      First In of the current day and last out before first in
-                      of next day
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 9</strong>
+                        <br />
+                        Standard pairing but First Time Out will pair
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-green-600">
+                        <strong>Device 10</strong>
+                        <br />
+                        First In of the current day and last out before first in
+                        of next day
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3485,7 +5374,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowTksGroupModal(false)}
+              onClick={() => {
+                setShowTksGroupModal(false);
+                setTksGroupSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-2xl"
@@ -3497,7 +5389,10 @@ export function TimeKeepGroupPage() {
                     TKS Group
                   </h2>
                   <button
-                    onClick={() => setShowTksGroupModal(false)}
+                    onClick={() => {
+                      setShowTksGroupModal(false);
+                      setTksGroupSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -3544,31 +5439,13 @@ export function TimeKeepGroupPage() {
                           className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
                             index % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }`}
-                          onClick={async () => {
-                            setTksGroupCode(item.tksGroupCode);
-                            setTksGroupDescription(item.description);
-                            setPayrollDescription(item.description);
-                            setPayrollLocationCode(item.tksGroupCode);
-                            setcutOffPeriod(item.cutOffDatePeriod);
-                            const monthIndex =
-                              parseInt(item.cutOffDateMonth, 10) - 1;
-                            setCutOffMonth(months[monthIndex] || "");
-
-                            const latestPolicy =
-                              (await fetchGroupSetupLoginPolicyData(
-                                item.tksGroupCode,
-                              )) as LoginPolicyItem;
-                            if (latestPolicy)
-                              populateFromGroupSetupLoginPolicy(latestPolicy);
-
-                            setShowTksGroupModal(false);
-                          }}
+                          onClick={() => handleGroupRowClick(item)}
                         >
                           <td className="py-2 text-gray-800">
-                            {item.tksGroupCode}
+                            {item.groupCode}
                           </td>
                           <td className="py-2 text-gray-800">
-                            {item.description}
+                            {item.groupDescription}
                           </td>
                         </tr>
                       ))}
@@ -3654,11 +5531,16 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowPayrollLocationModal(false)}
+              onClick={() => {
+                setShowPayrollLocationModal(false);
+                setPayrollLocationSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-2xl"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
               >
                 {/* Modal Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-100">
@@ -3666,7 +5548,10 @@ export function TimeKeepGroupPage() {
                     Payroll Location
                   </h2>
                   <button
-                    onClick={() => setShowPayrollLocationModal(false)}
+                    onClick={() => {
+                      setShowPayrollLocationModal(false);
+                      setPayrollLocationSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -3680,7 +5565,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={payrollLocationSearchTerm}
-                      onChange={(e) => setPayrollLocationSearchTerm(e.target.value)}
+                      onChange={(e) =>
+                        setPayrollLocationSearchTerm(e.target.value)
+                      }
                       className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Search by code or description..."
                     />
@@ -3735,15 +5622,23 @@ export function TimeKeepGroupPage() {
                 <div className="flex items-center justify-between mt-3 px-6 pb-4">
                   <div className="text-gray-600 text-xs">
                     Showing{" "}
-                    {filteredPayrollLocations.length === 0 ? 0 : startPayrollLocationsIndex + 1} to{" "}
-                    {Math.min(endPayrollLocationsIndex, filteredPayrollLocations.length)} of{" "}
-                    {filteredPayrollLocations.length} entries
+                    {filteredPayrollLocations.length === 0
+                      ? 0
+                      : startPayrollLocationsIndex + 1}{" "}
+                    to{" "}
+                    {Math.min(
+                      endPayrollLocationsIndex,
+                      filteredPayrollLocations.length,
+                    )}{" "}
+                    of {filteredPayrollLocations.length} entries
                   </div>
 
                   <div className="flex gap-1">
                     <button
                       onClick={() =>
-                        setCurrentPayrollLocationsPage((prev) => Math.max(prev - 1, 1))
+                        setCurrentPayrollLocationsPage((prev) =>
+                          Math.max(prev - 1, 1),
+                        )
                       }
                       disabled={currentPayrollLocationsPage === 1}
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
@@ -3762,7 +5657,9 @@ export function TimeKeepGroupPage() {
                       ) : (
                         <button
                           key={page}
-                          onClick={() => setCurrentPayrollLocationsPage(page as number)}
+                          onClick={() =>
+                            setCurrentPayrollLocationsPage(page as number)
+                          }
                           className={`px-2 py-1 rounded text-xs ${
                             currentPayrollLocationsPage === page
                               ? "bg-blue-600 text-white"
@@ -3781,7 +5678,8 @@ export function TimeKeepGroupPage() {
                         )
                       }
                       disabled={
-                        currentPayrollLocationsPage === totalPayrollLocationsPages ||
+                        currentPayrollLocationsPage ===
+                          totalPayrollLocationsPages ||
                         totalPayrollLocationsPages === 0
                       }
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
@@ -3809,7 +5707,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForAbsentModal(false)}
+              onClick={() => {
+                setShowForAbsentModal(false);
+                setForAbsentSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -3821,7 +5722,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForAbsentModal(false)}
+                    onClick={() => {
+                      setShowForAbsentModal(false);
+                      setForAbsentSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -3927,7 +5831,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayAbsent.length === 0
                       ? 0
                       : startEquivDayAbsentIndex + 1}{" "}
-                    to {Math.min(endEquivDayAbsentIndex, filteredEquivDayAbsent.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayAbsentIndex,
+                      filteredEquivDayAbsent.length,
+                    )}{" "}
                     of {filteredEquivDayAbsent.length} entries
                   </div>
 
@@ -3993,7 +5901,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoLoginModal(false)}
+              onClick={() => {
+                setShowForNoLoginModal(false);
+                setForNoLoginSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -4005,7 +5916,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoLoginModal(false)}
+                    onClick={() => {
+                      setShowForNoLoginModal(false);
+                      setForNoLoginSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -4067,42 +5981,47 @@ export function TimeKeepGroupPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedEquivDayNoLogin.map((item, index) => (//dito yun
-                        <tr
-                          key={`${item.id}-${index}`}
-                          className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
-                          onClick={() => {
-                            setForNoLogin(item.code);
-                            setShowForNoLoginModal(false);
-                          }}
-                        >
-                          <td className="py-2 text-gray-800">{item.code}</td>
-                          <td className="py-2 text-gray-800">
-                            {item.description}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.monday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.tuesday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.wednesday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.thursday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.friday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.saturday ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-2 text-gray-800">
-                            {Number(item.sunday ?? 0).toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
+                      {paginatedEquivDayNoLogin.map(
+                        (
+                          item,
+                          index, //dito yun
+                        ) => (
+                          <tr
+                            key={`${item.id}-${index}`}
+                            className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors`}
+                            onClick={() => {
+                              setForNoLogin(item.code);
+                              setShowForNoLoginModal(false);
+                            }}
+                          >
+                            <td className="py-2 text-gray-800">{item.code}</td>
+                            <td className="py-2 text-gray-800">
+                              {item.description}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.monday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.tuesday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.wednesday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.thursday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.friday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.saturday ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-2 text-gray-800">
+                              {Number(item.sunday ?? 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -4114,7 +6033,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoLogin.length === 0
                       ? 0
                       : startEquivDayNoLoginIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoLoginIndex, filteredEquivDayNoLogin.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoLoginIndex,
+                      filteredEquivDayNoLogin.length,
+                    )}{" "}
                     of {filteredEquivDayNoLogin.length} entries
                   </div>
 
@@ -4180,7 +6103,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoLogoutModal(false)}
+              onClick={() => {
+                setShowForNoLogoutModal(false);
+                setForNoLogoutSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -4192,7 +6118,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoLogoutModal(false)}
+                    onClick={() => {
+                      setShowForNoLogoutModal(false);
+                      setForNoLogoutSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -4301,7 +6230,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoLogout.length === 0
                       ? 0
                       : startEquivDayNoLogoutIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoLogoutIndex, filteredEquivDayNoLogout.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoLogoutIndex,
+                      filteredEquivDayNoLogout.length,
+                    )}{" "}
                     of {filteredEquivDayNoLogout.length} entries
                   </div>
 
@@ -4367,7 +6300,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoBreak2InModal(false)}
+              onClick={() => {
+                setShowForNoBreak2InModal(false);
+                setForNoBreak2InSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -4379,7 +6315,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoBreak2InModal(false)}
+                    onClick={() => {
+                      setShowForNoBreak2InModal(false);
+                      setForNoBreak2InSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -4393,7 +6332,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={forNoBreak2InSearchTerm}
-                      onChange={(e) => setForNoBreak2InSearchTerm(e.target.value)}
+                      onChange={(e) =>
+                        setForNoBreak2InSearchTerm(e.target.value)
+                      }
                       className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder=""
                     />
@@ -4488,7 +6429,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoBreak2In.length === 0
                       ? 0
                       : startEquivDayNoBreak2InIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoBreak2InIndex, filteredEquivDayNoBreak2In.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoBreak2InIndex,
+                      filteredEquivDayNoBreak2In.length,
+                    )}{" "}
                     of {filteredEquivDayNoBreak2In.length} entries
                   </div>
 
@@ -4516,7 +6461,9 @@ export function TimeKeepGroupPage() {
                       ) : (
                         <button
                           key={page}
-                          onClick={() => setCurrentEquivDayForNoBreak2InPage(page)}
+                          onClick={() =>
+                            setCurrentEquivDayForNoBreak2InPage(page)
+                          }
                           className={`px-2 py-1 rounded text-xs ${
                             currentEquivDayForNoBreak2InPage === page
                               ? "bg-blue-600 text-white"
@@ -4554,7 +6501,10 @@ export function TimeKeepGroupPage() {
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowForNoBreak2OutModal(false)}
+              onClick={() => {
+                setShowForNoBreak2OutModal(false);
+                setForNoBreak2OutSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-4xl"
@@ -4566,7 +6516,10 @@ export function TimeKeepGroupPage() {
                     Select Code
                   </h2>
                   <button
-                    onClick={() => setShowForNoBreak2OutModal(false)}
+                    onClick={() => {
+                      setShowForNoBreak2OutModal(false);
+                      setForNoBreak2OutSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -4580,7 +6533,9 @@ export function TimeKeepGroupPage() {
                     <input
                       type="text"
                       value={forNoBreak2OutSearchTerm}
-                      onChange={(e) => setForNoBreak2OutSearchTerm(e.target.value)}
+                      onChange={(e) =>
+                        setForNoBreak2OutSearchTerm(e.target.value)
+                      }
                       className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder=""
                     />
@@ -4675,7 +6630,11 @@ export function TimeKeepGroupPage() {
                     {filteredEquivDayNoBreak2Out.length === 0
                       ? 0
                       : startEquivDayNoBreak2OutIndex + 1}{" "}
-                    to {Math.min(endEquivDayNoBreak2OutIndex, filteredEquivDayNoBreak2Out.length)}{" "}
+                    to{" "}
+                    {Math.min(
+                      endEquivDayNoBreak2OutIndex,
+                      filteredEquivDayNoBreak2Out.length,
+                    )}{" "}
                     of {filteredEquivDayNoBreak2Out.length} entries
                   </div>
 
@@ -4703,7 +6662,9 @@ export function TimeKeepGroupPage() {
                       ) : (
                         <button
                           key={page}
-                          onClick={() => setCurrentEquivDayForNoBreak2OutPage(page)}
+                          onClick={() =>
+                            setCurrentEquivDayForNoBreak2OutPage(page)
+                          }
                           className={`px-2 py-1 rounded text-xs ${
                             currentEquivDayForNoBreak2OutPage === page
                               ? "bg-blue-600 text-white"
@@ -4736,13 +6697,15 @@ export function TimeKeepGroupPage() {
             </div>
           )}
 
-
           {/* Supervisory Group Search Modal */}
           {showSupervisoryGroupModal && (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
-              onClick={() => setShowSupervisoryGroupModal(false)}
+              onClick={() => {
+                setShowSupervisoryGroupModal(false);
+                setSupervisoryGroupSearchTerm("");
+              }}
             >
               <div
                 className="bg-white rounded-lg shadow-2xl w-full max-w-2xl"
@@ -4754,7 +6717,10 @@ export function TimeKeepGroupPage() {
                     Supervisory Group
                   </h2>
                   <button
-                    onClick={() => setShowSupervisoryGroupModal(false)}
+                    onClick={() => {
+                      setShowSupervisoryGroupModal(false);
+                      setSupervisoryGroupSearchTerm("");
+                    }}
                     className="text-gray-500 hover:text-gray-700"
                   >
                     <X className="w-5 h-5" />
@@ -4802,15 +6768,15 @@ export function TimeKeepGroupPage() {
                             index % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }`}
                           onClick={() => {
-                            setSupervisoryGroupCode(item.tksGroupCode);
+                            setSupervisoryGroupCode(item.groupCode);
                             setShowSupervisoryGroupModal(false);
                           }}
                         >
                           <td className="py-2 text-gray-800">
-                            {item.tksGroupCode}
+                            {item.groupCode}
                           </td>
                           <td className="py-2 text-gray-800">
-                            {item.description}
+                            {item.groupCode}
                           </td>
                         </tr>
                       ))}
@@ -4830,7 +6796,7 @@ export function TimeKeepGroupPage() {
                       endSupervisoryIndex,
                       filteredSupervisoryGroups.length,
                     )}{" "}
-                    of {filteredSupervisoryGroups.length} entries
+                    of {supervisoryGroupsTotolData.length} entries
                   </div>
 
                   <div className="flex gap-1">
@@ -4899,6 +6865,7 @@ export function TimeKeepGroupPage() {
                 setShowOtCodeModal(false);
                 setIsEditOTRatesFor2Shifts(false);
                 setIsEditBirthDayPay(false);
+                setOtCodeSearchTerm("");
               }}
             >
               <div
@@ -4916,6 +6883,7 @@ export function TimeKeepGroupPage() {
                       setShowOtCodeModal(false);
                       setIsEditOTRatesFor2Shifts(false);
                       setIsEditBirthDayPay(false);
+                      setOtCodeSearchTerm("");
                     }}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
@@ -4974,8 +6942,10 @@ export function TimeKeepGroupPage() {
                             if (isEditOTRates) {
                               setOverTimeCode(item.oTFileSetupCode);
                             } else if (isEditOTRatesFor2Shifts) {
-                              setOverTimeCodeFor2ShiftsDay(item.oTFileSetupCode);
-                            }  else if (isEditBirthDayPay) {
+                              setOverTimeCodeFor2ShiftsDay(
+                                item.oTFileSetupCode,
+                              );
+                            } else if (isEditBirthDayPay) {
                               setBirthdayPay(item.oTFileSetupCode);
                             } else {
                               setOtCodePerWeek(item.oTFileSetupCode);
@@ -5008,8 +6978,8 @@ export function TimeKeepGroupPage() {
                 <div className="flex items-center justify-between mt-3 px-6 pb-4">
                   <div className="text-gray-600 text-xs">
                     Showing{" "}
-                    {filteredOtCodes.length === 0 ? 0 : startOtCodesIndex + 1} to{" "}
-                    {Math.min(endOtCodesIndex, filteredOtCodes.length)} of{" "}
+                    {filteredOtCodes.length === 0 ? 0 : startOtCodesIndex + 1}{" "}
+                    to {Math.min(endOtCodesIndex, filteredOtCodes.length)} of{" "}
                     {filteredOtCodes.length} entries
                   </div>
 
@@ -5068,7 +7038,6 @@ export function TimeKeepGroupPage() {
               </div>
             </div>
           )}
-
         </div>
       </div>
 
@@ -5077,3 +7046,4 @@ export function TimeKeepGroupPage() {
     </div>
   );
 }
+

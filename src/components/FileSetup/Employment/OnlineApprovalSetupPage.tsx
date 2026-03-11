@@ -7,8 +7,11 @@ import { EmployeeSearchModal } from "../../Modals/EmployeeSearchModal";
 import { DeviceSearchModal } from "../../Modals/DeviceSearchModal";
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Online Approval SetUp';
+import { fetchEmployees } from "../../../services/employeeService";
+
+// Form Name
+const formName = 'Online Approval SetUp';
+
 export function OnlineApprovalSetupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -66,7 +69,6 @@ export function OnlineApprovalSetupPage() {
         (p) => decryptData(p.formName) === "OnlineApprovalSetup",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -97,7 +99,6 @@ export function OnlineApprovalSetupPage() {
   const [loadingApprovals, setLoadingApprovals] = useState(false);
   const [approvalError, setApprovalError] = useState("");
 
-  // Fetch online approval data from API
   useEffect(() => {
     fetchApprovalData();
   }, []);
@@ -110,7 +111,6 @@ export function OnlineApprovalSetupPage() {
         "/Fs/Employment/OnlineApprovalSetUp",
       );
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((approval: any) => ({
           id: approval.id || "",
           code: approval.onlineAppCode || "",
@@ -137,38 +137,27 @@ export function OnlineApprovalSetupPage() {
     }
   };
 
-  // Fetch employee data from API
   useEffect(() => {
     fetchEmployeeData();
   }, []);
 
-  const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError("");
-    try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-      if (response.status === 200 && response.data) {
-        // Map API response to expected format
-        const mappedData = response.data.map((emp: any) => ({
-          empCode: emp.empCode || emp.code || "",
-          name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
-          groupCode: emp.grpCode || "",
-        }));
-        setEmployeeData(mappedData);
-      }
-    } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to load employees";
-      setEmployeeError(errorMsg);
-      console.error("Error fetching employees:", error);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
+const fetchEmployeeData = async () => {
+  setLoadingEmployees(true);
+  setEmployeeError('');
+  try {
+    const { employees } = await fetchEmployees();
+    setEmployeeData(employees.map((emp) => ({
+      empCode: emp.empCode || '',
+      name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+      groupCode: emp.grpCode || '',
+    })));
+  } catch (error: any) {
+    setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+  } finally {
+    setLoadingEmployees(false);
+  }
+};
 
-  // Fetch device data from API
   useEffect(() => {
     fetchDeviceData();
   }, []);
@@ -181,7 +170,6 @@ export function OnlineApprovalSetupPage() {
         "/Fs/Process/Device/BorrowedDeviceName",
       );
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((device: any) => ({
           id: device.id || "",
           code: device.code || "",
@@ -201,7 +189,6 @@ export function OnlineApprovalSetupPage() {
     }
   };
 
-  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -218,11 +205,66 @@ export function OnlineApprovalSetupPage() {
     };
   }, [showCreateModal]);
 
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateNew = () => {
     setIsEditMode(false);
     setSelectedApprovalIndex(null);
     setApprovalId(null);
-    // Clear form
     setCode("");
     setCodeError("");
     setDescription("");
@@ -246,6 +288,11 @@ export function OnlineApprovalSetupPage() {
   };
 
   const handleDelete = async (approval: any) => {
+    // ── 1. HRIS / Payroll path check ────────────────────────────────────
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
@@ -257,38 +304,38 @@ export function OnlineApprovalSetupPage() {
       cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(
-          `/Fs/Employment/OnlineApprovalSetUp/${approval.id}`,
-        );
-        await auditTrail.log({
-            accessType: 'Delete',
-            trans: `Deleted online approval ${approval.code}`,
-            messages: `Online approval deleted: ${approval.code} - ${approval.onlineAppDesc}`,
-            formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Online approval deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        // Refresh the approval list
-        await fetchApprovalData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete online approval";
-        await Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: errorMsg,
-        });
-        console.error("Error deleting online approval:", error);
-      }
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(
+        `/Fs/Employment/OnlineApprovalSetUp/${approval.id}`,
+      );
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted online approval ${approval.code}`,
+        messages: `Online approval deleted: ${approval.code} - ${approval.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Online approval deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchApprovalData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete online approval";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting online approval:", error);
     }
   };
 
@@ -302,7 +349,7 @@ export function OnlineApprovalSetupPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate code - must not be empty and must be max 10 characters
+    // ── 1. Basic required-field / length check ───────────────────────────
     if (!code.trim() || code.length > 10) {
       await Swal.fire({
         icon: "warning",
@@ -311,12 +358,14 @@ export function OnlineApprovalSetupPage() {
       });
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
     const isDuplicate = approvalList.some((approval, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedApprovalIndex === index) {
-        return false;
-      }
+      if (isEditMode && selectedApprovalIndex === index) return false;
       return approval.code.toLowerCase() === code.trim().toLowerCase();
     });
 
@@ -328,6 +377,8 @@ export function OnlineApprovalSetupPage() {
       });
       return;
     }
+
+    // ── 4. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const loginPayloadStr = localStorage.getItem("userData");
@@ -337,6 +388,7 @@ export function OnlineApprovalSetupPage() {
         loginPayload.username ||
         loginPayload.name ||
         "Guest";
+
       const payload = {
         id: isEditMode && approvalId ? parseInt(approvalId) : 0,
         onlineAppCode: code,
@@ -344,24 +396,21 @@ export function OnlineApprovalSetupPage() {
         onlineAppMngr: headCode,
         createdBy: isEditMode ? null : userName,
         createdDate: isEditMode ? null : new Date().toISOString(),
-
-        // 2. Edit Fields: Set ONLY when editing
         editedBy: isEditMode ? userName : null,
         editedDate: isEditMode ? new Date().toISOString() : null,
         deviceName: deviceName,
       };
 
       if (isEditMode && approvalId) {
-        // Update existing record via PUT
         await apiClient.put(
           `/Fs/Employment/OnlineApprovalSetUp/${approvalId}`,
           payload,
         );
         await auditTrail.log({
-            accessType: 'Edit',
-            trans: `Edited online approval ${payload.onlineAppCode}`,
-            messages: `Online approval updated: ${payload.onlineAppCode} - ${payload.onlineAppDesc}`,
-            formName,
+          accessType: 'Edit',
+          trans: `Edited online approval ${payload.onlineAppCode}`,
+          messages: `Online approval updated: ${payload.onlineAppCode} - ${payload.onlineAppDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -370,16 +419,13 @@ export function OnlineApprovalSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the approval list
-        await fetchApprovalData();
       } else {
-        // Create new record via POST
         await apiClient.post("/Fs/Employment/OnlineApprovalSetUp", payload);
         await auditTrail.log({
-            accessType: 'Add',
-            trans: `Added online approval ${payload.onlineAppCode}`,
-            messages: `Online approval created: ${payload.onlineAppCode} - ${payload.onlineAppDesc}`,
-            formName,
+          accessType: 'Add',
+          trans: `Added online approval ${payload.onlineAppCode}`,
+          messages: `Online approval created: ${payload.onlineAppCode} - ${payload.onlineAppDesc}`,
+          formName,
         });
         await Swal.fire({
           icon: "success",
@@ -388,11 +434,9 @@ export function OnlineApprovalSetupPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        // Refresh the approval list
-        await fetchApprovalData();
       }
 
-      // Close modal and reset form
+      await fetchApprovalData();
       setShowCreateModal(false);
       setCode("");
       setCodeError("");
@@ -406,11 +450,7 @@ export function OnlineApprovalSetupPage() {
     } catch (error: any) {
       const errorMsg =
         error.response?.data?.message || error.message || "An error occurred";
-      await Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: errorMsg,
-      });
+      await Swal.fire({ icon: "error", title: "Error", text: errorMsg });
       console.error("Error submitting form:", error);
     } finally {
       setSubmitting(false);
@@ -442,24 +482,19 @@ export function OnlineApprovalSetupPage() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedApprovals = filteredApprovals.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Online Approval Setup</h1>
           </div>
 
-          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
-            {/* Information Frame */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -524,15 +559,17 @@ export function OnlineApprovalSetupPage() {
                   Create New
                 </button>
               )}
-              <div className="ml-auto flex items-center gap-2">
-                <label className="text-gray-700">Search:</label>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                />
-              </div>
+              {hasPermission("View") && (
+                <div className="ml-auto flex items-center gap-2">
+                  <label className="text-gray-700">Search:</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Data Table */}
@@ -668,16 +705,13 @@ export function OnlineApprovalSetupPage() {
             {/* Create/Edit Modal */}
             {showCreateModal && (
               <>
-                {/* Modal Backdrop */}
                 <div
                   className="fixed inset-0 bg-black/30 z-10"
                   onClick={() => setShowCreateModal(false)}
                 ></div>
 
-                {/* Modal Dialog */}
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-                    {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                       <h2 className="text-gray-800">
                         {isEditMode ? "Edit Online Approval" : "Create New"}
@@ -690,13 +724,11 @@ export function OnlineApprovalSetupPage() {
                       </button>
                     </div>
 
-                    {/* Modal Content */}
                     <div className="p-4">
                       <h3 className="text-blue-600 mb-3">
                         Online Approval Setup
                       </h3>
 
-                      {/* Form Fields */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="w-32 text-gray-700 text-sm">
@@ -798,7 +830,6 @@ export function OnlineApprovalSetupPage() {
                         </div>
                       </div>
 
-                      {/* Modal Actions */}
                       <div className="flex gap-3 mt-4">
                         <button
                           onClick={handleSubmit}
@@ -825,7 +856,6 @@ export function OnlineApprovalSetupPage() {
               </>
             )}
 
-            {/* Employee Search Modal - Reusable Component */}
             <EmployeeSearchModal
               isOpen={showHeadModal}
               onClose={() => setShowHeadModal(false)}
@@ -835,7 +865,6 @@ export function OnlineApprovalSetupPage() {
               error={employeeError}
             />
 
-            {/* Device Search Modal - Reusable Component */}
             <DeviceSearchModal
               isOpen={showDeviceNameModal}
               onClose={() => setShowDeviceNameModal(false)}
@@ -848,7 +877,6 @@ export function OnlineApprovalSetupPage() {
         </div>
       </div>
 
-      {/* Footer */}
       <Footer />
     </div>
   );

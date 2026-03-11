@@ -7,8 +7,11 @@ import apiClient from "../../../services/apiClient";
 import auditTrail from '../../../services/auditTrail';
 import Swal from "sweetalert2";
 import { decryptData } from "../../../services/encryptionService";
-  // Form Name
-  const formName = 'Department SetUp';
+import { fetchEmployees } from "../../../services/employeeService";
+
+// Form Name
+const formName = 'Department SetUp';
+
 // Division Search Modal Component
 function DivisionSearchModal({
   isOpen,
@@ -213,8 +216,6 @@ export function DepartmentSetupPage() {
   const hasPermission = (accessType: string) =>
     permissions[accessType] === true;
 
-
-
   useEffect(() => {
     getDepartmentSetupPermissions();
   }, []);
@@ -231,7 +232,6 @@ export function DepartmentSetupPage() {
         (p) => decryptData(p.formName) === "DepartmentSetUp",
       );
 
-      // Build a map: { Add: true, Edit: true, ... }
       const permMap: Record<string, boolean> = {};
       branchEntries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -244,7 +244,62 @@ export function DepartmentSetupPage() {
     }
   };
 
-  // Fetch department data from API
+  // ─── Company Info Validation (HRIS / Payroll Path) ───────────────────────────
+  /**
+   * Fetches company information and checks whether HRIS or Payroll paths are
+   * configured. Returns true when the transaction is allowed to proceed.
+   */
+  const validateCompanyPaths = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo =
+        Array.isArray(response.data) ? response.data[0] : response.data;
+
+      if (!companyInfo) {
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
+        return false;
+      }
+
+      const hrisPath = (companyInfo.hrisPath ?? "").trim();
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+
+      if (hrisPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
+      return false;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     fetchDepartmentData();
   }, []);
@@ -283,7 +338,6 @@ export function DepartmentSetupPage() {
     }
   };
 
-  // Fetch division data from API
   useEffect(() => {
     fetchDivisionData();
   }, []);
@@ -312,37 +366,27 @@ export function DepartmentSetupPage() {
     }
   };
 
-  // Fetch employee data from API
   useEffect(() => {
     fetchEmployeeData();
   }, []);
 
-  const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError("");
-    try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-      if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((emp: any) => ({
-          empCode: emp.empCode || emp.code || "",
-          name: `${emp.lName || ""}, ${emp.fName || ""} ${emp.mName || ""}`.trim(),
-          groupCode: emp.grpCode || "",
-        }));
-        setEmployeeData(mappedData);
-      }
-    } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to load employees";
-      setEmployeeError(errorMsg);
-      console.error("Error fetching employees:", error);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
+const fetchEmployeeData = async () => {
+  setLoadingEmployees(true);
+  setEmployeeError('');
+  try {
+    const { employees } = await fetchEmployees();
+    setEmployeeData(employees.map((emp) => ({
+      empCode: emp.empCode || '',
+      name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+      groupCode: emp.grpCode || '',
+    })));
+  } catch (error: any) {
+    setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+  } finally {
+    setLoadingEmployees(false);
+  }
+};
 
-  // Fetch device data from API
   useEffect(() => {
     fetchDeviceData();
   }, []);
@@ -355,13 +399,11 @@ export function DepartmentSetupPage() {
         "/Fs/Process/Device/BorrowedDeviceName",
       );
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((device: any) => ({
           id: device.id || "",
           code: device.code || "",
           description: device.description || "",
         }));
-        setDeviceData(mappedData);
         setDeviceData(mappedData);
       }
     } catch (error: any) {
@@ -376,7 +418,6 @@ export function DepartmentSetupPage() {
     }
   };
 
-  // Handle ESC key to close create modal only
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showCreateModal) {
@@ -427,6 +468,11 @@ export function DepartmentSetupPage() {
   };
 
   const handleDelete = async (department: any) => {
+    // ── 1. HRIS / Payroll path check (same as Create/Delete in backend) ──
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 2. Confirm deletion ──────────────────────────────────────────────
     const confirmed = await Swal.fire({
       icon: "warning",
       title: "Confirm Delete",
@@ -438,39 +484,74 @@ export function DepartmentSetupPage() {
       cancelButtonText: "Cancel",
     });
 
-    if (confirmed.isConfirmed) {
-      try {
-        await apiClient.delete(`/Fs/Employment/DepartmentSetUp/${department.id}`,);
-        await auditTrail.log({
-          accessType: 'Delete',
-          trans: `Deleted department ${department.code}`,
-          messages: `Department deleted: ${department.code} - ${department.description}`,
-          formName,
-        });
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Department deleted successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        await fetchDepartmentData();
-      } catch (error: any) {
-        const errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to delete department";
+    if (!confirmed.isConfirmed) return;
+
+    // ── 3. Check if department is used in Employee Masterfile ────────────
+    try {
+      const empResponse = await apiClient.get('/Maintenance/EmployeeMasterFile');
+      const employees: any[] = Array.isArray(empResponse.data)
+        ? empResponse.data
+        : [];
+
+      const isUsedInMasterfile = employees.some(
+        (emp: any) =>
+          (emp.depCode ?? "").trim().toUpperCase() ===
+          (department.code ?? "").trim().toUpperCase(),
+      );
+
+      if (isUsedInMasterfile) {
         await Swal.fire({
           icon: "error",
-          title: "Error",
-          text: errorMsg,
+          title: "Cannot Delete",
+          text: "This setup is already used in Employee Masterfile.",
         });
-        console.error("Error deleting department:", error);
+        return;
       }
+    } catch (error: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate department usage.",
+      });
+      return;
+    }
+
+    // ── 4. Proceed with deletion ─────────────────────────────────────────
+    try {
+      await apiClient.delete(`/Fs/Employment/DepartmentSetUp/${department.departmentId}`);
+      await auditTrail.log({
+        accessType: 'Delete',
+        trans: `Deleted department ${department.code}`,
+        messages: `Department deleted: ${department.code} - ${department.description}`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Department deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      await fetchDepartmentData();
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete department";
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMsg,
+      });
+      console.error("Error deleting department:", error);
     }
   };
 
   const handleSubmit = async () => {
+    // ── 1. Basic required-field check ────────────────────────────────────
     if (!departmentCode.trim()) {
       await Swal.fire({
         icon: "warning",
@@ -479,26 +560,72 @@ export function DepartmentSetupPage() {
       });
       return;
     }
-    // Check for duplicate code (only when creating new or changing code during edit)
-    const isDuplicate = departmentList.some((department, index) => {
-      // When editing, exclude the current record from duplicate check
-      if (isEditMode && selectedDepartmentIndex === index) {
-        return false;
-      }
+
+    // ── 2. HRIS / Payroll path check (applies to both Create and Edit) ───
+    const companyPathsValid = await validateCompanyPaths();
+    if (!companyPathsValid) return;
+
+    // ── 3. Duplicate code check ──────────────────────────────────────────
+    const isDuplicateCode = departmentList.some((department, index) => {
+      if (isEditMode && selectedDepartmentIndex === index) return false;
       return (
-        department.code.toLowerCase() === departmentCode.trim().toLowerCase()
+        department.code.trim().toUpperCase() ===
+        departmentCode.trim().toUpperCase()
       );
     });
 
-    if (isDuplicate) {
+    if (isDuplicateCode) {
       await Swal.fire({
         icon: "error",
         title: "Duplicate Code",
-        text: "This code is already in use. Please use a different code.",
+        text: "Code is already exist.",
       });
       return;
     }
-    // Validate email format
+
+    // ── 4. Duplicate description check ──────────────────────────────────
+    const isDuplicateDesc = departmentList.some((department, index) => {
+      if (isEditMode && selectedDepartmentIndex === index) return false;
+      return (
+        (department.description ?? "").trim().toUpperCase() ===
+        description.trim().toUpperCase()
+      );
+    });
+
+    if (isDuplicateDesc) {
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
+      return;
+    }
+
+    // ── 5. Head 1 / Email 1 must both have values or both be empty ───────
+    const hasHead1 = head1.trim() !== "";
+    const hasEmail1 = email1.trim() !== "";
+    if (hasHead1 !== hasEmail1) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Head 1 and Email 1 must have value.",
+      });
+      return;
+    }
+
+    // ── 6. Head 2 / Email 2 must both have values or both be empty ───────
+    const hasHead2 = head2.trim() !== "";
+    const hasEmail2 = email2.trim() !== "";
+    if (hasHead2 !== hasEmail2) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Head 2 and Email 2 must have value.",
+      });
+      return;
+    }
+
+    // ── 7. Email format validation ───────────────────────────────────────
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (email1.trim() && !emailRegex.test(email1)) {
@@ -519,6 +646,27 @@ export function DepartmentSetupPage() {
       return;
     }
 
+    // ── 8. Duplicate device name check (skip when deviceName is empty) ───
+    if (deviceName.trim() !== "") {
+      const isDuplicateDevice = departmentList.some((department, index) => {
+        if (isEditMode && selectedDepartmentIndex === index) return false;
+        return (
+          (department.deviceName ?? "").trim().toUpperCase() ===
+          deviceName.trim().toUpperCase()
+        );
+      });
+
+      if (isDuplicateDevice) {
+        await Swal.fire({
+          icon: "error",
+          title: "Duplicate Device",
+          text: "Device Name is already used.",
+        });
+        return;
+      }
+    }
+
+    // ── 9. Submit ────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
       const payload = {
@@ -634,7 +782,6 @@ export function DepartmentSetupPage() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedDepartments = filteredDepartments.slice(startIndex, endIndex);
 
-  // Get visible page numbers
   const getPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
@@ -651,7 +798,6 @@ export function DepartmentSetupPage() {
     return pages;
   };
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
@@ -924,7 +1070,6 @@ export function DepartmentSetupPage() {
                           value={departmentCode}
                           onChange={(e) => {
                             const value = e.target.value;
-                            // Limit to 10 characters at HTML level
                             if (value.length <= 10) {
                               setDepartmentCode(value);
                             }
