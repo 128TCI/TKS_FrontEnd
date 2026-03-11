@@ -77,7 +77,7 @@ import { RawdataOnStraightDutyPage } from '../components/Maintenance/RawdataOnSt
 import { ProcessedDataPage } from '../components/Maintenance/ProcessedDataPage';
 import { TwoShiftsEmployeeTimekeepConfigPage } from '../components/Maintenance/TwoShiftsEmployeeTimekeepConfigPage';
 import { TwoShiftsRawDataPage } from '../components/Maintenance/TwoShiftsRawDataPage';
-import { UpdateRawdataOnlinePage } from '../components/Maintenance/UpdateRawdataOnlinePage';
+import { UpdateRawdataOnlinePage } from '../components/Utilities/UpdateRawdataOnlinePage';
 
 // ─── Process ──────────────────────────────────────────────────────────────────
 import { ProcessPage } from '../components/Process/ProcessPage';

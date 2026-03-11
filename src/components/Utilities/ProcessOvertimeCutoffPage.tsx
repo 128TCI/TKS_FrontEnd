@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import { Footer } from '../Footer/Footer';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem {
   id: number;
@@ -220,10 +221,10 @@ export function ProcessOvertimeCutoffPage() {
     try {
       setIsUpdating(true);
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        DateFrom: new Date(dateFrom).toISOString(),
-        DateTo:   new Date(dateTo).toISOString(),
-        OTDate:   new Date(overtimeDate).toISOString(),
+        empCode: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
+        otDate:   toISO(overtimeDate),
       };
 
       const res = await apiClient.post('/Utilities/ProcessOvertimeCutoff_Update', payload);

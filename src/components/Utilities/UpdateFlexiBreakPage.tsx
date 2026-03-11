@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem {
   id: number;
@@ -39,20 +40,14 @@ export function UpdateFlexiBreakPage() {
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   // ── Per-tab selections — each tab keeps its own checked IDs independently ──
-  const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>({
-    'TK Group':       [],
-    'Branch':         [],
-    'Department':     [],
-    'Division':       [],
-    'Group Schedule': [],
-    'Pay House':      [],
-    'Section':        [],
-    'Unit':           [],
-  });
+const EMPTY_SELECTION: Record<TabName, number[]> = {
+  'TK Group': [], 'Branch': [], 'Department': [], 'Division': [],
+  'Group Schedule': [], 'Pay House': [], 'Section': [], 'Unit': [],
+};
 
-  // Convenience: selected IDs for the currently active tab
+  // ── Per-tab selections — each tab keeps its own checked IDs independently ─
+  const [selectedGroupsMap, setSelectedGroupsMap]   = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
   const selectedGroups = selectedGroupsMap[activeTab] ?? [];
-
   const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) => {
     setSelectedGroupsMap(prev => ({
       ...prev,
@@ -216,20 +211,6 @@ export function UpdateFlexiBreakPage() {
     setSelectedEmployees([]);
   }, [activeTab, selectedGroups, statusFilter]);  // eslint-disable-line
 
-  const getSelectionTitle = () => {
-    switch (activeTab) {
-      case 'TK Group': return 'TK Group Selection';
-      case 'Branch': return 'Branch Selection';
-      case 'Department': return 'Department Selection';
-      case 'Division': return 'Division Selection';
-      case 'Group Schedule': return 'Group Schedule Selection';
-      case 'Pay House': return 'Pay House Selection';
-      case 'Section': return 'Section Selection';
-      case 'Unit': return 'Unit Selection';
-      default: return 'Selection';
-    }
-  };
-
   // ── Filtered + paginated groups ───────────────────────────────────────────
   const currentItems = getCurrentData();
 
@@ -272,7 +253,7 @@ export function UpdateFlexiBreakPage() {
     return pages;
   };
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleGroupToggle = (id: number) =>
     setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
@@ -280,14 +261,10 @@ export function UpdateFlexiBreakPage() {
     setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const handleSelectAllGroups = () =>
-    setSelectedGroups(
-      selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id)
-    );
+    setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
 
   const handleSelectAllEmployees = () =>
-    setSelectedEmployees(
-      selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id)
-    );
+    setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
@@ -295,29 +272,19 @@ export function UpdateFlexiBreakPage() {
 
     try {
       setIsUpdating(true);
-      const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
-        empCodes: selectedEmployees.map(id =>
+        empCode: selectedEmployees.map(id =>
           employeeItems.find(e => e.id === id)?.code ?? String(id)
         ),
-        DateFrom: toISO(dateFrom),
-        DateTo:   toISO(dateTo),
+        dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
       };
 
-      const res = await apiClient.post('/Utilities/UpdateFlexiBreakByDate', payload);
+      const res = await apiClient.post('/Utilities/UpdateFlexiBreak', payload);
       if (ApiService.isApiSuccess(res)) {
         await showSuccessModal('Flexi Break settings successfully updated.');
         // Clear selections across ALL tabs
-        setSelectedGroupsMap({
-          'TK Group':       [],
-          'Branch':         [],
-          'Department':     [],
-          'Division':       [],
-          'Group Schedule': [],
-          'Pay House':      [],
-          'Section':        [],
-          'Unit':           [],
-        });
+        setSelectedGroupsMap({ ...EMPTY_SELECTION });
         setSelectedEmployees([]);
         setDateFrom('');
         setDateTo('');
@@ -421,10 +388,6 @@ export function UpdateFlexiBreakPage() {
 
               {/* ── Left: Group list ─────────────────────────────────────── */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-900">{getSelectionTitle()}</h3>
-                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                   
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm}
@@ -472,10 +435,6 @@ export function UpdateFlexiBreakPage() {
 
                 {/* Employee list */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-gray-900">Employees</h3>
-                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
-                  </div>                   
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input type="text" value={employeeSearchTerm}

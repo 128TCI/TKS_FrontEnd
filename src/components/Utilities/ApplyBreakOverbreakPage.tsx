@@ -5,12 +5,37 @@ import { Footer } from '../Footer/Footer';
 import { EmployeeSearchModal } from './../Modals/EmployeeSearchModal';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
-import { group } from 'console';
 
 interface GroupItem {
   id: number;
   code: string;
   description: string;
+}
+
+interface BreakDetailRowDto {
+  id: number;
+  empCode: string;
+  workShift: string;
+  rawDate: string | null;
+  rawBreak1In: string | null;
+  rawBreak1Out: string | null;
+  rawBreak3In: string | null;
+  rawBreak3Out: string | null;
+  afterGrace: number | null;
+  withinGrace: number | null;
+  tardiOrUnder: number;
+  groupCode: string;
+}
+
+interface BreakSummaryRowDto {
+  id: number;
+  empCode: string;
+  empName?: string;
+  appDate: string | null;
+  deduct: number | null;
+  tardiOrUnder: number;
+  rawDateIn: string | null;
+  groupCode: string;
 }
 
 export function ApplyBreakOverbreakPage() {
@@ -22,7 +47,16 @@ export function ApplyBreakOverbreakPage() {
   const [currentPage,   setCurrentPage]   = useState(1);
   const itemsPerPage = 10;
 
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpdating,  setIsUpdating]  = useState(false);
+  const [isComputing, setIsComputing] = useState(false);
+
+  // Computed data — populated by Compute, sent back by Update
+  const [detailRows,  setDetailRows]  = useState<BreakDetailRowDto[]>([]);
+  const [summaryRows, setSummaryRows] = useState<BreakSummaryRowDto[]>([]);
+  const [detailPage,  setDetailPage]  = useState(1);
+  const [summaryPage, setSummaryPage] = useState(1);
+  const detailPageSize  = 10;
+  const summaryPageSize = 10;
 
   // Form Fields
   const [headCode, setHeadCode] = useState('');
@@ -127,33 +161,51 @@ export function ApplyBreakOverbreakPage() {
     setDateTo('');
   };
 
-  const handleUpdate = async () => {
+  const buildComputePayload = () => ({
+    empCode:     headCode,
+    dateToApply: new Date(dateToApply).toISOString(),
+    dateFrom:    new Date(dateFrom).toISOString(),
+    dateTo:      new Date(dateTo).toISOString(),
+    groupCodes:  selectedItems.map(id => tkGroupItems.find(g => g.id === id)?.code ?? String(id)),
+  });
+
+  const handleCompute = async () => {
     if (!selectedItems.length) { await showErrorModal('Please select TK Group item/s.'); return; }
-    if (!headCode.length)      { await showErrorModal('Please select Employee.'); return; }
     if (!dateToApply)          { await showErrorModal('Please select Date to Apply.'); return; }
     if (!dateFrom || !dateTo)  { await showErrorModal('Please select Date From and Date To.'); return; }
+    try {
+      setIsComputing(true);
+      const res = await apiClient.post('/Utilities/Compute/ApplyBreakOverbreak', buildComputePayload());
+      if (res.data?.success) {
+        setDetailRows(res.data.details ?? []);
+        setSummaryRows(res.data.summary ?? []);
+        setDetailPage(1);
+        setSummaryPage(1);
+      } else {
+        await showErrorModal(res.data?.message ?? 'Compute failed.');
+      }
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.message ?? 'Failed to compute records.');
+    } finally {
+      setIsComputing(false);
+    }
+  };
 
+  const handleUpdate = async () => {
+    if (summaryRows.length === 0) { await showErrorModal('No data to Update. Please Compute first.'); return; }
     try {
       setIsUpdating(true);
-      const groupCodes = selectedItems
-        .map(id => tkGroupItems.find(g => g.id === id)?.code ?? String(id));
-
-      const payload = {
-        empCode:    headCode,
-        dateToApply: new Date(dateToApply).toISOString(),
-        dateFrom:    new Date(dateFrom).toISOString(),
-        dateTo:      new Date(dateTo).toISOString(),
-        groupCodes,
-      };
-
-      const res = await apiClient.post('/Utilities/ApplyBreakOverbreak', payload);
-      if (ApiService.isApiSuccess(res)) {
-        await showSuccessModal('Successfully updated Break1 and Breaks Overbreak.');
+      const res = await apiClient.post('/Utilities/Update/ApplyBreakOverbreak', { summary: summaryRows });
+      if (res.data?.success) {
+        await showSuccessModal(res.data.message ?? 'Successfully updated Break1 and Breaks Overbreak.');
         resetForm();
+        setDetailRows([]);
+        setSummaryRows([]);
+      } else {
+        await showErrorModal(res.data?.message ?? 'Failed to update records.');
       }
-    } catch (error: any) {
-      console.error(error);
-      await showErrorModal('Failed to update records');
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.message ?? 'Failed to update records.');
     } finally {
       setIsUpdating(false);
     }
@@ -305,8 +357,9 @@ export function ApplyBreakOverbreakPage() {
 
                   {/* Action buttons */}
                   <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                    <button className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2">
-                      <Calculator className="w-4 h-4" />Compute
+                    <button onClick={handleCompute} disabled={isComputing}
+                      className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Calculator className="w-4 h-4" />{isComputing ? 'Computing…' : 'Compute'}
                     </button>
                     <button onClick={handleUpdate} disabled={isUpdating}
                       className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -329,18 +382,35 @@ export function ApplyBreakOverbreakPage() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">No data available in table</td></tr>
+                    <tbody className="divide-y divide-gray-100">
+                      {detailRows.length === 0
+                        ? <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">No data available. Click Compute to load records.</td></tr>
+                        : detailRows.slice((detailPage-1)*detailPageSize, detailPage*detailPageSize).map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50 text-xs">
+                            <td className="px-3 py-2">{row.empCode}</td>
+                            <td className="px-3 py-2">{row.workShift}</td>
+                            <td className="px-3 py-2">{row.rawDate ? new Date(row.rawDate).toLocaleDateString() : ''}</td>
+                            <td className="px-3 py-2">{row.rawBreak1Out ? new Date(row.rawBreak1Out).toLocaleTimeString() : ''}</td>
+                            <td className="px-3 py-2">{row.rawBreak1In  ? new Date(row.rawBreak1In ).toLocaleTimeString() : ''}</td>
+                            <td className="px-3 py-2">{row.rawBreak3Out ? new Date(row.rawBreak3Out).toLocaleTimeString() : ''}</td>
+                            <td className="px-3 py-2">{row.rawBreak3In  ? new Date(row.rawBreak3In ).toLocaleTimeString() : ''}</td>
+                            <td className="px-3 py-2">{row.afterGrace}</td>
+                            <td className="px-3 py-2">{row.withinGrace}</td>
+                          </tr>
+                        ))
+                      }
                     </tbody>
                   </table>
                 </div>
-                <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 bg-gray-50">
-                  <button className="text-sm text-gray-600 hover:text-gray-900">◄</button>
+                <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500">
+                  <span>Page {detailPage} of {Math.max(1, Math.ceil(detailRows.length / detailPageSize))}</span>
                   <div className="flex gap-1">
-                    <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900">Previous</button>
-                    <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900">Next</button>
+                    <button onClick={() => setDetailPage(p => Math.max(1, p-1))} disabled={detailPage === 1}
+                      className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-40">Previous</button>
+                    <button onClick={() => setDetailPage(p => Math.min(Math.ceil(detailRows.length/detailPageSize), p+1))}
+                      disabled={detailPage >= Math.ceil(detailRows.length/detailPageSize) || detailRows.length === 0}
+                      className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-40">Next</button>
                   </div>
-                  <button className="text-sm text-gray-600 hover:text-gray-900">►</button>
                 </div>
               </div>
 
@@ -354,18 +424,29 @@ export function ApplyBreakOverbreakPage() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">No data available in table</td></tr>
+                    <tbody className="divide-y divide-gray-100">
+                      {summaryRows.length === 0
+                        ? <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">No data available. Click Compute to load records.</td></tr>
+                        : summaryRows.slice((summaryPage-1)*summaryPageSize, summaryPage*summaryPageSize).map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50 text-xs">
+                            <td className="px-3 py-2">{row.empCode}</td>
+                            <td className="px-3 py-2">{row.deduct}</td>
+                            <td className="px-3 py-2">{row.appDate ? new Date(row.appDate).toLocaleDateString() : ''}</td>
+                          </tr>
+                        ))
+                      }
                     </tbody>
                   </table>
                 </div>
-                <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 bg-gray-50">
-                  <button className="text-sm text-gray-600 hover:text-gray-900">◄</button>
+                <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500">
+                  <span>Page {summaryPage} of {Math.max(1, Math.ceil(summaryRows.length / summaryPageSize))}</span>
                   <div className="flex gap-1">
-                    <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900">Previous</button>
-                    <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900">Next</button>
+                    <button onClick={() => setSummaryPage(p => Math.max(1, p-1))} disabled={summaryPage === 1}
+                      className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-40">Previous</button>
+                    <button onClick={() => setSummaryPage(p => Math.min(Math.ceil(summaryRows.length/summaryPageSize), p+1))}
+                      disabled={summaryPage >= Math.ceil(summaryRows.length/summaryPageSize) || summaryRows.length === 0}
+                      className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-40">Next</button>
                   </div>
-                  <button className="text-sm text-gray-600 hover:text-gray-900">►</button>
                 </div>
               </div>
             </div>

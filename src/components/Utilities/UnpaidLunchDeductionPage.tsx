@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem {
   id: number;
@@ -273,14 +274,13 @@ export function UnpaidLunchDeductionPage() {
 
     try {
       setIsUpdating(true);
-      const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        empCode: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
         DateFrom: toISO(dateFrom),
         DateTo:   toISO(dateTo),
       };
 
-      const res = await apiClient.post('/Utilities/UpdateUnpaidLunchDeductionByDate', payload);
+      const res = await apiClient.post('/Utilities/UnpaidLunchDeduction', payload);
       if (ApiService.isApiSuccess(res)) {
         await showSuccessModal('Unpaid Lunch Deduction settings successfully updated.');
         setSelectedGroupsMap({ ...EMPTY_SELECTION });

@@ -3,7 +3,8 @@ import { RotateCcw, Check, RefreshCw, Users, Building2, Briefcase, Network, Cale
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 
 interface GroupItem {
   id: number;
@@ -281,10 +282,10 @@ export function UnpostTransactionPage() {
     if (!Object.values(options).some(Boolean)) { await showErrorModal('Please check at least 1 transaction to unpost.'); return; }
     try {
       setIsUpdating(true);
-      const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
         dateFrom: toISO(dateFrom),
         dateTo:   toISO(dateTo),
+        userName: getLoggedInUsername(),
         empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
         updateOptions: {
           tardiness:        options.tardiness,
@@ -297,7 +298,7 @@ export function UnpostTransactionPage() {
           lateFiling:       options.lateFiling,
         },
       };
-      const res = await apiClient.post('/Utilities/UnpostTransaction_RawDataUnpost', payload);
+      const res = await apiClient.post('/Utilities/UnpostTransaction', payload);
       if (res.data?.success) {
         await showSuccessModal(res.data.message ?? 'Successfully Unpost Transactions.');
         resetForm();

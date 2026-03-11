@@ -232,7 +232,7 @@ export function LeaveTypeSetupPage() {
           className="fixed inset-0 bg-transparent flex items-center justify-center z-[100] p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowSearchModal(false); }}
         >
-<div className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto" style={{ width: '600px' }}>
+          <div className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto" style={{ width: '600px' }}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
               <h2 className="text-gray-900 font-semibold text-sm">Search</h2>
               <button type="button" onClick={() => setShowSearchModal(false)} className="text-gray-600 hover:text-gray-800 transition-colors">
