@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, Check, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
+import { AlertCircle, Check, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box, RotateCcw } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -41,6 +41,10 @@ export function UpdateTardinessPenaltyPage() {
   const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom,           setDateFrom]           = useState('');
   const [dateTo,             setDateTo]             = useState('');
+  const [year,               setYear]               = useState('');
+  const [month,              setMonth]              = useState<number>(new Date().getMonth() + 1); // Current month (1-12)
+  const [noOfTardiness,      setNoOfTardiness]      = useState('');
+  const [gracePeriod, setGracePeriod] = useState(''); 
   const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
 
@@ -269,24 +273,30 @@ export function UpdateTardinessPenaltyPage() {
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
-    if (!dateFrom || !dateTo)      { await showErrorModal('Please select Date From and Date To.'); return; }
-
+    if (month < 1 || !year)        { await showErrorModal('Invalid Month or Year.'); return; }
+    if (!noOfTardiness || isNaN(Number(noOfTardiness)) || Number(noOfTardiness) <= 0) { await showErrorModal('Please fill no of Tardiness.');
+      return; }
+    if (!gracePeriod || isNaN(Number(gracePeriod)) || Number(gracePeriod) < 0) { await showErrorModal('Please fill Grace Period.');
+      return; }
     try {
       setIsUpdating(true);
-      const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
         empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        DateFrom: toISO(dateFrom),
-        DateTo:   toISO(dateTo),
+        year: year,
+        month: month,
+        gracePeriod: gracePeriod,
+        noOfTardiness: noOfTardiness,
       };
 
-      const res = await apiClient.post('/Utilities/UpdateTardinessPenaltyByDate', payload);
+      const res = await apiClient.post('/Utilities/UpdateTardinessPenalty/Update', payload);
       if (ApiService.isApiSuccess(res)) {
         await showSuccessModal('Tardiness Penalty settings successfully updated.');
         setSelectedGroupsMap({ ...EMPTY_SELECTION });
         setSelectedEmployees([]);
-        setDateFrom('');
-        setDateTo('');
+        setYear('');
+        setMonth(new Date().getMonth() + 1);
+        setNoOfTardiness('');
+        setGracePeriod('');
       }
     } catch {
       await showErrorModal('Failed to update records.');
@@ -294,6 +304,39 @@ export function UpdateTardinessPenaltyPage() {
       setIsUpdating(false);
     }
   };
+
+  const handleUnpost = async () => {
+    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
+    if (month < 1 || !year)        { await showErrorModal('Invalid Month or Year.'); return; }
+    try {
+      setIsUpdating(true);
+      const payload = {
+        // Send codes, not IDs — same fix applied to handleUpdate
+        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        year:    Number(year),
+        month:   month,
+      };
+
+      const res = await apiClient.post('/Utilities/UpdateTardinessPenalty/Unpost', payload);
+
+      if (ApiService.isApiSuccess(res)) {
+        await showSuccessModal(res.data?.message ?? 'Successfully unposted Tardiness Penalty.');
+        setSelectedGroupsMap({ ...EMPTY_SELECTION });
+        setSelectedEmployees([]);
+        setYear('');
+        setMonth(new Date().getMonth() + 1);
+        setNoOfTardiness('');
+        setGracePeriod('');
+      } else {
+        await showErrorModal(res.data?.message ?? 'Unpost failed.');
+      }
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.message ?? 'Failed to unpost records.');
+    } finally {
+      setIsUpdating(false);
+    }
+  }; 
+  
 
   // ── Pagination renderer ───────────────────────────────────────────────────
   const renderPagination = (
@@ -514,23 +557,73 @@ export function UpdateTardinessPenaltyPage() {
                 {/* Date range */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-24">Date From:</label>
-                      <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                      <CalendarPopover date={dateFrom} onChange={setDateFrom} />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm text-gray-700">Year</label>
+                        <input
+                          type="text"
+                          value={year}
+                          onChange={(e) => setYear(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm text-gray-700">Month</label>
+                        <select
+                          value={month}
+                          onChange={(e) => setMonth(parseInt(e.target.value))}
+                          className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                        >
+                          <option value="1">January</option>
+                          <option value="2">February</option>
+                          <option value="3">March</option>
+                          <option value="4">April</option>
+                          <option value="5">May</option>
+                          <option value="6">June</option>
+                          <option value="7">July</option>
+                          <option value="8">August</option>
+                          <option value="9">September</option>
+                          <option value="10">October</option>
+                          <option value="11">November</option>
+                          <option value="12">December</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-24">Date To:</label>
-                      <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                      <CalendarPopover date={dateTo} onChange={setDateTo} />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm text-gray-700">No of Tardiness</label>
+                        <input
+                          type="text"
+                          value={noOfTardiness}
+                          onChange={(e) => setNoOfTardiness(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm text-gray-700">Grace Period [hh.mm]</label>
+                        <input
+                          type="text"
+                          value={gracePeriod}
+                          onChange={(e) => setGracePeriod(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                        />
+                      </div>
                     </div>
-                    <div className="flex justify-end pt-4 border-t border-gray-200">
-                      <button onClick={handleUpdate} disabled={isUpdating}
-                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2" 
+                        onClick={handleUpdate}
+                      >
                         <Save className="w-4 h-4" />
-                        {isUpdating ? 'Updating…' : 'Update'}
+                        Update
+                      </button>
+                      <button className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm flex items-center gap-2"
+                        onClick={handleUnpost}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Unpost
                       </button>
                     </div>
                   </div>

@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
@@ -29,10 +30,6 @@ export function DeductAbsencesExcessPage() {
   const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom,           setDateFrom]           = useState('');
   const [dateTo,             setDateTo]             = useState('');
-  const [year,               setYear]               = useState('');
-  const [month,              setMonth]              = useState('January');
-  const [noOfTardiness,      setNoOfTardiness]      = useState('');
-  const [gracePeriod,        setGracePeriod]        = useState('');
   const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [isUpdating,         setIsUpdating]         = useState(false);
@@ -175,11 +172,11 @@ export function DeductAbsencesExcessPage() {
     try {
       setIsUpdating(true);
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        DateFrom: new Date(dateFrom).toISOString(),
-        DateTo:   new Date(dateTo).toISOString(),
+        empCode: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        dateFrom: toISO(dateFrom),
+        dateTo:   toISO(dateTo),
       };
-      const res = await apiClient.post('/Utilities/ProcessOvertime24Hours_Update', payload);
+      const res = await apiClient.post('/Utilities/DeductAbsencesExcess', payload);
       if (ApiService.isApiSuccess(res)) { await showSuccessModal('Deduct Absences with pay successfully updated.'); resetForm(); }
     } catch { await showErrorModal('Failed to update records'); }
     finally { setIsUpdating(false); }
@@ -306,43 +303,28 @@ export function DeductAbsencesExcessPage() {
                   </div>
                 </div>
 
-                {/* Form fields */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                {/* Date range */}
+                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                  <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Year:</label>
-                      <input type="text" value={year} onChange={e => setYear(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <label className="text-sm text-gray-700 w-24">Date From:</label>
+                      <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Month:</label>
-                      <select value={month} onChange={e => setMonth(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
+                      <label className="text-sm text-gray-700 w-24">Date To:</label>
+                      <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <CalendarPopover date={dateTo} onChange={setDateTo} />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">No. Of Tardiness:</label>
-                      <input type="text" value={noOfTardiness} onChange={e => setNoOfTardiness(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <div className="flex justify-end pt-4 border-t border-gray-200">
+                      <button onClick={handleUpdate} disabled={isUpdating}
+                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Save className="w-4 h-4" />
+                        {isUpdating ? 'Updating…' : 'Update'}
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 w-20">Grace Period:</label>
-                      <input type="text" value={gracePeriod} onChange={e => setGracePeriod(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-20">Date From:</label>
-                    <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                    <CalendarPopover date={dateFrom} onChange={setDateFrom} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-20">Date To:</label>
-                    <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                    <CalendarPopover date={dateTo} onChange={setDateTo} />
-                  </div>
-                  <div className="flex justify-end pt-4 border-t border-gray-200">
-                    <button onClick={handleUpdate} disabled={isUpdating}
-                      className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                      <Save className="w-4 h-4" />{isUpdating ? 'Updating…' : 'Update'}
-                    </button>
                   </div>
                 </div>
               </div>

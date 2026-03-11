@@ -4,9 +4,12 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { LeaveCodeSearchModal } from '../Modals/LeaveCodeSearchModal';
+import { Search, X } from 'lucide-react';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
+interface LeaveCode { leaveID: number; leaveCode: string; leaveDesc: string; }
 
 type TabName = 'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit';
 
@@ -33,6 +36,11 @@ export function DeleteEmployeeTransactionsPage() {
   const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [isUpdating,         setIsUpdating]         = useState(false);
+  const [leaveCode,          setLeaveCode]          = useState('');
+  const [leaveCodeItems,     setLeaveCodeItems]     = useState<LeaveCode[]>([]);
+  const [loadingLeaveCodes,  setLoadingLeaveCodes]  = useState(false);
+  const [leaveCodeError,     setLeaveCodeError]     = useState('');
+  const [showLeaveCodeModal, setShowLeaveCodeModal] = useState(false);
   const itemsPerPage = 10;
 
   const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
@@ -125,6 +133,28 @@ export function DeleteEmployeeTransactionsPage() {
     setSelectedEmployees([]);
   }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
 
+  // Fetch leave codes — same API as UpdateEmployeeLeaveApplicationPage
+  useEffect(() => {
+    const loadLeaveCodes = async () => {
+      setLoadingLeaveCodes(true);
+      setLeaveCodeError('');
+      try {
+        const response = await apiClient.get('/Fs/Process/LeaveTypeSetUp');
+        const list = Array.isArray(response.data) ? response.data : [];
+        setLeaveCodeItems(list.map((item: any): LeaveCode => ({
+          leaveID:   item.leaveID   ?? item.ID  ?? 0,
+          leaveCode: item.leaveCode ?? item.code ?? '',
+          leaveDesc: item.leaveDesc ?? item.description ?? '',
+        })));
+      } catch (err: any) {
+        setLeaveCodeError(err?.response?.data?.message ?? 'Failed to load leave codes.');
+      } finally {
+        setLoadingLeaveCodes(false);
+      }
+    };
+    loadLeaveCodes();
+  }, []);
+
   const getSelectionTitle = () => {
     switch (activeTab) {
       case 'TK Group': return 'TK Group Selection';
@@ -164,7 +194,12 @@ export function DeleteEmployeeTransactionsPage() {
   const handleSelectAllGroups    = () => setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
-  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); };
+  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); setLeaveCode(''); };
+
+  const handleLeaveCodeSelect = (code: string) => {
+    setLeaveCode(code);
+    setShowLeaveCodeModal(false);
+  };
 
   const handleDelete = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
@@ -180,7 +215,7 @@ export function DeleteEmployeeTransactionsPage() {
         transType: transactionType,
         dateFrom:  new Date(dateFrom).toISOString(),
         dateTo:    new Date(dateTo).toISOString(),
-        leavecode: '',
+        leavecode: transactionType === 'Leave' ? leaveCode : '',
         empCode:   selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
       };
       const res = await apiClient.post('/Utilities/DeleteEmployeeTransactions', payload);
@@ -311,11 +346,42 @@ export function DeleteEmployeeTransactionsPage() {
                   {/* Transaction type */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-700 w-32">Transaction Type:</label>
-                    <select value={transactionType} onChange={e => setTransactionType(e.target.value)}
+                    <select
+                      value={transactionType}
+                      onChange={e => { setTransactionType(e.target.value); setLeaveCode(''); }}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                       {TRANSACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
+
+                  {/* Leave Code — only shown when Transaction Type is "Leave" */}
+                  {transactionType === 'Leave' && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-700 w-32">Leave Code:</label>
+                      <input
+                        type="text"
+                        value={leaveCode}
+                        onChange={e => setLeaveCode(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="Select leave code..."
+                        readOnly
+                      />
+                      <button
+                        onClick={() => setShowLeaveCodeModal(true)}
+                        className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                        title="Search leave code"
+                      >
+                        <Search className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setLeaveCode('')}
+                        className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                        title="Clear leave code"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-700 w-20">Date From:</label>
                     <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
@@ -339,6 +405,15 @@ export function DeleteEmployeeTransactionsPage() {
         </div>
       </div>
       <Footer />
+
+      <LeaveCodeSearchModal
+        isOpen={showLeaveCodeModal}
+        onClose={() => setShowLeaveCodeModal(false)}
+        onSelect={handleLeaveCodeSelect}
+        leaveCodeItems={leaveCodeItems}
+        loading={loadingLeaveCodes}
+        error={leaveCodeError}
+      />
     </div>
   );
 }

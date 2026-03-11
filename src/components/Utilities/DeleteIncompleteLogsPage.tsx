@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem {
   id: number;
@@ -223,7 +224,9 @@ export function DeleteIncompleteLogsPage() {
 
     try {
       setIsUpdating(true);
-      const toISO = (d: string) => new Date(d).toISOString();
+      console.log(dateFrom);
+      console.log(dateTo);
+
       const payload = {
         dateFrom: toISO(dateFrom),
         dateTo:   toISO(dateTo),

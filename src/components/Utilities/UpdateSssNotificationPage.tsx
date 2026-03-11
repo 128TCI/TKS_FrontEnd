@@ -5,6 +5,7 @@ import { Footer } from '../Footer/Footer';
 import { EmployeeSearchModal } from './../Modals/EmployeeSearchModal';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem {
   id: number;
@@ -21,6 +22,7 @@ interface EmployeeModalItem {
 export function UpdateSssNotificationPage() {
   const [dateFrom,      setDateFrom]      = useState('');
   const [dateTo,        setDateTo]        = useState('');
+  const [appliedDate,   setAppliedDate]   = useState('');
   const [searchTerm,    setSearchTerm]    = useState('');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [currentPage,   setCurrentPage]   = useState(1);
@@ -113,7 +115,6 @@ export function UpdateSssNotificationPage() {
     return pages;
   };
 
-  const toISO = (d: string) => new Date(d).toISOString();
 
   const resetForm = () => {
     setSelectedItems([]);
@@ -125,11 +126,13 @@ export function UpdateSssNotificationPage() {
     if (!selectedItems.length) { await showErrorModal('Please select TK Group item/s.'); return; }
     if (!headCode)             { await showErrorModal('Please select an employee.'); return; }
     if (!dateFrom || !dateTo)  { await showErrorModal('Please select Date From and Date To.'); return; }
+    if (!appliedDate)          { await showErrorModal('Please select Applied Date.'); return; }
     try {
       setIsUpdating(true);
       const res = await apiClient.post('/Utilities/UpdateSSSNotification', {
         DateFrom: toISO(dateFrom),
         DateTo:   toISO(dateTo),
+        AppliedDate: toISO(appliedDate),
         EmpCode:  headCode,
         Mode:     'Update',
       });
@@ -314,6 +317,17 @@ export function UpdateSssNotificationPage() {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-700 w-24">Date Applied:</label>
+                    <input
+                      type="text"
+                      value={appliedDate}
+                      onChange={(e) => setAppliedDate(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-43"
+                    />
+                    <CalendarPopover date={appliedDate} onChange={setAppliedDate} />
+                    
+                  </div>                  
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                     <button onClick={handleUpdate} disabled={isUpdating}

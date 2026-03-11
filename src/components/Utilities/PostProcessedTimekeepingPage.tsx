@@ -200,7 +200,7 @@ export function PostProcessedTimekeepingPage() {
         empCodes:      selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
         dateFrom:      new Date(dateFrom).toISOString(),
         dateTo:        new Date(dateTo).toISOString(),
-        userName:      getLoggedInUsername(), 
+        userName:      getLoggedInUsername(),
         updateOptions: {
           tardiness:        options.tardiness,
           otherEarnings:    options.otherEarnings,

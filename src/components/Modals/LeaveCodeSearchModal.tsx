@@ -1,45 +1,32 @@
-import { X, Search } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import apiClient from '../../services/apiClient';
-import Swal from 'sweetalert2';
 
-interface LeaveType {
+interface LeaveCode {
   leaveID: number;
   leaveCode: string;
   leaveDesc: string;
-  chargeableTo: string;
-  withPay: string;
-  subTypeRequired: boolean;
-  basedOnTenure: boolean;
-  withDateDuration: boolean;
-  noBalance: boolean;
-  legalFileAsLeave: boolean;
-  sphFileAsLeave: boolean;
-  dbleLegalFileAsLeave: boolean;
-  sph2FileAsLeave: boolean;
-  prevYrLvCode: string;
-  nwhFileAsLeave: boolean;
-  requiredAdvanceFiling: boolean;
-  exemptFromAllowDeduction: boolean;
 }
 
 interface LeaveCodeSearchModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelect: (empCode: string, name: string) => void;
+    onSelect: (code: string, description: string) => void;
+    leaveCodeItems: LeaveCode[];
+    loading?: boolean;
+    error?: string;
 }
 
 export function LeaveCodeSearchModal({
     isOpen,
     onClose,
     onSelect,
+    leaveCodeItems,
+    loading = false,
+    error = '',
 }: LeaveCodeSearchModalProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
-    const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
 
     // Handle ESC key to close modal
@@ -67,7 +54,8 @@ export function LeaveCodeSearchModal({
         }
     }, [isOpen]);
 
-    const filteredItems = leaveTypes.filter(item =>
+
+    const filteredItems = leaveCodeItems.filter(item =>
         item.leaveCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.leaveDesc.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -121,7 +109,7 @@ export function LeaveCodeSearchModal({
 
                     {/* Modal Content */}
                     <div className="p-3">
-                        <h3 className="text-blue-600 mb-2 text-sm">Employee Classification Code</h3>
+                        <h3 className="text-blue-600 mb-2 text-sm">Leave Code</h3>
 
                         {/* Search Input */}
                         <div className="flex items-center gap-2 mb-3">
@@ -165,10 +153,7 @@ export function LeaveCodeSearchModal({
                                                 <tr
                                                     key={item.leaveID}
                                                     className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                                    onClick={() => {
-                                                        onSelect(item.leaveID.toString(), item.leaveCode);
-                                                        onClose();
-                                                    }}
+                                                    onClick={() => onSelect(item.leaveCode, item.leaveDesc)}
                                                 >
                                                     <td className="px-3 py-1.5">{item.leaveCode}</td>
                                                     <td className="px-3 py-1.5">{item.leaveDesc}</td>

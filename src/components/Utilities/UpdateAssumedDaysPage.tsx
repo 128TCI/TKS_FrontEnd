@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem {
   id: number;
@@ -273,11 +274,11 @@ export function UpdateAssumedDaysPage() {
 
     try {
       setIsUpdating(true);
-      const toISO = (d: string) => new Date(d).toISOString();
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        EmpCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
         DateFrom: toISO(dateFrom),
         DateTo:   toISO(dateTo),
+        Mode:     'Update',
       };
 
       const res = await apiClient.post('/Utilities/UpdateAssumedDaysByDate', payload);
