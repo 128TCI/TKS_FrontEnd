@@ -1,19 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import React from 'react';
-import { Calendar, Search, X, Printer, Check, Clock, Users, Building2, Briefcase, Award, Network, Grid } from 'lucide-react';
+import { Calendar, Search, X, FileText, Printer, Check, Clock, Users, Building2, Briefcase, Award, Network, Grid } from 'lucide-react';
 import { CalendarPopover } from '../CalendarPopover';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername} from '../../services/apiClient';
+//import { Footer } from './Footer';
 import { Footer } from '../Footer/Footer';
 import Swal from 'sweetalert2';
-import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-type TabType       = 'tk-group' | 'branch' | 'department' | 'designation' | 'division' | 'section';
-type StatusType    = 'Active' | 'InActive' | 'All';
-type ModeType      = 'Absences' | 'Leave' | 'All';
-type HrsOptionType = 'Per Employee' | 'Summary';
-type PayType       = 'WithPay' | 'WithOutPay' | 'All';
+type TabType = 'tk-group' | 'branch' | 'department' | 'designation' | 'division' | 'section';
 
 interface GroupItem {
   id: number;
@@ -55,53 +49,103 @@ interface ReportFilter {
   optionTardy: number
 }
 
-interface ReportFilter {
-  empCode:           string;
-  dateFr:            string;
-  dateTo:            string;
-  groups:            string[];
-  departments:       string[];
-  divisions:         string[];
-  branch:            string[];
-  designation:       string[];
-  section:           string[];
-  company:           string;
-  address:           string;
-  userName:          string;
-  mode:              string;
-  activeInActiveAll: string;
+interface TardinessFilter {
+  empCode: string
+  year: number
+  month: number
+  cutOffDateFrom: string
+  cutOffDateTo: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  designation: string []
+  section: string []
+  activeInActiveAll: string
+}
+
+interface ExemptionReportFilter {
+  empCode: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  designation: string []
+  section: string []
+  tardiness: boolean
+  undertime: boolean
+  nightDiffBasic: boolean
+  overtime: boolean
+  absences: boolean
+  otherEarnAllow: boolean
+  holidayPay: boolean
+  activeInActiveAll: string
+}
+
+interface IncompleteLogsFilter {
+  empCode: string
+  dateFr: string
+  dateTo: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  company: string 
+  address: string
+  designation: string []
+  section: string []
+  logs: boolean
+  break1: boolean
+  break2: boolean
+  break3: boolean
+  activeInActiveAll: string
 }
 
 interface LeaveAbsencesFilter {
-  empCode:         string;
-  dateFr:          string;
-  dateTo:          string;
-  groups:          string[];
-  departments:     string[];
-  divisions:       string[];
-  branch:          string[];
-  designation:     string[];
-  section:         string[];
-  company:         string;
-  address:         string;
-  leaveType:       string;
-  leaveWithOrWPay: string;
-  includeLeaveAdj: boolean;
-  status:          string;
-  mode:            string;
+  empCode: string
+  dateFr: string
+  dateTo: string
+  groups: string []
+  departments: string []
+  divisions:string []
+  branch: string []
+  designation: string []
+  section: string []
+  company: string | null
+  address: string | null
+  leaveType: string | null
+  leaveWithOrWPay: string
+  includeLeaveAdj: boolean
+  status: string
+  mode: string
 }
 
 interface DailyRecord {
-  date: string; day: string; restDay: boolean;
-  timeIn: string; timeOut: string; workShift: string;
-  noOfHrs: string; tardiness: string; undertime: string;
-  absences: string; leaveWithPay: string;
+  date: string;
+  day: string;
+  restDay: boolean;
+  timeIn: string;
+  timeOut: string;
+  workShift: string;
+  noOfHrs: string;
+  tardiness: string;
+  undertime: string;
+  absences: string;
+  leaveWithPay: string;
 }
 
 interface EmployeeReport {
-  seqNo: number; empCode: string; fullName: string;
+  seqNo: number;
+  empCode: string;
+  fullName: string;
   dailyRecords: DailyRecord[];
-  subtotal: { noOfHrs: string; tardiness: string; undertime: string; absences: string; leaveWithPay: string };
+  subtotal: {
+    noOfHrs: string;
+    tardiness: string;
+    undertime: string;
+    absences: string;
+    leaveWithPay: string;
+  };
 }
 
 export function DailyTimeRecordMonitoringPage() {
@@ -251,7 +295,7 @@ export function DailyTimeRecordMonitoringPage() {
         holidayPay: newValue
       });
     } else {
-      params.append(key, String(value));
+      setProcessOptions(prev => ({ ...prev, [option]: !prev[option] }));
     }
   };
   const handleLogsChange = (option: keyof typeof logsOptions) => {
@@ -674,18 +718,18 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
   };
 
   const leaveAbsenceFilter: LeaveAbsencesFilter = {
-    empCode,
-    dateFr:          formatDate(dateFrom),
-    dateTo:          formatDate(dateTo),
-    groups:          idsToCodeList(selectedMap['tk-group'],    tkGroupItems),
-    departments:     idsToCodeList(selectedMap['department'],  departmentItems),
-    divisions:       idsToCodeList(selectedMap['division'],    divisionItems),
-    branch:          idsToCodeList(selectedMap['branch'],      branchItems),
-    designation:     idsToCodeList(selectedMap['designation'], designationItems),
-    section:         idsToCodeList(selectedMap['section'],     sectionItems),
-    company:         '',
-    address:         '',
-    leaveType:       selectedLeaveType,
+    empCode: empCode,
+    dateFr: dateFrom ? new Date(dateFrom).toLocaleDateString() : '-',
+    dateTo: dateTo ? new Date(dateTo).toLocaleDateString() : '-',
+    groups: selectedItems.length === 0 ? [] : selectedItems.toLocaleString().split(","),
+    departments: selectedDepItems.length === 0 ? [] : selectedDepItems.toLocaleString().split(","),
+    divisions: selectedDivItems.length === 0 ? [] : selectedDivItems.toLocaleString().split(","),
+    branch: selectedBranchItems.length === 0 ? [] : selectedBranchItems.toLocaleString().split(","),
+    designation: selectedDesItems.length === 0 ? [] : selectedDesItems.toLocaleString().split(","),
+    section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
+    company: "",
+    address: "",
+    leaveType: selectedLeaveType,
     leaveWithOrWPay: withOrWOutPay,
     includeLeaveAdj: includeLeaveAdj,
     status: status,
@@ -2869,12 +2913,21 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     setEmployeeCode('');
   };
 
-  // ── Report view ────────────────────────────────────────────────────────────
+  // const handleDisplay = () => {
+  //   setShowReport(true);
+  // };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (showReport) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
+        {/* Main Content */}
         <div className="flex-1 relative z-10 p-6">
           <div className="max-w-7xl mx-auto relative">
+            {/* Print Header */}
             <div className="flex items-center justify-between mb-6 print:hidden">
               <button
                 onClick={() => setShowReport(false)}
@@ -2883,46 +2936,50 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                 ← Back to Filters
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={handlePrint}
                 className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
               >
                 <Printer className="w-5 h-5" />
                 <span>Print Report</span>
               </button>
             </div>
-            <div className="bg-white shadow-sm border border-gray-200 p-8">
+
+            {/* Report Content */}
+            {/*<div className="bg-white shadow-sm border border-gray-200 p-8">
               <div className="text-center mb-6">
                 <h1 className="text-gray-900 mb-2">Daily Time Report</h1>
                 <p className="text-gray-600">Period From Mar 01, 2020 to Mar 15, 2020</p>
               </div>
-              <div className="border-t-4 border-black mb-6" />
+
+              <div className="border-t-4 border-black mb-6"></div>
+
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-black">
-                    <th className="px-2 py-2 text-left w-10">Seq. No.</th>
-                    <th className="px-2 py-2 text-left w-20">EmpCode</th>
-                    <th className="px-2 py-2 text-left w-48">Full Name</th>
-                    <th className="px-2 py-2 text-center w-24">IN</th>
-                    <th className="px-2 py-2 text-center w-24">OUT</th>
-                    <th className="px-2 py-2 text-center w-28">Work Shift</th>
-                    <th className="px-2 py-2 text-right w-20">No of Hrs</th>
-                    <th className="px-2 py-2 text-right w-20">Tardiness</th>
-                    <th className="px-2 py-2 text-right w-20">Undertime</th>
-                    <th className="px-2 py-2 text-right w-20">Absences</th>
-                    <th className="px-2 py-2 text-right w-20">Leave With Pay</th>
+                    <th className="px-2 py-2 text-left" style={{ width: '40px' }}>Seq. No.</th>
+                    <th className="px-2 py-2 text-left" style={{ width: '80px' }}>EmpCode</th>
+                    <th className="px-2 py-2 text-left" style={{ width: '200px' }}>Full Name</th>
+                    <th className="px-2 py-2 text-center" style={{ width: '90px' }}>IN</th>
+                    <th className="px-2 py-2 text-center" style={{ width: '90px' }}>OUT</th>
+                    <th className="px-2 py-2 text-center" style={{ width: '100px' }}>Work Shift</th>
+                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>No of Hrs</th>
+                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Tardiness</th>
+                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Undertime</th>
+                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Absences</th>
+                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Leave With Pay</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {SAMPLE_REPORT_DATA.map(employee => (
+                  {reportData.map((employee) => (
                     <React.Fragment key={employee.empCode}>
                       <tr className="bg-gray-100">
                         <td className="px-2 py-2 align-top">{employee.seqNo}.</td>
                         <td className="px-2 py-2 align-top">{employee.empCode}</td>
                         <td className="px-2 py-2 align-top" colSpan={9}>{employee.fullName}</td>
                       </tr>
-                      {employee.dailyRecords.map((record, idx) => (
-                        <tr key={idx} className={record.restDay ? 'bg-gray-50' : ''}>
-                          <td className="px-2 py-1" />
+                      {employee.dailyRecords.map((record, index) => (
+                        <tr key={index} className={record.restDay ? 'bg-gray-50' : ''}>
+                          <td className="px-2 py-1"></td>
                           <td className="px-2 py-1 text-xs">{record.date}</td>
                           <td className="px-2 py-1 text-xs">{record.day}</td>
                           <td className="px-2 py-1 text-xs text-center">{record.timeIn}</td>
@@ -2936,14 +2993,16 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                         </tr>
                       ))}
                       <tr className="border-t border-gray-300 bg-gray-200">
-                        <td className="px-2 py-2 text-right" colSpan={6}>Subtotal:</td>
+                        <td className="px-2 py-2" colSpan={6}>
+                          <span className="text-right block">Subtotal:</span>
+                        </td>
                         <td className="px-2 py-2 text-right">{employee.subtotal.noOfHrs}</td>
                         <td className="px-2 py-2 text-right">{employee.subtotal.tardiness}</td>
                         <td className="px-2 py-2 text-right">{employee.subtotal.undertime}</td>
                         <td className="px-2 py-2 text-right">{employee.subtotal.absences}</td>
                         <td className="px-2 py-2 text-right">{employee.subtotal.leaveWithPay}</td>
                       </tr>
-                      <tr className="h-4" />
+                      <tr className="h-4"></tr>
                     </React.Fragment>
                   ))}
                 </tbody>
@@ -2951,179 +3010,516 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
             </div>*/}
           </div>
         </div>
+
+        {/* Footer */}
         <Footer />
       </div>
     );
   }
 
-  // ── Main view ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      {/* Main Content */}
       <div className="flex-1 relative z-10 p-6">
         <div className="max-w-7xl mx-auto relative">
-
           {/* Page Header */}
           <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 border-l-4 border-blue-500 rounded-lg p-4">
             <h1 className="text-white">Daily Time Record Monitoring</h1>
           </div>
 
+          {/* Content Container */}
           <div className="bg-white rounded-b-lg shadow-lg p-6">
-
-            {/* Info Banner */}
+            {/* Info Section */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg p-5">
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-5 h-5 text-white" />
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-white" />
+                  </div>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-3">
                     Monitor and generate daily time record reports for employees. Filter by date range, employee status, and organizational groups.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                    {['Filter by date range', 'Export to Excel format', 'Multiple report types', 'Print ready reports'].map(text => (
-                      <div key={text} className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-gray-700">{text}</span>
-                      </div>
-                    ))}
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-gray-700">Filter by date range</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-gray-700">Export to Excel format</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-gray-700">Multiple report types</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-gray-700">Print ready reports</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-              {/* ── Left Panel ─────────────────────────────────────────────── */}
+              {/* Left Panel - Date Range & Filters */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-gray-900 mb-6">Date Range</h3>
+                      <h3 className="text-gray-900 mb-6">Date Range</h3>
 
-                  {/* Date From */}
-                  <div className="mb-4">
-                    <label className="block text-gray-700 text-sm mb-2">Date From</label>
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                          className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          placeholder="MM/DD/YYYY"
-                        />
+                      {/* Date From */}
+                      <div className="mb-4">
+                        <label className="block text-gray-700 text-sm mb-2">Date From</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                              type="text"
+                              value={dateFrom}
+                              onChange={(e) => setDateFrom(e.target.value)}
+                              className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              placeholder="MM/DD/YYYY"
+                            />
+                          </div>
+                          <CalendarPopover
+                            date={dateFrom}
+                            onChange={setDateFrom}
+                          />
+                        </div>
                       </div>
-                      <CalendarPopover date={dateFrom} onChange={setDateFrom} />
-                    </div>
-                  </div>
 
-                  {/* Date To */}
-                  <div className="mb-4">
-                    <label className="block text-gray-700 text-sm mb-2">Date To</label>
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                          className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          placeholder="MM/DD/YYYY"
-                        />
+                      {/* Date To */}
+                      <div className="mb-4">
+                        <label className="block text-gray-700 text-sm mb-2">Date To</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                              type="text"
+                              value={dateTo}
+                              onChange={(e) => setDateTo(e.target.value)}
+                              className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              placeholder="MM/DD/YYYY"
+                            />
+                          </div>
+                          <CalendarPopover
+                            date={dateTo}
+                            onChange={setDateTo}
+                          />
+                        </div>
                       </div>
-                      <CalendarPopover date={dateTo} onChange={setDateTo} />
-                    </div>
-                  </div>
 
-                  {/* Sort Alphabetically */}
-                  <div className="mb-6">
-                    <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-                      <input
-                        type="checkbox" checked={sortAlphabetically}
-                        onChange={e => setSortAlphabetically(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-gray-700">Sort Alphabetically</span>
-                    </label>
-                  </div>
+                      {/* Sort Alphabetically */}
+                      <div className="mb-6">
+                        <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={sortAlphabetically}
+                            onChange={(e) => setSortAlphabetically(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700">Sort Alphabetically</span>
+                        </label>
+                      </div>
 
-                  {/* Employee Status */}
-                  <div className="mb-6 space-y-2">
-                    {(['Active', 'InActive', 'All'] as StatusType[]).map(s => (
-                      <label key={s} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                        <input
-                          type="radio" name="empStatus" value={s}
-                          checked={empStatus === s} onChange={() => setEmpStatus(s)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500"
-                        />
-                        <span className="text-gray-700">{s === 'InActive' ? 'In Active' : s}</span>
-                      </label>
-                    ))}
-                  </div>
+                      {/* Status Radio Buttons */}
+                      <div className="mb-6">
+                        <div className="space-y-2">
+                          <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                            <input
+                              type="radio"
+                              name="status"
+                              value="Active"
+                              checked={empStatus === 'Active'}
+                              onChange={(e) => setEmpStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">Active</span>
+                          </label>
+                          <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                            <input
+                              type="radio"
+                              name="status"
+                              value="InActive"
+                              checked={empStatus === 'InActive'}
+                              onChange={(e) => setEmpStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">In Active</span>
+                          </label>
+                          <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                            <input
+                              type="radio"
+                              name="status"
+                              value="All"
+                              checked={empStatus === 'All'}
+                              onChange={(e) => setEmpStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">All</span>
+                          </label>
+                        </div>
+                      </div>
 
-                  {/* Employee Code */}
-                  <div className="mb-6">
-                    <label className="block text-gray-700 mb-2">Employee Code</label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text" value={empCode} readOnly
-                        className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-                        placeholder="Enter employee code"
-                      />
-                      <button
-                        onClick={() => setShowSearchModal(true)}
-                        className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        <Search className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => { setEmpCode(''); setEmpName(''); }}
-                        className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                    {empCode && (
-                      <p className="mt-2 text-sm text-gray-600">Employee Name: {empName}</p>
-                    )}
-                  </div>
+                      {/* Employee Code */}
+                      <div className="mb-6">
+                        <label className="block text-gray-700 mb-2">Employee Code</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={empCode}
+                            onChange={(e) => setEmpCode(e.target.value)}
+                            className="flex-grow min-w-0 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Select Employee"
+                            readOnly
+                          />
 
-                  {/* Report Type */}
-                  <div className="mb-6">
-                    <select
-                      value={reportType} onChange={e => setReportType(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 appearance-none cursor-pointer"
-                    >
-                      {[
-                        'Accumulation', 'Adjustment', 'Allowance', 'Application Report', 'Assumed Days',
-                        'Attendance Ratio', 'Attendance Summary', 'Consecutive Absences',
-                        'Count Of Employee Per Workshift', 'Daily Time', 'Device Code Report',
-                        'Employees Raw Data Report', 'Employees Raw In And Out (From Update Rawdata)',
-                        'Employees With No Workshift', 'Exemption Report', 'In And Out By Position',
-                        'Leave And Absences', 'Man Hours',
-                        'Man Hours By Division-Branch-Category-Dept-Section', 'No In And Out',
-                        'Overtime', 'Perfect Attendance', 'Questionable Entries', 'Questionable Workshifts',
-                        'Restday in a Week', 'Tardiness', 'Tardiness/ Overbreak/ Undertime Violation',
-                        'Tardiness And Undertime Report', 'Tardiness Penalty', 'Timesheet',
-                        'Unauthorized Absences', 'Undertime', 'User Group Access', 'User TK Group Access',
-                      ].map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
+                          <button
+                            onClick={() => setShowSearchModal(true)}
+                            className="flex-shrink-0 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            <Search className="w-5 h-5" />
+                          </button>
 
-                  {/* Convert to HH:MM */}
-                  {REPORT_TYPES_WITH_HHMM.includes(reportType) && (
-                    <label className="flex items-center space-x-3 p-3 mb-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                      <input
-                        type="checkbox" checked={convertToHHMM}
-                        onChange={e => setConvertToHHMM(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-gray-700">Convert To HH:MM</span>
-                    </label>
-                  )}
+                          <button
+                            onClick={() => { setEmpCode(""); setEmpName(""); }}
+                            className="flex-shrink-0 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                        {empCode &&(<label className="block mt-2">Employee Name: {empName}</label>)}
+                      </div>
+                      {/* Employee List Section */}
+                        {showSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          {/* Search Modal */}
+                      
+                        <>
+                          {/* Modal Backdrop */}
+                          <div 
+                            className="fixed inset-0 bg-black/30 z-30"
+                            onClick={() => setShowSearchModal(false)}
+                          ></div>
+                
+                          {/* Modal Dialog */}
+                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                              {/* Modal Header */}
+                              <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                                <h2 className="text-gray-800 text-sm">Search</h2>
+                                <button 
+                                  onClick={() => setShowSearchModal(false)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                
+                              {/* Modal Content */}
+                              <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm">Select Employee</h3>
+                
+                                {/* Search Input */}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <label className="text-gray-700 text-sm">Search:</label>
+                                  <input
+                                    type="text"
+                                    value={employeeSearchTerm}
+                                    onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  />
+                                </div>
+                
+                                {/* Employee Table */}
+                                <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                  <table className="w-full border-collapse text-sm">
+                                    <thead className="sticky top-0 bg-white">
+                                      <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode</th>
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {filteredEmployees.map((emp, index) => (
+                                        <tr 
+                                          key={emp.empCode}
+                                          className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                          onClick={() => handleEmployeeSelect(emp.empCode, emp.lName + ", " + emp.fName + " " + emp.mName)}
+                                        >
+                                          <td className="px-3 py-1.5">{emp.empCode}</td>
+                                          <td className="px-3 py-1.5">{emp.lName}, {emp.fName} {emp.mName}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                
+                                {/* Pagination */}
+                                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                <span>
+                                  Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
+                                    disabled={currentEmpPage === 1}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Previous
+                                  </button>
+                                  {getEmployeePageNumbers().map((page, index) => (
+                                    typeof page === 'number' ? (
+                                      <button
+                                        key={index}
+                                        onClick={() => setCurrentEmpPage(page)}
+                                        className={`px-2 py-1 rounded text-xs ${
+                                          currentEmpPage === page
+                                            ? 'bg-blue-500 text-white'
+                                            : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {page}
+                                      </button>
+                                    ) : (
+                                      <span key={index} className="px-2">
+                                        {page}
+                                      </span>
+                                    )
+                                  ))}
+                                  <button
+                                    onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
+                                    disabled={currentEmpPage === totalEmployeePages}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      
+                      </div>)}
+                      {/* Report Type Dropdown */}
+                      <div className="mb-6">
+                        <select
+                          value={reportType}
+                          onChange={(e) => setReportType(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none cursor-pointer"
+                        >
+                          <option value="Accumulation">Accumulation</option>
+                          <option value="Adjustment">Adjustment</option>
+                          <option value="Allowance">Allowance</option>
+                          <option value="Application Report">Application Report</option>
+                          <option value="Assumed Days">Assumed Days</option>
+                          <option value="Attendance Ratio">Attendance Ratio</option>
+                          <option value="Attendance Summary">Attendance Summary</option>
+                          <option value="Consecutive Absences">Consecutive Absences</option>
+                          <option value="Count Of Employee Per Workshift">Count Of Employee Per Workshift</option>
+                          <option value="Daily Time">Daily Time</option>
+                          <option value="Device Code Report">Device Code Report</option>
+                          <option value="Employees Raw Data Report">Employees Raw Data Report</option>
+                          <option value="Employees Raw In And Out (From Update Rawdata)">Employees Raw In And Out (From Update Rawdata)</option>
+                          <option value="Employees With No Workshift">Employees With No Workshift</option>
+                          <option value="Exemption Report">Exemption Report</option>
+                          <option value="In And Out By Position">In And Out By Position</option>
+                          <option value="Leave And Absences">Leave And Absences</option>
+                          <option value="Man Hours">Man Hours</option>
+                          <option value="Man Hours By Division-Branch-Category-Dept-Section">Man Hours By Division-Branch-Category-Dept-Section</option>
+                          <option value="No In And Out">No In And Out</option>
+                          <option value="Overtime">Overtime</option>
+                          <option value="Perfect Attendance">Perfect Attendance</option>
+                          <option value="Questionable Entries">Questionable Entries</option>
+                          <option value="Questionable Workshifts">Questionable Workshifts</option>
+                          <option value="Restday in a Week">Restday in a Week</option>
+                          <option value="Tardiness">Tardiness</option>
+                          <option value="Tardiness/ Overbreak/ Undertime Violation">Tardiness/ Overbreak/ Undertime Violation</option>
+                          <option value="Tardiness And Undertime Report">Tardiness And Undertime Report</option>
+                          <option value="Tardiness Penalty">Tardiness Penalty</option>
+                          <option value="Timesheet">Timesheet</option>
+                          <option value="Unauthorized Absences">Unauthorized Absences</option>
+                          <option value="Undertime">Undertime</option>
+                          <option value="User Group Access">User Group Access</option>
+                          <option value="User TK Group Access">User TK Group Access</option>
+                        </select>
+                      </div>
+                      {/* User Group */}
+                      {reportType == "User Group Access" && (<div className="mb-6">
+                        <label className="block text-gray-700 mb-2">User Group</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={groupName}
+                            onChange={(e) => setGroupName(e.target.value)}
+                            className="flex-grow min-w-0 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Select User Group"
+                            readOnly
+                          />
 
-                  {/* Man Hours options */}
-                  {reportType === 'Man Hours' && (
-                    <div className="mb-4">
-                      <span className="text-sm text-gray-700">Options</span>
-                      <div className="mt-2 flex items-center gap-4">
-                        {(['Per Employee', 'Summary'] as HrsOptionType[]).map(o => (
-                          <label key={o} className="flex items-center gap-2 cursor-pointer">
+                          <button
+                            onClick={() => setShowGroupSearchModal(true)}
+                            className="flex-shrink-0 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            <Search className="w-5 h-5" />
+                          </button>
+
+                          <button
+                            onClick={() => { setGroupName(""); setGroupDesc(""); }}
+                            className="flex-shrink-0 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>)}
+                      {/* User Group List Section */}
+                        {showGroupSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          {/* Search Modal */}
+                      
+                        <>
+                          {/* Modal Backdrop */}
+                          <div 
+                            className="fixed inset-0 bg-black/30 z-30"
+                            onClick={() => setShowGroupSearchModal(false)}
+                          ></div>
+                
+                          {/* Modal Dialog */}
+                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                              {/* Modal Header */}
+                              <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                                <h2 className="text-gray-800 text-sm">Search</h2>
+                                <button 
+                                  onClick={() => setShowGroupSearchModal(false)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                
+                              {/* Modal Content */}
+                              <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm">Select User Group</h3>
+                
+                                {/* Search Input */}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <label className="text-gray-700 text-sm">Search:</label>
+                                  <input
+                                    type="text"
+                                    value={userGroupSearchTerm}
+                                    onChange={(e) => setUserGroupSearchTerm(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  />
+                                </div>
+                
+                                {/* Employee Table */}
+                                <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                  <table className="w-full border-collapse text-sm">
+                                    <thead className="sticky top-0 bg-white">
+                                      <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Group Name</th>
+                                        <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Group Description</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {filteredUserGroup.map((emp, index) => (
+                                        <tr 
+                                          key={emp.groupName}
+                                          className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                          onClick={() => handleGroupSelect(emp.groupName, groupDesc)}
+                                        >
+                                          <td className="px-3 py-1.5">{emp.groupName}</td>
+                                          <td className="px-3 py-1.5">{emp.groupDesc}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                
+                                {/* Pagination */}
+                                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                <span>
+                                  Showing {startUserGroupIndex + 1} to {Math.min(endUserGroupIndex, filteredUserGroup.length)} of {filteredUserGroup.length} entries
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setCurrentUserGroupPage(p => Math.max(1, p - 1))}
+                                    disabled={currentUserGroupPage === 1}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Previous
+                                  </button>
+                                  {getUserGroupPageNumbers().map((page, index) => (
+                                    typeof page === 'number' ? (
+                                      <button
+                                        key={index}
+                                        onClick={() => setCurrentUserGroupPage(page)}
+                                        className={`px-2 py-1 rounded text-xs ${
+                                          currentUserGroupPage === page
+                                            ? 'bg-blue-500 text-white'
+                                            : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {page}
+                                      </button>
+                                    ) : (
+                                      <span key={index} className="px-2">
+                                        {page}
+                                      </span>
+                                    )
+                                  ))}
+                                  <button
+                                    onClick={() => setCurrentUserGroupPage(p => Math.min(totalUserGroupPages, p + 1))}
+                                    disabled={currentUserGroupPage === totalUserGroupPages}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      
+                      </div>)}
+
+                      {/* Checkboxes */}
+                      <div className="mb-6 space-y-2">
+                        {/* {reportType != "Attendance Summary" &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={toExcelFile}
+                            onChange={(e) => setToExcelFile(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700">To Excel File</span>
+                        </label>)} */}
+                        {["Leave And Absences", "Daily Time", "Attendance Summary", "Adjustment", "Assumed Days", "Overtime",
+                          "Tardiness", "Unauthorized Absences", "Undertime"
+                        ].includes(reportType) 
+                        &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={convertToHHMM}
+                            onChange={(e) => setConvertToHHMM(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700">Convert To HH:MM</span>
+                        </label>)}
+                        {reportType == "Perfect Attendance" && (<div>
+                          <label className="mb-3 flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={includeWPay}
+                              onChange={(e) => setIncludeWPay(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">Include With Pay</span>
+                          </label>
+                          <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
                             <input
                               type="checkbox"
                               checked={includeWOutPay}
@@ -3794,90 +4190,349 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                           <div className="mt-4 mb-4 flex items-center gap-4">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input
-                                type="radio" name="leaveStatus" value={s}
-                                checked={status === s} onChange={() => setStatus(s)}
+                                type="radio"
+                                name="otOption"
+                                value="Listing"
+                                checked={otOptions === 'Listing'}
+                                onChange={(e) => setOTOptions(e.target.value as 'Listing' | 'Summary')}
                                 className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                               />
-                              <span className="text-sm text-gray-700">{s === 'InActive' ? 'In Active' : s}</span>
+                              <span className="text-sm text-gray-700">Listing</span>
                             </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <span className="text-sm text-gray-700">Options</span>
-                        <div className="mt-2 flex items-center gap-4">
-                          {(['Absences', 'Leave', 'All'] as ModeType[]).map(m => (
-                            <label key={m} className="flex items-center gap-2 cursor-pointer">
+                            <label className="flex items-center gap-2 cursor-pointer">
                               <input
-                                type="radio" name="leaveMode" value={m}
-                                checked={mode === m} onChange={() => setMode(m)}
+                                type="radio"
+                                name="otOption"
+                                value="Summary"
+                                checked={otOptions === 'Summary'}
+                                onChange={(e) => setOTOptions(e.target.value as 'Listing' | 'Summary')}
                                 className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                               />
-                              <span className="text-sm text-gray-700">{m}</span>
+                              <span className="text-sm text-gray-700">Summary</span>
                             </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      {mode === 'Leave' && (
-                        <>
-                          <div className="mb-4">
-                            <label className="block text-gray-700 text-sm mb-2">Leave Type:</label>
-                            <select
-                              value={selectedLeaveType} onChange={e => setSelectedLeaveType(e.target.value)}
-                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            >
-                              <option value="" />
-                              {leaveTypes.map(lt => (
-                                <option key={lt.leaveCode} value={lt.leaveCode}>{lt.leaveDesc}</option>
-                              ))}
-                            </select>
                           </div>
-                          <div className="mb-4 flex items-center gap-4">
-                            {(['WithPay', 'WithOutPay', 'All'] as PayType[]).map(p => (
-                              <label key={p} className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio" name="wPay" value={p}
-                                  checked={withOrWOutPay === p} onChange={() => setWithOrWOutPay(p)}
-                                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-700">
-                                  {p === 'WithPay' ? 'With Pay' : p === 'WithOutPay' ? 'Without Pay' : 'All'}
+                          <button
+                            onClick={() => setShowOvertimeSearchModal(true)}
+                            className="px-4 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all duration-200 shadow-md"
+                          >
+                            Filter Overtime Code
+                          </button>
+                        </div>)}
+                        {/* Overtime Section */}
+                        {showOvertimeSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+                          {/* Search Modal */}
+                      
+                        <>
+                          {/* Modal Backdrop */}
+                          <div 
+                            className="fixed inset-0 bg-black/30 z-30"
+                            onClick={() => setShowOvertimeSearchModal(false)}
+                          ></div>
+                
+                          {/* Modal Dialog */}
+                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                              {/* Modal Header */}
+                              <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                                <h2 className="text-gray-800 text-sm">Search</h2>
+                                <button 
+                                  onClick={() => setShowOvertimeSearchModal(false)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                
+                              {/* Modal Content */}
+                              <div className="p-3">
+                                <h3 className="text-blue-600 mb-2 text-sm">Select Overtime</h3>
+                
+                                {/* Search Input */}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <label className="text-gray-700 text-sm">Search:</label>
+                                  <input
+                                    type="text"
+                                    value={overtimeSearchTerm}
+                                    onChange={(e) => setOvertimeSearchTerm(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  />
+                                </div>
+                
+                                {/* Overtime Table */}
+                                <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                  <table className="w-full">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                      <tr>
+                                        <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                                          <input
+                                            type="checkbox"
+                                            // checked={selectedItems.length === records.length}
+                                            checked={selectedOTItems.length === filteredOvertime.length && filteredOvertime.length > 0}
+                                            onChange={handleSelectOTAll}
+                                            className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                          />
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                                        <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                                          </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {paginatedOT.map((item) => (
+                                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                          <td className="px-4 py-3 text-center">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedOTItems.includes(item.code)}
+                                              onChange={() => handleOTItemToggle(item.code)}
+                                              className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                                          <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                
+                                {/* Pagination */}
+                                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                <span>
+                                  Showing {startOTIndex + 1} to {Math.min(endOTIndex, filteredOvertime.length)} of {filteredOvertime.length} entries
                                 </span>
-                              </label>
-                            ))}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setCurrentOTPage(p => Math.max(1, p - 1))}
+                                    disabled={currentOTPage === 1}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Previous
+                                  </button>
+                                  {getOTPageNumbers().map((page, index) => (
+                                    typeof page === 'number' ? (
+                                      <button
+                                        key={index}
+                                        onClick={() => setCurrentOTPage(page)}
+                                        className={`px-2 py-1 rounded text-xs ${
+                                          currentOTPage === page
+                                            ? 'bg-blue-500 text-white'
+                                            : 'border border-gray-300 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {page}
+                                      </button>
+                                    ) : (
+                                      <span key={index} className="px-2">
+                                        {page}
+                                      </span>
+                                    )
+                                  ))}
+                                  <button
+                                    onClick={() => setCurrentOTPage(p => Math.min(totalOvertimePages, p + 1))}
+                                    disabled={currentOTPage === totalOvertimePages}
+                                    className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                              </div>
+                            </div>
                           </div>
                         </>
-                      )}
-                    </>
-                  )}
+                      
+                      </div>)}
+                        {reportType == "Employees Raw Data Report" &&(<div>
+                          <label className="block text-gray-700 text-sm mb-2">Raw Data Type:</label>
+                          <select
+                          value={dataMode}
+                          onChange={(e) => setDataMode(e.target.value)}
+                          className="mb-4 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          
+                          <option value="CompleteLogs">Complete Logs</option>
+                          <option value="IncompleteLogs">Incomplete Logs</option>
+                        </select>
+                        </div>)}
+                        {reportType == "Application Report" &&(<div>
+                          <label className="block text-gray-700 text-sm mb-2">Application Type:</label>
+                          <select
+                          value={appMode}
+                          onChange={(e) => setAppMode(e.target.value)}
+                          className="mb-4 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          
+                          <option value="OvertimeApplication">Overtime Application</option>
+                          <option value="LeaveAppplication">Leave Application</option>
+                        </select>
+                        </div>)}
+                        {reportType == "Leave And Absences" &&(<label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={includeLeaveAdj}
+                            onChange={(e) => setIncludeLeaveAdj(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700">Include Leave Adjustment</span>
+                        </label>)}
+                      </div>
+                      {/* Filter Status For Leave and Absences */}
+                      {reportType == "Leave And Absences" &&(<div>
+                        <span>Status</span>
+                        <div className="mt-4 mb-4 flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveStatus"
+                              value="Active"
+                              checked={status === 'Active'}
+                              onChange={(e) => setStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Active</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveStatus"
+                              value="InActive"
+                              checked={status === 'InActive'}
+                              onChange={(e) => setStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">In Active</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveStatus"
+                              value="All"
+                              checked={status === 'All'}
+                              onChange={(e) => setStatus(e.target.value as 'Active' | 'InActive' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">All</span>
+                          </label>
+                        </div>
+                      </div>)}
+                      {/* Filter Mode For Leave and Absences */}
+                      {reportType == "Leave And Absences" &&(<div>
+                        <span>Options</span>
+                        <div className="mt-4 mb-4 flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveMode"
+                              value="Absences"
+                              checked={mode === 'Absences'}
+                              onChange={(e) => setMode(e.target.value as 'Absences' | 'Leave' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Absences</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveMode"
+                              value="Leave"
+                              checked={mode === 'Leave'}
+                              onChange={(e) => setMode(e.target.value as 'Absences' | 'Leave' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Leave</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="leaveMode"
+                              value="All"
+                              checked={mode === 'All'}
+                              onChange={(e) => setMode(e.target.value as 'Absences' | 'Leave' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">All</span>
+                          </label>
+                        </div>
+                        {/* Leave Type Selection */}
+                        {mode == "Leave" &&(<div>
+                          <label className="block text-gray-700 text-sm mb-2">Leave Type:</label>
+                          <select
+                            value={selectedLeaveType}
+                            onChange={(e) => setSelectedLeaveType(e.target.value)}
+                            className="mb-4 w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          >
+                            <option></option>
+                            {getLeaveType.map(getLeaveType => (
+                              <option
+                                key={getLeaveType.leaveCode}
+                                value={getLeaveType.leaveCode}
+                              >
+                                {getLeaveType.leaveDesc}
+                              </option>
+                            ))}
+                          </select>
+                        </div>)}
+                        {mode == "Leave" &&(<div className="mt-4 mb-4 flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="wPay"
+                              value="WithPay"
+                              checked={withOrWOutPay === 'WithPay'}
+                              onChange={(e) => setWithOrWOutPay(e.target.value as 'WithPay' | 'WithOutPay' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">With Pay</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="wPay"
+                              value="WithOutPay"
+                              checked={withOrWOutPay === 'WithOutPay'}
+                              onChange={(e) => setWithOrWOutPay(e.target.value as 'WithPay' | 'WithOutPay' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Without Pay</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="wPay"
+                              value="All"
+                              checked={withOrWOutPay === 'All'}
+                              onChange={(e) => setWithOrWOutPay(e.target.value as 'WithPay' | 'WithOutPay' | 'All')}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">All</span>
+                          </label>
+                        </div>)}
+                      </div>)}
 
-                  {/* Download Button */}
-                  <button
-                    onClick={printReport}
-                    className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg shadow-blue-500/30"
-                  >
-                    Download Report
-                  </button>
+                      {/* Display Button */}
+                      <button
+                        onClick={printReport}
+                        className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg shadow-blue-500/30"
+                      >
+                        Download Report
+                      </button>
                 </div>
               </div>
 
-              {/* ── Right Panel ────────────────────────────────────────────── */}
+              {/* Right Panel - Tabs and Table */}
               <div className="lg:col-span-2">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-
                   {/* Tabs */}
-                  <div className="flex items-center gap-1 border-b border-gray-200 flex-wrap p-6 pb-0">
-                    {TABS.map(tab => (
+                  <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap p-6 pb-0">
+                    {tabs.map((tab) => (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg transition-colors ${
+                        onClick={() => setActiveTab(tab.id as TabType)}
+                        className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${
                           activeTab === tab.id
-                            ? 'font-medium bg-blue-600 text-white -mb-px'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                                ? 'font-medium bg-blue-600 text-white -mb-px'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            } transition-colors`}
                       >
                         <tab.icon className="w-4 h-4" />
                         {tab.label}
@@ -3885,39 +4540,476 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                     ))}
                   </div>
 
-                  {/* Table + Search + Pagination */}
-                  <div className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <label className="text-sm text-gray-700">Search:</label>
-                      <input
-                        type="text" value={groupSearchTerm}
-                        onChange={e => setGroupSearchTerm(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Search..."
-                      />
+                  {/* Search */}
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex items-center justify-end">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-700">Search:</span>
+                        <input
+                          type="text"
+                          value={groupSearchTerm}
+                          onChange={(e) => setGroupSearchTerm(e.target.value)}
+                          className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          placeholder="Search..."
+                        />
+                      </div>
                     </div>
-                    {renderGroupTable()}
-                    {renderPagination()}
                   </div>
 
+                  {/* Table */}
+                  <div className="p-6">
+                    {activeTab === "tk-group" && (<div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                              <input
+                                type="checkbox"
+                                // checked={selectedItems.length === records.length}
+                                checked={selectedItems.length === filteredGroups.length && filteredGroups.length > 0}
+                                onChange={handleSelectAll}
+                                className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                            <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                              </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {paginatedGroups.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                              <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>)}
+                    {/*branch */}
+                    {activeTab === "branch" && (<div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                              <input
+                                type="checkbox"
+                                // checked={selectedItems.length === records.length}
+                                checked={selectedBranchItems.length === filteredBranch.length && filteredBranch.length > 0}
+                                onChange={handleSelectAll}
+                                className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                            <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                              </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {paginatedBranch.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedBranchItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                              <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>)}
+                    {/*department */}
+                    {activeTab === "department" && (<div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                              <input
+                                type="checkbox"
+                                // checked={selectedItems.length === records.length}
+                                checked={selectedDepItems.length === filteredDep.length && filteredDep.length > 0}
+                                onChange={handleSelectAll}
+                                className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                            <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                              </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {paginatedDep.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDepItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                              <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>)}
+                    {/*designation*/}
+                    {activeTab === "designation" && (<div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                              <input
+                                type="checkbox"
+                                // checked={selectedItems.length === records.length}
+                                checked={selectedDesItems.length === filteredDes.length && filteredDes.length > 0}
+                                onChange={handleSelectAll}
+                                className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                            <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                              </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {paginatedDes.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDesItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                              <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>)}
+                    {/*division*/}
+                    {activeTab === "division" && (<div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                              <input
+                                type="checkbox"
+                                // checked={selectedItems.length === records.length}
+                                checked={selectedDivItems.length === filteredDiv.length && filteredDiv.length > 0}
+                                onChange={handleSelectAll}
+                                className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                            <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                              </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {paginatedDiv.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDivItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                              <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>)}
+                    {/*section*/}
+                    {activeTab === "section" && (<div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-center" style={{ width: '50px' }}>
+                              <input
+                                type="checkbox"
+                                // checked={selectedItems.length === records.length}
+                                checked={selectedSecItems.length === filteredSec.length && filteredSec.length > 0}
+                                onChange={handleSelectAll}
+                                className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3 text-left text-gray-700">Code</th>
+                            <th className="px-4 py-3 text-left text-gray-700">Description</th>
+                              </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {paginatedSec.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSecItems.includes(item.code)}
+                                  onChange={() => handleItemToggle(item.code)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-900">{item.code}</td>
+                              <td className="px-4 py-3 text-gray-600">{item.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>)}
+                    {/* Pagination */}
+                    {activeTab === "tk-group" &&(<div className="flex items-center justify-between mt-3">
+                      <div className="text-gray-600 text-xs">
+                          Showing {filteredGroups.length === 0 ? 0 : startGroupIndex + 1} to {Math.min(endGroupIndex, filteredGroups.length)} of {filteredGroups.length} entries
+                      </div>
+                      <div className="flex gap-1">
+                          <button
+                              onClick={() => setCurrentGroupPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentGroupPage === 1}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Previous
+                          </button>
+                          {getGroupPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                              ) : (
+                                  <button
+                                      key={page}
+                                      onClick={() => setCurrentGroupPage(page as number)}
+                                      className={`px-2 py-1 rounded text-xs ${currentGroupPage === page
+                                              ? 'bg-blue-600 text-white'
+                                              : 'border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                  >
+                                      {page}
+                                  </button>
+                              )
+                          ))}
+                          <button
+                              onClick={() => setCurrentGroupPage(prev => Math.min(prev + 1, totalGroupPages))}
+                              disabled={currentGroupPage === totalGroupPages || totalGroupPages === 0}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Next
+                          </button>
+                      </div>
+                    </div>)}
+                    {/*branch pagination */}
+                    {activeTab === "branch" &&(<div className="flex items-center justify-between mt-3">
+                      <div className="text-gray-600 text-xs">
+                          Showing {filteredBranch.length === 0 ? 0 : startBranchIndex + 1} to {Math.min(endBranchIndex, filteredBranch.length)} of {filteredBranch.length} entries
+                      </div>
+                      <div className="flex gap-1">
+                          <button
+                              onClick={() => setCurrentBranchPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentBranchPage === 1}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Previous
+                          </button>
+                          {getBranchPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                              ) : (
+                                  <button
+                                      key={page}
+                                      onClick={() => setCurrentBranchPage(page as number)}
+                                      className={`px-2 py-1 rounded text-xs ${currentBranchPage === page
+                                              ? 'bg-blue-600 text-white'
+                                              : 'border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                  >
+                                      {page}
+                                  </button>
+                              )
+                          ))}
+                          <button
+                              onClick={() => setCurrentBranchPage(prev => Math.min(prev + 1, totalBranchPages))}
+                              disabled={currentBranchPage === totalBranchPages || totalBranchPages === 0}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Next
+                          </button>
+                      </div>
+                    </div>)}
+                    {/*department pagination */}
+                    {activeTab === "department" &&(<div className="flex items-center justify-between mt-3">
+                      <div className="text-gray-600 text-xs">
+                          Showing {filteredDep.length === 0 ? 0 : startDepIndex + 1} to {Math.min(endDepIndex, filteredDep.length)} of {filteredDep.length} entries
+                      </div>
+                      <div className="flex gap-1">
+                          <button
+                              onClick={() => setCurrentDepPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentDepPage === 1}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Previous
+                          </button>
+                          {getDepPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                              ) : (
+                                  <button
+                                      key={page}
+                                      onClick={() => setCurrentDepPage(page as number)}
+                                      className={`px-2 py-1 rounded text-xs ${currentDepPage === page
+                                              ? 'bg-blue-600 text-white'
+                                              : 'border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                  >
+                                      {page}
+                                  </button>
+                              )
+                          ))}
+                          <button
+                              onClick={() => setCurrentDepPage(prev => Math.min(prev + 1, totalDepPages))}
+                              disabled={currentDepPage === totalDepPages || totalDepPages === 0}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Next
+                          </button>
+                      </div>
+                    </div>)}
+                    {/*designation pagination */}
+                    {activeTab === "designation" &&(<div className="flex items-center justify-between mt-3">
+                      <div className="text-gray-600 text-xs">
+                          Showing {filteredDes.length === 0 ? 0 : startDesIndex + 1} to {Math.min(endDesIndex, filteredDes.length)} of {filteredDes.length} entries
+                      </div>
+                      <div className="flex gap-1">
+                          <button
+                              onClick={() => setCurrentDesPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentDesPage === 1}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Previous
+                          </button>
+                          {getDesPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                              ) : (
+                                  <button
+                                      key={page}
+                                      onClick={() => setCurrentDesPage(page as number)}
+                                      className={`px-2 py-1 rounded text-xs ${currentDesPage === page
+                                              ? 'bg-blue-600 text-white'
+                                              : 'border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                  >
+                                      {page}
+                                  </button>
+                              )
+                          ))}
+                          <button
+                              onClick={() => setCurrentDesPage(prev => Math.min(prev + 1, totalDesPages))}
+                              disabled={currentDesPage === totalDesPages || totalDesPages === 0}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Next
+                          </button>
+                      </div>
+                    </div>)}
+                    {/*division pagination */}
+                    {activeTab === "division" &&(<div className="flex items-center justify-between mt-3">
+                      <div className="text-gray-600 text-xs">
+                          Showing {filteredDiv.length === 0 ? 0 : startDivIndex + 1} to {Math.min(endDivIndex, filteredDiv.length)} of {filteredDiv.length} entries
+                      </div>
+                      <div className="flex gap-1">
+                          <button
+                              onClick={() => setCurrentDivPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentDivPage === 1}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Previous
+                          </button>
+                          {getDivPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                              ) : (
+                                  <button
+                                      key={page}
+                                      onClick={() => setCurrentDivPage(page as number)}
+                                      className={`px-2 py-1 rounded text-xs ${currentDivPage === page
+                                              ? 'bg-blue-600 text-white'
+                                              : 'border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                  >
+                                      {page}
+                                  </button>
+                              )
+                          ))}
+                          <button
+                              onClick={() => setCurrentDivPage(prev => Math.min(prev + 1, totalDivPages))}
+                              disabled={currentDivPage === totalDivPages || totalDivPages === 0}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Next
+                          </button>
+                      </div>
+                    </div>)}
+                    {/*section pagination */}
+                    {activeTab === "section" &&(<div className="flex items-center justify-between mt-3">
+                      <div className="text-gray-600 text-xs">
+                          Showing {filteredSec.length === 0 ? 0 : startSecIndex + 1} to {Math.min(endSecIndex, filteredSec.length)} of {filteredSec.length} entries
+                      </div>
+                      <div className="flex gap-1">
+                          <button
+                              onClick={() => setCurrentSecPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentSecPage === 1}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Previous
+                          </button>
+                          {getSecPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                              ) : (
+                                  <button
+                                      key={page}
+                                      onClick={() => setCurrentSecPage(page as number)}
+                                      className={`px-2 py-1 rounded text-xs ${currentDivPage === page
+                                              ? 'bg-blue-600 text-white'
+                                              : 'border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                  >
+                                      {page}
+                                  </button>
+                              )
+                          ))}
+                          <button
+                              onClick={() => setCurrentSecPage(prev => Math.min(prev + 1, totalSecPages))}
+                              disabled={currentSecPage === totalSecPages || totalSecPages === 0}
+                              className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Next
+                          </button>
+                      </div>
+                    </div>)}
+                  </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
       </div>
 
-      {/* Employee Search Modal */}
-      <EmployeeSearchModal
-        isOpen={showSearchModal}
-        onClose={() => setShowSearchModal(false)}
-        onSelect={(code, name) => { setEmpCode(code); setEmpName(name); }}
-        employees={modalEmployees}
-        loading={loadingEmployees}
-        error={employeeError}
-      />
-
+      {/* Footer */}
       <Footer />
     </div>
   );
