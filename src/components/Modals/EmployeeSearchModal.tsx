@@ -26,7 +26,7 @@ export function EmployeeSearchModal({
 }: EmployeeSearchModalProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 20;
+    const itemsPerPage = 10;
 
     // Handle ESC key to close modal
     useEffect(() => {

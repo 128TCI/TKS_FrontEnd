@@ -436,6 +436,7 @@ export function TimeKeepGroupPage() {
 
   // Global Edit Mode
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isCreateNew, setIsCreateNew] = useState(false);
 
   // Values Before Editing (for Cancel action)
   const [snapshot, setSnapshot] = useState<Record<string, any>>({});
@@ -603,6 +604,7 @@ export function TimeKeepGroupPage() {
 
   // CuttOff Group Pagination and Search
   const {
+    filteredData: cutOffTotalData,
     paginatedData: filteredCutOffData,
     totalPages: cutOffTotalPages,
     currentPage: cutOffCurrentPage,
@@ -628,6 +630,7 @@ export function TimeKeepGroupPage() {
 
   // For Supervisory Groups
   const {
+    filteredData: supervisoryGroupsTotolData,
     paginatedData: filteredSupervisoryGroups,
     totalPages: totalSupervisoryPages,
     currentPage: currentSupervisoryPage,
@@ -844,6 +847,14 @@ export function TimeKeepGroupPage() {
     const year = date.getFullYear();
     return `${month}/${day}/${year}`;
   };
+
+  function uncheckedGracePeriodSemiAnnual() {
+    setGracePeriodPerSemiAnnual("");
+    setFirstHalfDateFrom("");
+    setFirstHalfDateTo("");
+    setSecondHalfDateFrom("");
+    setSecondHalfDateTo("");
+  }
 
   // Fetch TKSGroup data from API
   const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
@@ -1477,10 +1488,71 @@ export function TimeKeepGroupPage() {
     setRestDayOT("");
     setLegalHolidayOT("");
     setSpecialHolidayOT("");
+    setDoubleLegalHolidayOT("");
+    setSpecialHolidayOT2("");
+    setNonWorkingHolidayOT("");
+    setRegularDayOTLateFiling("");
+    setRestDayOTLateFiling("");
+    setLegalHolidayOTLateFiling("");
+    setSpecialHolidayOTLateFiling("");
+    setDoubleLegalHolidayOTLateFiling("");
+    setSpecialHoliday2OTLateFiling("");
+    setNonWorkingHolidayOTLateFiling("");
+    setRegDayMinHrsToCompOT("");
+    setRestDayMinHrsToCompOT("");
+    setLegalHolidayMinHrsToCompOT("");
+    setSpecialHolidayMinHrsToCompOT("");
+    setSpecialHoliday2MinHrsToCompOT("");
+    setDoubleLegalHolidayMinHrsToCompOT("");
+    setNonWorkingHolidayMinHrsToCompOT("");
+    setOtBreakMinHours(0);
+    setOTBreakNoOfHrsDed(0);
+    setOTBreakAppliesToRegDay(false);
+    setOTBreakAppliesToLegHol(false);
+    setOTBreakAppliesToSHol(false);
+    setOTBreakAppliesToDoubleLegHol(false);
+    setOTBreakAppliesToS2Hol(false);
+    setOTBreakAppliesToNonWorkHol(false);
+    setOTBreakAppliesToRestDay(false);
+    setOTBreakAppliesToLegHolRest(false);
+    setOTBreakAppliesToSHolRest(false);
+    setOTBreakAppliesToDoubleLegHolRest(false);
+    setOTBreakAppliesToS2HolRest(false);
+    setOTBreakAppliesToNonWorkRest(false);
     setUseOTPremium(false);
     setUseActualDayType(false);
     setHolidayWithWorkshift(false);
-    setOtBreakMinHours(0);
+    setUseActualDayType(false);
+    setDeductMealBreakFromOT(false);
+    setComputeOTForBreak2(false);
+    setEnable24HourOT(false);
+    setIncludeUnworkedHolidayInRegular(false);
+    setSundayOTIfWorkedSaturday(false);
+
+    setRestDayToBeComputedAsOtherRate("");
+    setRestDayOtherRate("");
+    setIsOverTimeCutoffFlag(false);
+    setOverTimeCode("");
+    setRequiredHours("");
+    setOverTimeCodeFor2ShiftsDay("");
+    setOTRoundingToTheNearestHourMin("");
+    setBirthdayPay("");
+    setNDBasicRoundingToTheNearestHourMin("");
+
+    setUseOverTimeAuthorization(false);
+    setIsSpecialOTCompFlag(false);
+
+    setIsHolPayLegalFlag(false);
+    setIsHolPaySpecialFlag(false);
+    setCompHolPayForMonth(false);
+    setCompHolPayIfWorkBeforeHolidayRestDay(false);
+    setCompHolPayIfWorkBeforeHolidayLegalHoliday(false);
+    setCompHolPayIfWorkBeforeHolidaySpecialHoliday(false);
+    setNoPayIfAbsentBeforeHoliday(false);
+    setNoPayIfAbsentAfterHoliday(false);
+    setCompHolidayWithPaidLeave(false);
+    setMinimumNoOfHrsRequiredToCompHol("");
+    setCompFirstRestdayHoliday(false);
 
     // Other Policies
     setUseDefaultRestday(false);
@@ -1573,7 +1645,10 @@ export function TimeKeepGroupPage() {
                 <>
                   <button
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                    onClick={handleCreateNew}
+                    onClick={() => {
+                      handleCreateNew();
+                      setIsCreateNew(true);
+                    }}
                   >
                     <Plus className="w-4 h-4" />
                     Create New
@@ -1643,6 +1718,7 @@ export function TimeKeepGroupPage() {
                       setAutoPairingFrom(snapshot.autoPairingFrom ?? "");
                       setAutoPairingTo(snapshot.autoPairingTo ?? "");
                       setIsEditMode(false);
+                      setIsCreateNew(false);
                     }}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
                   >
@@ -1983,7 +2059,7 @@ export function TimeKeepGroupPage() {
                                 cutOffEndIndex,
                                 filteredCutOffData.length,
                               )}{" "}
-                              of {filteredCutOffData.length} entries
+                              of {cutOffTotalData.length} entries
                             </span>
                             <div className="flex items-center gap-1">
                               <button
@@ -2342,9 +2418,10 @@ export function TimeKeepGroupPage() {
                       <input
                         type="checkbox"
                         checked={gracePeriodSemiAnnual}
-                        onChange={(e) =>
+                        onChange={(e) => { 
                           setGracePeriodSemiAnnual(e.target.checked)
-                        }
+                          uncheckedGracePeriodSemiAnnual();
+                        }}
                         disabled={!isEditMode}
                         className="w-4 h-4 mt-1"
                       />
@@ -2420,6 +2497,7 @@ export function TimeKeepGroupPage() {
                           setGracePeriodPerSemiAnnual(e.target.value)
                         }
                         readOnly={!isEditMode}
+                        disabled={!gracePeriodSemiAnnual}
                         className={`w-28 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                       />
                       <span className="text-gray-500 text-sm">[hh:hh]</span>
@@ -2432,7 +2510,7 @@ export function TimeKeepGroupPage() {
                       <DatePicker
                         value={firstHalfDateFrom}
                         onChange={(date) => setFirstHalfDateFrom(date)}
-                        disabled={!isEditMode}
+                        disabled={!isEditMode || !gracePeriodSemiAnnual}
                         className="w-52"
                         placeholder="MM/DD/YYYY"
                       />
@@ -2445,7 +2523,7 @@ export function TimeKeepGroupPage() {
                       <DatePicker
                         value={firstHalfDateTo}
                         onChange={(date) => setFirstHalfDateTo(date)}
-                        disabled={!isEditMode}
+                        disabled={!isEditMode || !gracePeriodSemiAnnual}
                         className="w-52"
                         placeholder="MM/DD/YYYY"
                       />
@@ -2458,7 +2536,7 @@ export function TimeKeepGroupPage() {
                       <DatePicker
                         value={secondHalfDateFrom}
                         onChange={(date) => setSecondHalfDateFrom(date)}
-                        disabled={!isEditMode}
+                        disabled={!isEditMode || !gracePeriodSemiAnnual}
                         className="w-52"
                         placeholder="MM/DD/YYYY"
                       />
@@ -2471,7 +2549,7 @@ export function TimeKeepGroupPage() {
                       <DatePicker
                         value={secondHalfDateTo}
                         onChange={(date) => setSecondHalfDateTo(date)}
-                        disabled={!isEditMode}
+                        disabled={!isEditMode || !gracePeriodSemiAnnual}
                         className="w-52"
                         placeholder="MM/DD/YYYY"
                       />
@@ -3071,6 +3149,7 @@ export function TimeKeepGroupPage() {
                 tksGroupDescription={tksGroupDescription}
                 isEditMode={isEditMode}
                 isEditOTRates={isEditOTRates}
+                isCreateNew={isCreateNew}
                 setIsEditOTRates={setIsEditOTRates}
                 showOtCodeModal={showOtCodeModal}
                 setShowOtCodeModal={setShowOtCodeModal}
@@ -3241,6 +3320,7 @@ export function TimeKeepGroupPage() {
                 tksGroupCode={tksGroupCode}
                 tksGroupDescription={tksGroupDescription}
                 isEditMode={isEditMode}
+                isCreateNew={isCreateNew}
               />
             )}
 
@@ -4830,7 +4910,7 @@ export function TimeKeepGroupPage() {
                       endSupervisoryIndex,
                       filteredSupervisoryGroups.length,
                     )}{" "}
-                    of {filteredSupervisoryGroups.length} entries
+                    of {supervisoryGroupsTotolData.length} entries
                   </div>
 
                   <div className="flex gap-1">
