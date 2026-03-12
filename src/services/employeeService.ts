@@ -128,20 +128,25 @@ function toAuthorizedEmployee(e: any): AuthorizedEmployee {
  *
  * @throws Re-throws the original Axios error so the caller can handle / display it.
  */
-export async function fetchEmployees(userName?: string): Promise<FetchEmployeesResult> {
-  const user = userName ?? getLoggedInUsername();
+export async function fetchEmployees(): Promise<FetchEmployeesResult> {
+  const userName = getLoggedInUsername();
 
-  if (user && user !== 'Guest') {
+  if (userName && userName !== 'Guest') {
     const { data } = await apiClient.get(
-      `/Maintenance/EmployeeMasterFile/GetAuthorized?userName=${encodeURIComponent(user)}`
+      `/Maintenance/EmployeeMasterFile/GetAuthorized?userName=${encodeURIComponent(userName)}`
     );
-    const employees: Employee[] = data ?? [];
+
+    const employees: Employee[]                     = data ?? [];
     const authorizedEmployees: AuthorizedEmployee[] = employees.map(toAuthorizedEmployee);
+
     return { employees, authorizedEmployees };
   }
 
+  // Fallback — no valid session
   const { data } = await apiClient.get('/Maintenance/EmployeeMasterFile');
-  const employees: Employee[] = data ?? [];
+
+  const employees: Employee[]                     = data ?? [];
   const authorizedEmployees: AuthorizedEmployee[] = employees.map(toAuthorizedEmployee);
+
   return { employees, authorizedEmployees };
 }

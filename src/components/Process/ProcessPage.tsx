@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar, RotateCcw, Check, Users, Building2, Briefcase, CalendarClock, Clock, Search, Play, CheckCircle, Wallet, Grid, Network, Box, RefreshCw } from 'lucide-react';
 import { DatePicker } from '../DateSetup/DatePicker';
@@ -369,7 +370,46 @@ const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
     fetchFilteredEmployees(activeTab, selectedGroups, allItems, statusFilter);
     setSelectedEmployees([]);
   }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
+const fetchFilteredEmployees = useCallback(async (
+  tab: typeof activeTab,
+  selectedIds: number[],
+  allItems: GroupItem[],
+  status: 'active' | 'inactive' | 'all'
+) => {
+  setLoadingEmployees(true);
+  try {
+    const all = await fetchEmployeeData();
 
+    let filtered = all;
+
+    // Filter by selected group codes
+    if (selectedIds.length > 0) {
+      const selectedCodes = allItems
+        .filter(g => selectedIds.includes(g.id))
+        .map(g => g.code);
+
+      filtered = filtered.filter(emp => {
+        switch (tab) {
+          case 'TK Group':        return selectedCodes.includes(emp.tkGroup ?? '');
+          case 'Branch':          return selectedCodes.includes(emp.branchCode ?? '');
+          case 'Department':      return selectedCodes.includes(emp.departmentCode ?? '');
+          case 'Division':        return selectedCodes.includes(emp.divisionCode ?? '');
+          case 'Group Schedule':  return selectedCodes.includes(emp.groupScheduleCode ?? '');
+          case 'Pay House':       return selectedCodes.includes(emp.payHouseCode ?? '');
+          case 'Section':         return selectedCodes.includes(emp.sectionCode ?? '');
+          case 'Unit':            return selectedCodes.includes(emp.unitCode ?? '');
+          default:                return true;
+        }
+      });
+    }
+
+    setEmployeeItems(filtered);
+  } catch (err) {
+    console.error('Failed to fetch filtered employees', err);
+  } finally {
+    setLoadingEmployees(false);
+  }
+}, []);
   const getSelectionTitle = () => {
     switch (activeTab) {
       case 'TK Group': return 'TK Group Selection';

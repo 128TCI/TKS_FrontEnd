@@ -368,7 +368,51 @@ const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
     item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
+const fetchFilteredEmployees = useCallback(async (
+  tab: typeof activeTab,
+  selectedIds: number[],
+  allItems: GroupItem[],
+  status: 'active' | 'inactive' | 'all'
+) => {
+  setLoadingEmployees(true);
+  try {
+    const all = await fetchEmployeeData();
 
+    let filtered = all;
+
+    // Filter by status
+    // (assumes employeeService returns an `empStatus` or similar field — adjust if needed)
+    // If your EmployeeItem doesn't carry a status field, remove this block
+    // filtered = status === 'all' ? filtered : filtered.filter(e => ...);
+
+    // Filter by selected group codes
+    if (selectedIds.length > 0) {
+      const selectedCodes = allItems
+        .filter(g => selectedIds.includes(g.id))
+        .map(g => g.code);
+
+      filtered = filtered.filter(emp => {
+        switch (tab) {
+          case 'TK Group':        return selectedCodes.includes(emp.tkGroup ?? '');
+          case 'Branch':          return selectedCodes.includes(emp.branchCode ?? '');
+          case 'Department':      return selectedCodes.includes(emp.departmentCode ?? '');
+          case 'Division':        return selectedCodes.includes(emp.divisionCode ?? '');
+          case 'Group Schedule':  return selectedCodes.includes(emp.groupScheduleCode ?? '');
+          case 'Pay House':       return selectedCodes.includes(emp.payHouseCode ?? '');
+          case 'Section':         return selectedCodes.includes(emp.sectionCode ?? '');
+          case 'Unit':            return selectedCodes.includes(emp.unitCode ?? '');
+          default:                return true;
+        }
+      });
+    }
+
+    setEmployeeItems(filtered);
+  } catch (err) {
+    console.error('Failed to fetch filtered employees', err);
+  } finally {
+    setLoadingEmployees(false);
+  }
+}, []);
   // Employee list is already filtered by the SP via fetchFilteredEmployees;
   // apply local text search on top
   const filteredEmployees = employeeItems.filter(emp =>
