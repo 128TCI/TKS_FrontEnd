@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Check, Info, Edit, Trash2 } from 'lucide-react';
 import { Footer } from '../../../Footer/Footer';
 import apiClient from '../../../../services/apiClient';
@@ -108,27 +108,22 @@ export function WorkshiftSetupPage() {
 
   const [selectedWorkshift, setSelectedWorkshift] = useState<Workshift | null>(null);
 
-  // ── Fetch on mount ───────────────────────────────────────────────────────
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const workshifts = await apiClient.get('/Fs/Process/WorkshiftSetUp');
-        if (!controller.signal.aborted) {
-          setWorkshiftData(workshifts.data?.data ?? workshifts.data ?? []);
-        }
-      } catch (error) {
-        console.error('Failed to load workshift data:', error);
-      } finally {
-        if (!controller.signal.aborted) setIsLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => controller.abort();
+  // ── Fetch data ───────────────────────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const workshifts = await apiClient.get('/Fs/Process/WorkshiftSetUp');
+      setWorkshiftData(workshifts.data?.data ?? workshifts.data ?? []);
+    } catch (error) {
+      console.error('Failed to load workshift data:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // ── ESC key to close modals ──────────────────────────────────────────────
   useEffect(() => {
@@ -215,12 +210,8 @@ export function WorkshiftSetupPage() {
   };
 
   // Called by WorkshiftFormModal after a successful save
-  const handleSuccess = (saved: Workshift) => {
-    setWorkshiftData((prev) =>
-      isEditMode
-        ? prev.map((item) => (item.code === editingCode ? saved : item))
-        : [...prev, saved],
-    );
+  const handleSuccess = async () => {
+    await fetchData();
     setShowFormModal(false);
     setIsEditMode(false);
     setEditingCode('');

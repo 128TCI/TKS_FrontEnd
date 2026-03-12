@@ -538,7 +538,7 @@ export interface WorkshiftFormModalProps {
   formData:      Workshift;
   setFormData:   (data: Workshift) => void;
   existingCodes: string[];
-  onSuccess:     (saved: Workshift) => void;
+  onSuccess:     () => void;
   onClose:       () => void;
 }
 
@@ -700,7 +700,7 @@ export function WorkshiftFormModal({
         Swal.fire({icon: 'success', title: 'Created', text: 'Workshift created successfully.', timer: 1500, showConfirmButton: false,});
       }
 
-      onSuccess({ ...formData });
+      onSuccess();
 
     } catch (error: any) {
       console.error('Failed to save workshift:', error);
