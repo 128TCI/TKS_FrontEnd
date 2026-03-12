@@ -160,10 +160,8 @@ export function DailyTimeRecordMonitoringPage() {
   const [searchGroupModalTerm, setSearchGroupModalTerm] = useState('');
   const [searchWorkshiftModalTerm, setSearchWorkshiftModalTerm] = useState('');
   const [sortAlphabetically, setSortAlphabetically] = useState(false);
-  //const [status, setStatus] = useState<StatusType>('active');
   const [employeeCode, setEmployeeCode] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('tk-group');
-  //const [searchTerm, setSearchTerm] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedBranchItems, setSelectedBranchItems] = useState<string[]>([]);
   const [selectedDepItems, setSelectedDepItems] = useState<string[]>([]);
