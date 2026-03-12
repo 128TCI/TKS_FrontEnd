@@ -2918,101 +2918,102 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     window.print();
   };
 
-  if (showReport) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col">
-        {/* Main Content */}
-        <div className="flex-1 relative z-10 p-6">
-          <div className="max-w-7xl mx-auto relative">
-            {/* Print Header */}
-            <div className="flex items-center justify-between mb-6 print:hidden">
-              <button
-                onClick={() => setShowReport(false)}
-                className="px-6 py-3 bg-yellow-500 text-gray-700 rounded-xl hover:bg-yellow-600 transition-colors"
-              >
-                ← Back to Filters
-              </button>
-              <button
-                onClick={handlePrint}
-                className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-              >
-                <Printer className="w-5 h-5" />
-                <span>Print Report</span>
-              </button>
-            </div>
+  // if (showReport) {
+  //   return (
+  //     <div className="min-h-screen bg-white flex flex-col">
+  //       {/* Main Content */}
+  //       <div className="flex-1 relative z-10 p-6">
+  //         <div className="max-w-7xl mx-auto relative">
+  //           {/* Print Header */}
+  //           <div className="flex items-center justify-between mb-6 print:hidden">
+  //             <button
+  //               onClick={() => setShowReport(false)}
+  //               className="px-6 py-3 bg-yellow-500 text-gray-700 rounded-xl hover:bg-yellow-600 transition-colors"
+  //             >
+  //               ← Back to Filters
+  //             </button>
+  //             <button
+  //               onClick={handlePrint}
+  //               className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+  //             >
+  //               <Printer className="w-5 h-5" />
+  //               <span>Print Report</span>
+  //             </button>
+  //           </div>
 
-            {/* Report Content */}
-            {/*<div className="bg-white shadow-sm border border-gray-200 p-8">
-              <div className="text-center mb-6">
-                <h1 className="text-gray-900 mb-2">Daily Time Report</h1>
-                <p className="text-gray-600">Period From Mar 01, 2020 to Mar 15, 2020</p>
-              </div>
+  //           {/* Report Content */}
+  //           {/*<div className="bg-white shadow-sm border border-gray-200 p-8">
+  //             <div className="text-center mb-6">
+  //               <h1 className="text-gray-900 mb-2">Daily Time Report</h1>
+  //               <p className="text-gray-600">Period From Mar 01, 2020 to Mar 15, 2020</p>
+  //             </div>
 
-              <div className="border-t-4 border-black mb-6"></div>
+  //             <div className="border-t-4 border-black mb-6"></div>
 
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-black">
-                    <th className="px-2 py-2 text-left" style={{ width: '40px' }}>Seq. No.</th>
-                    <th className="px-2 py-2 text-left" style={{ width: '80px' }}>EmpCode</th>
-                    <th className="px-2 py-2 text-left" style={{ width: '200px' }}>Full Name</th>
-                    <th className="px-2 py-2 text-center" style={{ width: '90px' }}>IN</th>
-                    <th className="px-2 py-2 text-center" style={{ width: '90px' }}>OUT</th>
-                    <th className="px-2 py-2 text-center" style={{ width: '100px' }}>Work Shift</th>
-                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>No of Hrs</th>
-                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Tardiness</th>
-                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Undertime</th>
-                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Absences</th>
-                    <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Leave With Pay</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.map((employee) => (
-                    <React.Fragment key={employee.empCode}>
-                      <tr className="bg-gray-100">
-                        <td className="px-2 py-2 align-top">{employee.seqNo}.</td>
-                        <td className="px-2 py-2 align-top">{employee.empCode}</td>
-                        <td className="px-2 py-2 align-top" colSpan={9}>{employee.fullName}</td>
-                      </tr>
-                      {employee.dailyRecords.map((record, index) => (
-                        <tr key={index} className={record.restDay ? 'bg-gray-50' : ''}>
-                          <td className="px-2 py-1"></td>
-                          <td className="px-2 py-1 text-xs">{record.date}</td>
-                          <td className="px-2 py-1 text-xs">{record.day}</td>
-                          <td className="px-2 py-1 text-xs text-center">{record.timeIn}</td>
-                          <td className="px-2 py-1 text-xs text-center">{record.timeOut}</td>
-                          <td className="px-2 py-1 text-xs text-center">{record.workShift}</td>
-                          <td className="px-2 py-1 text-xs text-right">{record.noOfHrs}</td>
-                          <td className="px-2 py-1 text-xs text-right">{record.tardiness}</td>
-                          <td className="px-2 py-1 text-xs text-right">{record.undertime}</td>
-                          <td className="px-2 py-1 text-xs text-right">{record.absences}</td>
-                          <td className="px-2 py-1 text-xs text-right">{record.leaveWithPay}</td>
-                        </tr>
-                      ))}
-                      <tr className="border-t border-gray-300 bg-gray-200">
-                        <td className="px-2 py-2" colSpan={6}>
-                          <span className="text-right block">Subtotal:</span>
-                        </td>
-                        <td className="px-2 py-2 text-right">{employee.subtotal.noOfHrs}</td>
-                        <td className="px-2 py-2 text-right">{employee.subtotal.tardiness}</td>
-                        <td className="px-2 py-2 text-right">{employee.subtotal.undertime}</td>
-                        <td className="px-2 py-2 text-right">{employee.subtotal.absences}</td>
-                        <td className="px-2 py-2 text-right">{employee.subtotal.leaveWithPay}</td>
-                      </tr>
-                      <tr className="h-4"></tr>
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+  //             <table className="w-full text-sm">
+  //               <thead>
+  //                 <tr className="border-b-2 border-black">
+  //                   <th className="px-2 py-2 text-left" style={{ width: '40px' }}>Seq. No.</th>
+  //                   <th className="px-2 py-2 text-left" style={{ width: '80px' }}>EmpCode</th>
+  //                   <th className="px-2 py-2 text-left" style={{ width: '200px' }}>Full Name</th>
+  //                   <th className="px-2 py-2 text-center" style={{ width: '90px' }}>IN</th>
+  //                   <th className="px-2 py-2 text-center" style={{ width: '90px' }}>OUT</th>
+  //                   <th className="px-2 py-2 text-center" style={{ width: '100px' }}>Work Shift</th>
+  //                   <th className="px-2 py-2 text-right" style={{ width: '70px' }}>No of Hrs</th>
+  //                   <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Tardiness</th>
+  //                   <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Undertime</th>
+  //                   <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Absences</th>
+  //                   <th className="px-2 py-2 text-right" style={{ width: '70px' }}>Leave With Pay</th>
+  //                 </tr>
+  //               </thead>
+  //               <tbody>
+  //                 {reportData.map((employee) => (
+  //                   <React.Fragment key={employee.empCode}>
+  //                     <tr className="bg-gray-100">
+  //                       <td className="px-2 py-2 align-top">{employee.seqNo}.</td>
+  //                       <td className="px-2 py-2 align-top">{employee.empCode}</td>
+  //                       <td className="px-2 py-2 align-top" colSpan={9}>{employee.fullName}</td>
+  //                     </tr>
+  //                     {employee.dailyRecords.map((record, index) => (
+  //                       <tr key={index} className={record.restDay ? 'bg-gray-50' : ''}>
+  //                         <td className="px-2 py-1"></td>
+  //                         <td className="px-2 py-1 text-xs">{record.date}</td>
+  //                         <td className="px-2 py-1 text-xs">{record.day}</td>
+  //                         <td className="px-2 py-1 text-xs text-center">{record.timeIn}</td>
+  //                         <td className="px-2 py-1 text-xs text-center">{record.timeOut}</td>
+  //                         <td className="px-2 py-1 text-xs text-center">{record.workShift}</td>
+  //                         <td className="px-2 py-1 text-xs text-right">{record.noOfHrs}</td>
+  //                         <td className="px-2 py-1 text-xs text-right">{record.tardiness}</td>
+  //                         <td className="px-2 py-1 text-xs text-right">{record.undertime}</td>
+  //                         <td className="px-2 py-1 text-xs text-right">{record.absences}</td>
+  //                         <td className="px-2 py-1 text-xs text-right">{record.leaveWithPay}</td>
+  //                       </tr>
+  //                     ))}
+  //                     <tr className="border-t border-gray-300 bg-gray-200">
+  //                       <td className="px-2 py-2" colSpan={6}>
+  //                         <span className="text-right block">Subtotal:</span>
+  //                       </td>
+  //                       <td className="px-2 py-2 text-right">{employee.subtotal.noOfHrs}</td>
+  //                       <td className="px-2 py-2 text-right">{employee.subtotal.tardiness}</td>
+  //                       <td className="px-2 py-2 text-right">{employee.subtotal.undertime}</td>
+  //                       <td className="px-2 py-2 text-right">{employee.subtotal.absences}</td>
+  //                       <td className="px-2 py-2 text-right">{employee.subtotal.leaveWithPay}</td>
+  //                     </tr>
+  //                     <tr className="h-4"></tr>
+  //                   </React.Fragment>
+  //                 ))}
+  //               </tbody>
+  //             </table>
+  //           </div>
+  //         </div>
+  //       </div>
 
-        {/* Footer */}
-        <Footer />
-      </div>
-    );
-  }
+  //       {/* Footer */}
+  //       <Footer />
+  //     </div>
+  //   );
+  // }
+
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

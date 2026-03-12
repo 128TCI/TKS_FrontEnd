@@ -94,9 +94,10 @@ import { ImportEmployeeMasterfilePage } from '../components/Import/ImportEmploye
 import { ImportLogsFromDeviceV2Page } from '../components/Import/ImportLogsFromDeviceV2Page';
 import { UpdateRawDataPage } from '../components/Import/UpdateRawDataPage';
 import { ImportAdjustmentPage } from '../components/Import/ImportAdjustmentPage';
-import { OvertimeApplication2ShiftsPage } from '../components/OvertimeApplication2ShiftsPage';
-import { WorkshiftVariable2ShiftsPage } from '../components/Import/WorkshiftVariable2ShiftsPage';
-import { ImportLogsFromDevice2ShiftsPage } from '../components/Import/ImportLogsFromDevice2ShiftsPage';
+//import { OvertimeApplication2ShiftsPage } from '../components/import {  } from "module";/OvertimeApplication2ShiftsPage';
+import { OvertimeApplication2ShiftsPage } from '../components/Import/2Shifts/OvertimeApplication2ShiftsPage';
+import { WorkshiftVariable2ShiftsPage } from '../components/Import/2Shifts/WorkshiftVariable2ShiftsPage';
+import { ImportLogsFromDevice2ShiftsPage } from '../components/Import/2Shifts/ImportLogsFromDevice2ShiftsPage';
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 import { ExportPayrollDataPage } from '../components/Export/ExportPayrollDataPage';

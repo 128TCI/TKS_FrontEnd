@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { Upload, Download, Check, FileText } from "lucide-react";
-import { DatePickerWithButton } from "../components/DateSetup/DatePickerWithButton";
-import { Footer } from "../components/Footer/Footer";
-import { TKSGroupTable } from "../components/TKSGroupTable";
-import { tksGroupData } from "../data/tksGroupData";
+import { DatePickerWithButton } from "../../DateSetup/DatePickerWithButton";
+import { Footer } from "../../Footer/Footer";
+import { TKSGroupTable } from "../../TKSGroupTable";
+import { tksGroupData } from "../../../data/tksGroupData";
 import * as XLSX from "xlsx";
-import apiClient from "../services/apiClient";
+import apiClient from "../../../services/apiClient";
 import Swal from "sweetalert2";
-import { decryptData } from "../services/encryptionService";
+import { decryptData } from "../../../services/encryptionService";
 
 interface ImportOvertimeApplication2ShiftsDto {
   id: number;
@@ -53,7 +53,7 @@ export function OvertimeApplication2ShiftsPage() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [fileLoaded, setFileLoaded] = useState(false);
@@ -95,7 +95,7 @@ export function OvertimeApplication2ShiftsPage() {
     fetchTKSGroups();
   }, []);
 
-  const handleCodeToggle = (id: number) => {
+  const handleCodeToggle = (id: string) => {
     setSelectedCodes((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
@@ -105,7 +105,7 @@ export function OvertimeApplication2ShiftsPage() {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupList.map((w) => w.id));
+      setSelectedCodes(tksGroupList.map((w) => w.groupCode));
     }
   };
 
