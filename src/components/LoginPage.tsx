@@ -216,7 +216,6 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                 <input
                   type="text" 
                   value={username}
-                  autoComplete='username'
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Username"
@@ -233,11 +232,10 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  autoComplete='new-password'
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-11 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Password"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   name="password-no-autofill"
                 />
                 <button
