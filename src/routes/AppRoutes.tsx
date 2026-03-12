@@ -77,7 +77,6 @@ import { RawdataOnStraightDutyPage } from '../components/Maintenance/RawdataOnSt
 import { ProcessedDataPage } from '../components/Maintenance/ProcessedDataPage';
 import { TwoShiftsEmployeeTimekeepConfigPage } from '../components/Maintenance/TwoShiftsEmployeeTimekeepConfigPage';
 import { TwoShiftsRawDataPage } from '../components/Maintenance/TwoShiftsRawDataPage';
-import { UpdateRawdataOnlinePage } from '../components/Utilities/UpdateRawdataOnlinePage';
 
 // ─── Process ──────────────────────────────────────────────────────────────────
 import { ProcessPage } from '../components/Process/ProcessPage';
@@ -263,7 +262,6 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
         <Route path="/maintenance/rawdata-ot-gap" element={<RawdataOtGapPage />} />
         <Route path="/maintenance/rawdata-on-straight-duty" element={<RawdataOnStraightDutyPage />} />
         <Route path="/maintenance/processed-data" element={<ProcessedDataPage />} />
-        <Route path="/maintenance/update-rawdata-online" element={<UpdateRawdataOnlinePage />} />
         {/* 2 Shifts */}
         <Route path="/maintenance/2-shifts/employee-timekeep-config" element={<TwoShiftsEmployeeTimekeepConfigPage />} />
         <Route path="/maintenance/2-shifts/raw-data" element={<TwoShiftsRawDataPage />} />
