@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { Upload, Download, Check, FileText } from "lucide-react";
-import { DatePickerWithButton } from "../../DateSetup/DatePickerWithButton";
-import { Footer } from "../../Footer/Footer";
-import { TKSGroupTable } from "../../TKSGroupTable";
-import { tksGroupData } from "../../../data/tksGroupData";
+import { DatePickerWithButton } from "../components/DateSetup/DatePickerWithButton";
+import { Footer } from "../components/Footer/Footer";
+import { TKSGroupTable } from "../components/TKSGroupTable";
+import { tksGroupData } from "../data/tksGroupData";
 import * as XLSX from "xlsx";
-import apiClient from "../../../services/apiClient";
+import apiClient from "../services/apiClient";
 import Swal from "sweetalert2";
-import { decryptData } from "../../../services/encryptionService";
+import { decryptData } from "../services/encryptionService";
 
 interface ImportOvertimeApplication2ShiftsDto {
   id: number;
@@ -292,8 +292,18 @@ export function OvertimeApplication2ShiftsPage() {
     }
   };
 
+const LoadingOverlay = () => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="flex flex-col items-center gap-6">
+      <div className="w-20 h-20 border-8 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+      <p className="text-white text-2xl font-semibold">Loading...</p>
+    </div>
+  </div>
+);
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      {isProcessing && <LoadingOverlay />}
       {/* Main Content */}
       <div className="flex-1 relative z-10 p-6">
         <div className="max-w-7xl mx-auto relative">
@@ -498,7 +508,7 @@ export function OvertimeApplication2ShiftsPage() {
                         className="text-sm text-blue-600 hover:text-blue-700"
                         onClick={(e) => {
                           e.preventDefault();
-                          downloadTemplate();
+                          if (!isProcessing) downloadTemplate();
                         }}
                       >
                         Download Template
@@ -513,7 +523,7 @@ export function OvertimeApplication2ShiftsPage() {
                       onClick={onClickImport}
                     >
                       <Upload className="w-4 h-4" />
-                      Import Data
+                      {isProcessing ? "Importing..." : "Import Data"}
                     </button>
                     <button
                       className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -532,7 +542,7 @@ export function OvertimeApplication2ShiftsPage() {
                           d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      Update Data
+                      {isProcessing ? "Updating..." : "Update Data"}
                     </button>
                   </div>
                 </div>
