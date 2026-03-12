@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Lock } from 'lucide-react';
+import { Building2, User, Lock, Eye, EyeOff } from 'lucide-react';
 import apiClient from '../services/apiClient';
 import auditTrail from '../services/auditTrail'
 import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
@@ -68,37 +68,38 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   const [windowsAuth, setWindowsAuth] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
-
+  const [showPassword, setShowPassword] = useState(false);
+const [companyDisplayName, setCompanyDisplayName] = useState('');
   // ─── Fetch companies from API on mount ──────────────────────────────────────
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const response = await apiClient.get('/Security/DatabaseConfiguration/databases');
-        console.log("API response:", response);
-        
-        // Convert response to boolean
-        const isSuccess = ApiService.isApiSuccess(response);
-        console.log("Is success:", isSuccess);   
+useEffect(() => {
+  const fetchCompanies = async () => {
+    try {
+      const infoResponse = await apiClient.get('/Fs/System/CompanyInformation');
+  const infoList: Array<{ companyCode?: string; companyName?: string }> =
+  Array.isArray(infoResponse.data) ? infoResponse.data : [];
 
-        const servers: string[] = response.data?.servers ?? [];
-        setCompanies(servers);
-        if (servers.length > 0) {
-          setCompany(servers[0]); // default to first company
-        }
-      } catch (err) {
-        console.error('Failed to fetch companies:', err);
-        await showErrorModal("Failed to load company list. Please try again later.");
-        // Fallback list in case the API is unreachable
-        const fallback = ['DEMO COMPANY INC'];
-        setCompanies(fallback);
-        setCompany(fallback[0]);
-      } finally {
-        setLoadingCompanies(false);
-      }
-    };
+const names = infoList
+  .filter((info) => info.companyName)
+  .map((info) => info.companyName as string);
 
-    fetchCompanies();
-  }, []);
+setCompanies(names);
+setCompanyDisplayName(names[0] ?? ''); // ← add this
+if (names.length > 0) {
+  setCompany(names[0]);
+}
+    } catch (err) {
+      console.error('Failed to fetch companies:', err);
+      await showErrorModal("Failed to load company list. Please try again later.");
+      const fallback = ['DEMO COMPANY INC'];
+      setCompanies(fallback);
+      setCompany(fallback[0]);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  fetchCompanies();
+}, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,12 +184,14 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
         <div className="absolute top-40 -right-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000"></div>
       </div>
 
-      {/* Dark Slate Bar with Company Name */}
-      <div className="w-full bg-green-600 text-white py-3">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-white tracking-wide">DEMO ACCOUNT</p>
-        </div>
-      </div>
+    {/* Dark Slate Bar with Company Name */}
+<div className="w-full bg-green-600 text-white py-3">
+  <div className="max-w-7xl mx-auto">
+    <p className="text-white tracking-wide">
+      {companyDisplayName || 'DEMO ACCOUNT'}
+    </p>
+  </div>
+</div>
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-6 relative z-10">
@@ -215,7 +218,6 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                 <input
                   type="text" 
                   value={username}
-                  autoComplete='username'
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Username"
@@ -230,15 +232,27 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
-                  autoComplete='new-password'
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
+                  className="w-full pl-10 pr-11 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
                   placeholder="Password"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   name="password-no-autofill"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
 
               {/* Company Name — dynamically populated */}

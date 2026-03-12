@@ -3,13 +3,8 @@
     "",
     "\\src",
     "\\src\\components",
-    "\\src\\components\\Dashboard",
-    "\\src\\components\\Export",
-    "\\src\\components\\FileSetup",
-    "\\src\\components\\FileSetup\\Employment",
-    "\\src\\components\\Maintenance",
-    "\\src\\components\\Modals"
+    "\\src\\components\\Security"
   ],
-  "SelectedNode": "\\src\\components\\Modals\\ProcessedDataModals.tsx",
+  "SelectedNode": "\\src\\components\\Security\\SecurityManagerPage.tsx",
   "PreviewInSolutionExplorer": false
 }

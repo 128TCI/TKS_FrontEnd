@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { Upload, Download, Check, FileText } from "lucide-react";
-import { DatePickerWithButton } from "../components/DateSetup/DatePickerWithButton";
-import { Footer } from "../components/Footer/Footer";
-import { TKSGroupTable } from "../components/TKSGroupTable";
-import { tksGroupData } from "../data/tksGroupData";
+import { DatePickerWithButton } from "../../components/DateSetup/DatePickerWithButton";
+import { Footer } from "../../components/Footer/Footer";
+import { TKSGroupTable } from "../../components/TKSGroupTable";
+import { tksGroupData } from "../../data/tksGroupData";
 import * as XLSX from "xlsx";
-import apiClient from "../services/apiClient";
+import apiClient from "../../services/apiClient";
 import Swal from "sweetalert2";
-import { decryptData } from "../services/encryptionService";
+import { decryptData } from "../../services/encryptionService";
 
 interface ImportOvertimeApplication2ShiftsDto {
   id: number;

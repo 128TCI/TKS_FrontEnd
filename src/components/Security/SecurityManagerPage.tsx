@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Check, UserPlus, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft,
-  Search, Users, Settings, Plus, Trash2, Save, X, Key, Calendar
+  Search, Users, Settings, Plus, Trash2, Save, X, Key, Calendar, Eye, EyeOff
 } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -26,8 +26,16 @@ export function SecurityManagerPage() {
   const [selectedTKSGroupAccess, setSelectedTKSGroupAccess] = useState<number[]>([]);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
   const [editedRowData, setEditedRowData] = useState<FormAccess | null>(null);
+  const [showPassword, setShowPassword] = useState(false);  
   const itemsPerPage = 10;
 
+  // Show/hide password toggles
+  const [showOldPassword,          setShowOldPassword]          = useState(false);
+  const [showNewPassword,          setShowNewPassword]          = useState(false);
+  const [showConfirmNewPassword,   setShowConfirmNewPassword]   = useState(false);
+  const [showResetNewPassword,     setShowResetNewPassword]     = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
+    
   // Modal states
   const [showUserModal, setShowUserModal] = useState(false);
   const [showUserGroupModal, setShowUserGroupModal] = useState(false);
@@ -518,7 +526,7 @@ const handleEditUser = (user: User) => {
           messages: `Security Manager - Users update record: ${selectedUser.username}`,
           formName: 'Security Manager - Users',
         });
-        console.log("API response:", res);
+        //console.log("API response:", res);
         showSuccessModal('User updated successfully.');
       } else {
         await securityService.createUser({
@@ -1644,18 +1652,36 @@ const handleEditUser = (user: User) => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Old Password *</label>
-                    <input type="password" value={passwordForm.oldPassword} onChange={e => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <div className="relative">
+                      <input type={showOldPassword ? 'text' : 'password'} value={passwordForm.oldPassword} onChange={e => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                        className="w-full px-3 pr-11 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <button type="button" tabIndex={-1} onClick={() => setShowOldPassword(p => !p)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        {showOldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">New Password *</label>
-                    <input type="password" value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <div className="relative">
+                      <input type={showNewPassword ? 'text' : 'password'} value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                        className="w-full px-3 pr-11 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <button type="button" tabIndex={-1} onClick={() => setShowNewPassword(p => !p)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Confirm New Password *</label>
-                    <input type="password" value={passwordForm.confirmNewPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <div className="relative">
+                      <input type={showConfirmNewPassword ? 'text' : 'password'} value={passwordForm.confirmNewPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
+                        className="w-full px-3 pr-11 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <button type="button" tabIndex={-1} onClick={() => setShowConfirmNewPassword(p => !p)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        {showConfirmNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-3 mt-6">
@@ -1687,13 +1713,25 @@ const handleEditUser = (user: User) => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">New Password *</label>
-                    <input type="password" value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <div className="relative">
+                      <input type={showResetNewPassword ? 'text' : 'password'} value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                        className="w-full px-3 pr-11 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <button type="button" tabIndex={-1} onClick={() => setShowResetNewPassword(p => !p)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        {showResetNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Confirm New Password *</label>
-                    <input type="password" value={passwordForm.confirmNewPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <div className="relative">
+                      <input type={showResetConfirmPassword ? 'text' : 'password'} value={passwordForm.confirmNewPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
+                        className="w-full px-3 pr-11 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                      <button type="button" tabIndex={-1} onClick={() => setShowResetConfirmPassword(p => !p)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        {showResetConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-3 mt-6">
@@ -1707,6 +1745,7 @@ const handleEditUser = (user: User) => {
           </div>
         </>
       )}
+
 
       {/* ── Add User Group Modal (original structure) ──────────────────── */}
       {showUserGroupModal && (

@@ -548,8 +548,8 @@ export function LeaveTypeSetupPage() {
   const handleSelectChargeable = useCallback((code: string) => {
     setFormData((prev) => ({ ...prev, chargeableTo: code }));
     setShowSearchModal(false); setSearchModalTerm('');
-  };
-
+  }, []);
+  
   // ── Chargeable-To Search Modal ─────────────────────────────────────────────
   const renderSearchModal = () => (
     <>
