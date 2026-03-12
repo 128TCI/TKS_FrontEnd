@@ -3,7 +3,6 @@ import React from 'react';
 import { Calendar, Search, X, FileText, Printer, Check, Clock, Users, Building2, Briefcase, Award, Network, Grid } from 'lucide-react';
 import { CalendarPopover } from '../CalendarPopover';
 import apiClient, { getLoggedInUsername} from '../../services/apiClient';
-//import { Footer } from './Footer';
 import { Footer } from '../Footer/Footer';
 import Swal from 'sweetalert2';
 
