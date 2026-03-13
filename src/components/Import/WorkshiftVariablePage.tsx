@@ -95,6 +95,23 @@ export function WorkshiftVariablePage() {
 
     if (!file) return;
 
+      const allowedTypes = [
+        "application/vnd.ms-excel", // .xls
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xls and .xlsx files are allowed.",
+        //confirmButtonColor: "#14b8a6"
+        });
+
+        e.target.value = ""; // reset input
+        return;
+      }
+
     setXlsxFile(file);  
     setFileName(file!.name);
   };
@@ -182,8 +199,16 @@ export function WorkshiftVariablePage() {
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
 
-    console.log(dateFrom, dateTo)
-
+    Swal.fire({
+      icon: 'info',
+      title: 'Importing Data',
+      text: 'Importing Data/s please wait.',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+      });
     if(importType == "workshift-variable"){
       try {
         const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import/ImportWorkshiftVariable`, formData, {
@@ -270,7 +295,35 @@ export function WorkshiftVariablePage() {
       imports: importDataResult.filter(x => !x.message) // only valid records
     }
     console.log(param, dateFrom, dateTo);
-    try {
+    if(importType == "workshift-variable"){
+      try {
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import/UpdateWorkshiftVariable`, param)
+        setImportDataResult(data.data.resultData);
+        if(data.data.errors.length > 0){
+            setImportDataResult([]);
+            await Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: data.data.messages,
+            });
+            
+            setErrors(data.data.errors);
+        }
+        else{
+          Swal.fire({
+            icon: 'success',
+            title: 'Done',
+            text: 'Update done.',
+            timer: 2000,
+            showConfirmButton: false,
+          });
+        }
+      } finally {
+          setIsProcessing(false);
+      }
+    }
+    else if(importType == "workshift-restday"){
+      try {
         const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/ImportRestDay/UpdateWorkshiftRestDay`, param)
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
@@ -294,6 +347,7 @@ export function WorkshiftVariablePage() {
         }
     } finally {
         setIsProcessing(false);
+    }
     }
   }
 

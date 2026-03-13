@@ -131,6 +131,23 @@ export function OvertimeApplicationPage() {
     const file = e.target.files?.[0] ?? null;
     if (!file) return;
 
+    const allowedTypes = [
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xls and .xlsx files are allowed.",
+        //confirmButtonColor: "#14b8a6"
+      });
+    
+      e.target.value = ""; // reset input
+      return;
+    }
+
     setXlsxFile(file);
     setFileName(file.name);
 
