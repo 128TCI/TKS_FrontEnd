@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, Save, XCircle, Upload, Download, Calendar, Database } from 'lucide-react';
-import { Footer } from './Footer/Footer';
+import { Footer } from '../Footer/Footer';
 
 export function ImportLogsFromDevicePage() {
   const [isEditing, setIsEditing] = useState(false);

@@ -208,10 +208,10 @@ export function WorkshiftVariablePage() {
       didOpen: () => {
         Swal.showLoading();
       }
-      });
+    });
     if(importType == "workshift-variable"){
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import/ImportWorkshiftVariable`, formData, {
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/ImportWorkshiftVariable`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
@@ -247,7 +247,7 @@ export function WorkshiftVariablePage() {
     }
     else if(importType == "workshift-restday"){
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/ImportRestDay/ImportRestDay`, formData, {
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/ImportRestDay`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
@@ -297,7 +297,7 @@ export function WorkshiftVariablePage() {
     console.log(param, dateFrom, dateTo);
     if(importType == "workshift-variable"){
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import/UpdateWorkshiftVariable`, param)
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/UpdateWorkshiftVariable`, param)
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
             setImportDataResult([]);
@@ -324,7 +324,7 @@ export function WorkshiftVariablePage() {
     }
     else if(importType == "workshift-restday"){
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/ImportRestDay/UpdateWorkshiftRestDay`, param)
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/UpdateWorkshiftRestDay`, param)
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
             setImportDataResult([]);

@@ -223,7 +223,7 @@ const onClickImport = async ( ) => {
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Utilities/Import/ImportEmployeeMasterfile`, formData, {
+      const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Import/ImportEmployeeMasterfile`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
@@ -262,7 +262,7 @@ const onClickImport = async ( ) => {
     console.log(param);
     console.log(xlsxFile);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Utilities/Import/UpdateImportEmployeeMasterfile`, param)
+        const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Import/UpdateImportEmployeeMasterfile`, param)
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
             setImportDataResult([]);
