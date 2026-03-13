@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RotateCcw, Check, RefreshCw, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
+import { RotateCcw, Check, RefreshCw, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -531,7 +531,7 @@ export function UnpostTransactionPage() {
                   <div className="flex justify-end pt-4 border-t border-gray-200 mt-4">
                     <button onClick={handleUpdate} disabled={isUpdating}
                       className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                      <RefreshCw className="w-4 h-4" />
+                      <Save className="w-4 h-4" />
                       {isUpdating ? 'Updating…' : 'Update'}
                     </button>
                   </div>

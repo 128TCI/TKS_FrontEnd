@@ -154,6 +154,7 @@ import { SecurityManagerPage } from '../components/Security/SecurityManagerPage'
 import { AuditTrailPage } from '../components/Security/AuditTrailPage';
 import { EmailConfigurationPage } from '../components/Security/EmailConfigurationPage';
 import { CreateNewDatabasePage } from '../components/Security/CreateNewDatabasePage';
+import { ChangePasswordPage } from '../components/Security/ChangePasswordPage';
 
 // ─── Unknown Page Path ─────────────────────────────────────────────────────────────────
 import { NotFoundPage } from '../components/NotFoundPage';
@@ -341,6 +342,8 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
         <Route path="/security/audit-trail" element={<AuditTrailPage />} />
         <Route path="/security/email-configuration" element={<EmailConfigurationPage />} />
         <Route path="/security/create-new-database" element={<CreateNewDatabasePage />} />
+        <Route path="/security/change-password" element={<ChangePasswordPage onBack={onBackToLogin} />} />
+
 
         {/* Catch-all: unknown protected paths → home */}
         <Route path="*" element={<NotFoundPage />} />
