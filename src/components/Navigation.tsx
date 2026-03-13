@@ -59,7 +59,7 @@ export function Navigation({ onLogout }: NavigationProps) {
   const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // ✅ FIX 1: declare fetchedRef so data is only fetched once
   const fetchedRef       = useRef(false);
-
+const [companyDisplayName, setCompanyDisplayName] = useState('');
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
   const token = localStorage.getItem('token');
 
@@ -177,6 +177,20 @@ export function Navigation({ onLogout }: NavigationProps) {
 
   // ✅ FIX 2: setLoadingInfo(true) BEFORE await; fetchedRef prevents re-fetch;
   //           reset fetchedRef on failure so it can retry
+  useEffect(() => {
+  const fetchCompanyName = async () => {
+    try {
+      const response = await apiClient.get('/Fs/System/CompanyInformation');
+      const infoList = Array.isArray(response.data) ? response.data : [];
+      const name = infoList[0]?.companyName ?? '';
+      setCompanyDisplayName(name);
+    } catch {
+      setCompanyDisplayName('');
+    }
+  };
+
+  fetchCompanyName();
+}, []);
   const fetchSystemInfo = async () => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
@@ -650,12 +664,14 @@ export function Navigation({ onLogout }: NavigationProps) {
         <div className="flex items-center justify-between h-14">
 
           {/* Logo */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
-              <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
-            </div>
-            <h1 className="text-white text-lg">DEMO ACCOUNT</h1>
-          </div>
+<div className="flex items-center space-x-3">
+  <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
+    <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
+  </div>
+  <h1 className="text-white text-lg">
+    {companyDisplayName || 'DEMO ACCOUNT'}
+  </h1>
+</div>
 
           {/* Desktop menu buttons */}
           <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center relative">

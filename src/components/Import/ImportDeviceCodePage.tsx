@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Check, FileText, CheckCircle } from 'lucide-react';
+import { Upload, Download, Check, FileText, CheckCircle, Info, Save } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { TKSGroupTable } from '../TKSGroupTable';
 import apiClient from '../../services/apiClient';
@@ -268,9 +268,9 @@ const onClickImport = async ( ) => {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                    <Info className="w-5 h-5 text-white" />
+                  </div>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
@@ -399,7 +399,7 @@ const onClickImport = async ( ) => {
                     <button className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <CheckCircle className="w-4 h-4" onClick={onClickInsertUpdate}/>
+                      <Save className="w-4 h-4" onClick={onClickInsertUpdate}/>
                       Update Data
                     </button>
                   </div>

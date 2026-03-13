@@ -472,9 +472,17 @@ const [overtimeStotats, setOvertimeStotats] = useState('');
 const [overtimeIsLateFiling, setOvertimeIsLateFiling] = useState(false);
 const [overtimeAppliedBeforeShiftDate, setOvertimeAppliedBeforeShiftDate] = useState('');
 const [overtimeIsOTBeforeShiftNextDay, setOvertimeIsOTBeforeShiftNextDay] = useState(false);
-
+const [groupDescMap, setGroupDescMap] = useState<Map<string, string>>(new Map());
   // ==================== API FUNCTIONS ====================
-  
+  const fetchGroupDescriptions = async (): Promise<Map<string, string>> => {
+  try {
+    const { data } = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+    const groups: { groupCode: string; groupDescription: string }[] = data ?? [];
+    return new Map(groups.map((g) => [String(g.groupCode), g.groupDescription]));
+  } catch {
+    return new Map();
+  }
+};
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -1702,9 +1710,16 @@ const handleSuspensionSubmit = async () => {
   const handlePreviousPage = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
   const handleNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
 
-  const adaptedEmployees = useMemo(() => {
-    return employees.map(emp => ({ ...emp, name: `${emp.lName}, ${emp.fName}`, groupCode: emp.grpCode }));
-  }, [employees]);
+const adaptedEmployees = useMemo(() => {
+    return employees.map(emp => ({
+        ...emp,
+        name: `${emp.lName}, ${emp.fName}`,
+        groupCode: groupDescMap.get(String((emp as any).tksGroupCode ?? ''))
+                   ?? (emp as any).tksGroupCode
+                   ?? emp.grpCode
+                   ?? ''
+    }));
+}, [employees, groupDescMap]);
 
   const handleEmployeeSearchSelect = async (empCodeValue: string, name: string) => {
     try {
@@ -1904,6 +1919,7 @@ if (activeTab === 'basic-config') {
     fetchWorkshiftCodes();
     fetchClassificationCodes();
     fetchLeaveCodes(); // ── NEW ─────────────────────────────────────────────────
+     fetchGroupDescriptions().then(setGroupDescMap);
   }, []);
 
   useEffect(() => {
