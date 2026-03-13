@@ -96,29 +96,29 @@ if (names.length > 0) {
 }, []);
 
   // ── Fetch build version on mount ────────────────────────────────────────
-  useEffect(() => {
-    apiClient.get('/api/SystemInfo/version')
-      .then(res => setBuildDate(res.data?.buildDate ?? ''))
-      .catch(() => {});
-  }, []);
+  // useEffect(() => {
+  //   apiClient.get('/api/SystemInfo/version')
+  //     .then(res => setBuildDate(res.data?.buildDate ?? ''))
+  //     .catch(() => {});
+  // }, []);
 
-  // ── Copy build info to clipboard ─────────────────────────────────────────
-  const handleCopyBuildInfo = async () => {
-    if (!buildDate) return;
-    try {
-      await navigator.clipboard.writeText(buildDate);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = buildDate;
-      ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-    setToast(true);
-    setTimeout(() => setToast(false), 2500);
-  };
+  // // ── Copy build info to clipboard ─────────────────────────────────────────
+  // const handleCopyBuildInfo = async () => {
+  //   if (!buildDate) return;
+  //   try {
+  //     await navigator.clipboard.writeText(buildDate);
+  //   } catch {
+  //     const ta = document.createElement('textarea');
+  //     ta.value = buildDate;
+  //     ta.style.position = 'fixed'; ta.style.opacity = '0';
+  //     document.body.appendChild(ta);
+  //     ta.select();
+  //     document.execCommand('copy');
+  //     document.body.removeChild(ta);
+  //   }
+  //   setToast(true);
+  //   setTimeout(() => setToast(false), 2500);
+  // };
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
