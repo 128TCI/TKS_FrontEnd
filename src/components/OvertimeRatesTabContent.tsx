@@ -249,14 +249,11 @@ export function OvertimeRatesTabContent({
   tksGroupCode,
   tksGroupDescription,
   isEditMode,
-  isEditOTRates,
   isCreateNew,
   setIsEditOTRates,
   showOtCodeModal,
   setShowOtCodeModal,
-  isEditOTRatesFor2Shifts,
   setIsEditOTRatesFor2Shifts,
-  isEditBirthDayPay,
   setIsEditBirthDayPay,
 
   regularDayOT,
@@ -831,14 +828,41 @@ export function OvertimeRatesTabContent({
       if (event.key === "Escape") {
         if (showEarningCodeModal) {
           setShowEarningCodeModal(false);
+        } else if (showRegDayOvertimeRatesModal) {
+          setShowRegDayOvertimeRatesModal(false);
+        } else if (showRestDayOvertimeRatesModal) {
+          setShowRestDayOvertimeRatesModal(false);
+        } else if (showLegalHolidayOTRatesModal) {
+          setShowLegalHolidayOTRatesModal(false);
+        } else if (showSpecialHolidayOTRatesModal) {
+          setShowSpecialHolidayOTRatesModal(false);
+        } else if (showDoubleLegalHolidayOTRatesModal) {
+          setShowDoubleLegalHolidayOTRatesModal(false);
+        } else if (showSpecialHoliday2OTRatesModal) {
+          setShowSpecialHoliday2OTRatesModal(false);
+        } else if (showNonWorkingHolidayOTRatesModal) {
+          setShowNonWorkingHolidayOTRatesModal(false);
+        } else if (showOtCodeModal) {
+          setShowOtCodeModal(false);
         }
       }
     };
 
+    document.addEventListener("keydown", handleEscKey); // ✅ this was missing
     return () => {
       document.removeEventListener("keydown", handleEscKey);
     };
-  }, [showEarningCodeModal]);
+  }, [
+    showEarningCodeModal,
+    showRegDayOvertimeRatesModal,
+    showRestDayOvertimeRatesModal,
+    showLegalHolidayOTRatesModal,
+    showSpecialHolidayOTRatesModal,
+    showDoubleLegalHolidayOTRatesModal,
+    showSpecialHoliday2OTRatesModal,
+    showNonWorkingHolidayOTRatesModal,
+    showOtCodeModal,
+  ]);
 
   const handleAddAllowance = async () => {
     const finalDayType = dayType || "Any";

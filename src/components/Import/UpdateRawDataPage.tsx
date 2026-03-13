@@ -4,7 +4,7 @@ import { DatePickerWithButton } from '../DateSetup/DatePickerWithButton';
 import { Footer } from '../Footer/Footer';
 import { TKSGroupTable } from '../TKSGroupTable';
 import { tksGroupData } from '../../data/tksGroupData';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername} from '../../services/apiClient';
 import { Search, Trash2, X, TableOfContents } from 'lucide-react';
 import Swal from 'sweetalert2';
 import * as XLSX from "xlsx";
@@ -46,7 +46,7 @@ export function UpdateRawDataPage() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [selectedEmpCodes, setSelectedEmpCodes] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('10/01/2025');
   const [dateTo, setDateTo] = useState('11/16/2025');
@@ -151,15 +151,68 @@ export function UpdateRawDataPage() {
   //   fetchRawData();
   // }, []);
 
+  // const fetchRawData = async () => {
+  //   setEmpCode(selectedEmpCodes);
+  //   setLoading(true);
+  //     error;
+  //     try {
+  //     const response = await apiClient.get(`/Import/LogsFromDevice/GetRawData?rawDateInFrom=${dateFrom}&rawDateInTo=${dateTo}&empCode=${selectedEmpCodes}`);
+  //     if (response.data) {
+  //       const mappedData = response.data.map((rawData: any) => ({
+  //         id: rawData.id || rawData.Id || '',
+  //         empCode: rawData.empCode || rawData.EmpCode || '',
+  //         lName: rawData.lName || rawData.LName || '',
+  //         fName: rawData.fName || rawData.FName || '',
+  //         mName: rawData.mName || rawData.MName || '',
+  //         suffix: rawData.suffix || rawData.Suffix || '',
+  //         rawDateIn: rawData.rawDateIn || rawData.RawDateIn || '',
+  //         workShiftCode: rawData.workShiftCode || rawData.WorkShiftCode || '',
+  //         workShiftDesc: rawData.workShiftDesc || rawData.WorkShiftDesc || '',
+  //         dayType: rawData.dayType || rawData.DayType || '',
+  //         rawTimeIn: rawData.rawTimeIn || rawData.RawTimeIn || '',
+  //         rawBreak1In: rawData.rawBreak1In || rawData.RawBreak1In || '',
+  //         rawBreak1Out: rawData.rawBreak1Out || rawData.RawBreak1Out || '',
+  //         rawBreak2In: rawData.rawBreak2In || rawData.RawBreak2In || '',
+  //         rawBreak2Out: rawData.rawBreak2Out || rawData.RawBreak2Out || '',
+  //         rawBreak3In: rawData.rawBreak3In || rawData.RawBreak3In || '',
+  //         rawBreak3Out: rawData.rawBreak3Out || rawData.RawBreak3Out || '',
+  //         rawTimeOut: rawData.rawTimeOut || rawData.RawTimeOut || '',
+  //         rawDateOut: rawData.rawDateOut || rawData.RawDateOut || '',
+  //         rawOTApproved: rawData.rawOTApproved || rawData.RawOTApproved || '',
+  //         rawRemarks: rawData.rawRemarks || rawData.RawRemarks || '',
+  //         entryFlag: rawData.entryFlag || rawData.EntryFlag || '',
+  //         terminalID: rawData.terminalID || rawData.TerminalID || '',
+  //         dayTypeDOLE: rawData.dayTypeDOLE || rawData.DayTypeDOLE || '',
+  //         aprOTTime: rawData.aprOTTime || rawData.AprOTTime || ''
+  //       }));
+  //       setGetRawData(mappedData);
+  //       console.log(empCode)
+  //       console.log(dateFrom, dateTo)
+  //       console.log(getRawData);
+  //     }
+  //     } catch (error: any) {
+  //         const errorMsg = error.response?.data?.message || error.message || 'Failed to Load Data';
+  //         setError(errorMsg);
+  //         console.error('Error fetching data', error);
+  //       } finally {
+  //         loading;
+  //       }
+  // };
   const fetchRawData = async () => {
     setEmpCode(selectedEmpCodes);
     setLoading(true);
       error;
       try {
-      const response = await apiClient.get(`/Import/LogsFromDevice/GetRawData?rawDateInFrom=${dateFrom}&rawDateInTo=${dateTo}&empCode=${selectedEmpCodes}`);
+      const response = await apiClient.post("/Import/ImportUpdateRawData/GetDTRLogs/GetDTRLogs", {
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        userName: getLoggedInUsername(),
+        doNotIncludeResignedEmp: doNotIncludeResigned,
+        empCodes: selectedEmpCodes
+      });
       if (response.data) {
         const mappedData = response.data.map((rawData: any) => ({
-          id: rawData.id || rawData.Id || '',
+          id: rawData.id || rawData.Id || rawData.ID,
           empCode: rawData.empCode || rawData.EmpCode || '',
           lName: rawData.lName || rawData.LName || '',
           fName: rawData.fName || rawData.FName || '',
@@ -227,7 +280,8 @@ export function UpdateRawDataPage() {
 
   useEffect(() => {
     fetchEmployee();
-  }, [filterStatus]);
+  }, 
+  [filterStatus, selectedCodes]);
 
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -260,29 +314,71 @@ export function UpdateRawDataPage() {
     return pages;
   };
 
+  // const fetchEmployee = async () => {
+  //   setLoading(true);
+  //     error;
+  //     try {
+  //     const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/GetActive?active=${filterStatus}`);
+  //     if (response.data) {
+  //       const mappedData = response.data.map((getEmployee: any) => ({
+  //         empID: getEmployee.empID || getEmployee.EmpID || '',
+  //         empCode: getEmployee.empCode || getEmployee.EmpCode || '',
+  //         lName: getEmployee.lName || getEmployee.LName || '',
+  //         fName: getEmployee.fName || getEmployee.fName || '',
+  //         mName: getEmployee.mName || getEmployee.mName || '',
+  //         suffix: getEmployee.suffix || getEmployee.suffix || ''
+  //       }));
+  //       setGetEmployee(mappedData);
+  //     }
+  //     } catch (error: any) {
+  //         const errorMsg = error.response?.data?.message || error.message || 'Failed to load Employees';
+  //         setError(errorMsg);
+  //         console.error('Error fetching employees', error);
+  //       } finally {
+  //         loading;
+  //       }
+  // };
   const fetchEmployee = async () => {
     setLoading(true);
-      error;
-      try {
-      const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/GetActive?active=${filterStatus}`);
+    setError(null);
+
+    try {
+      const groupCodes = selectedCodes; // example selected groups
+
+      const params = new URLSearchParams();
+      params.append("active", filterStatus);
+
+      groupCodes.forEach(gc => {
+        params.append("groupCode", gc);
+      });
+
+      const response = await apiClient.get(
+        `/Maintenance/EmployeeMasterFile/GetActive?${params.toString()}`
+      );
+
       if (response.data) {
-        const mappedData = response.data.map((getEmployee: any) => ({
-          empID: getEmployee.empID || getEmployee.EmpID || '',
-          empCode: getEmployee.empCode || getEmployee.EmpCode || '',
-          lName: getEmployee.lName || getEmployee.LName || '',
-          fName: getEmployee.fName || getEmployee.fName || '',
-          mName: getEmployee.mName || getEmployee.mName || '',
-          suffix: getEmployee.suffix || getEmployee.suffix || ''
+        const mappedData = response.data.map((getEmployee:any) => ({
+          empID: getEmployee.empID || getEmployee.EmpID || "",
+          empCode: getEmployee.empCode || getEmployee.EmpCode || "",
+          lName: getEmployee.lName || getEmployee.LName || "",
+          fName: getEmployee.fName || getEmployee.FName || "",
+          mName: getEmployee.mName || getEmployee.MName || "",
+          suffix: getEmployee.suffix || getEmployee.Suffix || ""
         }));
+
         setGetEmployee(mappedData);
       }
-      } catch (error: any) {
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to load Employees';
-          setError(errorMsg);
-          console.error('Error fetching employees', error);
-        } finally {
-          loading;
-        }
+    } catch (error:any) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load Employees";
+
+      setError(errorMsg);
+      console.error("Error fetching employees", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -303,7 +399,7 @@ export function UpdateRawDataPage() {
     };
   }, [showSearchModal]);
 
-  const handleCodeToggle = (id: number) => {
+  const handleCodeToggle = (id: string) => {
     setSelectedCodes(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -319,7 +415,7 @@ export function UpdateRawDataPage() {
     if (selectedCodes.length === tksGroupData.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupData.map(w => w.id));
+      setSelectedCodes(tksGroupData.map(w => w.code));
     }
   };
   const onSelectAll = () => {
@@ -464,7 +560,11 @@ const onClickImport = async ( ) => {
       formData.append("file", xlsxFile, fileName)
       console.log(xlsxFile);
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData)
+        const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
           setImportDataResult(data.data.resultData);
           if (data.data.errors.length > 0){
             console.log(data.data.errors)
@@ -711,8 +811,9 @@ const onClickImport = async ( ) => {
 
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
-                    <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2">
-                      <Upload className="w-4 h-4" />
+                    <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      onClick={onClickImport}>
+                      <Upload className="w-4 h-4" onClick={onClickImport}/>
                       Import
                     </button>
                     {/* <button className="px-6 py-2.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center gap-2">

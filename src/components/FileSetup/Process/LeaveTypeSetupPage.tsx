@@ -545,11 +545,16 @@ export function LeaveTypeSetupPage() {
     setShowSearchModal(true);
   }, []);
 
-  const handleSelectChargeable = useCallback((code: string) => {
+const handleSelectChargeable = useCallback((code: string) => {
     setFormData((prev) => ({ ...prev, chargeableTo: code }));
-    setShowSearchModal(false); setSearchModalTerm('');
+    setShowSearchModal(false);
+    setSearchModalTerm('');
   }, []);
-  
+const filteredSearchData = leaveTypes.filter(
+  (item) =>
+    item.leaveCode.toLowerCase().includes(searchModalTerm.toLowerCase()) ||
+    item.leaveDesc.toLowerCase().includes(searchModalTerm.toLowerCase()),
+);
   // ── Chargeable-To Search Modal ─────────────────────────────────────────────
   const renderSearchModal = () => (
     <>
@@ -588,7 +593,7 @@ export function LeaveTypeSetupPage() {
                   <tbody className="divide-y divide-gray-200">
                     {filteredSearchData.length > 0 ? (
                       filteredSearchData.map((item) => (
-                        <tr key={item.leaveID} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => handleSelectLeaveType(item.leaveCode)}>
+                        <tr key={item.leaveID} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => handleSelectChargeable(item.leaveCode)}>
                           <td className="px-3 py-2 text-sm text-gray-900">{item.leaveCode}</td>
                           <td className="px-3 py-2 text-sm text-gray-600">{item.leaveDesc}</td>
                         </tr>

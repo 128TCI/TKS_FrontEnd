@@ -69,37 +69,37 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
   const [showPassword, setShowPassword] = useState(false);
-const [companyDisplayName, setCompanyDisplayName] = useState('');
+
   // ─── Fetch companies from API on mount ──────────────────────────────────────
-useEffect(() => {
-  const fetchCompanies = async () => {
-    try {
-      const infoResponse = await apiClient.get('/Fs/System/CompanyInformation');
-  const infoList: Array<{ companyCode?: string; companyName?: string }> =
-  Array.isArray(infoResponse.data) ? infoResponse.data : [];
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await apiClient.get('/Security/DatabaseConfiguration/databases');
+        console.log("API response:", response);
+        
+        // Convert response to boolean
+        const isSuccess = ApiService.isApiSuccess(response);
+        console.log("Is success:", isSuccess);   
 
-const names = infoList
-  .filter((info) => info.companyName)
-  .map((info) => info.companyName as string);
+        const servers: string[] = response.data?.servers ?? [];
+        setCompanies(servers);
+        if (servers.length > 0) {
+          setCompany(servers[0]); // default to first company
+        }
+      } catch (err) {
+        console.error('Failed to fetch companies:', err);
+        await showErrorModal("Failed to load company list. Please try again later.");
+        // Fallback list in case the API is unreachable
+        const fallback = ['DEMO COMPANY INC'];
+        setCompanies(fallback);
+        setCompany(fallback[0]);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
 
-setCompanies(names);
-setCompanyDisplayName(names[0] ?? ''); // ← add this
-if (names.length > 0) {
-  setCompany(names[0]);
-}
-    } catch (err) {
-      console.error('Failed to fetch companies:', err);
-      await showErrorModal("Failed to load company list. Please try again later.");
-      const fallback = ['DEMO COMPANY INC'];
-      setCompanies(fallback);
-      setCompany(fallback[0]);
-    } finally {
-      setLoadingCompanies(false);
-    }
-  };
-
-  fetchCompanies();
-}, []);
+    fetchCompanies();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,14 +184,12 @@ if (names.length > 0) {
         <div className="absolute top-40 -right-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000"></div>
       </div>
 
-    {/* Dark Slate Bar with Company Name */}
-<div className="w-full bg-green-600 text-white py-3">
-  <div className="max-w-7xl mx-auto">
-    <p className="text-white tracking-wide">
-      {companyDisplayName || 'DEMO ACCOUNT'}
-    </p>
-  </div>
-</div>
+      {/* Dark Slate Bar with Company Name */}
+      <div className="w-full bg-green-600 text-white py-3">
+        <div className="max-w-7xl mx-auto">
+          <p className="text-white tracking-wide">DEMO ACCOUNT</p>
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-6 relative z-10">

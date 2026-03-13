@@ -33,7 +33,7 @@ type ResponseResultDto<T> = {
 }
 
 export function WorkshiftVariablePage() {
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -76,7 +76,7 @@ export function WorkshiftVariablePage() {
         }
   };
   
-  const handleCodeToggle = (id: number) => {
+  const handleCodeToggle = (id: string) => {
     setSelectedCodes(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -86,7 +86,7 @@ export function WorkshiftVariablePage() {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupList.map(w => w.id));
+      setSelectedCodes(tksGroupList.map(w => w.groupCode));
     }
   };
 
@@ -186,7 +186,11 @@ export function WorkshiftVariablePage() {
 
     if(importType == "workshift-variable"){
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import/ImportWorkshiftVariable`, formData)
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import/ImportWorkshiftVariable`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
         //importDataResult.value = data.resultData || [];
         setImportDataResult(data.data.resultData);
         if (data.data.errors.length > 0){
@@ -218,7 +222,11 @@ export function WorkshiftVariablePage() {
     }
     else if(importType == "workshift-restday"){
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/ImportRestDay/ImportRestDay`, formData)
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/ImportRestDay/ImportRestDay`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
             setImportDataResult([]);

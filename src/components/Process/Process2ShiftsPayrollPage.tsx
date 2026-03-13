@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar, RotateCcw, Check, Users, Building2, Briefcase, CalendarClock, Clock, Search, Play, CheckCircle, Wallet, Grid, Network, Box, RefreshCw } from 'lucide-react';
 import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 import Swal from 'sweetalert2';
 
 interface GroupItem {
@@ -217,104 +218,113 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   // ── Fetch helpers ─────────────────────────────────────────────────────────
+// ADD this
+const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
+  const userName = getLoggedInUsername();
+  const url = userName && userName !== 'Guest'
+    ? `/Fs/Process/TimeKeepGroupSetUp/by-user?userName=${encodeURIComponent(userName)}`
+    : `/Fs/Process/TimeKeepGroupSetUp`;
 
-  // Load all group lists once on mount
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [tks, bra, dep, div, grp, pay, sec, unit] = await Promise.all([
-          apiClient.get('/Fs/Process/TimeKeepGroupSetUp'),
-          apiClient.get('/Fs/Employment/BranchSetUp'),
-          apiClient.get('/Fs/Employment/DepartmentSetUp'),
-          apiClient.get('/Fs/Employment/DivisionSetUp'),
-          apiClient.get('/Fs/Employment/GroupSetUp'),
-          apiClient.get('/Fs/Employment/PayHouseSetUp'),
-          apiClient.get('/Fs/Employment/SectionSetUp'),
-          apiClient.get('/Fs/Employment/UnitSetUp'),
-        ]);
-        const map = (data: any[], idKey: string, codeKey: string, descKey: string): GroupItem[] =>
-          (Array.isArray(data) ? data : []).map(i => ({
-            id:          i[idKey]   ?? i.ID   ?? i.id   ?? 0,
-            code:        i[codeKey] ?? i.code ?? '',
-            description: i[descKey] ?? i.description ?? '',
-          }));
-        setTKSGroupItems(map(tks.data,  'ID',        'groupCode', 'groupDescription'));
-        setBranchItems(map(bra.data,    'braID',     'braCode',   'braDesc'));
-        setDepartmentItems(map(dep.data,'depID',     'depCode',   'depDesc'));
-        setDivisionItems(map(div.data,  'divID',     'divCode',   'divDesc'));
-        setGroupScheduleItems(map(grp.data,'grpSchID','grpCode',  'grpDesc'));
-        setPayHouseItems(map(pay.data,  'lineID',    'lineCode',  'lineDesc'));
-        setSectionItems(map(sec.data,   'secID',     'secCode',   'secDesc'));
-        setUnitItems(map(unit.data,     'unitID',    'unitCode',  'unitDesc'));
-      } catch (err) {
-        console.error('Failed to load group lists:', err);
-      }
-    };
-    load();
-  }, []);
+  const response = await apiClient.get(url);
+  return (response.data ?? []).map((item: any) => ({
+    id: item.ID ?? item.id,
+    code: item.groupCode ?? item.code ?? '',
+    description: item.groupDescription ?? item.description ?? '',
+  })).filter((i: GroupItem) => i.id !== 0);
+};
 
-  // ── Build SP params from active tab + selected group IDs ──────────────────
-  const buildSpParams = useCallback((
-    tab: string,
-    selectedIds: number[],
-    allItems: GroupItem[],
-    status: 'active' | 'inactive' | 'all'
-  ) => {
-    const selectedCodes = allItems
-      .filter(i => selectedIds.includes(i.id))
-      .map(i => i.code)
-      .join(',');
-    const empty = '';
-    return {
-      Transaction:    status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
-      GroupCodes:     tab === 'TK Group'       ? selectedCodes : empty,
-      Branches:       tab === 'Branch'         ? selectedCodes : empty,
-      Divisions:      tab === 'Division'       ? selectedCodes : empty,
-      Departments:    tab === 'Department'     ? selectedCodes : empty,
-      Sections:       tab === 'Section'        ? selectedCodes : empty,
-      Units:          tab === 'Unit'           ? selectedCodes : empty,
-      Lines:          empty,
-      Areas:          empty,
-      Locations:      empty,
-      GroupSchedules: tab === 'Group Schedule' ? selectedCodes : empty,
-    };
-  }, []);
+  const fetchBranchData = async (): Promise<GroupItem[]> => {
+    const response = await apiClient.get('/Fs/Employment/BranchSetUp');
+    return response.data.map((item: any) => ({
+      id: item.braID || item.ID,
+      code: item.braCode || item.code,
+      description: item.braDesc || item.description,
+    }));
+  };
 
-  // ── Fetch employees via SP when groups selected, master file otherwise ─────
-  const fetchFilteredEmployees = useCallback(async (
-    tab: string,
-    selectedIds: number[],
-    allItems: GroupItem[],
-    status: 'active' | 'inactive' | 'all'
-  ) => {
-    setLoadingEmployees(true);
-    setCurrentEmpPage(1);
-    try {
-      if (selectedIds.length === 0) {
-        const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-        const list = Array.isArray(response.data) ? response.data : [];
-        setEmployeeItems(list.map((item: any): EmployeeItem => ({
-          id:                item.empID          ?? item.ID          ?? item.id ?? 0,
-          code:              item.empCode         || item.code        || '',
-          name:              `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
-        })));
-      } else {
-        const params = buildSpParams(tab, selectedIds, allItems, status);
-        const response = await apiClient.post('/Utilities/GetFilteredEmployees', params);
-        const list = Array.isArray(response.data) ? response.data : [];
-        setEmployeeItems(list.map((item: any): EmployeeItem => ({
-          id:                item.empID          ?? item.ID          ?? item.id ?? 0,
-          code:              item.empCode         ?? item.EmpCode     ?? item.code ?? '',
-          name:              `${item.lName ?? item.LName ?? ''}, ${item.fName ?? item.FName ?? ''} ${item.mName ?? item.MName ?? ''}`.trim(),
-        })));
-      }
-    } catch (err) {
-      console.error('Failed to fetch employees:', err);
-      setEmployeeItems([]);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  }, [buildSpParams]);
+  const fetchDepartmentData = async (): Promise<GroupItem[]> => {
+    const response = await apiClient.get('/Fs/Employment/DepartmentSetUp');
+    return response.data.map((item: any) => ({
+      id: item.depID || item.ID,
+      code: item.depCode || item.code,
+      description: item.depDesc || item.description,
+    }));
+  };
+
+  const fetchDivisionData = async (): Promise<GroupItem[]> => {
+    const response = await apiClient.get('/Fs/Employment/DivisionSetUp');
+    return response.data.map((item: any) => ({
+      id: item.divID || item.ID,
+      code: item.divCode || item.code,
+      description: item.divDesc || item.description,
+    }));
+  };
+
+  const fetchGroupScheduleData = async (): Promise<GroupItem[]> => {
+    const response = await apiClient.get('/Fs/Employment/GroupSetUp');
+    const list = Array.isArray(response.data) ? response.data : [];
+    return list.map((item: any) => ({
+      id: item.grpSchID || item.id || item.ID,
+      code: item.grpCode || item.code,
+      description: item.grpDesc || item.description,
+    }));
+  };
+
+  const fetchPayHouseData = async (): Promise<GroupItem[]> => {
+    const response = await apiClient.get('/Fs/Employment/PayHouseSetUp');
+    const list = Array.isArray(response.data) ? response.data : [];
+    return list.map((item: any) => ({
+      id: item.lineID ?? item.ID ?? item.id,
+      code: item.lineCode ?? item.code,
+      description: item.lineDesc ?? item.Description ?? item.description,
+    }));
+  };
+
+  const fetchSectionData = async (): Promise<GroupItem[]> => {
+    const response = await apiClient.get('/Fs/Employment/SectionSetUp');
+    const list = Array.isArray(response.data) ? response.data : [];
+    return list.map((item: any) => ({
+      id: item.secID ?? item.ID ?? item.id,
+      code: item.secCode ?? item.sectionCode ?? item.code,
+      description: item.secDesc ?? item.Description ?? item.description,
+    }));
+  };
+
+  const fetchUnitData = async (): Promise<GroupItem[]> => {
+    const response = await apiClient.get('/Fs/Employment/UnitSetUp');
+    return response.data.map((item: any) => ({
+      id: item.unitID || item.ID,
+      code: item.unitCode || item.code,
+      description: item.unitDesc || item.description,
+    }));
+  };
+
+const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
+    const { employees } = await fetchEmployeesService();
+    return employees.map((item: any): EmployeeItem => ({
+        id: item.empID ?? item.ID ?? item.id,
+        code: item.empCode || item.code || '',
+        name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
+        tkGroup:           item.tkGroup       ?? item.tKGroup       ?? item.groupCode      ?? item.tkGroupCode ?? '',
+        branchCode:        item.braCode       ?? item.branchCode    ?? item.branch         ?? '',
+        departmentCode:    item.depCode       ?? item.departmentCode?? item.department     ?? '',
+        divisionCode:      item.divCode       ?? item.divisionCode  ?? item.division       ?? '',
+        groupScheduleCode: item.grpCode       ?? item.groupSchedule ?? item.grpSchCode     ?? '',
+        payHouseCode:      item.lineCode      ?? item.payCode       ?? item.payHouseCode   ?? item.payHouse ?? '',
+        sectionCode:       item.secCode       ?? item.sectionCode   ?? item.section        ?? '',
+        unitCode:          item.unitCode      ?? item.unit          ?? '',
+    }));
+};
+
+  useEffect(() => { fetchTKSGroupData().then(setTKSGroupItems); }, []);
+  useEffect(() => { fetchBranchData().then(setBranchItems); }, []);
+  useEffect(() => { fetchDepartmentData().then(setDepartmentItems); }, []);
+  useEffect(() => { fetchDivisionData().then(setDivisionItems); }, []);
+  useEffect(() => { fetchGroupScheduleData().then(setGroupScheduleItems); }, []);
+  useEffect(() => { fetchPayHouseData().then(setPayHouseItems); }, []);
+  useEffect(() => { fetchSectionData().then(setSectionItems); }, []);
+  useEffect(() => { fetchUnitData().then(setUnitItems); }, []);
+  useEffect(() => { fetchEmployeeData().then(setEmployeeItems); }, []);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const getCurrentData = useCallback((): GroupItem[] => {
@@ -358,7 +368,51 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
     item.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
+const fetchFilteredEmployees = useCallback(async (
+  tab: typeof activeTab,
+  selectedIds: number[],
+  allItems: GroupItem[],
+  status: 'active' | 'inactive' | 'all'
+) => {
+  setLoadingEmployees(true);
+  try {
+    const all = await fetchEmployeeData();
 
+    let filtered = all;
+
+    // Filter by status
+    // (assumes employeeService returns an `empStatus` or similar field — adjust if needed)
+    // If your EmployeeItem doesn't carry a status field, remove this block
+    // filtered = status === 'all' ? filtered : filtered.filter(e => ...);
+
+    // Filter by selected group codes
+    if (selectedIds.length > 0) {
+      const selectedCodes = allItems
+        .filter(g => selectedIds.includes(g.id))
+        .map(g => g.code);
+
+      filtered = filtered.filter(emp => {
+        switch (tab) {
+          case 'TK Group':        return selectedCodes.includes(emp.tkGroup ?? '');
+          case 'Branch':          return selectedCodes.includes(emp.branchCode ?? '');
+          case 'Department':      return selectedCodes.includes(emp.departmentCode ?? '');
+          case 'Division':        return selectedCodes.includes(emp.divisionCode ?? '');
+          case 'Group Schedule':  return selectedCodes.includes(emp.groupScheduleCode ?? '');
+          case 'Pay House':       return selectedCodes.includes(emp.payHouseCode ?? '');
+          case 'Section':         return selectedCodes.includes(emp.sectionCode ?? '');
+          case 'Unit':            return selectedCodes.includes(emp.unitCode ?? '');
+          default:                return true;
+        }
+      });
+    }
+
+    setEmployeeItems(filtered);
+  } catch (err) {
+    console.error('Failed to fetch filtered employees', err);
+  } finally {
+    setLoadingEmployees(false);
+  }
+}, []);
   // Employee list is already filtered by the SP via fetchFilteredEmployees;
   // apply local text search on top
   const filteredEmployees = employeeItems.filter(emp =>

@@ -44,7 +44,7 @@ export function LeaveApplicationPage() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
@@ -94,7 +94,7 @@ export function LeaveApplicationPage() {
         }
   };
 
-  const handleCodeToggle = (id: number) => {
+  const handleCodeToggle = (id: string) => {
     setSelectedCodes(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -104,7 +104,7 @@ export function LeaveApplicationPage() {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupList.map(w => w.id));
+      setSelectedCodes(tksGroupList.map(w => w.groupCode));
     }
   };
   const getDefaultSheetName = (sheetNames: string[]) => {
@@ -247,9 +247,12 @@ const onClickImport = async ( ) => {
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("listNotEqual", String(listNotEqual));
     formData.append("file", xlsxFile, fileName)
-    console.log(xlsxFile);
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportLeaveApplicationDto[]>>(`/Utilities/Import/ImportLeaveApplication`, formData)
+      const data = await apiClient.post<ResponseResultDto<ImportLeaveApplicationDto[]>>(`/Utilities/Import/ImportLeaveApplication`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
         setImportDataResult(data.data.resultData);
         if (data.data.errors.length > 0){
           console.log(data.data.errors)

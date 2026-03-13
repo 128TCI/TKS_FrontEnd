@@ -245,16 +245,21 @@ export function ExportNAVPage() {
   useEffect(() => { setCurrentGroupPage(1); setGroupSearchTerm(''); }, [activeTab]);
 
   useEffect(() => {
-    apiClient.get('/Fs/Process/TimeKeepGroupSetUp').then(res => {
-      const items: GroupItem[] = res.data.map((i: any) => ({
-        id: i.ID ?? i.id,
-        code: i.groupCode ?? i.code,
-        description: i.groupDescription ?? i.description,
-      }));
-      setTKSGroupItems(items);
-      setSelectedTKGroups(items.map(i => i.id));
-    }).catch(() => {});
-  }, []);
+    const userName = getLoggedInUsername();
+  const url = userName && userName !== 'Guest'
+    ? `/Fs/Process/TimeKeepGroupSetUp/by-user?userName=${encodeURIComponent(userName)}`
+    : `/Fs/Process/TimeKeepGroupSetUp`;
+
+  apiClient.get(url).then(res => {
+    const items: GroupItem[] = (res.data ?? []).map((i: any) => ({
+      id: i.ID ?? i.id,
+      code: i.groupCode ?? i.code ?? '',
+      description: i.groupDescription ?? i.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+    setTKSGroupItems(items);
+    setSelectedTKGroups([]);
+  }).catch(() => {});
+}, []);
 
   useEffect(() => {
     apiClient.get('/Fs/Employment/BranchSetUp').then(res => {
@@ -264,7 +269,7 @@ export function ExportNAVPage() {
         description: i.braDesc ?? i.description,
       }));
       setBranchItems(items);
-      setSelectedBranches(items.map(i => i.id));
+      setSelectedBranches([]); // unchecked on load / refresh
     }).catch(() => {});
   }, []);
 
@@ -276,7 +281,7 @@ export function ExportNAVPage() {
         description: i.depDesc ?? i.description,
       }));
       setDepartmentItems(items);
-      setSelectedDepartments(items.map(i => i.id));
+      setSelectedDepartments([]); // unchecked on load / refresh
     }).catch(() => {});
   }, []);
 
@@ -289,7 +294,7 @@ export function ExportNAVPage() {
         description: i.desDesc ?? i.description,
       }));
       setGroupScheduleItems(items);
-      setSelectedGroupSchedules(items.map(i => i.id));
+      setSelectedGroupSchedules([]); // unchecked on load / refresh
     }).catch(() => {});
   }, []);
 
@@ -302,7 +307,7 @@ export function ExportNAVPage() {
         description: i.divDesc ?? i.description,
       }));
       setPayHouseItems(items);
-      setSelectedPayHouses(items.map(i => i.id));
+      setSelectedPayHouses([]); // unchecked on load / refresh
     }).catch(() => {});
   }, []);
 
@@ -315,7 +320,7 @@ export function ExportNAVPage() {
         description: i.secDesc ?? i.Description ?? i.description,
       }));
       setSectionItems(items);
-      setSelectedSections(items.map(i => i.id));
+      setSelectedSections([]); // unchecked on load / refresh
     }).catch(() => {});
   }, []);
 
@@ -466,7 +471,7 @@ export function ExportNAVPage() {
       });
 
       const cd = response.headers['content-disposition'] as string | undefined;
-      let fileName = `NAV_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+      let fileName = `NAV_Export_${new Date().toISOString().slice(0, 10)}.xlsx`;
       if (cd) {
         const match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
         if (match?.[1]) fileName = match[1].replace(/['"]/g, '').trim();

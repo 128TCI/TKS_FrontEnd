@@ -77,7 +77,7 @@ export function Navigation({ onLogout }: NavigationProps) {
       if (item.separator) { acc.push(item); return acc; }
       if (item.children) {
         const visibleChildren = filterSubmenu(item.children);
-        if (visibleChildren.length > 0) acc.push({ ...item, children: visibleChildren });
+        if (visibleChildren.filter(c => !c.separator).length > 0) acc.push({ ...item, children: visibleChildren });
         return acc;
       }
       if (canViewPath(item.path)) acc.push(item);

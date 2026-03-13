@@ -177,7 +177,6 @@ export const OtherPoliciesTabContent = forwardRef<
       useState<GroupSetUpOtherPoliciesItem[]>([]);
 
     // Other Policies States
-    const [groupCode, setGroupCode] = useState(tksGroupCode);
     const [useDefRestDay, setUseDefRestDay] = useState(false);
     const [restDayWithWorkShift, setRestDayWithWorkShift] = useState(false);
     const [defRestDay1, setDefRestDay1] = useState("");
@@ -462,7 +461,7 @@ export const OtherPoliciesTabContent = forwardRef<
     const startAllowPerClassIndex =
       (currentAllowPerClassPage - 1) * itemsPerPage;
     const endAllowPerClassIndex = startAllowPerClassIndex + itemsPerPage;
-
+    // dito
     // For Daily Schedule Pagination and Search
     const {
       filteredData: filteredDailySched,
@@ -821,6 +820,7 @@ export const OtherPoliciesTabContent = forwardRef<
         refNo: item.refNo,
         allowanceCode: item.allowanceCode,
         workShiftCode: item.workShiftCode,
+        classificationCode: item.classificationCode
       }));
     };
 
@@ -1268,6 +1268,44 @@ export const OtherPoliciesTabContent = forwardRef<
       handleSaveNew,
       handleDelete,
     }));
+
+    useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (showTardBrackModal) {
+          setShowTardBrackModal(false);
+        } else if (showUnderTimeBrackModal) {
+          setShowUnderTimeBrackModal(false);
+        } else if (showAccumulateBrackModal) {
+          setShowAccumulateBrackModal(false);
+        } else if (showDailySchedModal) {
+          setShowDailySchedModal(false);
+        } else if (showEarningCodeModal) {
+          setShowEarningCodeModal(false);
+        } else if (showAllowPerClassModal) {
+          setShowAllowPerClassModal(false);
+        } else if (showAllowBracketCodeModal) {
+          setShowAllowBracketCodeModal(false);
+        } else if (showAllowBrackByEmpStatModal) {
+          setShowAllowBrackByEmpStatModal(false);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleEscKey);
+    return () => {
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [
+    showTardBrackModal,
+    showUnderTimeBrackModal,
+    showAccumulateBrackModal,
+    showDailySchedModal,
+    showEarningCodeModal,
+    showAllowPerClassModal,
+    showAllowBracketCodeModal,
+    showAllowBrackByEmpStatModal,
+  ]);
 
     return (
       <div className="space-y-6">
@@ -1749,7 +1787,7 @@ export const OtherPoliciesTabContent = forwardRef<
                     value={calamYearsOfService}
                     onChange={(e) =>
                       isEditMode &&
-                      setCalamYearsOfService(Number(e.target.value))
+                      setCalamYearsOfService(parseFloat(e.target.value))
                     }
                     readOnly={!isEditMode}
                     className={`w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-white" : ""}`}
@@ -1777,7 +1815,7 @@ export const OtherPoliciesTabContent = forwardRef<
                     Allowance Amount
                   </label>
                   <input
-                    type="text"
+                    type="number"
                     value={calamAmount}
                     onChange={(e) =>
                       isEditMode && setCalamAmount(parseFloat(e.target.value))
@@ -2867,7 +2905,9 @@ export const OtherPoliciesTabContent = forwardRef<
             onClick={() => setShowAllowPerClassModal(false)}
             className="fixed inset-0 flex items-center justify-center z-50"
           >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-medium">
@@ -3027,7 +3067,9 @@ export const OtherPoliciesTabContent = forwardRef<
             onClick={() => setShowAllowBracketCodeModal(false)}
             className="fixed inset-0 flex items-center justify-center z-50"
           >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-medium">
@@ -3177,7 +3219,9 @@ export const OtherPoliciesTabContent = forwardRef<
             className="fixed inset-0 flex items-center justify-center z-50"
             onClick={() => setShowAllowBrackByEmpStatModal(false)}
           >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-medium">

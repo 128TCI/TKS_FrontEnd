@@ -94,9 +94,10 @@ import { ImportEmployeeMasterfilePage } from '../components/Import/ImportEmploye
 import { ImportLogsFromDeviceV2Page } from '../components/Import/ImportLogsFromDeviceV2Page';
 import { UpdateRawDataPage } from '../components/Import/UpdateRawDataPage';
 import { ImportAdjustmentPage } from '../components/Import/ImportAdjustmentPage';
-import { OvertimeApplication2ShiftsPage } from '../components/Import/OvertimeApplication2ShiftsPage';
-import { WorkshiftVariable2ShiftsPage } from '../components/Import/WorkshiftVariable2ShiftsPage';
-import { ImportLogsFromDevice2ShiftsPage } from '../components/Import/ImportLogsFromDevice2ShiftsPage';
+//import { OvertimeApplication2ShiftsPage } from '../components/import {  } from "module";/OvertimeApplication2ShiftsPage';
+import { OvertimeApplication2ShiftsPage } from '../components/Import/2Shifts/OvertimeApplication2ShiftsPage';
+import { WorkshiftVariable2ShiftsPage } from '../components/Import/2Shifts/WorkshiftVariable2ShiftsPage';
+import { ImportLogsFromDevice2ShiftsPage } from '../components/Import/2Shifts/ImportLogsFromDevice2ShiftsPage';
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 import { ExportPayrollDataPage } from '../components/Export/ExportPayrollDataPage';
@@ -154,7 +155,6 @@ import { SecurityManagerPage } from '../components/Security/SecurityManagerPage'
 import { AuditTrailPage } from '../components/Security/AuditTrailPage';
 import { EmailConfigurationPage } from '../components/Security/EmailConfigurationPage';
 import { CreateNewDatabasePage } from '../components/Security/CreateNewDatabasePage';
-import { ChangePasswordPage } from '../components/Security/ChangePasswordPage';
 
 // ─── Unknown Page Path ─────────────────────────────────────────────────────────────────
 import { NotFoundPage } from '../components/NotFoundPage';
@@ -169,11 +169,19 @@ interface AppRoutesProps {
 }
 
 export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }: AppRoutesProps) {
+    const token = localStorage.getItem('authToken');
+
   return (
     <Routes>
       {/* ── Public Routes ─────────────────────────────────────────── */}
-      <Route path="/login" element={<LoginPage onLogin={onLogin} onForgotPassword={onForgotPassword} />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage onBack={onBackToLogin} />} />
+      <Route
+        path="/login"
+        element={token ? <Navigate to="/home" replace /> : <LoginPage onLogin={onLogin} onForgotPassword={onForgotPassword} />}
+      />
+      <Route
+        path="/forgot-password"
+        element={token ? <Navigate to="/home" replace /> : <ForgotPasswordPage onBack={onBackToLogin} />}
+      />
 
       {/* ── Protected Routes (all share Navigation + Footer layout) ── */}
       <Route element={<ProtectedLayout onLogout={onLogout} />}>
@@ -255,7 +263,6 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
         <Route path="/maintenance/rawdata-ot-gap" element={<RawdataOtGapPage />} />
         <Route path="/maintenance/rawdata-on-straight-duty" element={<RawdataOnStraightDutyPage />} />
         <Route path="/maintenance/processed-data" element={<ProcessedDataPage />} />
-        <Route path="/maintenance/update-rawdata-online" element={<UpdateRawdataOnlinePage />} />
         {/* 2 Shifts */}
         <Route path="/maintenance/2-shifts/employee-timekeep-config" element={<TwoShiftsEmployeeTimekeepConfigPage />} />
         <Route path="/maintenance/2-shifts/raw-data" element={<TwoShiftsRawDataPage />} />
@@ -342,8 +349,6 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
         <Route path="/security/audit-trail" element={<AuditTrailPage />} />
         <Route path="/security/email-configuration" element={<EmailConfigurationPage />} />
         <Route path="/security/create-new-database" element={<CreateNewDatabasePage />} />
-        <Route path="/security/change-password" element={<ChangePasswordPage onBack={onBackToLogin} />} />
-
 
         {/* Catch-all: unknown protected paths → home */}
         <Route path="*" element={<NotFoundPage />} />

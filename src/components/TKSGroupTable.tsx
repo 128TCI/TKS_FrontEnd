@@ -3,8 +3,8 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
 interface TKSGroupTableProps {
-  selectedCodes: number[];
-  onToggle: (id: number) => void;
+  selectedCodes: string[];
+  onToggle: (id: string) => void;
   onSelectAll: () => void;
 }
 
@@ -181,8 +181,8 @@ export function TKSGroupTable({selectedCodes, onToggle, onSelectAll }: TKSGroupT
                   <td className="px-4 py-2">
                     <input
                       type="checkbox"
-                      checked={selectedCodes.includes(item.id)}
-                      onChange={() => onToggle(item.id)}
+                      checked={selectedCodes.includes(item.groupCode)}
+                      onChange={() => onToggle(item.groupCode)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                   </td>
