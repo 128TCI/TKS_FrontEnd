@@ -54,39 +54,46 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
-  const [username,          setUsername]          = useState('');
-  const [password,          setPassword]          = useState('');
-  const [company,           setCompany]           = useState('');
-  const [companies,         setCompanies]         = useState<string[]>([]);
-  const [loadingCompanies,  setLoadingCompanies]  = useState(true);
-  const [windowsAuth,       setWindowsAuth]       = useState(false);
-  const [loading,           setLoading]           = useState(false);
-  const [error,             setError]             = useState('');
-  const [showPassword,      setShowPassword]      = useState(false);
-  const [buildDate,         setBuildDate]         = useState('');
-  const [toast,             setToast]             = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [company,  setCompany]  = useState('');
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [windowsAuth, setWindowsAuth] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+const [companyDisplayName, setCompanyDisplayName] = useState('');
+  // ─── Fetch companies from API on mount ──────────────────────────────────────
+useEffect(() => {
+  const fetchCompanies = async () => {
+    try {
+      const infoResponse = await apiClient.get('/Fs/System/CompanyInformation');
+  const infoList: Array<{ companyCode?: string; companyName?: string }> =
+  Array.isArray(infoResponse.data) ? infoResponse.data : [];
 
-  // ── Fetch companies on mount ─────────────────────────────────────────────
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const res = await apiClient.get('/Fs/System/CompanyInformation');
-        const infoList: Array<{ companyName?: string }> =
-          Array.isArray(res.data) ? res.data : [];
-        const names = infoList.filter(i => i.companyName).map(i => i.companyName as string);
-        setCompanies(names);
-        if (names.length > 0) setCompany(names[0]);
-      } catch {
-        await showErrorModal("Failed to load company list. Please try again later.");
-        const fallback = ['DEMO COMPANY INC'];
-        setCompanies(fallback);
-        setCompany(fallback[0]);
-      } finally {
-        setLoadingCompanies(false);
-      }
-    };
-    fetchCompanies();
-  }, []);
+const names = infoList
+  .filter((info) => info.companyName)
+  .map((info) => info.companyName as string);
+
+setCompanies(names);
+setCompanyDisplayName(names[0] ?? ''); // ← add this
+if (names.length > 0) {
+  setCompany(names[0]);
+}
+    } catch (err) {
+      console.error('Failed to fetch companies:', err);
+      await showErrorModal("Failed to load company list. Please try again later.");
+      const fallback = ['DEMO COMPANY INC'];
+      setCompanies(fallback);
+      setCompany(fallback[0]);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  fetchCompanies();
+}, []);
 
   // ── Fetch build version on mount ────────────────────────────────────────
   useEffect(() => {
@@ -184,12 +191,14 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
         <div className="absolute top-40 -right-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000"></div>
       </div>
 
-      {/* Top bar */}
-      <div className="w-full bg-green-600 text-white py-3">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-white tracking-wide">DEMO ACCOUNT</p>
-        </div>
-      </div>
+    {/* Dark Slate Bar with Company Name */}
+<div className="w-full bg-green-600 text-white py-3">
+  <div className="max-w-7xl mx-auto">
+    <p className="text-white tracking-wide">
+      {companyDisplayName || 'DEMO ACCOUNT'}
+    </p>
+  </div>
+</div>
 
       {/* Main content */}
       <div className="flex-1 flex items-center justify-center p-6 relative z-10">

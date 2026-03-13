@@ -319,20 +319,27 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     }));
   };
 
-const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
+const fetchEmployeeData = async (status: 'active' | 'inactive' | 'all' = 'all'): Promise<EmployeeItem[]> => {
     const { employees } = await fetchEmployeesService();
-    return employees.map((item: any): EmployeeItem => ({
-        id: item.empID ?? item.ID ?? item.id,
-        code: item.empCode || item.code || '',
-        name: `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
-        tkGroup:           item.tkGroup       ?? item.tKGroup       ?? item.groupCode      ?? item.tkGroupCode ?? '',
-        branchCode:        item.braCode       ?? item.branchCode    ?? item.branch         ?? '',
-        departmentCode:    item.depCode       ?? item.departmentCode?? item.department     ?? '',
-        divisionCode:      item.divCode       ?? item.divisionCode  ?? item.division       ?? '',
-        groupScheduleCode: item.grpCode       ?? item.groupSchedule ?? item.grpSchCode     ?? '',
-        payHouseCode:      item.lineCode      ?? item.payCode       ?? item.payHouseCode  ?? item.payHouse ?? '',
-        sectionCode:       item.secCode       ?? item.sectionCode   ?? item.section        ?? '',
-        unitCode:          item.unitCode      ?? item.unit          ?? '',
+
+    const filtered = employees.filter((item: any) => {
+        if (status === 'active')   return item.active === true;
+        if (status === 'inactive') return item.active === false;
+        return true; // 'all'
+    });
+
+    return filtered.map((item: any): EmployeeItem => ({
+        id:                item.empID        ?? item.ID   ?? item.id,
+        code:              item.empCode      || item.code || '',
+        name:              `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
+        tkGroup:           item.tksGroupCode ?? item.tkGroup ?? item.groupCode ?? '',
+        branchCode:        item.braCode      ?? item.branchCode    ?? item.branch      ?? '',
+        departmentCode:    item.depCode      ?? item.departmentCode?? item.department  ?? '',
+        divisionCode:      item.divCode      ?? item.divisionCode  ?? item.division    ?? '',
+        groupScheduleCode: item.grpCode      ?? item.groupSchedule ?? item.grpSchCode  ?? '',
+        payHouseCode:      item.lineCode     ?? item.payCode       ?? item.payHouseCode ?? item.payHouse ?? '',
+        sectionCode:       item.secCode      ?? item.sectionCode   ?? item.section     ?? '',
+        unitCode:          item.unitCode     ?? item.unit          ?? '',
     }));
 };
 
@@ -378,11 +385,10 @@ const fetchFilteredEmployees = useCallback(async (
 ) => {
   setLoadingEmployees(true);
   try {
-    const all = await fetchEmployeeData();
+    const all = await fetchEmployeeData(status);  // ← passes status for active/inactive/all filter
 
     let filtered = all;
 
-    // Filter by selected group codes
     if (selectedIds.length > 0) {
       const selectedCodes = allItems
         .filter(g => selectedIds.includes(g.id))
