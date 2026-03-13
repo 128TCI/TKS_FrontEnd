@@ -280,7 +280,7 @@ export function OvertimeApplicationPage() {
     formData.append("file", xlsxFile, fileName);
 
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportOvertimeApplicationDto[]>>(`/Utilities/Import/ImportOvertimeApplication`, formData, {
+      const data = await apiClient.post<ResponseResultDto<ImportOvertimeApplicationDto[]>>(`/Import/ImportOvertimeApplication`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }

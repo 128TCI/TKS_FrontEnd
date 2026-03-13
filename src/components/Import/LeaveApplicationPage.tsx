@@ -248,7 +248,7 @@ const onClickImport = async ( ) => {
     formData.append("listNotEqual", String(listNotEqual));
     formData.append("file", xlsxFile, fileName)
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportLeaveApplicationDto[]>>(`/Utilities/Import/ImportLeaveApplication`, formData, {
+      const data = await apiClient.post<ResponseResultDto<ImportLeaveApplicationDto[]>>(`/Import/ImportLeaveApplication`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
