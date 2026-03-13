@@ -48,6 +48,7 @@ export function Navigation({ onLogout }: NavigationProps) {
   const [hoveredSubmenu, setHoveredSubmenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showVersionTooltip, setShowVersionTooltip] = useState(false);
+  const [navToast,           setNavToast]           = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileExpandedSubmenus, setMobileExpandedSubmenus] = useState<Set<string>>(new Set());
   const [mobileExpandedMainMenu, setMobileExpandedMainMenu] = useState<string | null>(null);
@@ -203,6 +204,23 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
     } finally {
       setLoadingInfo(false);
     }
+  };
+
+  // ── Copy build info to clipboard ─────────────────────────────────────────
+  const handleCopyBuildInfo = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!systemInfo) return;
+    const text = `${systemInfo.appVersion} ${systemInfo.buildDate}`;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    setNavToast(true);
+    setTimeout(() => setNavToast(false), 2500);
   };
 
   // ── Menu definition ────────────────────────────────────────────────────────
@@ -708,31 +726,48 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
 
             {/* ✅ FIX 3: onMouseEnter now calls fetchSystemInfo() AND shows tooltip */}
             <div
-              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-slate-600 rounded-lg relative cursor-pointer"
+              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-700 hover:bg-green-800 rounded-lg relative cursor-pointer transition-colors duration-150"
               onMouseEnter={() => { fetchSystemInfo(); setShowVersionTooltip(true); }}
               onMouseLeave={() => setShowVersionTooltip(false)}
+              onClick={() => goTo('/security/change-password')}
             >
               <User className="w-4 h-4 text-slate-200" />
               <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>
+              <span className="text-green-300 text-xs">🔑</span>
 
-              {/* ✅ FIX 4: proper loading / data / error states in tooltip */}
+              {/* Tooltip + copy toast */}
               {showVersionTooltip && (
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2.5 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fadeIn min-w-[180px]">
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fadeIn min-w-[180px]">
                   {loadingInfo ? (
-                    <div className="text-sm text-blue-200">Loading...</div>
+                    <div className="text-sm text-green-200">Loading...</div>
                   ) : systemInfo ? (
-                    <>
-                      <div className="text-sm font-semibold tracking-wide">
+                    <button
+                      type="button"
+                      onClick={handleCopyBuildInfo}
+                      onMouseDown={e => e.preventDefault()}
+                      title="Click to copy build info"
+                      className="w-full text-left focus:outline-none group"
+                    >
+                      <div className="text-sm font-semibold tracking-wide group-hover:text-green-100 transition-colors">
                         {systemInfo.appVersion} {systemInfo.buildDate}
                       </div>
-                      <div className="text-xs text-blue-200 mt-0.5">
+                      <div className="text-xs text-green-200 mt-0.5">
                         SQL {systemInfo.sqlVersion}
                       </div>
-                    </>
+                    </button>
                   ) : (
-                    <div className="text-sm text-blue-200">Unable to load</div>
+                    <div className="text-sm text-green-200">Unable to load</div>
                   )}
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-blue-600 rotate-45" />
+                  <div className="mt-2 pt-2 border-t border-green-500 text-xs text-green-200 text-center">
+                    Click to change password
+                  </div>
+                  {/* Toast inside tooltip */}
+                  <div className={`mt-2 text-center text-xs transition-all duration-300 ${
+                    navToast ? 'text-green-300 opacity-100' : 'opacity-0 h-0 mt-0 overflow-hidden'
+                  }`}>
+                    ✓ Build info copied
+                  </div>
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45" />
                 </div>
               )}
             </div>

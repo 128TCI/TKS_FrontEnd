@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, RefreshCw } from 'lucide-react';
+import { Clock, Save } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showErrorModal, showSuccessModal } from '../../services/apiService';
@@ -117,7 +117,7 @@ export function UpdateWorkshiftRawdataPage() {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-white" />
+                  <Save className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-3">
@@ -224,8 +224,8 @@ export function UpdateWorkshiftRawdataPage() {
                   </div>
                   <div className="flex justify-end pt-4 border-t border-gray-200">
                     <button onClick={handleUpdate} disabled={isUpdating}
-                      className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                      <RefreshCw className="w-4 h-4" />
+                      className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Save className="w-4 h-4" />
                       {isUpdating ? 'Updating…' : 'Update'}
                     </button>
                   </div>

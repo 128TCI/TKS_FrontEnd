@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Search, X, Calendar as CalendarIcon, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, RefreshCw } from 'lucide-react';
+import { Check, Search, X, Calendar as CalendarIcon, Save, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, RefreshCw } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -241,7 +241,7 @@ export function UpdateBatchRestDayPage() {
 
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center"><CalendarIcon className="w-5 h-5 text-white" /></div>
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center"><Save className="w-5 h-5 text-white" /></div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-3">Update employee rest day assignments in batch. Choose between fixed, variable, or by rest day setup configuration.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
@@ -437,8 +437,8 @@ export function UpdateBatchRestDayPage() {
                         <span className="text-sm text-gray-700">Delete Existing Rest Day</span>
                       </label>
                       <button onClick={handleUpdate} disabled={isUpdating}
-                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <RefreshCw className="w-4 h-4" />{isUpdating ? 'Updating…' : 'Update'}
+                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Save className="w-4 h-4" />{isUpdating ? 'Updating…' : 'Update'}
                       </button>
                     </div>
                   </div>
