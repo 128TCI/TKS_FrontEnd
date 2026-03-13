@@ -1381,7 +1381,7 @@ export function ExportPayrollDataPage() {
           </div>
         </div>
       </div>
-      <Footer />
+<Footer />
     </div>
   );
 }

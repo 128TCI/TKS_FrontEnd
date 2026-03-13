@@ -126,8 +126,8 @@ apiClient.interceptors.response.use(
 
 function redirectToLogin() {
   tokenStorage.clear();
-  if (window.location.pathname !== '/128_TKS/Login') {
-    window.location.href = '/128_TKS/Login';
+  if (window.location.pathname !== '/128_TKS_LATEST/Login') {
+    window.location.href = '/128_TKS_LATEST/Login';
   }
 }
 

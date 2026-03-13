@@ -872,7 +872,7 @@ const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
           </div>
         </div>
       </div>
-      <Footer />
-    </div>
-  );
-} 
+ <Footer />
+     </div>
+   );
+ }  
