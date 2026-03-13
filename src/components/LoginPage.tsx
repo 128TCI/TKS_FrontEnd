@@ -96,29 +96,29 @@ if (names.length > 0) {
 }, []);
 
   // ── Fetch build version on mount ────────────────────────────────────────
-  useEffect(() => {
-    apiClient.get('/api/SystemInfo/version')
-      .then(res => setBuildDate(res.data?.buildDate ?? ''))
-      .catch(() => {});
-  }, []);
+  // useEffect(() => {
+  //   apiClient.get('/api/SystemInfo/version')
+  //     .then(res => setBuildDate(res.data?.buildDate ?? ''))
+  //     .catch(() => {});
+  // }, []);
 
-  // ── Copy build info to clipboard ─────────────────────────────────────────
-  const handleCopyBuildInfo = async () => {
-    if (!buildDate) return;
-    try {
-      await navigator.clipboard.writeText(buildDate);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = buildDate;
-      ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-    setToast(true);
-    setTimeout(() => setToast(false), 2500);
-  };
+  // // ── Copy build info to clipboard ─────────────────────────────────────────
+  // const handleCopyBuildInfo = async () => {
+  //   if (!buildDate) return;
+  //   try {
+  //     await navigator.clipboard.writeText(buildDate);
+  //   } catch {
+  //     const ta = document.createElement('textarea');
+  //     ta.value = buildDate;
+  //     ta.style.position = 'fixed'; ta.style.opacity = '0';
+  //     document.body.appendChild(ta);
+  //     ta.select();
+  //     document.execCommand('copy');
+  //     document.body.removeChild(ta);
+  //   }
+  //   setToast(true);
+  //   setTimeout(() => setToast(false), 2500);
+  // };
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -326,31 +326,12 @@ if (names.length > 0) {
             </form>
           </div>
 
-          {/* Version / build date */}
-          <div className="text-center mt-6 relative">
-            {buildDate ? (
-              <button
-                type="button"
-                onClick={handleCopyBuildInfo}
-                title="Click to copy build info"
-                className="text-gray-400 hover:text-gray-600 transition-colors duration-150 focus:outline-none text-sm"
-              >
-                {buildDate}
-              </button>
-            ) : (
-              <p className="text-gray-400 text-sm">v7.3 • Secure Login</p>
-            )}
-            {/* Toast */}
-            <div className={`absolute left-1/2 -translate-x-1/2 -top-10 px-3 py-1.5 bg-gray-800 text-white rounded-md text-xs whitespace-nowrap pointer-events-none transition-all duration-300 ${toast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}>
-              Build info copied
-            </div>
-          </div>
-
+       
         </div>
       </div>
 
       {/* Footer */}
-      <Footer />
+     <Footer />
 
       {/* CSS Animations */}
       <style>{`
