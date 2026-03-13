@@ -585,7 +585,7 @@ export function ImportLogsFromDeviceV2Page() {
                       <Upload className="w-4 h-4" />
                       View Logs
                     </button> */}
-                    <button className="px-6 py-2.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2">
+                    <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2">
                       <Check className="w-4 h-4" />
                       Validate
                     </button>
