@@ -94,9 +94,10 @@ import { ImportEmployeeMasterfilePage } from '../components/Import/ImportEmploye
 import { ImportLogsFromDeviceV2Page } from '../components/Import/ImportLogsFromDeviceV2Page';
 import { UpdateRawDataPage } from '../components/Import/UpdateRawDataPage';
 import { ImportAdjustmentPage } from '../components/Import/ImportAdjustmentPage';
-import { OvertimeApplication2ShiftsPage } from '../components/OvertimeApplication2ShiftsPage';
-import { WorkshiftVariable2ShiftsPage } from '../components/WorkshiftVariable2ShiftsPage';
-import { ImportLogsFromDevice2ShiftsPage } from '../components/ImportLogsFromDevice2ShiftsPage';
+//import { OvertimeApplication2ShiftsPage } from '../components/import {  } from "module";/OvertimeApplication2ShiftsPage';
+import { OvertimeApplication2ShiftsPage } from '../components/Import/2Shifts/OvertimeApplication2ShiftsPage';
+import { WorkshiftVariable2ShiftsPage } from '../components/Import/2Shifts/WorkshiftVariable2ShiftsPage';
+import { ImportLogsFromDevice2ShiftsPage } from '../components/Import/2Shifts/ImportLogsFromDevice2ShiftsPage';
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 import { ExportPayrollDataPage } from '../components/Export/ExportPayrollDataPage';
@@ -157,6 +158,7 @@ import { CreateNewDatabasePage } from '../components/Security/CreateNewDatabaseP
 
 // ─── Unknown Page Path ─────────────────────────────────────────────────────────────────
 import { NotFoundPage } from '../components/NotFoundPage';
+import { ChangePasswordPage } from '../components/Security/ChangePasswordPage';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -348,7 +350,9 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
         <Route path="/security/audit-trail" element={<AuditTrailPage />} />
         <Route path="/security/email-configuration" element={<EmailConfigurationPage />} />
         <Route path="/security/create-new-database" element={<CreateNewDatabasePage />} />
-
+        <Route path="/security/change-password" element={<ChangePasswordPage onBack={function (): void {
+          throw new Error('Function not implemented.');
+        } } />} />    
         {/* Catch-all: unknown protected paths → home */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>

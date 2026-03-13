@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Upload, Download, Check, FileText, CheckCircle } from "lucide-react";
+import { Upload, Download, Check, FileText, CheckCircle, Info, Save } from "lucide-react";
 import { DatePickerWithButton } from "../DateSetup/DatePickerWithButton";
 import { Footer } from "../Footer/Footer";
 import { TKSGroupTable } from "../TKSGroupTable";
@@ -49,7 +49,7 @@ export function OvertimeApplicationPage() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState("");
   const [fileLoaded, setFileLoaded] = useState(false);
@@ -108,9 +108,9 @@ export function OvertimeApplicationPage() {
     }
   };
 
-  const handleCodeToggle = (id: number) => {
-    setSelectedCodes((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+  const handleCodeToggle = (id: string) => {
+    setSelectedCodes(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
 
@@ -118,7 +118,7 @@ export function OvertimeApplicationPage() {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupList.map((w) => w.id));
+      setSelectedCodes(tksGroupList.map(w => w.groupCode));
     }
   };
 
@@ -130,6 +130,23 @@ export function OvertimeApplicationPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (!file) return;
+
+    const allowedTypes = [
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xls and .xlsx files are allowed.",
+        //confirmButtonColor: "#14b8a6"
+      });
+    
+      e.target.value = ""; // reset input
+      return;
+    }
 
     setXlsxFile(file);
     setFileName(file.name);
@@ -263,25 +280,27 @@ export function OvertimeApplicationPage() {
     formData.append("file", xlsxFile, fileName);
 
     try {
-      const data = await apiClient.post<
-        ResponseResultDto<ImportOvertimeApplicationDto[]>
-      >(`/Utilities/Import/ImportOvertimeApplication`, formData);
-      setImportDataResult(data.data.resultData);
-      if (data.data.errors.length > 0) {
-        console.log(data.data.errors);
-        setImportDataResult([]);
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: data.data.resultData?.[0]?.message ?? data.data.errors,
-        });
-        setErrors(data.data.errors);
-      }
-    } finally {
-      setIsProcessing(false);
-      setFileLoaded(true);
-    }
-  };
+      const data = await apiClient.post<ResponseResultDto<ImportOvertimeApplicationDto[]>>(`/Utilities/Import/ImportOvertimeApplication`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        })
+        setImportDataResult(data.data.resultData);
+        if (data.data.errors.length > 0){
+          console.log(data.data.errors)
+          setImportDataResult([]);
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: data.data.resultData?.[0]?.message ?? data.data.errors,
+          });            
+          setErrors(data.data.errors);
+        }
+      } finally {
+          setIsProcessing(false);
+          setFileLoaded(true);
+        }
+  }
   function addOneDay(dateStr: string) {
     if (!dateStr) return null;
     const date = new Date(dateStr);
@@ -369,7 +388,7 @@ export function OvertimeApplicationPage() {
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-white" />
+                    <Info className="w-5 h-5 text-white" />
                   </div>
                 </div>
                 <div className="flex-1">
@@ -572,8 +591,7 @@ export function OvertimeApplicationPage() {
                       className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <CheckCircle
-                        className="w-4 h-4"
+                      <Save className="w-4 h-4"
                         onClick={onClickInsertUpdate}
                       />
                       Update Data

@@ -361,7 +361,7 @@ export function AdditionalHoursPerWeekPage() {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-white" />
+                  <Save className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-3">

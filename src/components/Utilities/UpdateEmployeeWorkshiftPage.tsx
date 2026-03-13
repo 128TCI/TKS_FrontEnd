@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Users, Building2, Briefcase, CalendarClock, Wallet, Grid } from 'lucide-react';
+import { Save, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, Check, Clock } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -189,6 +189,34 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Update Employee Workshift</h1>
           </div>
+
+          {/* Content Container */}
+          <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
+            {/* Information Frame */}
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-2">
+                    Update employee workshift assignments. Select groups and employees, choose between fixed or variable schedules, and set date ranges.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Fixed or variable workshifts</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-600">Bulk update multiple employees</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+            {/* Tabs */}
           <div className="bg-white rounded-b-lg shadow-lg p-6">
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
               {TABS.map(tab => (
@@ -309,8 +337,8 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
                       <input type="checkbox" checked={deleteExisting} onChange={e=>setDeleteExisting(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
                       <span className="text-sm text-gray-700">Delete Existing Workshift</span>
                     </label>
-                    <button onClick={handleUpdate} disabled={isUpdating} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
-                      <RefreshCw className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
+                    <button onClick={handleUpdate} disabled={isUpdating} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
+                      <Save className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
                     </button>
                   </div>
                 </div>

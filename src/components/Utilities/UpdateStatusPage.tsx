@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { RefreshCw, Check, Search } from 'lucide-react';
+import { Save, Check, Search } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -383,7 +383,7 @@ export function UpdateStatusPage() {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <RefreshCw className="w-6 h-6 text-white" />
+                  <Save className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
@@ -566,9 +566,9 @@ export function UpdateStatusPage() {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-gray-200">
-                  <button className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2"
+                  <button className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2"
                     onClick={handleUpdate} >
-                    <RefreshCw className="w-4 h-4" />
+                    <Save className="w-4 h-4" />
                     Update
                   </button>
                 </div>
