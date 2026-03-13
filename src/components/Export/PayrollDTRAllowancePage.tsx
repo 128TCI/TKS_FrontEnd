@@ -8,6 +8,7 @@ import Swal from 'sweetalert2';
 import { CalendarPopup } from '../CalendarPopup';
 import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+import { Footer } from '../Footer/Footer';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -330,14 +331,14 @@ const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
             id:                safeId(i.empID, i.ID, i.id),
             code:              empCode,
             name:              `${i.lName ?? ''}, ${i.fName ?? ''} ${i.mName ?? ''}`.trim().replace(/,\s*$/, ''),
-            tkGroup:           i.tkGroup        ?? i.tKGroup        ?? i.groupCode       ?? i.tkGroupCode ?? '',
-            branchCode:        i.braCode        ?? i.branchCode     ?? i.branch          ?? '',
-            departmentCode:    i.depCode        ?? i.departmentCode ?? i.department      ?? '',
-            divisionCode:      i.divCode        ?? i.divisionCode   ?? i.division        ?? '',
-            groupScheduleCode: i.grpCode        ?? i.groupSchedule  ?? i.grpSchCode      ?? '',
-            payHouseCode:      i.phCode         ?? i.lineCode       ?? i.payCode         ?? i.payHouseCode ?? i.payHouse ?? '',
-            sectionCode:       i.secCode        ?? i.sectionCode    ?? i.section         ?? '',
-            unitCode:          i.unitCode       ?? i.unit           ?? '',
+            tkGroup:           i.tksGroupCode ?? i.tkGroup ?? i.tKGroup ?? i.groupCode ?? i.tkGroupCode ?? '',
+            branchCode:        i.braCode      ?? i.branchCode     ?? i.branch          ?? '',
+            departmentCode:    i.depCode      ?? i.departmentCode ?? i.department      ?? '',
+            divisionCode:      i.divCode      ?? i.divisionCode   ?? i.division        ?? '',
+            groupScheduleCode: i.grpCode      ?? i.groupSchedule  ?? i.grpSchCode      ?? '',
+            payHouseCode:      i.lineCode     ?? i.phCode         ?? i.payCode         ?? i.payHouseCode ?? i.payHouse ?? '',
+            sectionCode:       i.secCode      ?? i.sectionCode    ?? i.section         ?? '',
+            unitCode:          i.unitCode     ?? i.unit           ?? '',
             isActive,
         };
     });
@@ -862,7 +863,7 @@ const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
                   disabled={isExporting}
                   className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Upload className="w-4 h-4" />
+                  <Download className="w-4 h-4" />
                   {isExporting ? 'Exporting...' : 'Export'}
                 </button>
               </div>
@@ -871,6 +872,7 @@ const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+ <Footer />
+     </div>
+   );
+ }  

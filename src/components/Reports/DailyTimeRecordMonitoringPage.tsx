@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import React from 'react';
-import { Calendar, Search, X, FileText, Printer, Check, Clock, Users, Building2, Briefcase, Award, Network, Grid } from 'lucide-react';
+import { Calendar, Search, X, FileText, Printer, Check, Clock, Users, Building2, Briefcase, Award, Network, Grid, } from 'lucide-react';
 import { CalendarPopover } from '../CalendarPopover';
 import apiClient, { getLoggedInUsername} from '../../services/apiClient';
 import { Footer } from '../Footer/Footer';
@@ -46,6 +46,8 @@ interface ReportFilter {
   instanceCount: number
   instanceMinutes: number
   optionTardy: number
+  sortAlphabetically: boolean
+  convertToHHMM: boolean
 }
 
 interface TardinessFilter {
@@ -61,6 +63,7 @@ interface TardinessFilter {
   designation: string []
   section: string []
   activeInActiveAll: string
+  sortAlphabetically: boolean
 }
 
 interface ExemptionReportFilter {
@@ -79,6 +82,7 @@ interface ExemptionReportFilter {
   otherEarnAllow: boolean
   holidayPay: boolean
   activeInActiveAll: string
+  sortAlphabetically: boolean
 }
 
 interface IncompleteLogsFilter {
@@ -98,6 +102,7 @@ interface IncompleteLogsFilter {
   break2: boolean
   break3: boolean
   activeInActiveAll: string
+  sortAlphabetically: boolean
 }
 
 interface LeaveAbsencesFilter {
@@ -117,6 +122,7 @@ interface LeaveAbsencesFilter {
   includeLeaveAdj: boolean
   status: string
   mode: string
+  sortAlphabetically: boolean
 }
 
 interface DailyRecord {
@@ -131,20 +137,6 @@ interface DailyRecord {
   undertime: string;
   absences: string;
   leaveWithPay: string;
-}
-
-interface EmployeeReport {
-  seqNo: number;
-  empCode: string;
-  fullName: string;
-  dailyRecords: DailyRecord[];
-  subtotal: {
-    noOfHrs: string;
-    tardiness: string;
-    undertime: string;
-    absences: string;
-    leaveWithPay: string;
-  };
 }
 
 export function DailyTimeRecordMonitoringPage() {
@@ -185,14 +177,13 @@ export function DailyTimeRecordMonitoringPage() {
   const [workShiftSearchTerm, setWorkshiftSearchTerm] = useState('');
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState('');
   const [reportType, setReportType] = useState('Accumulation');
-  const [toExcelFile, setToExcelFile] = useState(false);
   const [convertToHHMM, setConvertToHHMM] = useState(false);
   const [convertToRawData, setConvertToRawData] = useState(false);
+  const [convertLeaveToRawData, setConvertLeaveToRawData] = useState(false);
   const [includeWPay, setIncludeWPay] = useState(false);
   const [includeWOutPay, setIncludeWOutPay] = useState(false);
   const [utRawData, setUTRawData] = useState(false);
   const [includeLeaveAdj, setIncludeLeaveAdj] = useState(false);
-  const [showReport, setShowReport] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showGroupSearchModal, setShowGroupSearchModal] = useState(false);
   const [showShiftSearchModal, setShowShiftSearchModal] = useState(false);
@@ -205,6 +196,7 @@ export function DailyTimeRecordMonitoringPage() {
   const [tardyOptions, setTardyOptions] = useState<'Month' | 'Per Department' | 'Annual'>('Month');
   const [tardinessOptions, setTardinessOptions] = useState<'Listing' | 'Periodic'>('Listing');
   const [rawDataOptions, setRawDataOptions] = useState<'Actual' | 'Policy'>('Actual');
+  const [rawDataLeaveOptions, setRawDataLeaveOptions] = useState<'Policy' | 'Actual'>('Policy');
   const [periodOptions, setPeriodOptions] = useState<number>(1);
   const [instanceOptions, setInstanceOptions] = useState<number>(0);
   const [otOptions, setOTOptions] = useState<'Listing' | 'Summary'>('Listing');
@@ -661,7 +653,9 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     instance: instanceOptions,
     instanceCount: Number(instanceNum),
     instanceMinutes: Number(minutesNum),
-    optionTardy: periodOptions
+    optionTardy: periodOptions,
+    sortAlphabetically: sortAlphabetically,
+    convertToHHMM: convertToHHMM
   };
   const tardyFilter: TardinessFilter = {
     empCode: empCode,
@@ -676,6 +670,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     designation: selectedDesItems.length === 0 ? [] : selectedDesItems.toLocaleString().split(","),
     section: selectedSecItems.length === 0 ? [] : selectedSecItems.toLocaleString().split(","),
     activeInActiveAll: empStatus,
+    sortAlphabetically: sortAlphabetically
   };
   const exempFilter: ExemptionReportFilter = {
     empCode: empCode,
@@ -693,6 +688,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     otherEarnAllow: processOptions.otherEarnAllowances,
     holidayPay: processOptions.holidayPay,
     activeInActiveAll: empStatus,
+    sortAlphabetically: sortAlphabetically
   };
 
   const incLogsFilter: IncompleteLogsFilter = {
@@ -712,6 +708,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     break2: logsOptions.break2,
     break3: logsOptions.break3,
     activeInActiveAll: empStatus,
+    sortAlphabetically: sortAlphabetically
   };
 
   const leaveAbsenceFilter: LeaveAbsencesFilter = {
@@ -730,7 +727,8 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     leaveWithOrWPay: withOrWOutPay,
     includeLeaveAdj: includeLeaveAdj,
     status: status,
-    mode: mode
+    mode: mode,
+    sortAlphabetically: sortAlphabetically
   };
 
   function useToQueryParams<T extends Record<string, any>>(obj: T): string {
@@ -1168,7 +1166,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
      finally {
      }
     }
-    else if(reportType === "Leave And Absences" && mode === "All"){
+    else if(reportType === "Leave And Absences" && mode === "All" && convertLeaveToRawData === false){
       try{      
         const query = useToQueryParams<LeaveAbsencesFilter>(leaveAbsenceFilter);
         Swal.fire({
@@ -1200,7 +1198,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
      finally {
      }
     }
-    else if(reportType === "Leave And Absences" && mode === "Absences"){
+    else if(reportType === "Leave And Absences" && mode === "Absences" && convertLeaveToRawData === false){
       try{      
         const query = useToQueryParams<LeaveAbsencesFilter>(leaveAbsenceFilter);
         Swal.fire({
@@ -1232,7 +1230,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
      finally {
      }
     }
-    else if(reportType === "Leave And Absences" && mode === "Leave"){
+    else if(reportType === "Leave And Absences" && mode === "Leave" && convertLeaveToRawData === false){
       try{      
         const query = useToQueryParams<LeaveAbsencesFilter>(leaveAbsenceFilter);
         Swal.fire({
@@ -1250,6 +1248,70 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
         });
         console.log(response.headers);
         const fileName = "LeaveReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Leave And Absences" && convertLeaveToRawData === true && rawDataLeaveOptions === "Policy"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/LeaveAndAbsences/PrintLeaveByPolicy?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "LeaveAndAbsencesByPolicyReport.xlsx";
+        const mimeType = response.headers['content-type']
+        const blob = new Blob([response.data], { type: mimeType });
+        fileLinkCreate(blob, fileName)
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Download Successful!',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+     }
+     finally {
+     }
+    }
+    else if(reportType === "Leave And Absences" && convertLeaveToRawData === true && rawDataLeaveOptions === "Actual"){
+      try{      
+        const query = useToQueryParams<ReportFilter>(filter);
+        Swal.fire({
+          icon: 'info',
+          title: 'Downloading',
+          text: 'Please wait while your file is being downloaded.',
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const response = await apiClient.get(`/LeaveAndAbsences/PrintLeaveByActual?${query}`, {
+          responseType: 'blob'
+        });
+        console.log(response.headers);
+        const fileName = "LeaveAndAbsencesByActualTimeReport.xlsx";
         const mimeType = response.headers['content-type']
         const blob = new Blob([response.data], { type: mimeType });
         fileLinkCreate(blob, fileName)
@@ -3690,7 +3752,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             <span className="text-gray-700">From Raw Data</span>
                             </label>
                           </div>
-                          <div className="mt-4 mb-4 flex items-center gap-4">
+                          {convertToRawData == true && (<div className="mt-4 mb-4 flex items-center gap-4">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input
                                 type="radio"
@@ -3713,7 +3775,7 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                               />
                               <span className="text-sm text-gray-700">Based on Policy</span>
                             </label>
-                          </div>
+                          </div>)}
                         </div>)}
                         {/*Tardiness Penalty Options*/}
                         {reportType == "Tardiness Penalty" &&(<div>
@@ -4505,12 +4567,47 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
                             <span className="text-sm text-gray-700">All</span>
                           </label>
                         </div>)}
+                        <div className="mb-6 space-y-2">
+                            <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={convertLeaveToRawData}
+                                onChange={(e) => setConvertLeaveToRawData(e.target.checked)}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                              />
+                            <span className="text-gray-700">From Raw Data</span>
+                            </label>
+                          </div>
+                          {convertLeaveToRawData == true && (<div className="mt-4 mb-4 flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="rawDataLeaveOption"
+                                value="Policy"
+                                checked={rawDataLeaveOptions === 'Policy'}
+                                onChange={(e) => setRawDataLeaveOptions(e.target.value as 'Policy' | 'Actual')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Based on Policy</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="rawDataLeaveOption"
+                                value="Actual"
+                                checked={rawDataLeaveOptions === 'Actual'}
+                                onChange={(e) => setRawDataLeaveOptions(e.target.value as 'Policy' | 'Actual')}
+                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Based on Actual Time</span>
+                            </label>
+                          </div>)}
                       </div>)}
 
                       {/* Display Button */}
                       <button
                         onClick={printReport}
-                        className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg shadow-blue-500/30"
+                        className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg shadow-blue-500/30"
                       >
                         Download Report
                       </button>

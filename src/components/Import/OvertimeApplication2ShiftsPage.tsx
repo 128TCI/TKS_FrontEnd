@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { Upload, Download, Check, FileText, Info, Save } from "lucide-react";
-import { DatePickerWithButton } from "../../DateSetup/DatePickerWithButton";
-import { Footer } from "../../Footer/Footer";
-import { TKSGroupTable } from "../../TKSGroupTable";
-import { tksGroupData } from "../../../data/tksGroupData";
+import { Upload, Download, Check, FileText } from "lucide-react";
+import { DatePickerWithButton } from "../../components/DateSetup/DatePickerWithButton";
+import { Footer } from "../../components/Footer/Footer";
+import { TKSGroupTable } from "../../components/TKSGroupTable";
+import { tksGroupData } from "../../data/tksGroupData";
 import * as XLSX from "xlsx";
-import apiClient from "../../../services/apiClient";
+import apiClient from "../../services/apiClient";
 import Swal from "sweetalert2";
-import { decryptData } from "../../../services/encryptionService";
+import { decryptData } from "../../services/encryptionService";
 
 interface ImportOvertimeApplication2ShiftsDto {
   id: number;
@@ -53,7 +53,7 @@ export function OvertimeApplication2ShiftsPage() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetData, setSheetData] = useState<any[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<number[]>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [fileLoaded, setFileLoaded] = useState(false);
@@ -95,7 +95,7 @@ export function OvertimeApplication2ShiftsPage() {
     fetchTKSGroups();
   }, []);
 
-  const handleCodeToggle = (id: string) => {
+  const handleCodeToggle = (id: number) => {
     setSelectedCodes((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
@@ -105,7 +105,7 @@ export function OvertimeApplication2ShiftsPage() {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupList.map((w) => w.groupCode));
+      setSelectedCodes(tksGroupList.map((w) => w.id));
     }
   };
 
@@ -292,18 +292,8 @@ export function OvertimeApplication2ShiftsPage() {
     }
   };
 
-const LoadingOverlay = () => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="flex flex-col items-center gap-6">
-      <div className="w-20 h-20 border-8 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-      <p className="text-white text-2xl font-semibold">Loading...</p>
-    </div>
-  </div>
-);
-
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {isProcessing && <LoadingOverlay />}
       {/* Main Content */}
       <div className="flex-1 relative z-10 p-6">
         <div className="max-w-7xl mx-auto relative">
@@ -321,7 +311,7 @@ const LoadingOverlay = () => (
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                    <Info className="w-5 h-5 text-white" />
+                    <Upload className="w-5 h-5 text-white" />
                   </div>
                 </div>
                 <div className="flex-1">
@@ -508,7 +498,7 @@ const LoadingOverlay = () => (
                         className="text-sm text-blue-600 hover:text-blue-700"
                         onClick={(e) => {
                           e.preventDefault();
-                          if (!isProcessing) downloadTemplate();
+                          downloadTemplate();
                         }}
                       >
                         Download Template
@@ -523,14 +513,26 @@ const LoadingOverlay = () => (
                       onClick={onClickImport}
                     >
                       <Upload className="w-4 h-4" />
-                      {isProcessing ? "Importing..." : "Import Data"}
+                      Import Data
                     </button>
                     <button
                       className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <Save className="w-4 h-4"/>
-                      {isProcessing ? "Updating..." : "Update Data"}
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      Update Data
                     </button>
                   </div>
                 </div>

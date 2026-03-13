@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, JSX } from 'react';
-import { Calendar, Check, Upload, Users, Building2, Briefcase, Wallet, Grid } from 'lucide-react';
+import { Calendar, Check, Upload, Users, Building2, Briefcase, Wallet, Grid, Download } from 'lucide-react';
 import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 import Swal from 'sweetalert2';
+import { Footer } from '../Footer/Footer';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -545,7 +546,7 @@ export function ExportNAVPage() {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <Upload className="w-6 h-6 text-white" />
+                  <Download className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
@@ -615,7 +616,7 @@ export function ExportNAVPage() {
                 {/* Export Button — clean, no spinner (Swal handles loading) */}
                 <button type="button" onClick={handleExport} disabled={isExporting}
                   className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                  <Upload className="w-4 h-4" />
+                  <Download className="w-4 h-4" />
                   Export
                 </button>
               </div>
@@ -778,6 +779,7 @@ export function ExportNAVPage() {
           position={calendarPosition}
         />
       )}
-    </div>
-  );
-}
+ <Footer />
+     </div>
+   );
+ }  

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Mail, Check, Send, Edit } from 'lucide-react';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { Footer } from '../Footer/Footer';
 
 interface EmailConfiguration {
   id: number;
@@ -335,6 +336,7 @@ const handleSendTestEmail = async () => {
           </div>
         </div>
       </div>
+<Footer />
     </div>
   );
 }

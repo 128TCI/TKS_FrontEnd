@@ -134,22 +134,38 @@ export function PayHouseSetupPage() {
     fetchEmployeeData();
   }, []);
 
-  const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError('');
-    try {
-      const { employees } = await fetchEmployees();
-      setEmployeeData(employees.map((emp) => ({
-        empCode: emp.empCode || '',
-        name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-        groupCode: emp.grpCode || '',
-      })));
-    } catch (error: any) {
-      setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
+// ── Fetch group descriptions for lookup ──────────────────────────────────────
+const fetchGroupDescriptions = async (): Promise<Map<string, string>> => {
+  try {
+    const { data } = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+    const groups: { groupCode: string; groupDescription: string }[] = data ?? [];
+    return new Map(groups.map((g) => [String(g.groupCode), g.groupDescription]));
+  } catch {
+    return new Map();
+  }
+};
+
+// ── Fetch employees and map grpCode → groupDescription ───────────────────────
+const fetchEmployeeData = async () => {
+  setLoadingEmployees(true);
+  setEmployeeError('');
+  try {
+    const [{ employees }, groupMap] = await Promise.all([
+      fetchEmployees(),
+      fetchGroupDescriptions(),
+    ]);
+
+    setEmployeeData(employees.map((emp) => ({
+      empCode: emp.empCode || '',
+      name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+      groupCode: groupMap.get(String(emp.grpCode)) || String(emp.grpCode || '') || '',
+    })));
+  } catch (error: any) {
+    setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+  } finally {
+    setLoadingEmployees(false);
+  }
+};
 
   useEffect(() => {
     fetchDeviceData();

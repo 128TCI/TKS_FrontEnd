@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Check, FileText, CheckCircle } from 'lucide-react';
+import { Upload, Download, Check, FileText, CheckCircle, Info, Save } from 'lucide-react';
 import { DatePickerWithButton } from '../DateSetup/DatePickerWithButton';
 import { Footer } from '../Footer/Footer';
 import { TKSGroupTable } from '../TKSGroupTable';
@@ -367,7 +367,7 @@ const onClickImport = async ( ) => {
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-white" />
+                    <Info className="w-5 h-5 text-white" />
                   </div>
                 </div>
                 <div className="flex-1">
@@ -524,7 +524,7 @@ const onClickImport = async ( ) => {
                     <button className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <CheckCircle className="w-4 h-4" onClick={onClickInsertUpdate}/>
+                      <Save className="w-4 h-4" onClick={onClickInsertUpdate}/>
                       Update Data
                     </button>
                   </div>

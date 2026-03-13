@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Users, Building2, Briefcase, Network, CalendarClock, Wallet } from 'lucide-react';
+import { RefreshCw, Check, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Save } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -74,17 +74,6 @@ export function Unpost2ShiftsTransactionPage() {  const [activeTab,          set
     };
     load();
   }, []);
-  const getSelectionTitle = () => {
-    switch (activeTab) {
-      case 'TK Group': return 'TK Group Selection';
-      case 'Branch': return 'Branch Selection';
-      case 'Department': return 'Department Selection';
-      case 'Division': return 'Division Selection';
-      case 'Group Schedule': return 'Group Schedule Selection';
-      case 'Pay House': return 'Pay House Selection';
-      default: return 'Selection';
-    }
-  };  
   const getCurrentData = (): GroupItem[] => {
     switch (activeTab) {
       case 'Branch': return branchItems; case 'Department': return departmentItems;
@@ -201,6 +190,30 @@ export function Unpost2ShiftsTransactionPage() {  const [activeTab,          set
             <h1 className="text-white">Unpost 2 Shifts In A Day Transaction</h1>
           </div>
           <div className="bg-white rounded-b-lg shadow-lg p-6">
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Save className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-3">Batch unpost 2-shifts-in-a-day transactions for selected employee groups. Select update options and configure the date range for processing.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    {[
+                      'Select groups and employees',
+                      'Filter by employee status',
+                      'Set date range for updates',
+                      'Choose unpost options to apply',
+                    ].map(t => (
+                      <div key={t} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
               {TABS.map(tab => (
                 <button key={tab.name} onClick={()=>setActiveTab(tab.name)}
@@ -211,10 +224,6 @@ export function Unpost2ShiftsTransactionPage() {  const [activeTab,          set
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-900">{getSelectionTitle()}</h3>
-                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                  
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm} onChange={e=>{setGroupSearchTerm(e.target.value);setCurrentGroupPage(1);}} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
@@ -241,10 +250,6 @@ export function Unpost2ShiftsTransactionPage() {  const [activeTab,          set
               </div>
               <div className="space-y-6">
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-gray-900">Employees</h3>
-                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
-                  </div>                   
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input type="text" value={employeeSearchTerm} onChange={e=>{setEmployeeSearchTerm(e.target.value);setCurrentEmpPage(1);}} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
@@ -278,8 +283,7 @@ export function Unpost2ShiftsTransactionPage() {  const [activeTab,          set
                       </label>
                     ))}
                   </div>
-                </div>                
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
+                </div>                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-700 w-24">Date From:</label>
                     <input type="text" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"/>
@@ -313,7 +317,7 @@ export function Unpost2ShiftsTransactionPage() {  const [activeTab,          set
                   </div>
                   <div className="flex justify-end pt-4 border-t border-gray-200 mt-4">
                     <button onClick={handleAction} disabled={isUpdating} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                      <RefreshCw className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
+                      <Save className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
                     </button>
                   </div>
                 </div>
