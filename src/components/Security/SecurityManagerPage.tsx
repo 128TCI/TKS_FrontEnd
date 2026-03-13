@@ -569,6 +569,7 @@ const handleEditUser = (user: User) => {
     if (!passwordForm.oldPassword.trim()) { showErrorModal('Please enter your old password.'); return; }
     if (!passwordForm.newPassword.trim()) { showErrorModal('Please enter a new password.'); return; }
     if (passwordForm.newPassword !== passwordForm.confirmNewPassword) { showErrorModal('New passwords do not match.'); return; }
+    if (passwordForm.newPassword === passwordForm.oldPassword) { await showErrorModal('New password must be different from the current one.'); return; }
     try {
       const res = await securityService.changePassword(selectedUser!.username, {
         oldPassword: passwordForm.oldPassword,
@@ -820,12 +821,10 @@ const handleEditUser = (user: User) => {
   // ── Render (original JSX structure preserved exactly) ─────────────────────
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Main Content */}
-      <div className="flex-1 relative z-10 p-6">
-        <div className="max-w-7xl mx-auto relative">
-          {/* Page Header */}
-          <div className="bg-blue-600 text-white px-6 py-4 rounded-lg mb-1">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex-1 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">
               {activeTab === 'security-manager' && 'User SetUp'}
               {activeTab === 'group-member' && 'Group Member SetUp'}
