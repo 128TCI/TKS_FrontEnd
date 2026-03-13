@@ -135,7 +135,7 @@ export function EmployeeMasterFilePage() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showOnlineApprovalModal, setShowOnlineApprovalModal] = useState(false);
   const [showJobLevelModal, setShowJobLevelModal] = useState(false);
-  
+  const [groupDescMap, setGroupDescMap] = useState<Map<string, string>>(new Map());
   // Employee data
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
@@ -1245,13 +1245,28 @@ const fetchEmployees = async () => {
     setShowSearchModal(true);
   };
 
-  const adaptedEmployees = useMemo(() => {
+useEffect(() => {
+    fetchGroupDescriptions().then(setGroupDescMap);
+}, []);
+const fetchGroupDescriptions = async (): Promise<Map<string, string>> => {
+  try {
+    const { data } = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+    const groups: { groupCode: string; groupDescription: string }[] = data ?? [];
+    return new Map(groups.map((g) => [String(g.groupCode), g.groupDescription]));
+  } catch {
+    return new Map();
+  }
+};
+const adaptedEmployees = useMemo(() => {
     return employees.map(emp => ({
-      ...emp,
-      name: `${emp.lName}, ${emp.fName}`,
-      groupCode: emp.grpCode
+        ...emp,
+        name: `${emp.lName}, ${emp.fName}`,
+        groupCode: groupDescMap.get(String((emp as any).tksGroupCode ?? '')) 
+                   ?? (emp as any).tksGroupCode 
+                   ?? emp.grpCode 
+                   ?? ''
     }));
-  }, [employees]);
+}, [employees, groupDescMap]);
 
   const handleEmployeeSearchSelect = async (empCode: string, name: string) => {
     try {

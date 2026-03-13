@@ -20,7 +20,7 @@ import { CalendarPopup } from '../CalendarPopup';
 import { Footer } from '../Footer/Footer';
 import apiClient from '../../services/apiClient';
 import Swal from 'sweetalert2';
-
+import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 type TabType = 'overtime-applications' | 'workshift';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -352,15 +352,18 @@ export function TwoShiftsEmployeeTimekeepConfigPage() {
     setOvertimeStotats(''); setOvertimeIsLateFiling(false);
   };
 
-  const fetchEmployees = async () => {
-    setEmployeeLoading(true); setEmployeeError('');
-    try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
-      if (response.status === 200 && response.data) setEmployees(response.data);
-    } catch (error: any) {
-      setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
-    } finally { setEmployeeLoading(false); }
-  };
+const fetchEmployees = async () => {
+  setEmployeeLoading(true);
+  setEmployeeError('');
+  try {
+    const { employees: empList } = await fetchEmployeesService();
+    setEmployees(empList);
+  } catch (error: any) {
+    setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+  } finally {
+    setEmployeeLoading(false);
+  }
+};
 
   const fetchWorkshiftCodes = useCallback(async () => {
     setWorkshiftCodesLoading(true);

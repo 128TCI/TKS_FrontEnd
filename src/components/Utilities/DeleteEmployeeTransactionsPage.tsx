@@ -6,6 +6,7 @@ import { ApiService, showSuccessModal, showErrorModal } from '../../services/api
 import apiClient from '../../services/apiClient';
 import { LeaveCodeSearchModal } from '../Modals/LeaveCodeSearchModal';
 import { Search, X } from 'lucide-react';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
@@ -213,8 +214,8 @@ export function DeleteEmployeeTransactionsPage() {
       const payload = {
         mode:      'Delete',
         transType: transactionType,
-        dateFrom:  new Date(dateFrom).toISOString(),
-        dateTo:    new Date(dateTo).toISOString(),
+        dateFrom:  toISO(dateFrom),
+        dateTo:    toISO(dateTo),
         leavecode: transactionType === 'Leave' ? leaveCode : '',
         empCode:   selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
       };

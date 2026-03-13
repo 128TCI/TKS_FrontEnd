@@ -158,6 +158,7 @@ import { CreateNewDatabasePage } from '../components/Security/CreateNewDatabaseP
 
 // ─── Unknown Page Path ─────────────────────────────────────────────────────────────────
 import { NotFoundPage } from '../components/NotFoundPage';
+import { ChangePasswordPage } from '../components/Security/ChangePasswordPage';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -349,7 +350,9 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
         <Route path="/security/audit-trail" element={<AuditTrailPage />} />
         <Route path="/security/email-configuration" element={<EmailConfigurationPage />} />
         <Route path="/security/create-new-database" element={<CreateNewDatabasePage />} />
-
+        <Route path="/security/change-password" element={<ChangePasswordPage onBack={function (): void {
+          throw new Error('Function not implemented.');
+        } } />} />    
         {/* Catch-all: unknown protected paths → home */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
