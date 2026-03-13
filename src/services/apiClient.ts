@@ -13,9 +13,9 @@ import axios, {
 import { decryptData } from './encryptionService';
 
 
-const BASE_URL = 'https://localhost:7264/api';
+// const BASE_URL = 'https://localhost:7264/api';
 //server 2
-  // const BASE_URL = 'https://demo.128techconsultinginc.com/128_TKS_LATEST/api';
+  const BASE_URL = 'https://demo.128techconsultinginc.com/128_TKS_LATEST/api';
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 const TOKEN_KEY = '128bl3$$1ng$';
@@ -73,7 +73,7 @@ apiClient.interceptors.response.use(
 
     // Skip redirect for auth endpoints to prevent infinite loops
     const isAuthEndpoint =
-      originalRequest?.url?.includes('/128_TKS/Login') ||
+      originalRequest?.url?.includes('/128_TKS_LATEST/Login') ||
       originalRequest?.url?.includes('/Auth/refresh-token');
 
     // ── 401 Unauthorized — attempt token refresh ──────────────────────────────
