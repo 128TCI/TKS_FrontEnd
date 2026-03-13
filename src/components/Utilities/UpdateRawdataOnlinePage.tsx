@@ -348,7 +348,7 @@ export function UpdateRawdataOnlinePage() {
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-white" />
+                  <Save className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-3">Update existing raw attendance data in bulk. Upload Excel files to modify employee time records, correct attendance entries, and update timekeeping information for selected date ranges.</p>

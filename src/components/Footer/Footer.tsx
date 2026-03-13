@@ -3,7 +3,7 @@ export function Footer() {
     <div className="w-full bg-green-600 text-white py-3">
       <div className="text-center">
         <p className="text-white text-sm">
-          © 128 Tech Consulting Inc. 2025. All Rights Reserved.
+          © 2026 128 Tech Consulting Inc. All rights reserved. | v9.3.1
         </p>
       </div>
     </div>

@@ -3,13 +3,9 @@
     "",
     "\\src",
     "\\src\\components",
-    "\\src\\components\\Dashboard",
-    "\\src\\components\\Export",
-    "\\src\\components\\FileSetup",
-    "\\src\\components\\FileSetup\\Employment",
-    "\\src\\components\\Maintenance",
-    "\\src\\components\\Modals"
+    "\\src\\components\\Security",
+    "\\src\\routes"
   ],
-  "SelectedNode": "\\src\\components\\Modals\\ProcessedDataModals.tsx",
+  "SelectedNode": "\\src\\routes\\AppRoutes.tsx",
   "PreviewInSolutionExplorer": false
 }

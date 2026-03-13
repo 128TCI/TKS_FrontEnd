@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Briefcase, Settings, FlaskConical } from 'lucide-react';
+import { Mail, Briefcase, Settings, FlaskConical, Check } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { EmailConfigurationModal } from '../Modals/EmailConfigurationModal';
@@ -142,6 +142,30 @@ export function TimekeepEmailDistributionPage() {
             <h1 className="text-white">Timekeep Email Distribution</h1>
           </div>
           <div className="bg-white rounded-b-lg shadow-lg p-6">
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-3">Send timekeeping reports via email to selected departments or employees. Configure report type, date range, and email settings before sending.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    {[
+                      'Select departments and employees',
+                      'Filter by employee status',
+                      'Set date range for the report',
+                      'Configure and send email reports',
+                    ].map(t => (
+                      <div key={t} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200">
               <button type="button" className="px-4 py-2 text-sm font-medium bg-blue-600 text-white -mb-px rounded-t-lg flex items-center gap-2">
                 <Briefcase className="w-4 h-4"/>Department
