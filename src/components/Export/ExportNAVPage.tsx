@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, JSX } from 'react';
 import { Calendar, Check, Upload, Users, Building2, Briefcase, Wallet, Grid, Download } from 'lucide-react';
 import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 import Swal from 'sweetalert2';
+import { Footer } from '../Footer/Footer';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -778,6 +779,7 @@ export function ExportNAVPage() {
           position={calendarPosition}
         />
       )}
-    </div>
-  );
-}
+       <Footer />
+     </div>
+   );
+ }

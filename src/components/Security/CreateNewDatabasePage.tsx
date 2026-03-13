@@ -3,6 +3,7 @@ import { Database, Check } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { decryptData } from '../../services/encryptionService';
 import apiClient from '../../services/apiClient';
+import { Footer } from '../Footer/Footer';
 
 const SCRIPT_LINES = [
     '-- Initializing database creation process...',
@@ -496,6 +497,7 @@ export function CreateNewDatabasePage() {
                     </div>
                 </div>
             </div>
-        </div>
-    );
+      <Footer />
+    </div>
+  );
 }
