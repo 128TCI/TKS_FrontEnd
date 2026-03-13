@@ -1004,6 +1004,7 @@ export function AuditTrailPage() {
           setIsFormNameModalOpen(false);  
         }}
       />
+<Footer />
     </div>
   );
 }

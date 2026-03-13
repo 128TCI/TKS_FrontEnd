@@ -8,6 +8,7 @@ import Swal from 'sweetalert2';
 import { CalendarPopup } from '../CalendarPopup';
 import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+import { Footer } from '../Footer/Footer';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -871,6 +872,7 @@ const fetchEmployeeData = async (): Promise<EmployeeItem[]> => {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+ <Footer />
+     </div>
+   );
+ }  

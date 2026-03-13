@@ -5,6 +5,7 @@ import auditTrail from '../services/auditTrail'
 import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
 import CryptoJS from 'crypto-js';
 import { decryptData } from '../services/encryptionService';
+import { Footer } from './Footer/Footer';
 
 // ─── Encryption Helpers ────────────────────────────────────────────────────────
 
@@ -329,21 +330,12 @@ if (names.length > 0) {
             </form>
           </div>
 
-          {/* Footer Version Info */}
-          <div className="text-center mt-6">
-            <p className="text-gray-500" style={{ fontSize: '0.875rem' }}>v7.3 • Secure Login</p>
-          </div>
+       
         </div>
       </div>
 
       {/* Footer */}
-      <div className="bg-green-700 text-white px-6 py-4 relative z-10">
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-white" style={{ fontSize: '0.875rem' }}>
-            © 128 Tech Consulting Inc. 2025. All Rights Reserved.
-          </p>
-        </div>
-      </div>
+     <Footer />
 
       {/* CSS Animations */}
       <style>{`

@@ -1787,6 +1787,7 @@ const handleEditUser = (user: User) => {
           </div>
         </>
       )}
+<Footer />
     </div>
   );
 }
