@@ -22,6 +22,7 @@ export function ClassificationSetupPage() {
   const [editingItem, setEditingItem] = useState<Classification | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [codeError, setCodeError] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [classifications, setClassifications] = useState<Classification[]>([]);
   const [loading, setLoading] = useState(false);
@@ -115,6 +116,7 @@ export function ClassificationSetupPage() {
     setEditingItem(item);
     setFormData({ code: item.code, description: item.description });
     setCodeError('');
+    setIsEditMode(true);
     setShowEditModal(true);
   };
 
@@ -361,6 +363,7 @@ export function ClassificationSetupPage() {
   const handleCloseModal = () => {
     setShowCreateModal(false);
     setShowEditModal(false);
+    setIsEditMode(false)
     setEditingItem(null);
     setFormData({ code: '', description: '' });
     setCodeError('');
@@ -488,7 +491,10 @@ export function ClassificationSetupPage() {
                             <div className="flex items-center justify-center gap-2">
                               {hasPermission('Edit') && (
                                 <button
-                                  onClick={() => handleEdit(item)}
+                                  onClick={() => {
+                                    handleEdit(item);
+                  
+                                  }}
                                   className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                   title="Edit"
                                 >
@@ -669,6 +675,7 @@ export function ClassificationSetupPage() {
                       value={formData.code}
                       onChange={(e) => handleCodeChange(e.target.value, true)}
                       maxLength={10}
+                      readOnly={isEditMode}
                       className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
                         codeError 
                           ? 'border-red-500 focus:ring-red-500' 
