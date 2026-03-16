@@ -59,7 +59,6 @@ interface CompanyData {
   enableAutoPairingLogsFlag: boolean;
   enableAppOTRawDataFlag: boolean;
   enable2ndShiftRawDataFlag: boolean;
-  // License Policy fields (from API response)
   serverName: string | null;
   maxNoOfCompanies: string | null;
   maxNoOfEmployees: string | null;
@@ -79,11 +78,9 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [formData, setFormData] = useState<CompanyData | null>(null);
 
-  // Config state (numberOfAttempts, numberOfSeconds, passwordAge)
   const [configData, setConfigData] = useState<CompanyConfigData | null>(null);
   const [configForm, setConfigForm] = useState<CompanyConfigData | null>(null);
 
-  // Permissions
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const hasPermission = (accessType: string) => permissions[accessType] === true;
 
@@ -115,7 +112,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
     fetchAll();
   }, []);
 
-  // Fetch both endpoints in parallel
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -151,41 +147,117 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
     }
   };
 
-  const handleEdit = () => setIsEditing(true);
+  // ── Validate HRIS / Payroll paths from already-loaded formData ────────────
+  const validateCompanyPaths = (): boolean => {
+    if (!formData) return true;
+
+    const hrisPath = (formData.hrisPath ?? "").trim();
+    const payrollPath = (formData.payrollPath ?? "").trim();
+
+    if (hrisPath !== "") {
+      Swal.fire({
+        icon: "error",
+        title: "Not Allowed",
+        text: "You are connected to HRIS. You are not allowed to do any transaction for this setup.",
+      });
+      return false;
+    }
+
+    if (payrollPath !== "") {
+      Swal.fire({
+        icon: "error",
+        title: "Not Allowed",
+        text: "You are connected to Payroll. You are not allowed to do any transaction for this setup.",
+      });
+      return false;
+    }
+
+    return true;
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleEdit = () => {
+    if (!validateCompanyPaths()) return;
+    setIsEditing(true);
+  };
 
   const handleSave = async () => {
     if (!formData) return;
+
+    // ── Validate before saving ─────────────────────────────────────────────
+    if (!validateCompanyPaths()) return;
+
     try {
       setLoading(true);
 
-      // Save both endpoints in parallel
-      const [companyRes, configRes] = await Promise.all([
+      const [companyResult, configResult] = await Promise.allSettled([
         apiClient.put("/Fs/System/CompanyInformation", formData),
         configForm
-          ? apiClient.put("/Fs/System/CompanyInformation/Config", configForm)
+          ? apiClient.put(
+              `/Fs/System/CompanyInformation/Config/${configForm.id}`,
+              {
+                id: configForm.id,
+                numberOfAttempts: configForm.numberOfAttempts,
+                numberOfSeconds: configForm.numberOfSeconds,
+                passwordAge: configForm.passwordAge,
+              },
+            )
           : Promise.resolve(null),
       ]);
 
-      if (companyRes.status === 200) {
-        const updatedData = companyRes.data;
+      // ── Handle company response ──────────────────────────────────────────
+      if (companyResult.status === "rejected") {
+        const err = companyResult.reason;
+        console.error("Company PUT failed:", err);
+        const errorMsg =
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to save company information";
+        await Swal.fire({ icon: "error", title: "Company Save Failed", text: errorMsg });
+        return;
+      }
+
+      const companyRes = companyResult.value;
+      if (companyRes && companyRes.status === 200) {
+        const updatedData = Array.isArray(companyRes.data)
+          ? companyRes.data[0]
+          : companyRes.data;
         setCompanyData(updatedData);
         setFormData(updatedData);
       }
 
-      if (configRes && configRes.status === 200) {
-        const updatedCfg = Array.isArray(configRes.data)
-          ? configRes.data[0]
-          : configRes.data;
-        setConfigData(updatedCfg);
-        setConfigForm(updatedCfg);
+      // ── Handle config response ───────────────────────────────────────────
+      if (configResult.status === "rejected") {
+        const err = configResult.reason;
+        console.error("Config PUT failed:", err);
+        const errorMsg =
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to save config information";
+        await Swal.fire({ icon: "error", title: "Config Save Failed", text: errorMsg });
+        return;
       }
 
+      if (configResult.status === "fulfilled" && configResult.value) {
+        const configRes = configResult.value;
+        if (configRes.status === 200 || configRes.status === 201) {
+          const updatedCfg = Array.isArray(configRes.data)
+            ? configRes.data[0]
+            : configRes.data;
+          setConfigData(updatedCfg);
+          setConfigForm(updatedCfg);
+        }
+      }
+
+      // ── Success ──────────────────────────────────────────────────────────
       setIsEditing(false);
 
       await auditTrail.log({
         accessType: "Edit",
         trans: "Updated company information",
-        messages: `Company information updated: ${JSON.stringify(companyRes.data)}`,
+        messages: `Company information updated: ${JSON.stringify(
+          companyResult.status === "fulfilled" ? companyResult.value?.data : {},
+        )}`,
         formName: formName,
       });
 
@@ -227,7 +299,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
   };
 
   // ── Image upload handlers ─────────────────────────────────────────────────
-
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -260,7 +331,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
   };
 
   const handleSiteContentRemove = () => handleInputChange("siteContent", null);
-
   // ─────────────────────────────────────────────────────────────────────────
 
   const formatDate = (dateString: string) => {
@@ -325,7 +395,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                 {/* ── Left Sidebar – Company Logo ── */}
                 <div className="col-span-3">
                   <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                    {/* Preview */}
                     <div className="aspect-square bg-white border-2 border-dashed border-gray-300 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
                       {formData?.companyLogo ? (
                         <img
@@ -339,7 +408,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         </span>
                       )}
                     </div>
-
                     <input
                       id="company-logo-input"
                       type="file"
@@ -386,7 +454,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
 
                   {/* Basic Information */}
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Code + Edit/Save/Cancel buttons */}
                     <div className="col-span-2">
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-gray-700">Code</label>
@@ -616,12 +683,10 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                   {/* Company Config & License Policy */}
                   <div className="grid grid-cols-2 gap-6">
 
-                    {/* Company Config — from /Fs/System/CompanyInformation/Config */}
+                    {/* Company Config */}
                     <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
                       <h3 className="text-gray-800 mb-4">Company Config</h3>
                       <div className="space-y-3">
-
-                        {/* Number of Attempts */}
                         <div className="flex items-center justify-between">
                           <label className="text-gray-700 text-sm">Number of Attempts</label>
                           <input
@@ -637,8 +702,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                             readOnly={!isEditing}
                           />
                         </div>
-
-                        {/* Policy — from main CompanyData */}
                         <div className="flex items-center justify-between">
                           <label className="text-gray-700 text-sm">Policy</label>
                           <input
@@ -649,8 +712,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                             readOnly={!isEditing}
                           />
                         </div>
-
-                        {/* Password Age */}
                         <div className="flex items-center justify-between">
                           <label className="text-gray-700 text-sm">Password Age</label>
                           <input
@@ -666,8 +727,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                             readOnly={!isEditing}
                           />
                         </div>
-
-                        {/* Enforce Password History — from main CompanyData */}
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -681,7 +740,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       </div>
                     </div>
 
-                    {/* License Policy — from main CompanyData */}
+                    {/* License Policy */}
                     <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
                       <h3 className="text-gray-800 mb-4">License Policy</h3>
                       <div className="space-y-3">

@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar, RotateCcw, Check, Users, Building2, Briefcase, CalendarClock, Clock, Search, Play, CheckCircle, Wallet, Grid, Network, Box, RefreshCw } from 'lucide-react';
 import { DatePicker } from '../DateSetup/DatePicker';
@@ -7,6 +6,7 @@ import Swal from 'sweetalert2';
 import { CalendarPopup } from '../CalendarPopup';
 import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+
 interface GroupItem {
   id: number;
   code: string;
@@ -17,7 +17,6 @@ interface EmployeeItem {
   id: number;
   code: string;
   name: string;
-  // Org fields for tab-based filtering
   tkGroup?: string;
   branchCode?: string;
   departmentCode?: string;
@@ -76,6 +75,11 @@ interface PopulateOvertimeDto {
   remarks?: string;
   terminalID?: string;
   isLateFiling?: boolean;
+  // Returned by sp_tk_ProcessOvertime_v2
+  // Required by sp_tk_ProcessOvertimeInsert via ToPopOvertimeDataTable
+  otSeq?: string;
+  restDay24HrsFlag?: string;
+  restDay24HrsStart?: string;
 }
 
 interface PopulateNightDiffDto {
@@ -105,6 +109,8 @@ interface PopulateHolidayPayDto {
   overtime?: number;
   otCode?: string;
   origOTCode?: string;
+  terminalID?: string;
+  absentAfterHoliday?: string;
 }
 
 interface PopulateRegularWorkingHoursDto {
@@ -152,7 +158,6 @@ interface PopulateLeaveAbsencesDto {
 interface PopulateResult {
   isSuccessful?: boolean;
   message?: string;
-  // Field names exactly as returned by the Populate API
   tardiness?: PopulateTardinessDto[];
   undertime?: PopulateUndertimeDto[];
   leaveAbsences?: PopulateLeaveAbsencesDto[];
@@ -173,8 +178,8 @@ export function ProcessPage() {
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
-const today = new Date();
-const [dateApplied, setDateApplied] = useState(`${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`);
+  const today = new Date();
+  const [dateApplied, setDateApplied] = useState(`${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`);
   const [lateFiling, setLateFiling] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -200,12 +205,11 @@ const [dateApplied, setDateApplied] = useState(`${today.getMonth() + 1}/${today.
   const [currentGroupPage, setCurrentGroupPage] = useState(1);
   const [currentEmpPage, setCurrentEmpPage] = useState(1);
   const itemsPerPage = 10;
-const [showDateFromCalendar, setShowDateFromCalendar] = useState(false);
-const [showDateToCalendar, setShowDateToCalendar] = useState(false);
-const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
-  // ── Populate API result state ─────────────────────────────────────────────
+  const [showDateFromCalendar, setShowDateFromCalendar] = useState(false);
+  const [showDateToCalendar, setShowDateToCalendar] = useState(false);
+  const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
+  const [resultSearchTerm, setResultSearchTerm] = useState('');
   const [populateResult, setPopulateResult] = useState<PopulateResult | null>(null);
-  // Full process request payload (populated data + flags) stored for Process call
   const [processPayload, setProcessPayload] = useState<any | null>(null);
 
   const [processOptions, setProcessOptions] = useState({
@@ -221,8 +225,9 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
   });
 
   useEffect(() => {
-    setCurrentGroupPage(1);
-  }, [activeTab]);
+    setResultPage(1);
+    setResultSearchTerm('');
+  }, [activeResultTab]);
 
   // ── Group/Employee list states ────────────────────────────────────────────
 
@@ -239,19 +244,18 @@ const [showDateAppliedCalendar, setShowDateAppliedCalendar] = useState(false);
 
   // ── Fetch helpers ─────────────────────────────────────────────────────────
 
-const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
-  const userName = getLoggedInUsername();
-  const url = userName && userName !== 'Guest'
-    ? `/Fs/Process/TimeKeepGroupSetUp/by-user?userName=${encodeURIComponent(userName)}`
-    : `/Fs/Process/TimeKeepGroupSetUp`;
-
-  const response = await apiClient.get(url);
-  return (response.data ?? []).map((item: any) => ({
-    id: item.ID ?? item.id,
-    code: item.groupCode ?? item.code ?? '',
-    description: item.groupDescription ?? item.description ?? '',
-  })).filter((i: GroupItem) => i.id !== 0);
-};
+  const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
+    const userName = getLoggedInUsername();
+    const url = userName && userName !== 'Guest'
+      ? `/Fs/Process/TimeKeepGroupSetUp/by-user?userName=${encodeURIComponent(userName)}`
+      : `/Fs/Process/TimeKeepGroupSetUp`;
+    const response = await apiClient.get(url);
+    return (response.data ?? []).map((item: any) => ({
+      id: item.ID ?? item.id,
+      code: item.groupCode ?? item.code ?? '',
+      description: item.groupDescription ?? item.description ?? '',
+    })).filter((i: GroupItem) => i.id !== 0);
+  };
 
   const fetchBranchData = async (): Promise<GroupItem[]> => {
     const response = await apiClient.get('/Fs/Employment/BranchSetUp');
@@ -319,29 +323,27 @@ const fetchTKSGroupData = async (): Promise<GroupItem[]> => {
     }));
   };
 
-const fetchEmployeeData = async (status: 'active' | 'inactive' | 'all' = 'all'): Promise<EmployeeItem[]> => {
+  const fetchEmployeeData = async (status: 'active' | 'inactive' | 'all' = 'all'): Promise<EmployeeItem[]> => {
     const { employees } = await fetchEmployeesService();
-
     const filtered = employees.filter((item: any) => {
-        if (status === 'active')   return item.active === true;
-        if (status === 'inactive') return item.active === false;
-        return true; // 'all'
+      if (status === 'active')   return item.active === true;
+      if (status === 'inactive') return item.active === false;
+      return true;
     });
-
     return filtered.map((item: any): EmployeeItem => ({
-        id:                item.empID        ?? item.ID   ?? item.id,
-        code:              item.empCode      || item.code || '',
-        name:              `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
-        tkGroup:           item.tksGroupCode ?? item.tkGroup ?? item.groupCode ?? '',
-        branchCode:        item.braCode      ?? item.branchCode    ?? item.branch      ?? '',
-        departmentCode:    item.depCode      ?? item.departmentCode?? item.department  ?? '',
-        divisionCode:      item.divCode      ?? item.divisionCode  ?? item.division    ?? '',
-        groupScheduleCode: item.grpCode      ?? item.groupSchedule ?? item.grpSchCode  ?? '',
-        payHouseCode:      item.lineCode     ?? item.payCode       ?? item.payHouseCode ?? item.payHouse ?? '',
-        sectionCode:       item.secCode      ?? item.sectionCode   ?? item.section     ?? '',
-        unitCode:          item.unitCode     ?? item.unit          ?? '',
+      id:                item.empID        ?? item.ID   ?? item.id,
+      code:              item.empCode      || item.code || '',
+      name:              `${item.lName || ''}, ${item.fName || ''} ${item.mName || ''}`.trim(),
+      tkGroup:           item.tksGroupCode ?? item.tkGroup ?? item.groupCode ?? '',
+      branchCode:        item.braCode      ?? item.branchCode    ?? item.branch      ?? '',
+      departmentCode:    item.depCode      ?? item.departmentCode?? item.department  ?? '',
+      divisionCode:      item.divCode      ?? item.divisionCode  ?? item.division    ?? '',
+      groupScheduleCode: item.grpCode      ?? item.groupSchedule ?? item.grpSchCode  ?? '',
+      payHouseCode:      item.lineCode     ?? item.payCode       ?? item.payHouseCode ?? item.payHouse ?? '',
+      sectionCode:       item.secCode      ?? item.sectionCode   ?? item.section     ?? '',
+      unitCode:          item.unitCode     ?? item.unit          ?? '',
     }));
-};
+  };
 
   useEffect(() => { fetchTKSGroupData().then(setTKSGroupItems); }, []);
   useEffect(() => { fetchBranchData().then(setBranchItems); }, []);
@@ -371,62 +373,59 @@ const fetchEmployeeData = async (status: 'active' | 'inactive' | 'all' = 'all'):
 
   const currentItems = getCurrentData();
 
-  // Re-fetch employees whenever tab, group selection, or status changes
   useEffect(() => {
     const allItems = getCurrentData();
     fetchFilteredEmployees(activeTab, selectedGroups, allItems, statusFilter);
     setSelectedEmployees([]);
   }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
-const fetchFilteredEmployees = useCallback(async (
-  tab: typeof activeTab,
-  selectedIds: number[],
-  allItems: GroupItem[],
-  status: 'active' | 'inactive' | 'all'
-) => {
-  setLoadingEmployees(true);
-  try {
-    const all = await fetchEmployeeData(status);  // ← passes status for active/inactive/all filter
 
-    let filtered = all;
-
-    if (selectedIds.length > 0) {
-      const selectedCodes = allItems
-        .filter(g => selectedIds.includes(g.id))
-        .map(g => g.code);
-
-      filtered = filtered.filter(emp => {
-        switch (tab) {
-          case 'TK Group':        return selectedCodes.includes(emp.tkGroup ?? '');
-          case 'Branch':          return selectedCodes.includes(emp.branchCode ?? '');
-          case 'Department':      return selectedCodes.includes(emp.departmentCode ?? '');
-          case 'Division':        return selectedCodes.includes(emp.divisionCode ?? '');
-          case 'Group Schedule':  return selectedCodes.includes(emp.groupScheduleCode ?? '');
-          case 'Pay House':       return selectedCodes.includes(emp.payHouseCode ?? '');
-          case 'Section':         return selectedCodes.includes(emp.sectionCode ?? '');
-          case 'Unit':            return selectedCodes.includes(emp.unitCode ?? '');
-          default:                return true;
-        }
-      });
+  const fetchFilteredEmployees = useCallback(async (
+    tab: typeof activeTab,
+    selectedIds: number[],
+    allItems: GroupItem[],
+    status: 'active' | 'inactive' | 'all'
+  ) => {
+    setLoadingEmployees(true);
+    try {
+      const all = await fetchEmployeeData(status);
+      let filtered = all;
+      if (selectedIds.length > 0) {
+        const selectedCodes = allItems
+          .filter(g => selectedIds.includes(g.id))
+          .map(g => g.code);
+        filtered = filtered.filter(emp => {
+          switch (tab) {
+            case 'TK Group':        return selectedCodes.includes(emp.tkGroup ?? '');
+            case 'Branch':          return selectedCodes.includes(emp.branchCode ?? '');
+            case 'Department':      return selectedCodes.includes(emp.departmentCode ?? '');
+            case 'Division':        return selectedCodes.includes(emp.divisionCode ?? '');
+            case 'Group Schedule':  return selectedCodes.includes(emp.groupScheduleCode ?? '');
+            case 'Pay House':       return selectedCodes.includes(emp.payHouseCode ?? '');
+            case 'Section':         return selectedCodes.includes(emp.sectionCode ?? '');
+            case 'Unit':            return selectedCodes.includes(emp.unitCode ?? '');
+            default:                return true;
+          }
+        });
+      }
+      setEmployeeItems(filtered);
+    } catch (err) {
+      console.error('Failed to fetch filtered employees', err);
+    } finally {
+      setLoadingEmployees(false);
     }
+  }, []);
 
-    setEmployeeItems(filtered);
-  } catch (err) {
-    console.error('Failed to fetch filtered employees', err);
-  } finally {
-    setLoadingEmployees(false);
-  }
-}, []);
   const getSelectionTitle = () => {
     switch (activeTab) {
-      case 'TK Group': return 'TK Group Selection';
-      case 'Branch': return 'Branch Selection';
-      case 'Department': return 'Department Selection';
-      case 'Division': return 'Division Selection';
+      case 'TK Group':       return 'TK Group Selection';
+      case 'Branch':         return 'Branch Selection';
+      case 'Department':     return 'Department Selection';
+      case 'Division':       return 'Division Selection';
       case 'Group Schedule': return 'Group Schedule Selection';
-      case 'Pay House': return 'Pay House Selection';
-      case 'Section': return 'Section Selection';
-      case 'Unit': return 'Unit Selection';
-      default: return 'Selection';
+      case 'Pay House':      return 'Pay House Selection';
+      case 'Section':        return 'Section Selection';
+      case 'Unit':           return 'Unit Selection';
+      default:               return 'Selection';
     }
   };
 
@@ -435,14 +434,13 @@ const fetchFilteredEmployees = useCallback(async (
     item.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
 
-  // Employee list is already filtered by the SP via fetchFilteredEmployees;
-  // apply local text search on top
   const filteredEmployees = employeeItems.filter(emp =>
     emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
     emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
 
-  // Group Pagination
+  // ── Group Pagination ──────────────────────────────────────────────────────
+
   const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
   const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
   const endGroupIndex = startGroupIndex + itemsPerPage;
@@ -467,25 +465,27 @@ const fetchFilteredEmployees = useCallback(async (
     }
     return pages;
   };
-const parseDate = (dateStr: string): Date | undefined => {
-  if (!dateStr) return undefined;
-  const parts = dateStr.split('/');
-  if (parts.length === 3) {
-    const month = parseInt(parts[0]) - 1;
-    const day = parseInt(parts[1]);
-    const year = parseInt(parts[2]);
-    if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
-      return new Date(year, month, day);
-    }
-  }
-  return undefined;
-};
 
-const formatDate = (date: Date | undefined): string => {
-  if (!date) return '';
-  return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
-};
-  // Employee Pagination
+  const parseDate = (dateStr: string): Date | undefined => {
+    if (!dateStr) return undefined;
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const month = parseInt(parts[0]) - 1;
+      const day   = parseInt(parts[1]);
+      const year  = parseInt(parts[2]);
+      if (!isNaN(month) && !isNaN(day) && !isNaN(year))
+        return new Date(year, month, day);
+    }
+    return undefined;
+  };
+
+  const formatDate = (date: Date | undefined): string => {
+    if (!date) return '';
+    return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+  };
+
+  // ── Employee Pagination ───────────────────────────────────────────────────
+
   const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
   const startEmployeeIndex = (currentEmpPage - 1) * itemsPerPage;
   const endEmployeeIndex = startEmployeeIndex + itemsPerPage;
@@ -497,50 +497,33 @@ const formatDate = (date: Date | undefined): string => {
     pages.push(1);
     if (currentEmpPage > 3) pages.push('...');
     const start = Math.max(2, currentEmpPage - 1);
-    const end = Math.min(totalEmployeePages - 1, currentEmpPage + 1);
+    const end   = Math.min(totalEmployeePages - 1, currentEmpPage + 1);
     for (let i = start; i <= end; i++) pages.push(i);
     if (currentEmpPage < totalEmployeePages - 2) pages.push('...');
     pages.push(totalEmployeePages);
     return pages;
   };
 
-  const handleGroupToggle = (id: number) => {
-    setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const handleEmployeeToggle = (id: number) => {
-    setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
+  const handleGroupToggle    = (id: number) => setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleEmployeeToggle = (id: number) => setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const handleSelectAllGroups = () => {
-    if (selectedGroups.length === filteredGroups.length) {
-      setSelectedGroups([]);
-    } else {
-      setSelectedGroups(filteredGroups.map(g => g.id));
-    }
+    if (selectedGroups.length === filteredGroups.length) setSelectedGroups([]);
+    else setSelectedGroups(filteredGroups.map(g => g.id));
   };
 
   const handleSelectAllEmployees = () => {
-    if (selectedEmployees.length === filteredEmployees.length) {
-      setSelectedEmployees([]);
-    } else {
-      setSelectedEmployees(filteredEmployees.map(e => e.id));
-    }
+    if (selectedEmployees.length === filteredEmployees.length) setSelectedEmployees([]);
+    else setSelectedEmployees(filteredEmployees.map(e => e.id));
   };
 
   const handleOptionChange = (option: keyof typeof processOptions) => {
     if (option === 'selectAll') {
       const newValue = !processOptions.selectAll;
       setProcessOptions({
-        tardiness: newValue,
-        allowances: false,
-        undertime: newValue,
-        overtime: newValue,
-        selectAll: newValue,
-        leaveAbsences: newValue,
-        nightDifferentials: newValue,
-        regularWorking: false,
-        holidayPay: newValue
+        tardiness: newValue, allowances: false, undertime: newValue,
+        overtime: newValue, selectAll: newValue, leaveAbsences: newValue,
+        nightDifferentials: newValue, regularWorking: false, holidayPay: newValue
       });
     } else {
       setProcessOptions(prev => ({ ...prev, [option]: !prev[option] }));
@@ -549,41 +532,34 @@ const formatDate = (date: Date | undefined): string => {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /** Build the list of employee codes to send.
-   *  Priority: individually selected employees → all employees from selected groups. */
   const getEmpCodes = (): string[] => {
-    if (selectedEmployees.length > 0) {
-      return employeeItems
-        .filter(e => selectedEmployees.includes(e.id))
-        .map(e => e.code);
-    }
-    // Fall back to all employees (empty string means "all" in the old API, but the new
-    // API needs an explicit list – send every loaded employee code)
-    return employeeItems.map(e => e.code);
+    if (selectedEmployees.length > 0)
+      return employeeItems.filter(e => selectedEmployees.includes(e.id)).map(e => e.code);
+    if (selectedGroups.length > 0)
+      return employeeItems.map(e => e.code);
+    return [];
   };
 
-const parseDateToISO = (dateStr: string): string => {
-  if (!dateStr) return new Date().toISOString();
-  try {
-    // Handle M/D/YYYY or MM/DD/YYYY format
-    if (dateStr.includes('/')) {
-      const [m, d, y] = dateStr.split('/');
-      const month = m.padStart(2, '0');
-      const day = d.padStart(2, '0');
-      return `${y}-${month}-${day}T00:00:00.000Z`;
+  const parseDateToISO = (dateStr: string): string => {
+    if (!dateStr) return new Date().toISOString();
+    try {
+      if (dateStr.includes('/')) {
+        const [m, d, y] = dateStr.split('/');
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00.000Z`;
+      }
+      return new Date(dateStr).toISOString();
+    } catch {
+      return new Date().toISOString();
     }
-    return new Date(dateStr).toISOString();
-  } catch {
-    return new Date().toISOString();
-  }
-};
+  };
 
   const formatElapsed = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return { h, m, s };
+    return {
+      h: Math.floor(totalSeconds / 3600),
+      m: Math.floor((totalSeconds % 3600) / 60),
+      s: totalSeconds % 60,
+    };
   };
 
   // ── Populate ──────────────────────────────────────────────────────────────
@@ -591,30 +567,30 @@ const parseDateToISO = (dateStr: string): string => {
   const handlePopulate = async () => {
     const empCodes = getEmpCodes();
     if (empCodes.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Employees', text: 'Please select at least one employee or group.' });
+      Swal.fire({ icon: 'warning', title: 'No Selection', text: 'Please select at least one group or employee before populating.' });
       return;
     }
 
     const payload = {
-      dateFrom: parseDateToISO(dateFrom),
-      dateTo: parseDateToISO(dateTo),
-      dateApplied: parseDateToISO(dateApplied),
-      empCode: '',
+      dateFrom:            parseDateToISO(dateFrom),
+      dateTo:              parseDateToISO(dateTo),
+      dateApplied:         parseDateToISO(dateApplied),
+      empCode:             '',
       empCodes,
-      tardiness: processOptions.tardiness,
-      undertime: processOptions.undertime,
-      leaveAndAbsences: processOptions.leaveAbsences,
-      regularWorkingDays: processOptions.regularWorking,
-      allowances: processOptions.allowances,
-      overtime: processOptions.overtime,
-      nightDiff: processOptions.nightDifferentials,
-      holidayPay: processOptions.holidayPay,
+      tardiness:           processOptions.tardiness,
+      undertime:           processOptions.undertime,
+      leaveAndAbsences:    processOptions.leaveAbsences,
+      regularWorkingDays:  processOptions.regularWorking,
+      allowances:          processOptions.allowances,
+      overtime:            processOptions.overtime,
+      nightDiff:           processOptions.nightDifferentials,
+      holidayPay:          processOptions.holidayPay,
       unprodWorkOnHoliday: false,
       lateFiling,
-      oldOvertimeProcess: false,
-      oldNighDiffProcess: false,
+      oldOvertimeProcess:  false,
+      oldNighDiffProcess:  false,
       oldTardinessProcess: false,
-      userName: 'currentUser', // replace with actual session user if available
+      userName:            'currentUser',
     };
 
     setPopulating(true);
@@ -624,43 +600,191 @@ const parseDateToISO = (dateStr: string): string => {
 
     const startTime = Date.now();
 
+    Swal.fire({
+      title: 'Populating...',
+      html: 'Please wait while data is being populated.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => { Swal.showLoading(); },
+    });
+
     try {
       const response = await apiClient.post('/Populate/Populate', payload);
       const elapsed = formatElapsed(Date.now() - startTime);
       const data: PopulateResult = response.data;
-console.log(response);
+      console.log(response);
       setPopulateResult(data);
 
-      // Build the process payload now so it is ready when user clicks Process
+      // ── Payload mappers ───────────────────────────────────────────────────
+      // Resolve empName from local lookup when API returns null
+      const resolveName = (r: any) =>
+        r.empName || r.formattedName ||
+        employeeItems.find(e => e.code === r.empCode)?.name ||
+        r.empCode || '';
+
+      const fillAllowance = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:       r.empCode       ?? '',
+          empName:       resolveName(r),
+          formattedName: r.formattedName ?? '',
+          allowanceCode: r.allowanceCode ?? '',
+          date:          r.date          ?? null,
+          timeIn:        r.timeIn        ?? null,
+          timeOut:       r.timeOut       ?? null,
+          workshiftCode: r.workshiftCode ?? '',
+          amount:        r.amount        ?? 0,
+        }));
+
+      const fillUndertime = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:                    r.empCode                    ?? '',
+          empName:                    resolveName(r),
+          formattedName:              r.formattedName              ?? '',
+          dateFrom:                   r.dateFrom                   ?? null,
+          dateTo:                     r.dateTo                     ?? null,
+          timeIn:                     r.timeIn                     ?? null,
+          timeOut:                    r.timeOut                    ?? null,
+          workShift:                  r.workShift                  ?? '',
+          workShiftCode:              r.workShiftCode              ?? '',
+          undertime:                  r.undertime                  ?? 0,
+          undertimeWithinGracePeriod: r.undertimeWithinGracePeriod ?? 0,
+          actualUndertime:            r.actualUndertime            ?? 0,
+          remarks:                    r.remarks                    ?? '',
+          frmBreak1AndBreak3:         r.frmBreak1AndBreak3         ?? false,
+          isLateFiling:               r.isLateFiling               ?? false,
+        }));
+
+      // ↓ otSeq, restDay24HrsFlag, restDay24HrsStart are carried through
+      //   so ToPopOvertimeDataTable on the backend can read them for
+      //   sp_tk_ProcessOvertimeInsert
+      const fillOvertime = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:          r.empCode          ?? '',
+          empName:          resolveName(r),
+          formattedName:    r.formattedName    ?? '',
+          dateFrom:         r.dateFrom         ?? null,
+          dateTo:           r.dateTo           ?? null,
+          timeIn:           r.timeIn           ?? null,
+          timeOut:          r.timeOut          ?? null,
+          workShiftCode:    r.workShiftCode    ?? '',
+          overtime:         r.overtime         ?? 0,
+          otCode:           r.otCode           ?? '',
+          origOTCode:       r.origOTCode       ?? '',
+          reason:           r.reason           ?? '',
+          remarks:          r.remarks          ?? '',
+          terminalID:       r.terminalID       ?? '',
+          isLateFiling:     r.isLateFiling     ?? false,
+          otSeq:            r.otSeq            ?? '',   // from sp_tk_ProcessOvertime_v2
+          restDay24HrsFlag: r.restDay24HrsFlag ?? '',   // from sp_tk_ProcessOvertime_v2
+          restDay24HrsStart:r.restDay24HrsStart?? '',   // from sp_tk_ProcessOvertime_v2
+        }));
+
+      const fillNightDiff = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:       r.empCode       ?? '',
+          empName:       resolveName(r),
+          formattedName: r.formattedName ?? '',
+          dateFrom:      r.dateFrom      ?? null,
+          dateTo:        r.dateTo        ?? null,
+          timeIn:        r.timeIn        ?? null,
+          timeOut:       r.timeOut       ?? null,
+          workShiftCode: r.workShiftCode ?? '',
+          overtime:      r.overtime      ?? 0,
+          otCode:        r.otCode        ?? '',
+          origOTCode:    r.origOTCode    ?? '',
+          isLateFiling:  r.isLateFiling  ?? false,
+        }));
+
+ const fillHolidayPay = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:            r.empCode            ?? '',
+          empName:            resolveName(r),
+          formattedName:      r.formattedName      ?? '',
+          dateFrom:           r.dateFrom           ?? null,
+          dateTo:             r.dateTo             ?? null,
+          timeIn:             r.timeIn             ?? null,
+          timeOut:            r.timeOut            ?? null,
+          workShiftCode:      r.workShiftCode      ?? '',
+          overtime:           r.overtime           ?? 0,
+          otCode:             r.otCode             ?? '',
+          origOTCode:         r.origOTCode         ?? '',
+          terminalID:         r.terminalID         ?? '',
+          absentAfterHoliday: r.absentAfterHoliday ?? '',
+        }));
+
+      const fillRegularWorkingHours = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:       r.empCode       ?? '',
+          empName:       resolveName(r),
+          formattedName: r.formattedName ?? '',
+          dateIn:        r.dateIn        ?? null,
+          dateOut:       r.dateOut       ?? null,
+          workshiftCode: r.workshiftCode ?? '',
+          noOfHours:     r.noOfHours     ?? 0,
+          testRem:       r.testRem       ?? '',
+          remarks:       r.remarks       ?? '',
+        }));
+
+      // dataTardiness does NOT have empName per swagger — only formattedName
+      const fillTardiness = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:              r.empCode              ?? '',
+          formattedName:        resolveName(r),
+          dateFrom:             r.dateFrom             ?? null,
+          dateTo:               r.dateTo               ?? null,
+          timeIn:               r.timeIn               ?? null,
+          timeOut:              r.timeOut              ?? null,
+          workShift:            r.workShift            ?? '',
+          tardiness:            r.tardiness            ?? 0,
+          tardinessWithInGrace: r.tardinessWithInGrace ?? 0,
+          actualTardiness:      r.actualTardiness      ?? 0,
+          remarks:              r.remarks              ?? '',
+          frmBreak1AndBreak3:   r.frmBreak1AndBreak3   ?? false,
+          frmBreak2:            r.frmBreak2            ?? false,
+          isLateFiling:         r.isLateFiling         ?? false,
+        }));
+
+      const fillLeaveAbsences = (arr: any[] | undefined) =>
+        (arr ?? []).map((r: any) => ({
+          empCode:          r.empCode          ?? '',
+          empName:          resolveName(r),
+          formattedName:    r.formattedName    ?? '',
+          dateL:            r.dateL            ?? null,
+          leaveCode:        r.leaveCode        ?? '',
+          hoursLeaveAbsent: r.hoursLeaveAbsent ?? 0,
+          reason:           r.reason           ?? '',
+          remarks:          r.remarks          ?? '',
+          withPay:          r.withPay          ?? false,
+          isLateFiling:     r.isLateFiling     ?? false,
+        }));
+
       setProcessPayload({
         ...payload,
-        // flags mirror populate options
-        allowances: processOptions.allowances,
-        undertime: processOptions.undertime,
-        overtime: processOptions.overtime,
-        nightDiff: processOptions.nightDifferentials,
-        holidayPay: processOptions.holidayPay,
-        regularWorkingDays: processOptions.regularWorking,
-        tardiness: processOptions.tardiness,
-        leaveAndAbsences: processOptions.leaveAbsences,
+        allowances:          processOptions.allowances,
+        undertime:           processOptions.undertime,
+        overtime:            processOptions.overtime,
+        nightDiff:           processOptions.nightDifferentials,
+        holidayPay:          processOptions.holidayPay,
+        regularWorkingDays:  processOptions.regularWorking,
+        tardiness:           processOptions.tardiness,
+        leaveAndAbsences:    processOptions.leaveAbsences,
         lateFiling,
-        // populated data arrays
-        dataAllowance: data.allowance ?? [],
-        dataUndertime: data.undertime ?? [],
-        dataOvertime: data.overtime ?? [],
-        dataNightDiff: data.nightDiff ?? [],
-        dataHolidayPay: data.holidayPay ?? [],
-        dataRegularWorkingHours: data.regularWorkingHours ?? [],
-        dataTardiness: data.tardiness ?? [],
-        dataLeaveAbsences: data.leaveAbsences ?? [],
-        tardinessBelowThreshold: data.tardinessBelowThreshold ?? [],
-        tardinessAboveThreshold: data.tardinessAboveThreshold ?? [],
-        undertimeBelowThreshold: data.undertimeBelowThreshold ?? [],
-        undertimeAboveThreshold: data.undertimeAboveThreshold ?? [],
+        dataAllowance:           fillAllowance(data.allowance),
+        dataUndertime:           fillUndertime(data.undertime),
+        dataOvertime:            fillOvertime(data.overtime),
+        dataNightDiff:           fillNightDiff(data.nightDiff),
+        dataHolidayPay:          fillHolidayPay(data.holidayPay),
+        dataRegularWorkingHours: fillRegularWorkingHours(data.regularWorkingHours),
+        dataTardiness:           fillTardiness(data.tardiness),
+        dataLeaveAbsences:       fillLeaveAbsences(data.leaveAbsences),
+        tardinessBelowThreshold: fillTardiness(data.tardinessBelowThreshold),
+        tardinessAboveThreshold: fillLeaveAbsences(data.tardinessAboveThreshold),
+        undertimeBelowThreshold: fillUndertime(data.undertimeBelowThreshold),
+        undertimeAboveThreshold: fillLeaveAbsences(data.undertimeAboveThreshold),
       });
 
       setShowResults(true);
-      
       setActiveResultTab('tardiness');
 
       await Swal.fire({
@@ -701,6 +825,15 @@ console.log(response);
     setProcessing(true);
     const startTime = Date.now();
 
+    Swal.fire({
+      title: 'Processing...',
+      html: 'Please wait while data is being processed.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => { Swal.showLoading(); },
+    });
+
     try {
       const response = await apiClient.post('/Populate/Process', processPayload);
       const elapsed = formatElapsed(Date.now() - startTime);
@@ -734,39 +867,45 @@ console.log(response);
 
   // ── Result Tabs ───────────────────────────────────────────────────────────
 
-  // Reset result page when switching result tabs
-  useEffect(() => { setResultPage(1); }, [activeResultTab]);
+  useEffect(() => { setResultPage(1); }, [resultSearchTerm]);
 
   const resultTabs = [
-    { id: 'tardiness', label: 'Tardiness' },
-    { id: 'undertime', label: 'Undertime' },
-    { id: 'leave-absences', label: 'Leave and Absences' },
-    { id: 'regular-working', label: 'Regular Working Days/Hours' },
-    { id: 'allowances', label: 'Allowances' },
-    { id: 'overtime', label: 'Overtime' },
-    { id: 'night-differentials', label: 'Night Differentials' },
-    { id: 'holiday-pay', label: 'Holiday Pay' },
+    { id: 'tardiness',          label: 'Tardiness' },
+    { id: 'undertime',          label: 'Undertime' },
+    { id: 'leave-absences',     label: 'Leave and Absences' },
+    { id: 'regular-working',    label: 'Regular Working Days/Hours' },
+    { id: 'allowances',         label: 'Allowances' },
+    { id: 'overtime',           label: 'Overtime' },
+    { id: 'night-differentials',label: 'Night Differentials' },
+    { id: 'holiday-pay',        label: 'Holiday Pay' },
   ];
 
-  // ── Result pagination helpers ─────────────────────────────────────────────
   const getActiveResultData = (): any[] => {
     if (!populateResult) return [];
     switch (activeResultTab) {
-      case 'tardiness':          return populateResult.tardiness          ?? [];
-      case 'undertime':          return populateResult.undertime          ?? [];
-      case 'leave-absences':     return populateResult.leaveAbsences      ?? [];
-      case 'regular-working':    return populateResult.regularWorkingHours?? [];
-      case 'allowances':         return populateResult.allowance          ?? [];
-      case 'overtime':           return populateResult.overtime           ?? [];
-      case 'night-differentials':return populateResult.nightDiff          ?? [];
-      case 'holiday-pay':        return populateResult.holidayPay         ?? [];
+      case 'tardiness':          return populateResult.tardiness           ?? [];
+      case 'undertime':          return populateResult.undertime           ?? [];
+      case 'leave-absences':     return populateResult.leaveAbsences       ?? [];
+      case 'regular-working':    return populateResult.regularWorkingHours ?? [];
+      case 'allowances':         return populateResult.allowance           ?? [];
+      case 'overtime':           return populateResult.overtime            ?? [];
+      case 'night-differentials':return populateResult.nightDiff           ?? [];
+      case 'holiday-pay':        return populateResult.holidayPay          ?? [];
       default:                   return [];
     }
   };
 
   const activeResultData   = getActiveResultData();
-  const totalResultPages   = Math.ceil(activeResultData.length / resultPageSize);
-  const pagedResultData    = activeResultData.slice(
+  const filteredResultData = activeResultData.filter((r: any) => {
+    if (!resultSearchTerm.trim()) return true;
+    const term = resultSearchTerm.toLowerCase();
+    return Object.values(r).some(val =>
+      val !== null && val !== undefined && String(val).toLowerCase().includes(term)
+    );
+  });
+
+  const totalResultPages = Math.ceil(filteredResultData.length / resultPageSize);
+  const pagedResultData  = filteredResultData.slice(
     (resultPage - 1) * resultPageSize,
     resultPage * resultPageSize
   );
@@ -789,27 +928,22 @@ console.log(response);
     return pages;
   };
 
-  // Helpers to display datetime strings
-  const fmtDate = (v?: string) => {
-    if (!v) return '';
-    try { return new Date(v).toLocaleDateString(); } catch { return v; }
-  };
-  const fmtTime = (v?: string) => {
-    if (!v) return '';
-    try { return new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch { return v; }
-  };
-  const fmtNum = (v?: number) => (v !== undefined && v !== null) ? v.toFixed(4) : '';
+  const fmtDate = (v?: string) => { if (!v) return ''; try { return new Date(v).toLocaleDateString(); } catch { return v; } };
+  const fmtTime = (v?: string) => { if (!v) return ''; try { return new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch { return v; } };
+  const fmtNum  = (v?: number) => (v !== undefined && v !== null) ? v.toFixed(4) : '';
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex-1 relative z-10 p-6">
         <div className="max-w-7xl mx-auto relative">
+
           {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Process Data</h1>
           </div>
 
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
+
             {/* Info Banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -837,24 +971,21 @@ console.log(response);
             {/* Tabs */}
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
               {[
-                { name: 'TK Group' as const, icon: Users },
-                { name: 'Branch' as const, icon: Building2 },
-                { name: 'Department' as const, icon: Briefcase },
-                { name: 'Division' as const, icon: Network },
+                { name: 'TK Group'       as const, icon: Users },
+                { name: 'Branch'         as const, icon: Building2 },
+                { name: 'Department'     as const, icon: Briefcase },
+                { name: 'Division'       as const, icon: Network },
                 { name: 'Group Schedule' as const, icon: CalendarClock },
-                { name: 'Pay House' as const, icon: Wallet },
-                { name: 'Section' as const, icon: Grid },
-                { name: 'Unit' as const, icon: Box }
+                { name: 'Pay House'      as const, icon: Wallet },
+                { name: 'Section'        as const, icon: Grid },
+                { name: 'Unit'           as const, icon: Box },
               ].map((tab) => (
-                <button
-                  key={tab.name}
-                  onClick={() => setActiveTab(tab.name)}
+                <button key={tab.name} onClick={() => setActiveTab(tab.name)}
                   className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${
                     activeTab === tab.name
                       ? 'font-medium bg-blue-600 text-white -mb-px'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
+                  }`}>
                   <tab.icon className="w-4 h-4" />
                   {tab.name}
                 </button>
@@ -863,18 +994,16 @@ console.log(response);
 
             {/* Selection Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
               {/* Group Selection */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div> 
+                </div>
                 <div className="relative mb-4">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={groupSearchTerm}
+                  <input type="text" placeholder="Search..." value={groupSearchTerm}
                     onChange={(e) => setGroupSearchTerm(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
@@ -887,8 +1016,7 @@ console.log(response);
                           <input type="checkbox"
                             checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0}
                             onChange={handleSelectAllGroups}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                         </th>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
@@ -898,11 +1026,9 @@ console.log(response);
                       {paginatedGroups.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="px-4 py-2">
-                            <input type="checkbox"
-                              checked={selectedGroups.includes(item.id)}
+                            <input type="checkbox" checked={selectedGroups.includes(item.id)}
                               onChange={() => handleGroupToggle(item.id)}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
@@ -919,12 +1045,12 @@ console.log(response);
                     <button onClick={() => setCurrentGroupPage(p => Math.max(p - 1, 1))} disabled={currentGroupPage === 1}
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50">Previous</button>
                     {getGroupPageNumbers().map((page, idx) =>
-                      page === '...' ? <span key={`g-ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span> : (
-                        <button key={page} onClick={() => setCurrentGroupPage(page as number)}
-                          className={`px-2 py-1 rounded text-xs ${currentGroupPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
-                          {page}
-                        </button>
-                      )
+                      page === '...'
+                        ? <span key={`g-ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                        : <button key={page} onClick={() => setCurrentGroupPage(page as number)}
+                            className={`px-2 py-1 rounded text-xs ${currentGroupPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                            {page}
+                          </button>
                     )}
                     <button onClick={() => setCurrentGroupPage(p => Math.min(p + 1, totalGroupPages))} disabled={currentGroupPage === totalGroupPages || totalGroupPages === 0}
                       className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50">Next</button>
@@ -953,8 +1079,7 @@ console.log(response);
                           <input type="checkbox"
                             checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
                             onChange={handleSelectAllEmployees}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                         </th>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
@@ -962,21 +1087,15 @@ console.log(response);
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {loadingEmployees ? (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td>
-                        </tr>
+                        <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td></tr>
                       ) : paginatedEmployees.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td>
-                        </tr>
+                        <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td></tr>
                       ) : paginatedEmployees.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="px-4 py-2">
-                            <input type="checkbox"
-                              checked={selectedEmployees.includes(item.id)}
+                            <input type="checkbox" checked={selectedEmployees.includes(item.id)}
                               onChange={() => handleEmployeeToggle(item.id)}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
@@ -991,12 +1110,12 @@ console.log(response);
                     <button onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))} disabled={currentEmpPage === 1}
                       className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50">Previous</button>
                     {getEmployeePageNumbers().map((page, index) =>
-                      typeof page === 'number' ? (
-                        <button key={index} onClick={() => setCurrentEmpPage(page)}
-                          className={`px-2 py-1 rounded text-xs ${currentEmpPage === page ? 'bg-blue-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
-                          {page}
-                        </button>
-                      ) : <span key={index} className="px-2">{page}</span>
+                      typeof page === 'number'
+                        ? <button key={index} onClick={() => setCurrentEmpPage(page)}
+                            className={`px-2 py-1 rounded text-xs ${currentEmpPage === page ? 'bg-blue-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                            {page}
+                          </button>
+                        : <span key={index} className="px-2">{page}</span>
                     )}
                     <button onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))} disabled={currentEmpPage === totalEmployeePages}
                       className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50">Next</button>
@@ -1006,8 +1125,7 @@ console.log(response);
                 <div className="mt-4 flex items-center gap-6">
                   {(['active', 'inactive', 'all'] as const).map(s => (
                     <label key={s} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="statusFilter" value={s}
-                        checked={statusFilter === s}
+                      <input type="radio" name="statusFilter" value={s} checked={statusFilter === s}
                         onChange={() => setStatusFilter(s)}
                         className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                       <span className="text-sm text-gray-700 capitalize">
@@ -1025,127 +1143,86 @@ console.log(response);
                 <h2 className="text-gray-900">Processing Options</h2>
               </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-  {/* Date From */}
-  <div>
-    <label className="block text-gray-700 text-sm mb-2">Date From</label>
-    <div className="relative">
-      <input
-        type="text"
-        value={dateFrom}
-        onChange={(e) => setDateFrom(e.target.value)}
-        placeholder="MM/DD/YYYY"
-        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9"
-      />
-      <button
-        type="button"
-        onClick={() => setShowDateFromCalendar(!showDateFromCalendar)}
-        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-      >
-        <Calendar className="w-3.5 h-3.5" />
-      </button>
-      {showDateFromCalendar && (
-        <CalendarPopup
-          onDateSelect={(date) => { setDateFrom(date); setShowDateFromCalendar(false); }}
-          onClose={() => setShowDateFromCalendar(false)}
-        />
-      )}
-    </div>
-  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* Date From */}
+                <div>
+                  <label className="block text-gray-700 text-sm mb-2">Date From</label>
+                  <div className="relative">
+                    <input type="text" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="MM/DD/YYYY"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9" />
+                    <button type="button" onClick={() => setShowDateFromCalendar(!showDateFromCalendar)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
+                      <Calendar className="w-3.5 h-3.5" />
+                    </button>
+                    {showDateFromCalendar && (
+                      <CalendarPopup onDateSelect={(date) => { setDateFrom(date); setShowDateFromCalendar(false); }} onClose={() => setShowDateFromCalendar(false)} />
+                    )}
+                  </div>
+                </div>
+                {/* Date To */}
+                <div>
+                  <label className="block text-gray-700 text-sm mb-2">Date To</label>
+                  <div className="relative">
+                    <input type="text" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="MM/DD/YYYY"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9" />
+                    <button type="button" onClick={() => setShowDateToCalendar(!showDateToCalendar)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
+                      <Calendar className="w-3.5 h-3.5" />
+                    </button>
+                    {showDateToCalendar && (
+                      <CalendarPopup onDateSelect={(date) => { setDateTo(date); setShowDateToCalendar(false); }} onClose={() => setShowDateToCalendar(false)} />
+                    )}
+                  </div>
+                </div>
+              </div>
 
-  {/* Date To */}
-  <div>
-    <label className="block text-gray-700 text-sm mb-2">Date To</label>
-    <div className="relative">
-      <input
-        type="text"
-        value={dateTo}
-        onChange={(e) => setDateTo(e.target.value)}
-        placeholder="MM/DD/YYYY"
-        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9"
-      />
-      <button
-        type="button"
-        onClick={() => setShowDateToCalendar(!showDateToCalendar)}
-        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-      >
-        <Calendar className="w-3.5 h-3.5" />
-      </button>
-      {showDateToCalendar && (
-        <CalendarPopup
-          onDateSelect={(date) => { setDateTo(date); setShowDateToCalendar(false); }}
-          onClose={() => setShowDateToCalendar(false)}
-        />
-      )}
-    </div>
-  </div>
-</div>
-
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-  {/* Date Applied */}
-  <div>
-    <label className="block text-gray-700 text-sm mb-2">Date Applied</label>
-    <div className="relative">
-      <input
-        type="text"
-        value={dateApplied}
-        onChange={(e) => setDateApplied(e.target.value)}
-        placeholder="MM/DD/YYYY"
-        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9"
-      />
-      <button
-        type="button"
-        onClick={() => setShowDateAppliedCalendar(!showDateAppliedCalendar)}
-        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-      >
-        <Calendar className="w-3.5 h-3.5" />
-      </button>
-      {showDateAppliedCalendar && (
-        <CalendarPopup
-          onDateSelect={(date) => { setDateApplied(date); setShowDateAppliedCalendar(false); }}
-          onClose={() => setShowDateAppliedCalendar(false)}
-        />
-      )}
-    </div>
-  </div>
-
-  {/* Late Filing checkbox stays in the same row */}
-  <div className="flex items-end">
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={lateFiling}
-        onChange={(e) => setLateFiling(e.target.checked)}
-        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-      />
-      <span className="text-sm text-gray-700">Include Late Filing</span>
-    </label>
-  </div>
-</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* Date Applied */}
+                <div>
+                  <label className="block text-gray-700 text-sm mb-2">Date Applied</label>
+                  <div className="relative">
+                    <input type="text" value={dateApplied} onChange={(e) => setDateApplied(e.target.value)} placeholder="MM/DD/YYYY"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9" />
+                    <button type="button" onClick={() => setShowDateAppliedCalendar(!showDateAppliedCalendar)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
+                      <Calendar className="w-3.5 h-3.5" />
+                    </button>
+                    {showDateAppliedCalendar && (
+                      <CalendarPopup onDateSelect={(date) => { setDateApplied(date); setShowDateAppliedCalendar(false); }} onClose={() => setShowDateAppliedCalendar(false)} />
+                    )}
+                  </div>
+                </div>
+                {/* Late Filing */}
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={lateFiling} onChange={(e) => setLateFiling(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                    <span className="text-sm text-gray-700">Include Late Filing</span>
+                  </label>
+                </div>
+              </div>
 
               {/* Process Type Checkboxes */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <label className="flex items-center gap-2 cursor-pointer mb-3 pb-3 border-b border-blue-200">
                   <input type="checkbox" checked={processOptions.selectAll} onChange={() => handleOptionChange('selectAll')}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                   <span className="text-sm text-gray-900">Select All</span>
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {([
-                    ['tardiness', 'Tardiness'],
-                    ['undertime', 'Undertime'],
-                    ['overtime', 'Overtime'],
-                    ['leaveAbsences', 'Leave/Absences'],
-                    ['regularWorking', 'Regular Working Days/Hours'],
-                    ['allowances', 'Allowances'],
-                    ['nightDifferentials', 'Night Differential'],
-                    ['holidayPay', 'Holiday Pay'],
+                    ['tardiness',         'Tardiness'],
+                    ['undertime',         'Undertime'],
+                    ['overtime',          'Overtime'],
+                    ['leaveAbsences',     'Leave/Absences'],
+                    ['regularWorking',    'Regular Working Days/Hours'],
+                    ['allowances',        'Allowances'],
+                    ['nightDifferentials','Night Differential'],
+                    ['holidayPay',        'Holiday Pay'],
                   ] as [keyof typeof processOptions, string][]).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={processOptions[key] as boolean} onChange={() => handleOptionChange(key)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                       <span className="text-sm text-gray-700">{label}</span>
                     </label>
                   ))}
@@ -1154,28 +1231,14 @@ console.log(response);
 
               {/* Action Buttons */}
               <div className="flex gap-3 mt-4">
-                <button
-                  onClick={handlePopulate}
-                  disabled={populating || processing}
-                  className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {populating ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" />Populating...</>
-                  ) : (
-                    <><Users className="w-4 h-4" />Populate</>
-                  )}
+                <button onClick={handlePopulate} disabled={populating || processing}
+                  className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <Users className="w-4 h-4" />Populate
                 </button>
-                <button
-                  onClick={handleProcess}
-                  disabled={populating || processing || !processPayload}
+                <button onClick={handleProcess} disabled={populating || processing || !processPayload}
                   className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={!processPayload ? 'Run Populate first' : ''}
-                >
-                  {processing ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" />Processing...</>
-                  ) : (
-                    <><Play className="w-4 h-4" />Process</>
-                  )}
+                  title={!processPayload ? 'Run Populate first' : ''}>
+                  <Play className="w-4 h-4" />Process
                 </button>
               </div>
               {!processPayload && (
@@ -1207,131 +1270,118 @@ console.log(response);
                   </div>
                 </div>
 
+                {/* Result Search Bar */}
+                <div className="bg-white border-b border-gray-200 px-4 py-2">
+                  <div className="relative max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input type="text" placeholder="Search results..." value={resultSearchTerm}
+                      onChange={(e) => setResultSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    {resultSearchTerm && (
+                      <button onClick={() => setResultSearchTerm('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">✕</button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto bg-white">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        {/* ── Tardiness ── */}
-                        {activeResultTab === 'tardiness' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date From</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date To</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time In</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Tardiness</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Within Grace</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Actual</th>
-                          </>
-                        )}
-                        {/* ── Undertime ── */}
-                        {activeResultTab === 'undertime' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date From</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date To</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time In</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Undertime</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Within Grace</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Actual</th>
-                          </>
-                        )}
-                        {/* ── Leave & Absences ── */}
-                        {activeResultTab === 'leave-absences' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Leave Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Hours</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Reason</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Remarks</th>
-                            <th className="px-4 py-3 text-left text-gray-600">With Pay</th>
-                          </>
-                        )}
-                        {/* ── Regular Working ── */}
-                        {activeResultTab === 'regular-working' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date In</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date Out</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Hours</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Remarks</th>
-                          </>
-                        )}
-                        {/* ── Allowances ── */}
-                        {activeResultTab === 'allowances' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Allowance Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Amount</th>
-                          </>
-                        )}
-                        {/* ── Overtime ── */}
-                        {activeResultTab === 'overtime' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date From</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date To</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time In</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
-                            <th className="px-4 py-3 text-left text-gray-600">OT Hours</th>
-                            <th className="px-4 py-3 text-left text-gray-600">OT Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Reason</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Remarks</th>
-                          </>
-                        )}
-                        {/* ── Night Diff ── */}
-                        {activeResultTab === 'night-differentials' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date From</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date To</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time In</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
-                            <th className="px-4 py-3 text-left text-gray-600">ND Hours</th>
-                            <th className="px-4 py-3 text-left text-gray-600">OT Code</th>
-                          </>
-                        )}
-                        {/* ── Holiday Pay ── */}
-                        {activeResultTab === 'holiday-pay' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date From</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Date To</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time In</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
-                            <th className="px-4 py-3 text-left text-gray-600">Hours</th>
-                            <th className="px-4 py-3 text-left text-gray-600">OT Code</th>
-                          </>
-                        )}
+                        {activeResultTab === 'tardiness' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date From</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date To</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time In</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Tardiness</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Within Grace</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Actual</th>
+                        </>)}
+                        {activeResultTab === 'undertime' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date From</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date To</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time In</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Undertime</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Within Grace</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Actual</th>
+                        </>)}
+                        {activeResultTab === 'leave-absences' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Leave Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Hours</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Reason</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Remarks</th>
+                          <th className="px-4 py-3 text-left text-gray-600">With Pay</th>
+                        </>)}
+                        {activeResultTab === 'regular-working' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date In</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date Out</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Hours</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Remarks</th>
+                        </>)}
+                        {activeResultTab === 'allowances' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Allowance Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Amount</th>
+                        </>)}
+                        {activeResultTab === 'overtime' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date From</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date To</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time In</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
+                          <th className="px-4 py-3 text-left text-gray-600">OT Hours</th>
+                          <th className="px-4 py-3 text-left text-gray-600">OT Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Reason</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Remarks</th>
+                        </>)}
+                        {activeResultTab === 'night-differentials' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date From</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date To</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time In</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
+                          <th className="px-4 py-3 text-left text-gray-600">ND Hours</th>
+                          <th className="px-4 py-3 text-left text-gray-600">OT Code</th>
+                        </>)}
+                        {activeResultTab === 'holiday-pay' && (<>
+                          <th className="px-4 py-3 text-left text-gray-600">Emp Code</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Name</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date From</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Date To</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time In</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Time Out</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Workshift</th>
+                          <th className="px-4 py-3 text-left text-gray-600">Hours</th>
+                          <th className="px-4 py-3 text-left text-gray-600">OT Code</th>
+                        </>)}
                       </tr>
                     </thead>
-
                     <tbody className="divide-y divide-gray-100">
-                      {/* ── Tardiness rows ── */}
+
                       {activeResultTab === 'tardiness' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                          <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateFrom)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateTo)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtTime(r.timeIn)}</td>
@@ -1343,13 +1393,10 @@ console.log(response);
                         </tr>
                       ))}
 
-                      {/* ── Undertime rows ── */}
                       {activeResultTab === 'undertime' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                          <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateFrom)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateTo)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtTime(r.timeIn)}</td>
@@ -1361,32 +1408,25 @@ console.log(response);
                         </tr>
                       ))}
 
-                      {/* ── Leave & Absences rows ── */}
                       {activeResultTab === 'leave-absences' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                         <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateL)}</td>
                           <td className="px-4 py-3 text-gray-600">{r.leaveCode}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtNum(r.hoursLeaveAbsent)}</td>
                           <td className="px-4 py-3 text-gray-600">{r.reason}</td>
                           <td className="px-4 py-3 text-gray-600">{r.remarks}</td>
                           <td className="px-4 py-3">
-                            <input type="checkbox" checked={!!r.withPay} readOnly
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded" />
+                            <input type="checkbox" checked={!!r.withPay} readOnly className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded" />
                           </td>
                         </tr>
                       ))}
 
-                      {/* ── Regular Working rows ── */}
                       {activeResultTab === 'regular-working' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                         <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateIn)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateOut)}</td>
                           <td className="px-4 py-3 text-blue-600">{r.workshiftCode}</td>
@@ -1395,13 +1435,10 @@ console.log(response);
                         </tr>
                       ))}
 
-                      {/* ── Allowances rows ── */}
                       {activeResultTab === 'allowances' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                         <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{r.allowanceCode}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.date)}</td>
                           <td className="px-4 py-3 text-blue-600">{r.workshiftCode}</td>
@@ -1409,13 +1446,10 @@ console.log(response);
                         </tr>
                       ))}
 
-                      {/* ── Overtime rows ── */}
                       {activeResultTab === 'overtime' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                          <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateFrom)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateTo)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtTime(r.timeIn)}</td>
@@ -1428,13 +1462,10 @@ console.log(response);
                         </tr>
                       ))}
 
-                      {/* ── Night Differential rows ── */}
                       {activeResultTab === 'night-differentials' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                          <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateFrom)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateTo)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtTime(r.timeIn)}</td>
@@ -1445,13 +1476,10 @@ console.log(response);
                         </tr>
                       ))}
 
-                      {/* ── Holiday Pay rows ── */}
                       {activeResultTab === 'holiday-pay' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                          <td className="px-4 py-3 text-gray-900">
-  {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
-</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ''}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateFrom)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateTo)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtTime(r.timeIn)}</td>
@@ -1462,7 +1490,6 @@ console.log(response);
                         </tr>
                       ))}
 
-                      {/* ── Empty state ── */}
                       {activeResultData.length === 0 && (
                         <tr>
                           <td colSpan={11} className="px-4 py-12 text-center text-gray-400 text-sm">
@@ -1478,43 +1505,29 @@ console.log(response);
                 <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-wrap gap-2">
                   <span className="text-xs text-gray-500">
                     Showing{' '}
-                    {activeResultData.length === 0 ? 0 : (resultPage - 1) * resultPageSize + 1}
+                    {filteredResultData.length === 0 ? 0 : (resultPage - 1) * resultPageSize + 1}
                     {' '}–{' '}
-                    {Math.min(resultPage * resultPageSize, activeResultData.length)}
+                    {Math.min(resultPage * resultPageSize, filteredResultData.length)}
                     {' '}of{' '}
-                    {activeResultData.length} entries
+                    {filteredResultData.length} entries
+                    {resultSearchTerm && ` (filtered from ${activeResultData.length} total)`}
                   </span>
                   {totalResultPages > 1 && (
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setResultPage(p => Math.max(1, p - 1))}
-                        disabled={resultPage === 1}
-                        className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
+                      <button onClick={() => setResultPage(p => Math.max(1, p - 1))} disabled={resultPage === 1}
+                        className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
                         Previous
                       </button>
                       {getResultPageNumbers().map((page, idx) =>
-                        page === '...' ? (
-                          <span key={`rp-ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-                        ) : (
-                          <button
-                            key={page}
-                            onClick={() => setResultPage(page as number)}
-                            className={`px-2 py-1 rounded text-xs ${
-                              resultPage === page
-                                ? 'bg-blue-600 text-white'
-                                : 'border border-gray-300 hover:bg-gray-100'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        )
+                        page === '...'
+                          ? <span key={`rp-ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                          : <button key={page} onClick={() => setResultPage(page as number)}
+                              className={`px-2 py-1 rounded text-xs ${resultPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                              {page}
+                            </button>
                       )}
-                      <button
-                        onClick={() => setResultPage(p => Math.min(totalResultPages, p + 1))}
-                        disabled={resultPage === totalResultPages}
-                        className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
+                      <button onClick={() => setResultPage(p => Math.min(totalResultPages, p + 1))} disabled={resultPage === totalResultPages}
+                        className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
                         Next
                       </button>
                     </div>
@@ -1525,7 +1538,6 @@ console.log(response);
           </div>
         </div>
       </div>
-
       <Footer />
     </div>
   );
