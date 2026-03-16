@@ -3039,7 +3039,8 @@ const handleDeleteTardiness = async (index: number) => {
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Actual Tardiness [hh.mm]</th>
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Remarks</th>
                                             <th className="px-4 py-2 text-left text-gray-700 text-sm">Offset OT Flag</th>
-                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group…</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Group Code</th>
+                                            <th className="px-4 py-2 text-left text-gray-700 text-sm">Exemption RPT</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3067,6 +3068,7 @@ const handleDeleteTardiness = async (index: number) => {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.remarks}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.offSetOTFlag ? 'Yes' : 'No'}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{record.groupCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{record.exemptionRpt}</td>
                                             </tr>
                                         ))}
                                     </tbody>
