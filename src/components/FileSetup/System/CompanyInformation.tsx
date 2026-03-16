@@ -30,7 +30,7 @@ interface CompanyData {
   biR_BRNCode: string;
   busFr: string;
   busTo: string;
-  timeInTimeOutScreen: string | null;
+  timeInTimeOutScreen: boolean | null;
   militaryTime: boolean | null;
   decPlaces: number | null;
   webLogo: string | null;
@@ -77,11 +77,10 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
   const [loading, setLoading] = useState(true);
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [formData, setFormData] = useState<CompanyData | null>(null);
-
   const [configData, setConfigData] = useState<CompanyConfigData | null>(null);
   const [configForm, setConfigForm] = useState<CompanyConfigData | null>(null);
-
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+
   const hasPermission = (accessType: string) => permissions[accessType] === true;
 
   useEffect(() => {
@@ -147,15 +146,20 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
     }
   };
 
-  // ── Validate HRIS / Payroll paths from already-loaded formData ────────────
-  const validateCompanyPaths = (): boolean => {
-    if (!formData) return true;
+  // ✅ Accept source param — used for both Edit and Save validation
+  const validateCompanyPaths = async (): Promise<boolean> => {
+  try {
+    // ✅ Always fetch fresh data from API in real-time
+    const res = await apiClient.get("/Fs/System/CompanyInformation");
+    const freshData = Array.isArray(res.data) ? res.data[0] : res.data;
 
-    const hrisPath = (formData.hrisPath ?? "").trim();
-    const payrollPath = (formData.payrollPath ?? "").trim();
+    if (!freshData) return true;
+
+    const hrisPath = (freshData.hrisPath ?? "").trim();
+    const payrollPath = (freshData.payrollPath ?? "").trim();
 
     if (hrisPath !== "") {
-      Swal.fire({
+      await Swal.fire({
         icon: "error",
         title: "Not Allowed",
         text: "You are connected to HRIS. You are not allowed to do any transaction for this setup.",
@@ -164,7 +168,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
     }
 
     if (payrollPath !== "") {
-      Swal.fire({
+      await Swal.fire({
         icon: "error",
         title: "Not Allowed",
         text: "You are connected to Payroll. You are not allowed to do any transaction for this setup.",
@@ -173,42 +177,91 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
     }
 
     return true;
-  };
-  // ─────────────────────────────────────────────────────────────────────────
+  } catch (error) {
+    console.error("Failed to fetch company paths for validation:", error);
+    // ✅ If fetch fails, allow the action to proceed
+    return true;
+  }
+};
 
-  const handleEdit = () => {
-    if (!validateCompanyPaths()) return;
-    setIsEditing(true);
-  };
+  // ✅ On Edit — validate original DB data
+const handleEdit = async () => {
+  const allowed = await validateCompanyPaths();
+  if (!allowed) return;
+  setIsEditing(true);
+};
 
   const handleSave = async () => {
     if (!formData) return;
+  const allowed = await validateCompanyPaths();
+  if (!allowed) return;
 
-    // ── Validate before saving ─────────────────────────────────────────────
-    if (!validateCompanyPaths()) return;
-
-    try {
+  try {
       setLoading(true);
 
+      const payload = {
+        companyID:                  formData.companyID,
+        companyCode:                formData.companyCode,
+        companyName:                formData.companyName,
+        companyLogo:                formData.companyLogo,
+        address:                    formData.address,
+        city:                       formData.city,
+        province:                   formData.province,
+        zipCode:                    formData.zipCode,
+        telNo:                      formData.telNo,
+        email:                      formData.email,
+        sssNo:                      formData.sssNo,
+        philHealthNo:               formData.philHealthNo,
+        pag_Ibig:                   formData.pag_Ibig,
+        tin:                        formData.tin,
+        biR_BRNCode:                formData.biR_BRNCode,
+        busFr:                      formData.busFr,
+        busTo:                      formData.busTo,
+        timeInTimeOutScreen:        formData.timeInTimeOutScreen,
+        militaryTime:               formData.militaryTime,
+        decPlaces:                  formData.decPlaces,
+        webLogo:                    formData.webLogo,
+        webLogoType:                formData.webLogoType,
+        webLogoReports:             formData.webLogoReports,
+        webLogoReportsType:         formData.webLogoReportsType,
+        line1:                      formData.line1,
+        line2:                      formData.line2,
+        head:                       formData.head,
+        chartAcct:                  formData.chartAcct,
+        payrollPath:                formData.payrollPath,
+        hrisPath:                   formData.hrisPath,
+        otPremiumFlag:              formData.otPremiumFlag,
+        terminalID:                 formData.terminalID,
+        validateLogs:               formData.validateLogs,
+        readOnlyTxtDate:            formData.readOnlyTxtDate,
+        policy:                     formData.policy,
+        flag:                       formData.flag,
+        gsisNo:                     formData.gsisNo,
+        exportEmail:                formData.exportEmail,
+        siteLogo:                   formData.siteLogo,
+        siteContent:                formData.siteContent,
+        passwordHistory:            formData.passwordHistory,
+        tksPhotoPath:               formData.tksPhotoPath,
+        exportLateFilingDateFlag:   formData.exportLateFilingDateFlag,
+        enableAutoPairingLogsFlag:  formData.enableAutoPairingLogsFlag,
+        enableAppOTRawDataFlag:     formData.enableAppOTRawDataFlag,
+        enable2ndShiftRawDataFlag:  formData.enable2ndShiftRawDataFlag,
+      };
+
       const [companyResult, configResult] = await Promise.allSettled([
-        apiClient.put("/Fs/System/CompanyInformation", formData),
+        apiClient.put(`/Fs/System/CompanyInformation/${formData.companyID}`, payload),
         configForm
-          ? apiClient.put(
-              `/Fs/System/CompanyInformation/Config/${configForm.id}`,
-              {
-                id: configForm.id,
-                numberOfAttempts: configForm.numberOfAttempts,
-                numberOfSeconds: configForm.numberOfSeconds,
-                passwordAge: configForm.passwordAge,
-              },
-            )
+          ? apiClient.put(`/Fs/System/CompanyInformation/Config/${configForm.id}`, {
+              id:               configForm.id,
+              numberOfAttempts: configForm.numberOfAttempts,
+              numberOfSeconds:  configForm.numberOfSeconds,
+              passwordAge:      configForm.passwordAge,
+            })
           : Promise.resolve(null),
       ]);
 
-      // ── Handle company response ──────────────────────────────────────────
       if (companyResult.status === "rejected") {
         const err = companyResult.reason;
-        console.error("Company PUT failed:", err);
         const errorMsg =
           err?.response?.data?.message ||
           err?.message ||
@@ -226,10 +279,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
         setFormData(updatedData);
       }
 
-      // ── Handle config response ───────────────────────────────────────────
       if (configResult.status === "rejected") {
         const err = configResult.reason;
-        console.error("Config PUT failed:", err);
         const errorMsg =
           err?.response?.data?.message ||
           err?.message ||
@@ -249,7 +300,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
         }
       }
 
-      // ── Success ──────────────────────────────────────────────────────────
       setIsEditing(false);
 
       await auditTrail.log({
@@ -298,7 +348,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
     }
   };
 
-  // ── Image upload handlers ─────────────────────────────────────────────────
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -331,7 +380,6 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
   };
 
   const handleSiteContentRemove = () => handleInputChange("siteContent", null);
-  // ─────────────────────────────────────────────────────────────────────────
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
@@ -392,7 +440,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
             {hasPermission("View") ? (
               <div className="grid grid-cols-12 gap-6 p-6 pt-0">
 
-                {/* ── Left Sidebar – Company Logo ── */}
+                {/* Left Sidebar – Company Logo */}
                 <div className="col-span-3">
                   <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                     <div className="aspect-square bg-white border-2 border-dashed border-gray-300 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
@@ -449,7 +497,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                   </div>
                 </div>
 
-                {/* ── Main Content ── */}
+                {/* Main Content */}
                 <div className="col-span-9 space-y-6">
 
                   {/* Basic Information */}
@@ -621,26 +669,31 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           readOnly={!isEditing}
                         />
                       </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">Hrs Database Path:</label>
-                        <input
-                          type="text"
-                          value={formData?.hrisPath || ""}
-                          onChange={(e) => handleInputChange("hrisPath", e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">Payroll Database Path:</label>
-                        <input
-                          type="text"
-                          value={formData?.payrollPath || ""}
-                          onChange={(e) => handleInputChange("payrollPath", e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly={!isEditing}
-                        />
-                      </div>
+
+                     {/* Hrs Database Path */}
+<div>
+  <label className="block text-gray-700 mb-2">Hrs Database Path:</label>
+  <input
+    type="text"
+    value={formData?.hrisPath || ""}
+    onChange={(e) => handleInputChange("hrisPath", e.target.value)}
+    className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    readOnly={!isEditing}
+  />
+</div>
+
+{/* Payroll Database Path */}
+<div>
+  <label className="block text-gray-700 mb-2">Payroll Database Path:</label>
+  <input
+    type="text"
+    value={formData?.payrollPath || ""}
+    onChange={(e) => handleInputChange("payrollPath", e.target.value)}
+    className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    readOnly={!isEditing}
+  />
+</div>
+
                       <div>
                         <label className="block text-gray-700 mb-2">TKS Photo Path:</label>
                         <input
@@ -655,14 +708,14 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       {/* Checkboxes */}
                       <div className="space-y-2">
                         {[
-                          { label: "Use OT Premium Breakdown", field: "otPremiumFlag" as keyof CompanyData },
-                          { label: "With Terminal", field: "terminalID" as keyof CompanyData },
-                          { label: "Logs Validate", field: "validateLogs" as keyof CompanyData },
-                          { label: "Read Only Textbox Date", field: "readOnlyTxtDate" as keyof CompanyData },
-                          { label: "Export with Sending Email", field: "exportEmail" as keyof CompanyData },
-                          { label: "Export Late Filing Date", field: "exportLateFilingDateFlag" as keyof CompanyData },
-                          { label: "Enable Auto Pairing Logs", field: "enableAutoPairingLogsFlag" as keyof CompanyData },
-                          { label: "Enable Approved OT", field: "enableAppOTRawDataFlag" as keyof CompanyData },
+                          { label: "Use OT Premium Breakdown",     field: "otPremiumFlag" as keyof CompanyData },
+                          { label: "With Terminal",                field: "terminalID" as keyof CompanyData },
+                          { label: "Logs Validate",                field: "validateLogs" as keyof CompanyData },
+                          { label: "Read Only Textbox Date",       field: "readOnlyTxtDate" as keyof CompanyData },
+                          { label: "Export with Sending Email",    field: "exportEmail" as keyof CompanyData },
+                          { label: "Export Late Filing Date",      field: "exportLateFilingDateFlag" as keyof CompanyData },
+                          { label: "Enable Auto Pairing Logs",     field: "enableAutoPairingLogsFlag" as keyof CompanyData },
+                          { label: "Enable Approved OT",           field: "enableAppOTRawDataFlag" as keyof CompanyData },
                           { label: "Enable 2nd Shift in Raw Data", field: "enable2ndShiftRawDataFlag" as keyof CompanyData },
                         ].map(({ label, field }) => (
                           <label key={field} className="flex items-center gap-2 cursor-pointer">
@@ -693,10 +746,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                             type="number"
                             value={configForm?.numberOfAttempts ?? ""}
                             onChange={(e) =>
-                              handleConfigChange(
-                                "numberOfAttempts",
-                                e.target.value === "" ? 0 : Number(e.target.value),
-                              )
+                              handleConfigChange("numberOfAttempts",
+                                e.target.value === "" ? 0 : Number(e.target.value))
                             }
                             className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
@@ -718,10 +769,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                             type="number"
                             value={configForm?.passwordAge ?? ""}
                             onChange={(e) =>
-                              handleConfigChange(
-                                "passwordAge",
-                                e.target.value === "" ? 0 : Number(e.target.value),
-                              )
+                              handleConfigChange("passwordAge",
+                                e.target.value === "" ? 0 : Number(e.target.value))
                             }
                             className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             readOnly={!isEditing}
@@ -740,7 +789,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                       </div>
                     </div>
 
-                    {/* License Policy */}
+                    {/* License Policy — always read-only */}
                     <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
                       <h3 className="text-gray-800 mb-4">License Policy</h3>
                       <div className="space-y-3">
@@ -749,9 +798,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <input
                             type="text"
                             value={formData?.serverName ?? ""}
-                            onChange={(e) => handleInputChange("serverName", e.target.value)}
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            readOnly={!isEditing}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed text-sm"
+                            readOnly
                           />
                         </div>
                         <div className="flex items-center justify-between">
@@ -759,9 +807,8 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <input
                             type="text"
                             value={formData?.maxNoOfCompanies ?? ""}
-                            onChange={(e) => handleInputChange("maxNoOfCompanies", e.target.value)}
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            readOnly={!isEditing}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed text-sm"
+                            readOnly
                           />
                         </div>
                         <div className="flex items-center justify-between">
@@ -769,29 +816,18 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                           <input
                             type="text"
                             value={formData?.maxNoOfEmployees ?? ""}
-                            onChange={(e) => handleInputChange("maxNoOfEmployees", e.target.value)}
-                            className="w-40 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            readOnly={!isEditing}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed text-sm"
+                            readOnly
                           />
                         </div>
                         <div className="flex items-center justify-between">
                           <label className="text-gray-700 text-sm">Registered Database:</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={formData?.registeredDatabase ?? ""}
-                              onChange={(e) => handleInputChange("registeredDatabase", e.target.value)}
-                              className="w-28 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                              readOnly={!isEditing}
-                            />
-                            <button
-                              type="button"
-                              className="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={!isEditing}
-                            >
-                              ▶
-                            </button>
-                          </div>
+                          <input
+                            type="text"
+                            value={formData?.registeredDatabase ?? ""}
+                            className="w-40 px-3 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed text-sm"
+                            readOnly
+                          />
                         </div>
                       </div>
                     </div>
@@ -827,9 +863,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         <label
                           htmlFor="site-logo-input"
                           className={`flex-1 px-4 py-2 bg-blue-500 text-white rounded transition-colors flex items-center justify-center gap-2 ${
-                            isEditing
-                              ? "cursor-pointer hover:bg-blue-600"
-                              : "opacity-50 cursor-not-allowed pointer-events-none"
+                            isEditing ? "cursor-pointer hover:bg-blue-600" : "opacity-50 cursor-not-allowed pointer-events-none"
                           }`}
                         >
                           <Upload className="w-4 h-4" />Upload
@@ -873,9 +907,7 @@ export function CompanyInformation({ onBack }: CompanyInformationProps) {
                         <label
                           htmlFor="site-content-input"
                           className={`flex-1 px-4 py-2 bg-blue-500 text-white rounded transition-colors flex items-center justify-center gap-2 ${
-                            isEditing
-                              ? "cursor-pointer hover:bg-blue-600"
-                              : "opacity-50 cursor-not-allowed pointer-events-none"
+                            isEditing ? "cursor-pointer hover:bg-blue-600" : "opacity-50 cursor-not-allowed pointer-events-none"
                           }`}
                         >
                           <Upload className="w-4 h-4" />Upload
