@@ -152,4 +152,23 @@ export function getLoggedInUsername(): string {
   }
 }
 
+// ── Password helper — reads from userData in localStorage ─────────────────────
+export function getLoggedInPassword(): string {
+    try {
+        const raw = localStorage.getItem('userData') || '';
+        if (!raw) return 'Guest';
+        // Handles both plain string and JSON object
+        if (raw.startsWith('{')) {
+            const parsed = JSON.parse(raw);
+            console.log('Parsed userData for password retrieval:', parsed?.password);
+            return decryptData(parsed?.password ?? 'Guest');
+        }
+        return raw;
+    } catch (error) {
+        console.error('Error decrypting password:', error);
+        return 'Guest';
+    }
+}
+
+
 export default apiClient;

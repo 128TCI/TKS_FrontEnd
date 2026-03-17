@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInPassword } from '../../services/apiClient';
 import { securityService } from '../../services/securityService';
 import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../Types/security';
 import { ACCESS_TYPE_LABELS, ACCESS_TYPE_ORDER } from '../Types/security';
@@ -567,6 +567,7 @@ const handleEditUser = (user: User) => {
 
   const handleSaveChangePassword = async () => {
     if (!passwordForm.oldPassword.trim()) { showErrorModal('Please enter your old password.'); return; }
+    if (passwordForm.oldPassword !== getLoggedInPassword()) { showErrorModal('The entered old password is incorrect.'); return; }
     if (!passwordForm.newPassword.trim()) { showErrorModal('Please enter a new password.'); return; }
     if (passwordForm.newPassword !== passwordForm.confirmNewPassword) { showErrorModal('New passwords do not match.'); return; }
     if (passwordForm.newPassword === passwordForm.oldPassword) { await showErrorModal('New password must be different from the current one.'); return; }
