@@ -736,6 +736,7 @@ const fetchEmployeeData = async () => {
                             value={code}
                             onChange={(e) => handleCodeChange(e.target.value)}
                             maxLength={10}
+                            readOnly={isEditMode}
                             className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
                               codeError
                                 ? "border-red-500 focus:ring-red-500"

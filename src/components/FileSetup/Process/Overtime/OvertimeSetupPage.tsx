@@ -29,6 +29,7 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [editingItem, setEditingItem] = useState<OvertimeItem | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false)
 
     const [formData, setFormData] = useState({
         otfCode: '',
@@ -525,7 +526,10 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center justify-center gap-2">
                                                                 <button
-                                                                    onClick={() => handleEdit(item)}
+                                                                    onClick={() => {
+                                                                        handleEdit(item);
+                                                                        setIsEditMode(true);
+                                                                    }}
                                                                     className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                                                     title="Edit"
                                                                 >
@@ -598,7 +602,7 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg sticky top-0">
                                         <h2 className="text-gray-900">{editingItem ? 'Edit' : 'Create New'}</h2>
                                         <button
-                                            onClick={() => { setShowCreateModal(false); setEditingItem(null); }}
+                                            onClick={() => { setShowCreateModal(false); setEditingItem(null); setIsEditMode(false); }}
                                             className="text-gray-400 hover:text-gray-600 transition-colors"
                                         >
                                             <X className="w-5 h-5" />
@@ -616,6 +620,7 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     value={formData.otfCode}
                                                     maxLength={10}
                                                     onChange={(e) => setFormData({ ...formData, otfCode: e.target.value })}
+                                                    disabled={isEditMode}
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                     required
                                                 />
@@ -626,6 +631,7 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     type="text"
                                                     value={formData.description}
                                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                    disabled={isEditMode}
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                     required
                                                 />
@@ -636,6 +642,7 @@ export function OvertimeSetupPage({ onBack }: OvertimeSetupProps) {
                                                     type="text"
                                                     value={formData.earnCode}
                                                     onChange={(e) => setFormData({ ...formData, earnCode: e.target.value })}
+                                                    disabled={isEditMode}
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>

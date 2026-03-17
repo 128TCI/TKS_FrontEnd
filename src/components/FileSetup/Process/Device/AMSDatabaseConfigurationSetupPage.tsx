@@ -125,6 +125,7 @@ export function AMSDatabaseConfigurationSetupPage() {
     const [flagSearchTerm, setFlagSearchTerm] = useState('');
     const [showCalendar, setShowCalendar] = useState<'lastDateUpdated' | 'lastDateUpdatedFrom' | 'lastDateUpdatedTo' | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [isAutomaticEmpCodeFlag, setIsAutmoaticEmpCodeFlag] = useState(false);
 
     // ✅ Show/hide password toggle
     const [showPassword, setShowPassword] = useState(false);
@@ -654,7 +655,10 @@ export function AMSDatabaseConfigurationSetupPage() {
             <div className="flex items-center gap-3">
                 <label className={labelClass}>Automatic EmpCode :</label>
                 <input type="checkbox" checked={formData.automaticEmpCode}
-                    onChange={(e) => setFormData({ ...formData, automaticEmpCode: e.target.checked })}
+                    onChange={(e) => {
+                        setFormData({ ...formData, automaticEmpCode: e.target.checked });
+                        setIsAutmoaticEmpCodeFlag(e.target.checked)
+                    }}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500" />
             </div>
 
@@ -663,6 +667,7 @@ export function AMSDatabaseConfigurationSetupPage() {
                 <label className={labelClass}>EmpCode Table Name :</label>
                 <input type="text" value={formData.empCodeTableName}
                     onChange={(e) => setFormData({ ...formData, empCodeTableName: e.target.value })}
+                    readOnly={!isAutomaticEmpCodeFlag}
                     className={`${inputClass} ${formData.automaticEmpCode && !(formData.empCodeTableName ?? '').trim() ? 'border-red-400 focus:ring-red-500' : ''}`} />
             </div>
 
@@ -672,12 +677,14 @@ export function AMSDatabaseConfigurationSetupPage() {
                     <label className={labelClass}>EmpCode Column :</label>
                     <input type="text" value={formData.empCodeColumnName}
                         onChange={(e) => setFormData({ ...formData, empCodeColumnName: e.target.value })}
+                        readOnly={!isAutomaticEmpCodeFlag}
                         className={`${inputClass} ${formData.automaticEmpCode && !(formData.empCodeColumnName ?? '').trim() ? 'border-red-400 focus:ring-red-500' : ''}`} />
                 </div>
                 <div className="flex items-center gap-3">
                     <label className="text-gray-700 text-sm whitespace-nowrap w-36 shrink-0">EmpCode ID Column :</label>
                     <input type="text" value={formData.empCodeIDColumn}
                         onChange={(e) => setFormData({ ...formData, empCodeIDColumn: e.target.value })}
+                        readOnly={!isAutomaticEmpCodeFlag}
                         className={`${inputClass} ${formData.automaticEmpCode && !(formData.empCodeIDColumn ?? '').trim() ? 'border-red-400 focus:ring-red-500' : ''}`} />
                 </div>
             </div>
