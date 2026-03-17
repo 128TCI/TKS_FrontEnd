@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\dist\\assets\\index.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:dist\\assets\\index.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\dist\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:dist\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\routes\\AppRoutes.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\routes\\AppRoutes.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
     },
@@ -119,19 +127,45 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "index.js",
+              "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\dist\\assets\\index.js",
+              "RelativeDocumentMoniker": "dist\\assets\\index.js",
+              "ToolTip": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\dist\\assets\\index.js",
+              "RelativeToolTip": "dist\\assets\\index.js",
+              "ViewState": "AgIAADACAAAAAAAAAAAtwD8CAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-03-16T07:57:57.133Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "index.html",
+              "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\dist\\index.html",
+              "RelativeDocumentMoniker": "dist\\index.html",
+              "ToolTip": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\dist\\index.html",
+              "RelativeToolTip": "dist\\index.html",
+              "ViewState": "AgIAAAcAAAAAAAAAAAAAAA4AAAALAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2026-03-16T07:57:38.371Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "AppRoutes.tsx",
               "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\routes\\AppRoutes.tsx",
               "RelativeDocumentMoniker": "src\\routes\\AppRoutes.tsx",
               "ToolTip": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\routes\\AppRoutes.tsx",
               "RelativeToolTip": "src\\routes\\AppRoutes.tsx",
-              "ViewState": "AgIAAAMAAAAAAAAAAAAAAA8AAAAhAAAAAAAAAA==",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAAAoAAAA+AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2026-03-13T02:51:30.083Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "SecurityManagerPage.tsx",
               "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\components\\Security\\SecurityManagerPage.tsx",
               "RelativeDocumentMoniker": "src\\components\\Security\\SecurityManagerPage.tsx",
@@ -143,7 +177,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "DailyTimeRecordMonitoringPage.tsx",
               "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\components\\Reports\\DailyTimeRecordMonitoringPage.tsx",
               "RelativeDocumentMoniker": "src\\components\\Reports\\DailyTimeRecordMonitoringPage.tsx",
@@ -155,7 +189,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 5,
               "Title": "ProcessedDataModals.tsx",
               "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\components\\Modals\\ProcessedDataModals.tsx",
               "RelativeDocumentMoniker": "src\\components\\Modals\\ProcessedDataModals.tsx",
@@ -167,7 +201,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 7,
               "Title": "ProcessedDataPage.tsx",
               "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\components\\Maintenance\\ProcessedDataPage.tsx",
               "RelativeDocumentMoniker": "src\\components\\Maintenance\\ProcessedDataPage.tsx",
@@ -179,7 +213,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 6,
               "Title": "DashboardContent.tsx",
               "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\components\\Dashboard\\DashboardContent.tsx",
               "RelativeDocumentMoniker": "src\\components\\Dashboard\\DashboardContent.tsx",
@@ -191,7 +225,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 8,
               "Title": "BranchSetupPage.tsx",
               "DocumentMoniker": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\components\\FileSetup\\Employment\\BranchSetupPage.tsx",
               "RelativeDocumentMoniker": "src\\components\\FileSetup\\Employment\\BranchSetupPage.tsx",

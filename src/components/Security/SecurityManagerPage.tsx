@@ -1257,7 +1257,7 @@ const handleEditUser = (user: User) => {
                                               setEditingRowId(null); setEditedRowData(null);
                                             }}
                                             disabled={savingAccess}
-                                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-1"
                                           >
                                             <Save className="w-3 h-3" /> Save
                                           </button>
@@ -1271,7 +1271,7 @@ const handleEditUser = (user: User) => {
                                       ) : (
                                         <button
                                           onClick={() => { setEditingRowId(access.id); setEditedRowData({ ...access }); }}
-                                          className="px-3 py-1 text-xs text-green-600 hover:text-green-700 border border-green-600 rounded hover:bg-green-50"
+                                          className="px-3 py-1 text-xs text-blue-600 hover:text-blue-700 border border-blue-600 rounded hover:bg-blue-50"
                                         >Edit</button>
                                       )}
                                     </td>

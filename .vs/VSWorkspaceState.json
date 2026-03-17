@@ -3,7 +3,7 @@
     "",
     "\\src",
     "\\src\\components",
-    "\\src\\components\\Security",
+    "\\src\\components\\Utilities",
     "\\src\\routes"
   ],
   "SelectedNode": "\\src\\routes\\AppRoutes.tsx",
