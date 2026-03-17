@@ -758,6 +758,7 @@ function DTRLogFieldModal({
       value={formData.code}
       maxLength={10}
       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+      readOnly={isEdit}
       className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
       required
     />

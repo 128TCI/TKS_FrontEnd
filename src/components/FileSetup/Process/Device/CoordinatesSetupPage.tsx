@@ -565,6 +565,7 @@ export function CoordinatesSetupPage() {
                                                         value={code}
                                                         maxLength={10}
                                                         onChange={(e) => setCode(e.target.value)}
+                                                        readOnly={isEditMode}
                                                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                     />
                                                 </div>

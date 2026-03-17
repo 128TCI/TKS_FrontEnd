@@ -37,6 +37,7 @@ export function EquivalentHoursDeductionSetupPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingItem, setEditingItem] = useState<DeductionItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false)
 
   const [formData, setFormData] = useState({
     id: 0,
@@ -362,6 +363,7 @@ export function EquivalentHoursDeductionSetupPage() {
   const handleCloseModal = () => {
     setShowCreateModal(false);
     setEditingItem(null);
+    setIsEditMode(false);
   };
 
   // Handle ESC key press
@@ -546,7 +548,7 @@ export function EquivalentHoursDeductionSetupPage() {
                     paginatedData.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 text-sm text-gray-900">{item.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.description}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.desc}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{item.monday}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{item.tuesday}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{item.wednesday}</td>
@@ -559,7 +561,10 @@ export function EquivalentHoursDeductionSetupPage() {
                           <div className="flex items-center justify-center gap-2">
                             {hasPermission('Edit') && (
                               <button
-                                onClick={() => handleEdit(item)}
+                                onClick={() => {
+                                  handleEdit(item);
+                                  setIsEditMode(true);
+                                }}
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 title="Edit"
                               >
@@ -571,7 +576,7 @@ export function EquivalentHoursDeductionSetupPage() {
                             )}
                             {hasPermission('Delete') && (
                               <button
-                                onClick={() => handleDelete(item.id)}
+                                onClick={() => handleDelete(item)}
                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 title="Delete"
                               >
@@ -664,6 +669,7 @@ export function EquivalentHoursDeductionSetupPage() {
                     value={formData.code}
                     maxLength={10}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    readOnly={isEditMode}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     required
                   />

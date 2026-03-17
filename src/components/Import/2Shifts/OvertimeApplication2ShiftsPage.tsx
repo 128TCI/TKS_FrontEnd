@@ -75,6 +75,9 @@ export function OvertimeApplication2ShiftsPage() {
   const endIndex = startIndex + itemsPerPage;
   const currentData = importDataResult.slice(startIndex, endIndex);
   const [errors, setErrors] = useState<string[]>([]);
+  const [invalidRows, setInvalidRows] = useState<
+    ImportOvertimeApplication2ShiftsDto[]
+  >([]);
 
   const fetchTKSGroups = async () => {
     try {
@@ -112,6 +115,17 @@ export function OvertimeApplication2ShiftsPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "xlsx" && ext !== "xls") {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xlsx and .xls files are allowed.",
+      });
+      e.target.value = ""; // reset the input
+      return;
+    }
 
     setFileName(file.name);
     setImportDataResult([]);
@@ -179,11 +193,20 @@ export function OvertimeApplication2ShiftsPage() {
   const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const sheetName = e.target.value;
     setSelectedSheet(sheetName);
-    if (!workbook) return;
+    if (!workbook || !xlsxFile) return;
 
     const ws = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json(ws, { defval: "" });
     setSheetData(jsonData);
+
+    const newWb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(newWb, ws, sheetName);
+    const wbOut = XLSX.write(newWb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbOut], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const newFile = new File([blob], xlsxFile.name, { type: blob.type });
+    setXlsxFile(newFile);
   };
 
   const onClickImport = async () => {
@@ -208,12 +231,13 @@ export function OvertimeApplication2ShiftsPage() {
 
       const res = await apiClient.post<
         ResponseResultDto<ImportOvertimeApplication2ShiftsDto[]>
-      >("/Utilities/Import/ImportOTApplication2Shifts", formData, {
+      >("/Import/ImportOTApplication2Shifts", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       if (res.data.errors.length > 0) {
         setImportDataResult([]);
+        setInvalidRows(res.data.resultData || []);
         setErrors(res.data.errors);
         Swal.fire({
           icon: "error",
@@ -264,7 +288,7 @@ export function OvertimeApplication2ShiftsPage() {
 
       const res = await apiClient.post<
         ResponseResultDto<ImportOvertimeApplication2ShiftsDto[]>
-      >("/Utilities/Import/UpdateOTApplication2Shifts", payload);
+      >("/Import/UpdateOTApplication2Shifts", payload);
 
       if (res.data.errors.length > 0) {
         setImportDataResult([]);
@@ -292,14 +316,14 @@ export function OvertimeApplication2ShiftsPage() {
     }
   };
 
-const LoadingOverlay = () => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="flex flex-col items-center gap-6">
-      <div className="w-20 h-20 border-8 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-      <p className="text-white text-2xl font-semibold">Loading...</p>
+  const LoadingOverlay = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-20 h-20 border-8 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+        <p className="text-white text-2xl font-semibold">Loading...</p>
+      </div>
     </div>
-  </div>
-);
+  );
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -437,19 +461,34 @@ const LoadingOverlay = () => (
                     </select>
                   </div>
 
-                  {/* Date Range */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <DatePickerWithButton
                         date={dateFrom}
-                        onChange={setDateFrom}
+                        onChange={(val) => {
+                          setDateFrom(val);
+                          if (!dateTo || new Date(val) > new Date(dateTo)) {
+                            setDateTo(val);
+                          }
+                        }}
                         label="Date From"
                       />
                     </div>
                     <div>
                       <DatePickerWithButton
                         date={dateTo}
-                        onChange={setDateTo}
+                        onChange={(val) => {
+                          if (dateFrom && new Date(val) < new Date(dateFrom)) {
+                            Swal.fire({
+                              icon: "warning",
+                              title: "Invalid Date",
+                              text: "Date To cannot be earlier than Date From.",
+                            });
+                            setDateTo(dateFrom);
+                            return;
+                          }
+                          setDateTo(val);
+                        }}
                         label="Date To"
                       />
                     </div>
@@ -529,10 +568,32 @@ const LoadingOverlay = () => (
                       className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <Save className="w-4 h-4"/>
+                      <Save className="w-4 h-4" />
                       {isProcessing ? "Updating..." : "Update Data"}
                     </button>
                   </div>
+                  {/* Validation Error List */}
+                  {invalidRows.some((x) => x.message) && (
+                    <div className="mt-4 bg-red-50 border border-red-300 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-red-700 mb-2">
+                        List of Invalid Overtime Application 2 Shifts In A Day
+                      </p>
+                      <ul className="space-y-1">
+                        {invalidRows
+                          .filter((x) => x.message)
+                          .map((x, idx) => (
+                            <li key={idx} className="text-xs text-red-600">
+                              [EmpCode:{" "}
+                              <span className="font-medium">{x.empCode}</span> —{" "}
+                              {x.message?.replace(/\(Row:.*\)/, "").trim()} |
+                              Row Number:{" "}
+                              <span className="font-medium">{x.rowNumber}</span>
+                              ]
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
