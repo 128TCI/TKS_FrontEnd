@@ -43,23 +43,17 @@ export function Navigation({ onLogout }: NavigationProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [systemInfo, setSystemInfo]   = useState<SystemInfo | null>(null);
-  const [loadingInfo, setLoadingInfo] = useState(false);
-
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [hoveredSubmenu, setHoveredSubmenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showVersionTooltip, setShowVersionTooltip] = useState(false);
-  const [navToast,           setNavToast]           = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileExpandedSubmenus, setMobileExpandedSubmenus] = useState<Set<string>>(new Set());
   const [mobileExpandedMainMenu, setMobileExpandedMainMenu] = useState<string | null>(null);
   const [buttonPositions, setButtonPositions] = useState<{ [key: string]: { left: number; top: number; width: number } }>({});
 
-  const dropdownRef      = useRef<HTMLDivElement>(null);
-  const closeTimeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef          = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fetchedRef       = useRef(false);
   const [companyDisplayName, setCompanyDisplayName] = useState('');
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
   const token = localStorage.getItem('token');
@@ -191,38 +185,6 @@ export function Navigation({ onLogout }: NavigationProps) {
     };
     fetchCompanyName();
   }, []);
-
-  const fetchSystemInfo = async () => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
-    setLoadingInfo(true);
-    try {
-      const data = await systemService.getSystemInfo();
-      setSystemInfo(data);
-    } catch {
-      fetchedRef.current = false;
-      setSystemInfo(null);
-    } finally {
-      setLoadingInfo(false);
-    }
-  };
-
-  // ── Copy build info to clipboard ─────────────────────────────────────────
-  const handleCopyBuildInfo = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!systemInfo) return;
-    const text = `${systemInfo.appVersion} ${systemInfo.buildDate}`;
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
-    }
-    setNavToast(true);
-    setTimeout(() => setNavToast(false), 2500);
-  };
 
   // ── Menu definition ────────────────────────────────────────────────────────
   const menuItems: MenuItem[] = [
@@ -772,53 +734,16 @@ export function Navigation({ onLogout }: NavigationProps) {
             </div>
           )}
 
-          {/* User menu */}
+          {/* User menu — tooltip removed, navigate to change password on click */}
           <div className="flex items-center space-x-3">
-            <div
-              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-700 hover:bg-green-800 rounded-lg relative cursor-pointer transition-colors duration-150"
-              onMouseEnter={() => { fetchSystemInfo(); setShowVersionTooltip(true); }}
-              onMouseLeave={() => setShowVersionTooltip(false)}
+            <button
               onClick={() => goTo('/security/change-password')}
+              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-700 hover:bg-green-800 rounded-lg transition-colors duration-150"
             >
               <User className="w-4 h-4 text-slate-200" />
               <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>
               <span className="text-green-300 text-xs">🔑</span>
-
-              {/* Tooltip + copy toast */}
-              {showVersionTooltip && (
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fadeIn min-w-[180px]">
-                  {loadingInfo ? (
-                    <div className="text-sm text-green-200">Loading...</div>
-                  ) : systemInfo ? (
-                    <button
-                      type="button"
-                      onClick={handleCopyBuildInfo}
-                      onMouseDown={e => e.preventDefault()}
-                      title="Click to copy build info"
-                      className="w-full text-left focus:outline-none group"
-                    >
-                      <div className="text-sm font-semibold tracking-wide group-hover:text-green-100 transition-colors">
-                        {systemInfo.appVersion} {systemInfo.buildDate}
-                      </div>
-                      <div className="text-xs text-green-200 mt-0.5">
-                        SQL {systemInfo.sqlVersion}
-                      </div>
-                    </button>
-                  ) : (
-                    <div className="text-sm text-green-200">Unable to load</div>
-                  )}
-                  <div className="mt-2 pt-2 border-t border-green-500 text-xs text-green-200 text-center">
-                    Click to change password
-                  </div>
-                  <div className={`mt-2 text-center text-xs transition-all duration-300 ${
-                    navToast ? 'text-green-300 opacity-100' : 'opacity-0 h-0 mt-0 overflow-hidden'
-                  }`}>
-                    ✓ Build info copied
-                  </div>
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45" />
-                </div>
-              )}
-            </div>
+            </button>
 
             <button
               onClick={handleLogout}
@@ -828,6 +753,7 @@ export function Navigation({ onLogout }: NavigationProps) {
               <LogOut className="w-4 h-4" />
               <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
             </button>
+
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="lg:hidden flex items-center justify-center w-10 h-10 text-slate-200 hover:text-white hover:bg-slate-600 rounded-lg transition-all duration-200"
