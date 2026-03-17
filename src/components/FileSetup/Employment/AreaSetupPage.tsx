@@ -104,7 +104,7 @@ export function AreaSetupPage() {
     setLoadingAreas(true);
     setAreaError("");
     try {
-      const response = await apiClient.get("/Fs/EmploymentAreaSetUp");
+      const response = await apiClient.get("/Fs/Employment/AreaSetUp");
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((area: any) => ({
           id: area.id || area.ID || "",
