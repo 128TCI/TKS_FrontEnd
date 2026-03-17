@@ -4,9 +4,9 @@ import { ClipboardList, Clock, Users, Edit, Trash2 } from "lucide-react";
 import { decryptData } from "../../../../services/encryptionService";
 import apiClient from "../../../../services/apiClient";
 import Swal from "sweetalert2";
-import auditTrail from '../../../../services/auditTrail';
+import auditTrail from "../../../../services/auditTrail";
 
-const formName ='Tardiness Bracket SetUp';
+const formName = "Tardiness Bracket SetUp";
 interface TableEntry {
   id: number;
   time: string;
@@ -283,7 +283,6 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
       });
     }
   };
-
 
   const handleSubmit = async () => {
     const lateValue = String(formData.late ?? "").trim();
@@ -709,42 +708,49 @@ export function TardinessUndertimeAccumulationTableSetupPage() {
                           : "Bracket Code"}{" "}
                         :
                       </label>
-                      <select
-                        value={formData.bracketCode}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            bracketCode: e.target.value,
-                          })
-                        }
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                      >
-                        {loadingBracketCode ? (
-                          <option>Loading...</option>
-                        ) : bracketCodeError ? (
-                          <option>{bracketCodeError}</option>
-                        ) : (
-                          // Filter based on activeTab
-                          bracketCodeList
-                            .filter((item) => {
-                              if (activeTab === "Tardiness")
-                                return item.flag === "1";
-                              if (activeTab === "Undertime")
-                                return item.flag === "2";
-                              if (activeTab === "Accumulation")
-                                return item.flag === "3";
-                              return false;
+                      {isEditMode ? (
+                        <div className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100">
+                          {bracketCodeList.find(
+                            (item) => item.bracketCode === formData.bracketCode,
+                          )?.description || formData.bracketCode}
+                        </div>
+                      ) : (
+                        <select
+                          value={formData.bracketCode}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              bracketCode: e.target.value,
                             })
-                            .map((option) => (
-                              <option
-                                key={option.id}
-                                value={option.bracketCode}
-                              >
-                                {option.description}
-                              </option>
-                            ))
-                        )}
-                      </select>
+                          }
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                        >
+                          {loadingBracketCode ? (
+                            <option>Loading...</option>
+                          ) : bracketCodeError ? (
+                            <option>{bracketCodeError}</option>
+                          ) : (
+                            bracketCodeList
+                              .filter((item) => {
+                                if (activeTab === "Tardiness")
+                                  return item.flag === "1";
+                                if (activeTab === "Undertime")
+                                  return item.flag === "2";
+                                if (activeTab === "Accumulation")
+                                  return item.flag === "3";
+                                return false;
+                              })
+                              .map((option) => (
+                                <option
+                                  key={option.id}
+                                  value={option.bracketCode}
+                                >
+                                  {option.description}
+                                </option>
+                              ))
+                          )}
+                        </select>
+                      )}
                     </div>
                   </div>
 

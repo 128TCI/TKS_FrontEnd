@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, memo } from 'react';
-import { Search, Plus, X, Check, Edit, Trash2 } from 'lucide-react';
-import { Footer } from '../../Footer/Footer';
-import apiClient from '../../../services/apiClient';
-import Swal from 'sweetalert2';
-import { decryptData } from '../../../services/encryptionService';
-import auditTrail from '../../../services/auditTrail';
+import { useState, useEffect, useCallback, memo } from "react";
+import { Search, Plus, X, Check, Edit, Trash2 } from "lucide-react";
+import { Footer } from "../../Footer/Footer";
+import apiClient from "../../../services/apiClient";
+import Swal from "sweetalert2";
+import { decryptData } from "../../../services/encryptionService";
+import auditTrail from "../../../services/auditTrail";
 
-const API_BASE = '/Fs/Process/LeaveTypeSetUp';
-const formName = 'Leave Type Setup';
+const API_BASE = "/Fs/Process/LeaveTypeSetUp";
+const formName = "Leave Type Setup";
 
 interface LeaveType {
   leaveID: number;
@@ -29,13 +29,13 @@ interface LeaveType {
   exemptFromAllowDeduction: boolean;
 }
 
-type FormData = Omit<LeaveType, 'leaveID'>;
+type FormData = Omit<LeaveType, "leaveID">;
 
 const defaultForm: FormData = {
-  leaveCode: '',
-  leaveDesc: '',
-  chargeableTo: '',
-  withPay: '',
+  leaveCode: "",
+  leaveDesc: "",
+  chargeableTo: "",
+  withPay: "",
   subTypeRequired: false,
   basedOnTenure: false,
   withDateDuration: false,
@@ -44,7 +44,7 @@ const defaultForm: FormData = {
   sphFileAsLeave: false,
   dbleLegalFileAsLeave: false,
   sph2FileAsLeave: false,
-  prevYrLvCode: '',
+  prevYrLvCode: "",
   nwhFileAsLeave: false,
   requiredAdvanceFiling: false,
   exemptFromAllowDeduction: false,
@@ -61,7 +61,12 @@ interface SearchModalProps {
 }
 
 const ChargeableSearchModal = memo(function ChargeableSearchModal({
-  show, onClose, searchTerm, onSearchChange, data, onSelect,
+  show,
+  onClose,
+  searchTerm,
+  onSearchChange,
+  data,
+  onSelect,
 }: SearchModalProps) {
   if (!show) return null;
   const filtered = data.filter(
@@ -72,19 +77,32 @@ const ChargeableSearchModal = memo(function ChargeableSearchModal({
   return (
     <div
       className="fixed inset-0 bg-transparent flex items-center justify-center z-[100] p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto" style={{ width: '600px' }}>
+      <div
+        className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto"
+        style={{ width: "600px" }}
+      >
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
           <h2 className="text-gray-900 font-semibold text-sm">Search</h2>
-          <button type="button" onClick={onClose} className="text-gray-600 hover:text-gray-800 transition-colors">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-600 hover:text-gray-800 transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-4">
-          <h3 className="text-blue-600 mb-3 font-semibold text-sm">Leave Type</h3>
+          <h3 className="text-blue-600 mb-3 font-semibold text-sm">
+            Leave Type
+          </h3>
           <div className="flex items-center gap-2 mb-3">
-            <label className="text-gray-900 text-xs whitespace-nowrap">Search:</label>
+            <label className="text-gray-900 text-xs whitespace-nowrap">
+              Search:
+            </label>
             <input
               type="text"
               value={searchTerm}
@@ -97,8 +115,12 @@ const ChargeableSearchModal = memo(function ChargeableSearchModal({
             <table className="w-full">
               <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs text-gray-700">Code</th>
-                  <th className="px-3 py-2 text-left text-xs text-gray-700">Description</th>
+                  <th className="px-3 py-2 text-left text-xs text-gray-700">
+                    Code
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs text-gray-700">
+                    Description
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -109,13 +131,22 @@ const ChargeableSearchModal = memo(function ChargeableSearchModal({
                       className="hover:bg-blue-50 transition-colors cursor-pointer"
                       onClick={() => onSelect(item.leaveCode)}
                     >
-                      <td className="px-3 py-2 text-sm text-gray-900">{item.leaveCode}</td>
-                      <td className="px-3 py-2 text-sm text-gray-600">{item.leaveDesc}</td>
+                      <td className="px-3 py-2 text-sm text-gray-900">
+                        {item.leaveCode}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-gray-600">
+                        {item.leaveDesc}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={2} className="px-4 py-8 text-center text-gray-500 text-sm">No data available</td>
+                    <td
+                      colSpan={2}
+                      className="px-4 py-8 text-center text-gray-500 text-sm"
+                    >
+                      No data available
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -132,17 +163,25 @@ interface FormFieldsProps {
   formData: FormData;
   onChange: (updated: FormData) => void;
   onOpenSearch: () => void;
+  isEditMode: boolean;
+  setIsEditMode: (value: boolean) => void;
 }
 
 const LeaveTypeFormFields = memo(function LeaveTypeFormFields({
-  formData, onChange, onOpenSearch,
+  formData,
+  onChange,
+  onOpenSearch,
+  isEditMode,
+  setIsEditMode,
 }: FormFieldsProps) {
   const set = (key: keyof FormData, value: any) =>
     onChange({ ...formData, [key]: value });
 
   const checkboxRow = (key: keyof FormData, label: string) => (
     <div key={key} className="flex items-center gap-3">
-      <label className="text-gray-700 text-sm w-56 flex-shrink-0">{label} :</label>
+      <label className="text-gray-700 text-sm w-56 flex-shrink-0">
+        {label} :
+      </label>
       <input
         type="checkbox"
         checked={formData[key] as boolean}
@@ -155,79 +194,105 @@ const LeaveTypeFormFields = memo(function LeaveTypeFormFields({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Code :</label>
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">
+          Code :
+        </label>
         <input
           type="text"
           value={formData.leaveCode}
-          onChange={(e) => set('leaveCode', e.target.value)}
+          onChange={(e) => set("leaveCode", e.target.value)}
           maxLength={10}
-
+          readOnly={isEditMode}
           className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           required
         />
       </div>
-
       <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Description :</label>
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">
+          Description :
+        </label>
         <input
           type="text"
           value={formData.leaveDesc}
-          onChange={(e) => set('leaveDesc', e.target.value)}
+          onChange={(e) => set("leaveDesc", e.target.value)}
+          readOnly={isEditMode}
           className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
         />
       </div>
-
       <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Chargeable To :</label>
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">
+          Chargeable To :
+        </label>
         <div className="flex-1 flex items-center gap-2">
           <input
             type="text"
             value={formData.chargeableTo}
-            onChange={(e) => set('chargeableTo', e.target.value)}
+            onChange={(e) => set("chargeableTo", e.target.value)}
+            readOnly={true}
             className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             placeholder="Code"
           />
-          <button type="button" onClick={onOpenSearch} className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-            <Search className="w-4 h-4" />
-          </button>
-          <button type="button" onClick={() => set('chargeableTo', '')} className="px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+          {!isEditMode && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onOpenSearch}
+                className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => set("chargeableTo", "")}
+                className="px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
+      
       <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">With Pay :</label>
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">
+          With Pay :
+        </label>
         <input
-          type="text"
+          type="checkbox"
           value={formData.withPay}
-          onChange={(e) => set('withPay', e.target.value)}
-          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          onChange={(e) => set("withPay", e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           placeholder="e.g. Y / N"
         />
       </div>
-
       <div className="flex items-center gap-3">
-        <label className="text-gray-700 text-sm w-56 flex-shrink-0">Previous Year Leave Code :</label>
+        <label className="text-gray-700 text-sm w-56 flex-shrink-0">
+          Previous Year Leave Code :
+        </label>
         <input
           type="text"
           value={formData.prevYrLvCode}
-          onChange={(e) => set('prevYrLvCode', e.target.value)}
+          onChange={(e) => set("prevYrLvCode", e.target.value)}
           className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
         />
       </div>
-
-      {checkboxRow('subTypeRequired', 'Sub-Type Required')}
-      {checkboxRow('basedOnTenure', 'Based on Tenure')}
-      {checkboxRow('withDateDuration', 'With Date Duration')}
-      {checkboxRow('noBalance', 'No Balance')}
-      {checkboxRow('requiredAdvanceFiling', 'Required Advanced Filing')}
-      {checkboxRow('exemptFromAllowDeduction', 'Exempted From Allowance Deduction')}
-      {checkboxRow('legalFileAsLeave', 'Legal Holiday Filed As Leave')}
-      {checkboxRow('sphFileAsLeave', 'Special Holiday Filed As Leave')}
-      {checkboxRow('sph2FileAsLeave', 'Special Holiday 2 Filed As Leave')}
-      {checkboxRow('dbleLegalFileAsLeave', 'Double Legal Holiday Filed As Leave')}
-      {checkboxRow('nwhFileAsLeave', 'Non-Working Holiday Filed As Leave')}
+      {checkboxRow("subTypeRequired", "Sub-Type Required")}
+      {checkboxRow("basedOnTenure", "Based on Tenure")}
+      {checkboxRow("withDateDuration", "With Date Duration")}
+      {checkboxRow("noBalance", "No Balance")}
+      {checkboxRow("requiredAdvanceFiling", "Required Advanced Filing")}
+      {checkboxRow(
+        "exemptFromAllowDeduction",
+        "Exempted From Allowance Deduction",
+      )}
+      {checkboxRow("legalFileAsLeave", "Legal Holiday Filed As Leave")}
+      {checkboxRow("sphFileAsLeave", "Special Holiday Filed As Leave")}
+      {checkboxRow("sph2FileAsLeave", "Special Holiday 2 Filed As Leave")}
+      {checkboxRow(
+        "dbleLegalFileAsLeave",
+        "Double Legal Holiday Filed As Leave",
+      )}
+      {checkboxRow("nwhFileAsLeave", "Non-Working Holiday Filed As Leave")}
     </div>
   );
 });
@@ -248,29 +313,53 @@ interface ModalShellProps {
   searchModalTerm: string;
   onSearchModalTermChange: (v: string) => void;
   onSelectChargeable: (code: string) => void;
+  isEditMode: boolean;
+  setIsEditMode: (value: boolean) => void;
 }
 
 const ModalShell = memo(function ModalShell({
-  title, onSubmit, onClose, submitLabel, submitting,
-  formData, onFormChange, onOpenSearch,
-  leaveTypes, showSearch, onCloseSearch,
-  searchModalTerm, onSearchModalTermChange, onSelectChargeable,
+  title,
+  onSubmit,
+  onClose,
+  submitLabel,
+  submitting,
+  formData,
+  onFormChange,
+  onOpenSearch,
+  leaveTypes,
+  showSearch,
+  onCloseSearch,
+  searchModalTerm,
+  onSearchModalTermChange,
+  onSelectChargeable,
+  isEditMode,
+  setIsEditMode,
 }: ModalShellProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto" style={{ width: '600px' }}>
+      <div
+        className="bg-white rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto"
+        style={{ width: "600px" }}
+      >
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-xl sticky top-0 z-10">
           <h2 className="text-gray-900 font-semibold text-sm">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-5">
-          <h3 className="text-blue-600 mb-3 font-semibold text-sm">Leave Type Setup</h3>
+          <h3 className="text-blue-600 mb-3 font-semibold text-sm">
+            Leave Type Setup
+          </h3>
           <LeaveTypeFormFields
             formData={formData}
             onChange={onFormChange}
             onOpenSearch={onOpenSearch}
+            isEditMode={isEditMode}
+            setIsEditMode={setIsEditMode}
           />
           <div className="flex gap-3 mt-5 pt-4 border-t border-gray-200">
             <button
@@ -278,7 +367,7 @@ const ModalShell = memo(function ModalShell({
               disabled={submitting}
               className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? 'Saving...' : submitLabel}
+              {submitting ? "Saving..." : submitLabel}
             </button>
             <button
               type="button"
@@ -306,14 +395,14 @@ const ModalShell = memo(function ModalShell({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function LeaveTypeSetupPage() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [searchModalTerm, setSearchModalTerm] = useState('');
+  const [searchModalTerm, setSearchModalTerm] = useState("");
 
   const [formData, setFormData] = useState<FormData>(defaultForm);
   const [editingItem, setEditingItem] = useState<LeaveType | null>(null);
@@ -321,20 +410,26 @@ export function LeaveTypeSetupPage() {
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-  const hasPermission = (accessType: string) => permissions[accessType] === true;
+  const hasPermission = (accessType: string) =>
+    permissions[accessType] === true;
 
-  useEffect(() => { getLeaveTypeSetupPermissions(); }, []);
+  useEffect(() => {
+    getLeaveTypeSetupPermissions();
+  }, []);
 
   const getLeaveTypeSetupPermissions = () => {
-    const rawPayload = localStorage.getItem('loginPayload');
+    const rawPayload = localStorage.getItem("loginPayload");
     if (!rawPayload) return;
     try {
       const parsedPayload = JSON.parse(rawPayload);
       const encryptedArray: any[] = parsedPayload.permissions || [];
-      const entries = encryptedArray.filter((p) => decryptData(p.formName) === 'LeaveTypeSetUp');
+      const entries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "LeaveTypeSetUp",
+      );
       const permMap: Record<string, boolean> = {};
       entries.forEach((p) => {
         const accessType = decryptData(p.accessTypeName);
@@ -342,20 +437,26 @@ export function LeaveTypeSetupPage() {
       });
       setPermissions(permMap);
     } catch (e) {
-      console.error('Error parsing or decrypting payload', e);
+      console.error("Error parsing or decrypting payload", e);
     }
   };
 
-  useEffect(() => { fetchLeaveTypes(); }, []);
+  useEffect(() => {
+    fetchLeaveTypes();
+  }, []);
 
   const fetchLeaveTypes = async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const response = await apiClient.get(API_BASE);
-      if (response.status === 200 && response.data) setLeaveTypes(response.data);
+      if (response.status === 200 && response.data)
+        setLeaveTypes(response.data);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load leave types';
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load leave types";
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -364,50 +465,78 @@ export function LeaveTypeSetupPage() {
 
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== "Escape") return;
       if (showSearchModal) setShowSearchModal(false);
       else if (showCreateModal) setShowCreateModal(false);
-      else if (showEditModal) { setShowEditModal(false); setEditingItem(null); }
+      else if (showEditModal) {
+        setShowEditModal(false);
+        setEditingItem(null);
+      }
     };
     if (showSearchModal || showCreateModal || showEditModal)
-      document.addEventListener('keydown', handleEscKey);
-    return () => document.removeEventListener('keydown', handleEscKey);
+      document.addEventListener("keydown", handleEscKey);
+    return () => document.removeEventListener("keydown", handleEscKey);
   }, [showSearchModal, showCreateModal, showEditModal]);
 
   // ─── Company Info Validation (Payroll Path only per C# backend) ──────────────
   const validateCompanyPaths = async (): Promise<boolean> => {
     try {
-      const response = await apiClient.get('/Fs/System/CompanyInformation');
-      const companyInfo = Array.isArray(response.data) ? response.data[0] : response.data;
+      const response = await apiClient.get("/Fs/System/CompanyInformation");
+      const companyInfo = Array.isArray(response.data)
+        ? response.data[0]
+        : response.data;
 
       if (!companyInfo) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Company Information is not properly set.' });
+        await Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Company Information is not properly set.",
+        });
         return false;
       }
 
-      const payrollPath = (companyInfo.payrollPath ?? '').trim();
-      if (payrollPath !== '') {
-        await Swal.fire({ icon: 'error', title: 'Not Allowed', text: 'You are connected to Payroll. you are not allowed to do any transaction for this setup.' });
+      const payrollPath = (companyInfo.payrollPath ?? "").trim();
+      if (payrollPath !== "") {
+        await Swal.fire({
+          icon: "error",
+          title: "Not Allowed",
+          text: "You are connected to Payroll. you are not allowed to do any transaction for this setup.",
+        });
         return false;
       }
 
       return true;
     } catch (error: any) {
-      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to retrieve company information.' });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve company information.",
+      });
       return false;
     }
   };
 
-  const filteredData = leaveTypes.filter((item) =>
-    item.leaveCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.leaveDesc.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.chargeableTo ?? '').toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredData = leaveTypes.filter(
+    (item) =>
+      item.leaveCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.leaveDesc.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.chargeableTo ?? "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()),
   );
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedData = filteredData.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const handleCreateNew = useCallback(() => {
     setFormData(defaultForm);
@@ -417,13 +546,22 @@ export function LeaveTypeSetupPage() {
   const handleEdit = useCallback((item: LeaveType) => {
     setEditingItem(item);
     setFormData({
-      leaveCode: item.leaveCode, leaveDesc: item.leaveDesc, chargeableTo: item.chargeableTo,
-      withPay: item.withPay, subTypeRequired: item.subTypeRequired, basedOnTenure: item.basedOnTenure,
-      withDateDuration: item.withDateDuration, noBalance: item.noBalance,
-      legalFileAsLeave: item.legalFileAsLeave, sphFileAsLeave: item.sphFileAsLeave,
-      dbleLegalFileAsLeave: item.dbleLegalFileAsLeave, sph2FileAsLeave: item.sph2FileAsLeave,
-      prevYrLvCode: item.prevYrLvCode, nwhFileAsLeave: item.nwhFileAsLeave,
-      requiredAdvanceFiling: item.requiredAdvanceFiling, exemptFromAllowDeduction: item.exemptFromAllowDeduction,
+      leaveCode: item.leaveCode,
+      leaveDesc: item.leaveDesc,
+      chargeableTo: item.chargeableTo,
+      withPay: item.withPay,
+      subTypeRequired: item.subTypeRequired,
+      basedOnTenure: item.basedOnTenure,
+      withDateDuration: item.withDateDuration,
+      noBalance: item.noBalance,
+      legalFileAsLeave: item.legalFileAsLeave,
+      sphFileAsLeave: item.sphFileAsLeave,
+      dbleLegalFileAsLeave: item.dbleLegalFileAsLeave,
+      sph2FileAsLeave: item.sph2FileAsLeave,
+      prevYrLvCode: item.prevYrLvCode,
+      nwhFileAsLeave: item.nwhFileAsLeave,
+      requiredAdvanceFiling: item.requiredAdvanceFiling,
+      exemptFromAllowDeduction: item.exemptFromAllowDeduction,
     });
     setShowEditModal(true);
   }, []);
@@ -433,60 +571,104 @@ export function LeaveTypeSetupPage() {
     if (!companyPathsValid) return;
 
     const confirmed = await Swal.fire({
-      icon: 'warning', title: 'Confirm Delete',
+      icon: "warning",
+      title: "Confirm Delete",
       text: `Are you sure you want to delete leave type "${item.leaveDesc}"?`,
-      showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Delete', cancelButtonText: 'Cancel',
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
     });
 
     if (!confirmed.isConfirmed) return;
 
     try {
       await apiClient.delete(`${API_BASE}/${item.leaveID}`);
-      await auditTrail.log({ accessType: 'Delete', trans: `Deleted leave type "${item.leaveDesc}"`, messages: `Leave type "${item.leaveDesc}" removed`, formName });
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Leave type deleted successfully.', timer: 2000, showConfirmButton: false });
+      await auditTrail.log({
+        accessType: "Delete",
+        trans: `Deleted leave type "${item.leaveDesc}"`,
+        messages: `Leave type "${item.leaveDesc}" removed`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Leave type deleted successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
       await fetchLeaveTypes();
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+      const errorMsg =
+        error.response?.data?.message || error.message || "Failed to delete";
+      await Swal.fire({ icon: "error", title: "Error", text: errorMsg });
     }
   };
 
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.leaveCode.trim()) {
-      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a code.' });
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Please enter a code.",
+      });
       return;
     }
     const companyPathsValid = await validateCompanyPaths();
     if (!companyPathsValid) return;
 
     const isDuplicateCode = leaveTypes.some(
-      (lt) => lt.leaveCode.trim().toUpperCase() === formData.leaveCode.trim().toUpperCase(),
+      (lt) =>
+        lt.leaveCode.trim().toUpperCase() ===
+        formData.leaveCode.trim().toUpperCase(),
     );
     if (isDuplicateCode) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Code",
+        text: "Code is already exist.",
+      });
       return;
     }
 
     const isDuplicateDesc = leaveTypes.some(
-      (lt) => lt.leaveDesc.trim().toUpperCase() === formData.leaveDesc.trim().toUpperCase(),
+      (lt) =>
+        lt.leaveDesc.trim().toUpperCase() ===
+        formData.leaveDesc.trim().toUpperCase(),
     );
     if (isDuplicateDesc) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
       return;
     }
 
     setSubmitting(true);
     try {
       await apiClient.post(API_BASE, { leaveID: 0, ...formData });
-      await auditTrail.log({ accessType: 'Add', trans: `Created leave type "${formData.leaveDesc}"`, messages: `Leave type "${formData.leaveDesc}" created`, formName });
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Leave type created successfully.', timer: 2000, showConfirmButton: false });
+      await auditTrail.log({
+        accessType: "Add",
+        trans: `Created leave type "${formData.leaveDesc}"`,
+        messages: `Leave type "${formData.leaveDesc}" created`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Leave type created successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
       await fetchLeaveTypes();
       setShowCreateModal(false);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+      const errorMsg =
+        error.response?.data?.message || error.message || "An error occurred";
+      await Swal.fire({ icon: "error", title: "Error", text: errorMsg });
     } finally {
       setSubmitting(false);
     }
@@ -496,39 +678,72 @@ export function LeaveTypeSetupPage() {
     e.preventDefault();
     if (!editingItem) return;
     if (!formData.leaveCode.trim()) {
-      await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Please enter a code.' });
+      await Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Please enter a code.",
+      });
       return;
     }
     const companyPathsValid = await validateCompanyPaths();
     if (!companyPathsValid) return;
 
     const isDuplicateCode = leaveTypes.some(
-      (lt) => lt.leaveID !== editingItem.leaveID && lt.leaveCode.trim().toUpperCase() === formData.leaveCode.trim().toUpperCase(),
+      (lt) =>
+        lt.leaveID !== editingItem.leaveID &&
+        lt.leaveCode.trim().toUpperCase() ===
+          formData.leaveCode.trim().toUpperCase(),
     );
     if (isDuplicateCode) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Code is already exist.' });
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Code",
+        text: "Code is already exist.",
+      });
       return;
     }
 
     const isDuplicateDesc = leaveTypes.some(
-      (lt) => lt.leaveID !== editingItem.leaveID && lt.leaveDesc.trim().toUpperCase() === formData.leaveDesc.trim().toUpperCase(),
+      (lt) =>
+        lt.leaveID !== editingItem.leaveID &&
+        lt.leaveDesc.trim().toUpperCase() ===
+          formData.leaveDesc.trim().toUpperCase(),
     );
     if (isDuplicateDesc) {
-      await Swal.fire({ icon: 'error', title: 'Duplicate Description', text: 'Description is already exist.' });
+      await Swal.fire({
+        icon: "error",
+        title: "Duplicate Description",
+        text: "Description is already exist.",
+      });
       return;
     }
 
     setSubmitting(true);
     try {
-      await apiClient.put(`${API_BASE}/${editingItem.leaveID}`, { leaveID: editingItem.leaveID, ...formData });
-      await auditTrail.log({ accessType: 'Edit', trans: `Updated leave type "${formData.leaveDesc}"`, messages: `Leave type "${formData.leaveDesc}" updated`, formName });
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Leave type updated successfully.', timer: 2000, showConfirmButton: false });
+      await apiClient.put(`${API_BASE}/${editingItem.leaveID}`, {
+        leaveID: editingItem.leaveID,
+        ...formData,
+      });
+      await auditTrail.log({
+        accessType: "Edit",
+        trans: `Updated leave type "${formData.leaveDesc}"`,
+        messages: `Leave type "${formData.leaveDesc}" updated`,
+        formName,
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Leave type updated successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
       await fetchLeaveTypes();
       setShowEditModal(false);
       setEditingItem(null);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'An error occurred';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+      const errorMsg =
+        error.response?.data?.message || error.message || "An error occurred";
+      await Swal.fire({ icon: "error", title: "Error", text: errorMsg });
     } finally {
       setSubmitting(false);
     }
@@ -539,42 +754,56 @@ export function LeaveTypeSetupPage() {
     setShowEditModal(false);
     setEditingItem(null);
     setShowSearchModal(false);
+    setIsEditMode(false);
   }, []);
 
   const handleOpenSearchModal = useCallback(() => {
-    setSearchModalTerm('');
+    setSearchModalTerm("");
     setShowSearchModal(true);
   }, []);
 
-const handleSelectChargeable = useCallback((code: string) => {
+  const handleSelectChargeable = useCallback((code: string) => {
     setFormData((prev) => ({ ...prev, chargeableTo: code }));
     setShowSearchModal(false);
-    setSearchModalTerm('');
+    setSearchModalTerm("");
   }, []);
-const filteredSearchData = leaveTypes.filter(
-  (item) =>
-    item.leaveCode.toLowerCase().includes(searchModalTerm.toLowerCase()) ||
-    item.leaveDesc.toLowerCase().includes(searchModalTerm.toLowerCase()),
-);
+  const filteredSearchData = leaveTypes.filter(
+    (item) =>
+      item.leaveCode.toLowerCase().includes(searchModalTerm.toLowerCase()) ||
+      item.leaveDesc.toLowerCase().includes(searchModalTerm.toLowerCase()),
+  );
   // ── Chargeable-To Search Modal ─────────────────────────────────────────────
   const renderSearchModal = () => (
     <>
       {showSearchModal && (
         <div
           className="fixed inset-0 bg-transparent flex items-center justify-center z-[100] p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowSearchModal(false); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowSearchModal(false);
+          }}
         >
-          <div className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto" style={{ width: '600px' }}>
+          <div
+            className="bg-white rounded-lg shadow-xl max-h-[80vh] overflow-y-auto"
+            style={{ width: "600px" }}
+          >
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
               <h2 className="text-gray-900 font-semibold text-sm">Search</h2>
-              <button type="button" onClick={() => setShowSearchModal(false)} className="text-gray-600 hover:text-gray-800 transition-colors">
+              <button
+                type="button"
+                onClick={() => setShowSearchModal(false)}
+                className="text-gray-600 hover:text-gray-800 transition-colors"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-4">
-              <h3 className="text-blue-600 mb-3 font-semibold text-sm">Leave Type</h3>
+              <h3 className="text-blue-600 mb-3 font-semibold text-sm">
+                Leave Type
+              </h3>
               <div className="flex items-center gap-2 mb-3">
-                <label className="text-gray-900 text-xs whitespace-nowrap">Search:</label>
+                <label className="text-gray-900 text-xs whitespace-nowrap">
+                  Search:
+                </label>
                 <input
                   type="text"
                   value={searchModalTerm}
@@ -587,21 +816,38 @@ const filteredSearchData = leaveTypes.filter(
                 <table className="w-full">
                   <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs text-gray-700">Code</th>
-                      <th className="px-3 py-2 text-left text-xs text-gray-700">Description</th>
+                      <th className="px-3 py-2 text-left text-xs text-gray-700">
+                        Code
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs text-gray-700">
+                        Description
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredSearchData.length > 0 ? (
                       filteredSearchData.map((item) => (
-                        <tr key={item.leaveID} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => handleSelectChargeable(item.leaveCode)}>
-                          <td className="px-3 py-2 text-sm text-gray-900">{item.leaveCode}</td>
-                          <td className="px-3 py-2 text-sm text-gray-600">{item.leaveDesc}</td>
+                        <tr
+                          key={item.leaveID}
+                          className="hover:bg-blue-50 transition-colors cursor-pointer"
+                          onClick={() => handleSelectChargeable(item.leaveCode)}
+                        >
+                          <td className="px-3 py-2 text-sm text-gray-900">
+                            {item.leaveCode}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-600">
+                            {item.leaveDesc}
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={2} className="px-4 py-8 text-center text-gray-500 text-sm">No data available</td>
+                        <td
+                          colSpan={2}
+                          className="px-4 py-8 text-center text-gray-500 text-sm"
+                        >
+                          No data available
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -616,16 +862,22 @@ const filteredSearchData = leaveTypes.filter(
 
   // ── form fields (compact) ──────────────────────────────────────────────────
   type BooleanKeys = {
-    [K in keyof typeof defaultForm]: (typeof defaultForm)[K] extends boolean ? K : never;
+    [K in keyof typeof defaultForm]: (typeof defaultForm)[K] extends boolean
+      ? K
+      : never;
   }[keyof typeof defaultForm];
 
   const checkbox = (key: BooleanKeys, label: string) => (
     <div className="flex items-center gap-3">
-      <label className="text-gray-700 text-sm w-56 flex-shrink-0">{label} :</label>
+      <label className="text-gray-700 text-sm w-56 flex-shrink-0">
+        {label} :
+      </label>
       <input
         type="checkbox"
         checked={formData[key] as boolean}
-        onChange={(e) => setFormData((prev) => ({ ...prev, [key]: e.target.checked }))}
+        onChange={(e) =>
+          setFormData((prev) => ({ ...prev, [key]: e.target.checked }))
+        }
         className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
       />
     </div>
@@ -654,16 +906,33 @@ const filteredSearchData = leaveTypes.filter(
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-6 h-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Define and configure different types of employee leaves including vacation, sick leave, emergency leave, and other leave categories.
+                    Define and configure different types of employee leaves
+                    including vacation, sick leave, emergency leave, and other
+                    leave categories.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    {['Multiple leave type categories', 'Earning code integration', 'Flexible leave policies', 'Comprehensive leave management'].map((t) => (
+                    {[
+                      "Multiple leave type categories",
+                      "Earning code integration",
+                      "Flexible leave policies",
+                      "Comprehensive leave management",
+                    ].map((t) => (
                       <div key={t} className="flex items-start gap-2">
                         <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <span className="text-gray-600">{t}</span>
@@ -681,20 +950,25 @@ const filteredSearchData = leaveTypes.filter(
             )}
 
             {/* Controls */}
-            {hasPermission('View') && (
+            {hasPermission("View") && (
               <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-                {hasPermission('Add') && (
-                  <button onClick={handleCreateNew}
-                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                {hasPermission("Add") && (
+                  <button
+                    onClick={handleCreateNew}
+                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                  >
                     <Plus className="w-4 h-4" />
                     Create New
                   </button>
                 )}
                 <div className="flex items-center gap-2">
                   <label className="text-gray-700 text-sm">Search:</label>
-                  <input type="text" value={searchTerm}
+                  <input
+                    type="text"
+                    value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64" />
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                  />
                 </div>
               </div>
             )}
@@ -702,18 +976,43 @@ const filteredSearchData = leaveTypes.filter(
             {/* Table */}
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-gray-600 text-sm">Loading leave types...</div>
+                <div className="text-gray-600 text-sm">
+                  Loading leave types...
+                </div>
               </div>
-            ) : hasPermission('View') ? (
+            ) : hasPermission("View") ? (
               <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-100 border-b border-gray-200">
                     <tr>
-                      {['Code','Description','Chargeable To','With Pay','No Balance','Sub-Type Req.','Based on Tenure','Date Duration','Req. Adv. Filing','Exempt Allow. Ded.','Legal','Special','Special 2','Dbl Legal','Non-Working'].map((h) => (
-                        <th key={h} className="px-3 py-3 text-left text-xs text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                      {[
+                        "Code",
+                        "Description",
+                        "Chargeable To",
+                        "With Pay",
+                        "No Balance",
+                        "Sub-Type Req.",
+                        "Based on Tenure",
+                        "Date Duration",
+                        "Req. Adv. Filing",
+                        "Exempt Allow. Ded.",
+                        "Legal",
+                        "Special",
+                        "Special 2",
+                        "Dbl Legal",
+                        "Non-Working",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="px-3 py-3 text-left text-xs text-gray-600 uppercase whitespace-nowrap"
+                        >
+                          {h}
+                        </th>
                       ))}
-                      {(hasPermission('Edit') || hasPermission('Delete')) && (
-                        <th className="px-3 py-3 text-center text-xs text-gray-600 uppercase whitespace-nowrap">Actions</th>
+                      {(hasPermission("Edit") || hasPermission("Delete")) && (
+                        <th className="px-3 py-3 text-center text-xs text-gray-600 uppercase whitespace-nowrap">
+                          Actions
+                        </th>
                       )}
                     </tr>
                   </thead>
@@ -722,19 +1021,37 @@ const filteredSearchData = leaveTypes.filter(
                       paginatedData.map((item) => {
                         const boolCell = (val: boolean) => (
                           <td className="px-3 py-4 text-center">
-                            <input type="checkbox" checked={val} readOnly className="w-4 h-4 rounded border-gray-300 pointer-events-none" />
+                            <input
+                              type="checkbox"
+                              checked={val}
+                              readOnly
+                              className="w-4 h-4 rounded border-gray-300 pointer-events-none"
+                            />
                           </td>
                         );
-                        const chargeableMatch = leaveTypes.find((lt) => lt.leaveCode === item.chargeableTo);
+                        const chargeableMatch = leaveTypes.find(
+                          (lt) => lt.leaveCode === item.chargeableTo,
+                        );
                         const chargeableDisplay = chargeableMatch
                           ? `${chargeableMatch.leaveCode} - ${chargeableMatch.leaveDesc}`
                           : item.chargeableTo;
                         return (
-                          <tr key={item.leaveID} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-3 py-4 text-sm text-gray-900">{item.leaveCode}</td>
-                            <td className="px-3 py-4 text-sm text-gray-600">{item.leaveDesc}</td>
-                            <td className="px-3 py-4 text-sm text-gray-600">{chargeableDisplay}</td>
-                            <td className="px-3 py-4 text-sm text-gray-600">{item.withPay}</td>
+                          <tr
+                            key={item.leaveID}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-3 py-4 text-sm text-gray-900">
+                              {item.leaveCode}
+                            </td>
+                            <td className="px-3 py-4 text-sm text-gray-600">
+                              {item.leaveDesc}
+                            </td>
+                            <td className="px-3 py-4 text-sm text-gray-600">
+                              {chargeableDisplay}
+                            </td>
+                            <td className="px-3 py-4 text-sm text-gray-600">
+                              {item.withPay}
+                            </td>
                             {boolCell(item.noBalance)}
                             {boolCell(item.subTypeRequired)}
                             {boolCell(item.basedOnTenure)}
@@ -746,17 +1063,32 @@ const filteredSearchData = leaveTypes.filter(
                             {boolCell(item.sph2FileAsLeave)}
                             {boolCell(item.dbleLegalFileAsLeave)}
                             {boolCell(item.nwhFileAsLeave)}
-                            {(hasPermission('Edit') || hasPermission('Delete')) && (
+                            {(hasPermission("Edit") ||
+                              hasPermission("Delete")) && (
                               <td className="px-3 py-4">
                                 <div className="flex items-center justify-center gap-2">
-                                  {hasPermission('Edit') && (
-                                    <button onClick={() => handleEdit(item)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">
+                                  {hasPermission("Edit") && (
+                                    <button
+                                      onClick={() => {
+                                        handleEdit(item);
+                                        setIsEditMode(true);
+                                      }}
+                                      className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                      title="Edit"
+                                    >
                                       <Edit className="w-4 h-4" />
                                     </button>
                                   )}
-                                  {hasPermission('Edit') && hasPermission('Delete') && <span className="text-gray-300">|</span>}
-                                  {hasPermission('Delete') && (
-                                    <button onClick={() => handleDelete(item)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
+                                  {hasPermission("Edit") &&
+                                    hasPermission("Delete") && (
+                                      <span className="text-gray-300">|</span>
+                                    )}
+                                  {hasPermission("Delete") && (
+                                    <button
+                                      onClick={() => handleDelete(item)}
+                                      className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                      title="Delete"
+                                    >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
                                   )}
@@ -768,35 +1100,59 @@ const filteredSearchData = leaveTypes.filter(
                       })
                     ) : (
                       <tr>
-                        <td colSpan={16} className="px-6 py-16 text-center text-gray-500">No data available in table</td>
+                        <td
+                          colSpan={16}
+                          className="px-6 py-16 text-center text-gray-500"
+                        >
+                          No data available in table
+                        </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="text-center py-10 text-gray-500">You do not have permission to view this list.</div>
+              <div className="text-center py-10 text-gray-500">
+                You do not have permission to view this list.
+              </div>
             )}
 
             {/* Pagination */}
-            {hasPermission('View') && (
+            {hasPermission("View") && (
               <div className="mt-4 flex items-center justify-between text-sm">
                 <span className="text-gray-600">
-                  Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                  Showing {filteredData.length > 0 ? startIndex + 1 : 0} to{" "}
+                  {Math.min(startIndex + itemsPerPage, filteredData.length)} of{" "}
+                  {filteredData.length} entries
                 </span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
-                    className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     Previous
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button key={page} onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 rounded ${currentPage === page ? 'bg-blue-500 text-white' : 'text-blue-600 hover:bg-gray-100'}`}>
-                      {page}
-                    </button>
-                  ))}
-                  <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages || filteredData.length === 0}
-                    className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded ${currentPage === page ? "bg-blue-500 text-white" : "text-blue-600 hover:bg-gray-100"}`}
+                      >
+                        {page}
+                      </button>
+                    ),
+                  )}
+                  <button
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={
+                      currentPage >= totalPages || filteredData.length === 0
+                    }
+                    className="px-4 py-2 text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     Next
                   </button>
                 </div>
@@ -823,6 +1179,8 @@ const filteredSearchData = leaveTypes.filter(
           searchModalTerm={searchModalTerm}
           onSearchModalTermChange={setSearchModalTerm}
           onSelectChargeable={handleSelectChargeable}
+          isEditMode={isEditMode}
+          setIsEditMode={setIsEditMode}
         />
       )}
 
@@ -843,6 +1201,8 @@ const filteredSearchData = leaveTypes.filter(
           searchModalTerm={searchModalTerm}
           onSearchModalTermChange={setSearchModalTerm}
           onSelectChargeable={handleSelectChargeable}
+          isEditMode={isEditMode}
+          setIsEditMode={setIsEditMode}
         />
       )}
 
