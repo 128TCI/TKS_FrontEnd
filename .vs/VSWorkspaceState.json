@@ -3,9 +3,9 @@
     "",
     "\\src",
     "\\src\\components",
-    "\\src\\components\\Utilities",
+    "\\src\\components\\Security",
     "\\src\\routes"
   ],
-  "SelectedNode": "\\src\\routes\\AppRoutes.tsx",
+  "SelectedNode": "\\src\\components\\Security\\SecurityManagerPage.tsx",
   "PreviewInSolutionExplorer": false
 }
