@@ -5,6 +5,7 @@ import { showSuccessModal, showErrorModal } from '../../services/apiService';
 import auditTrail from '../../services/auditTrail';
 import { securityService } from '../../services/securityService';
 import { decryptData } from '../../services/encryptionService';
+import { Footer } from '../Footer/Footer';
 
 interface ChangePasswordPageProps {
   onBack: () => void;
@@ -179,6 +180,7 @@ function PasswordField({ label, placeholder, value, show, onChange, onToggle, on
           {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
       </div>
+
     </div>
   );
 }

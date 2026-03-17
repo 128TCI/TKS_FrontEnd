@@ -497,7 +497,7 @@ export function CreateNewDatabasePage() {
                     </div>
                 </div>
             </div>
-      <Footer />
+<Footer />
     </div>
   );
 }

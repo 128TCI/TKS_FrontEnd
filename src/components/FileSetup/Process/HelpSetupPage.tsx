@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Check, Edit, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, X, Check, Edit, Trash2, ExternalLink, Turtle } from 'lucide-react';
 import { Footer } from '../../Footer/Footer';
 import Swal from 'sweetalert2';
 import apiClient from '../../../services/apiClient';
@@ -25,6 +25,7 @@ export function HelpSetupPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingItem, setEditingItem] = useState<HelpItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false)
 
   const [formData, setFormData] = useState({
     code: '',
@@ -338,6 +339,7 @@ export function HelpSetupPage() {
     setShowEditModal(false);
     setEditingItem(null);
     setSelectedFile(null);
+    setIsEditMode(false);
   };
 
   // ── ESC key ───────────────────────────────────────────────────────────────
@@ -376,6 +378,7 @@ export function HelpSetupPage() {
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                readOnly={isEditMode}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 required
               />
@@ -550,7 +553,11 @@ export function HelpSetupPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
                             {hasPermission('Edit') && (
-                              <button onClick={() => handleEdit(item)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">
+                              <button onClick={() => {
+                                handleEdit(item);
+                                setIsEditMode(true);
+                              }} 
+                              className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">
                                 <Edit className="w-4 h-4" />
                               </button>
                             )}

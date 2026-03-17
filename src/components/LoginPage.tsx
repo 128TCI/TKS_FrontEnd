@@ -165,14 +165,15 @@ if (names.length > 0) {
     }
   };
 
-  // ── Login error handler ───────────────────────────────────────────────────
+ // ── Login error handler ───────────────────────────────────────────────────
   const handleLoginError = async (err: any) => {
     const status  = err.response?.status;
     const message = err.response?.data?.message || err.message || 'Login failed. Please try again.';
 
     let modalMessage: string;
     if      (status === 401)                                   modalMessage = 'Invalid username or password.';
-    else if (status === 403)                                   modalMessage = 'Account is suspended.';
+    else if (status === 403)                                   modalMessage = 'Account is suspended. Please contact administrator.';
+    else if (status === 409)                                   modalMessage = 'User is already logged in on another session.'; // ✅ Added
     else if (status === 400)                                   modalMessage = 'Invalid input data.';
     else if (status >= 500)                                    modalMessage = 'Server error. Please try again later.';
     else if (err.message === 'Network Error' || !err.response) modalMessage = 'Unable to connect to the server.';

@@ -6,7 +6,7 @@ import { TKSGroupTable } from '../../components/TKSGroupTable';
 import { tksGroupData } from '../../data/tksGroupData';
 
 export function ImportLogsFromDevice2ShiftsPage() {
-  const [selectedCodes, setSelectedCodes] = useState<number[]>([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('3/1/2020');
   const [dateTo, setDateTo] = useState('03/15/2020');
   const [consolidateDTR, setConsolidateDTR] = useState(false);
@@ -38,7 +38,7 @@ export function ImportLogsFromDevice2ShiftsPage() {
     emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
 
-  const handleCodeToggle = (id: number) => {
+  const handleCodeToggle = (id: string) => {
     setSelectedCodes(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -48,7 +48,7 @@ export function ImportLogsFromDevice2ShiftsPage() {
     if (selectedCodes.length === tksGroupData.length) {
       setSelectedCodes([]);
     } else {
-      setSelectedCodes(tksGroupData.map(w => w.id));
+      setSelectedCodes(tksGroupData.map(w => w.code));
     }
   };
 

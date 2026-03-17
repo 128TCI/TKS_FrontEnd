@@ -115,7 +115,7 @@ export function NoOfHoursModal({
                 <input
                   type="text"
                   value={empCode}
-                  readOnly
+                  readOnly style={{ cursor: 'not-allowed' }}
                   className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                 />
               </div>
@@ -124,7 +124,9 @@ export function NoOfHoursModal({
               <div className="flex items-center gap-2">
                 <label className="w-40 text-gray-700">Workshift Code :</label>
                 <input type="text" value={workshiftCode} onChange={(e) => setWorkshiftCode(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"                 
+                  readOnly
+                  style={{ cursor: 'not-allowed' }}/>
                 <button onClick={onWorkshiftSearch} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700">
                   <Search className="w-4 h-4" />
                 </button>
@@ -142,6 +144,8 @@ export function NoOfHoursModal({
                   onChange={(e) => setDateIn(e.target.value)}
                   placeholder="MM/DD/YYYY HH:MM AM"
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  readOnly
+                  style={{ cursor: 'not-allowed' }}
                 />
                 {/* ── Calendar button: capture position, portal the popup (snippet 1 pattern) ── */}
                 <button
@@ -186,6 +190,8 @@ export function NoOfHoursModal({
                   onChange={(e) => setDateOut(e.target.value)}
                   placeholder="MM/DD/YYYY HH:MM AM"
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  readOnly
+                  style={{ cursor: 'not-allowed' }}
                 />
                 {/* ── Calendar button: capture position, portal the popup (snippet 1 pattern) ── */}
                 <button
@@ -436,7 +442,7 @@ export function TardinessModal({
                           <input
                             type="text"
                             value={empCode}
-                            readOnly
+                            readOnly style={{ cursor: 'not-allowed' }}
                             className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                           />
                         </div>
@@ -450,7 +456,7 @@ export function TardinessModal({
                                     <label className={lbl}>Date From :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -476,7 +482,7 @@ export function TardinessModal({
                                     <label className={lbl}>Date To :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -505,7 +511,7 @@ export function TardinessModal({
                                     <label className={lbl}>Time In :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={timeIn} onChange={e => setTimeIn(e.target.value)}
-                                            placeholder="HH:MM AM/PM" className={inp} />
+                                            placeholder="HH:MM AM/PM" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         <button onClick={() => { closeAllPickers(); setShowTimeInPicker(v => !v); }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Clock className="w-4 h-4" />
@@ -520,7 +526,7 @@ export function TardinessModal({
                                     <label className={lbl}>Time Out :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={timeOut} onChange={e => setTimeOut(e.target.value)}
-                                            placeholder="HH:MM AM/PM" className={inp} />
+                                            placeholder="HH:MM AM/PM" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         <button onClick={() => { closeAllPickers(); setShowTimeOutPicker(v => !v); }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Clock className="w-4 h-4" />
@@ -537,7 +543,7 @@ export function TardinessModal({
                                 <label className={lbl}>Workshift Code :</label>
                                 <div className="flex gap-1">
                                     <input type="text" value={workShiftCode} onChange={e => setWorkShiftCode(e.target.value)}
-                                        className={inp} />
+                                        className={inp} placeholder='Select a Workshift Code' readOnly style={{ cursor: 'not-allowed' }}/>
                                     <button onClick={onWorkshiftSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                         <Search className="w-4 h-4" />
                                     </button>
@@ -595,7 +601,7 @@ export function TardinessModal({
 
                             <div>
                                 <label className={lbl}>Remarks :</label>
-                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} />
+                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} placeholder='Insert your remarks here...'/>
                             </div>
 
                             <div>
@@ -803,9 +809,8 @@ export function UndertimeModal({
                           <input
                             type="text"
                             value={empCode}
-                            readOnly
-                            className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
-                          />
+                            readOnly style={{ cursor: 'not-allowed' }}
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"                          />
                         </div>
 
                         {/* ── CARD 1: Schedule ── */}
@@ -817,7 +822,7 @@ export function UndertimeModal({
                                     <label className={lbl}>Date From :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -843,7 +848,7 @@ export function UndertimeModal({
                                     <label className={lbl}>Date To :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -872,7 +877,7 @@ export function UndertimeModal({
                                     <label className={lbl}>Time In :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={timeIn} onChange={e => setTimeIn(e.target.value)}
-                                            placeholder="HH:MM AM/PM" className={inp} />
+                                            placeholder="HH:MM AM/PM" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         <button onClick={() => { closeAllPickers(); setShowTimeInPicker(v => !v); }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Clock className="w-4 h-4" />
@@ -887,7 +892,7 @@ export function UndertimeModal({
                                     <label className={lbl}>Time Out :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={timeOut} onChange={e => setTimeOut(e.target.value)}
-                                            placeholder="HH:MM AM/PM" className={inp} />
+                                            placeholder="HH:MM AM/PM" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         <button onClick={() => { closeAllPickers(); setShowTimeOutPicker(v => !v); }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Clock className="w-4 h-4" />
@@ -904,7 +909,7 @@ export function UndertimeModal({
                                 <label className={lbl}>Workshift Code :</label>
                                 <div className="flex gap-1">
                                     <input type="text" value={workshiftCode} onChange={e => setWorkshiftCode(e.target.value)}
-                                        className={inp} />
+                                        className={inp} placeholder='Select a Workshift Code' readOnly style={{ cursor: 'not-allowed' }}/>
                                     <button onClick={onWorkshiftSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                         <Search className="w-4 h-4" />
                                     </button>
@@ -939,7 +944,8 @@ export function UndertimeModal({
 
                             <div>
                                 <label className={lbl}>Remarks :</label>
-                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} />
+                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} 
+                                placeholder='Insert your remarks here...'/>
                             </div>
                         </div>
 
@@ -1092,7 +1098,7 @@ export function LeaveAbsencesModal({
                           <input
                             type="text"
                             value={empCode}
-                            readOnly
+                            readOnly style={{ cursor: 'not-allowed' }}
                             className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                           />
                         </div>
@@ -1106,7 +1112,7 @@ export function LeaveAbsencesModal({
                                     <label className={lbl}>Date :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={date} onChange={e => setDate(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -1138,7 +1144,7 @@ export function LeaveAbsencesModal({
                                 <label className={lbl}>Leave Code :</label>
                                 <div className="flex gap-1">
                                     <input type="text" value={leaveCode} onChange={e => setLeaveCode(e.target.value)}
-                                        className={inp} />
+                                        className={inp} placeholder='Select a Leave Code' readOnly style={{ cursor: 'not-allowed' }}/>
                                     <button onClick={onLeaveCodeSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                         <Search className="w-4 h-4" />
                                     </button>
@@ -1151,7 +1157,7 @@ export function LeaveAbsencesModal({
                             <div>
                                 <label className={lbl}>Leave Description :</label>
                                 <input type="text" value={leaveDescription} onChange={e => setLeaveDescription(e.target.value)}
-                                    className={inp} />
+                                    className={inp} placeholder='Leave description is auto-filled' readOnly style={{ cursor: 'not-allowed' }}/>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="flex items-center gap-2">
@@ -1173,12 +1179,14 @@ export function LeaveAbsencesModal({
 
                             <div>
                                 <label className={lbl}>Reason :</label>
-                                <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inp} />
+                                <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inp} 
+                                placeholder='Insert leave reason here...'/>
                             </div>
 
                             <div>
                                 <label className={lbl}>Remarks :</label>
-                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} />
+                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} 
+                                placeholder='Insert remarks here...'/>
                             </div>
                         </div>
 
@@ -1332,7 +1340,7 @@ export function OvertimeModal({
                           <input
                             type="text"
                             value={empCode}
-                            readOnly
+                            readOnly style={{ cursor: 'not-allowed' }}
                             className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                           />
                         </div>
@@ -1346,7 +1354,7 @@ export function OvertimeModal({
                                     <label className={lbl}>Date From :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -1372,7 +1380,7 @@ export function OvertimeModal({
                                     <label className={lbl}>Date To :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -1401,7 +1409,7 @@ export function OvertimeModal({
                                     <label className={lbl}>Time In :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={timeIn} onChange={e => setTimeIn(e.target.value)}
-                                            placeholder="HH:MM AM/PM" className={inp} />
+                                            placeholder="HH:MM AM/PM" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         <button onClick={() => { closeAllPickers(); setShowTimeInPicker(v => !v); }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Clock className="w-4 h-4" />
@@ -1416,7 +1424,7 @@ export function OvertimeModal({
                                     <label className={lbl}>Time Out :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={timeOut} onChange={e => setTimeOut(e.target.value)}
-                                            placeholder="HH:MM AM/PM" className={inp} />
+                                            placeholder="HH:MM AM/PM" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                         <button onClick={() => { closeAllPickers(); setShowTimeOutPicker(v => !v); }}
                                             className={iBtn('bg-blue-600 hover:bg-blue-700')}>
                                             <Clock className="w-4 h-4" />
@@ -1433,7 +1441,7 @@ export function OvertimeModal({
                                 <label className={lbl}>Workshift Code :</label>
                                 <div className="flex gap-1">
                                     <input type="text" value={workshiftCode} onChange={e => setWorkshiftCode(e.target.value)}
-                                        className={inp} />
+                                        className={inp} placeholder='Select a Workshift Code' readOnly style={{ cursor: 'not-allowed' }}/>
                                     <button onClick={onWorkshiftSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                         <Search className="w-4 h-4" />
                                     </button>
@@ -1458,7 +1466,7 @@ export function OvertimeModal({
                                     <label className={lbl}>OT Code :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={otCode} onChange={e => setOtCode(e.target.value)}
-                                            className={inp} />
+                                            className={inp} placeholder='Select an Overtime Code' readOnly style={{ cursor: 'not-allowed' }} />
                                         <button onClick={onOTCodeSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                             <Search className="w-4 h-4" />
                                         </button>
@@ -1471,12 +1479,12 @@ export function OvertimeModal({
 
                             <div>
                                 <label className={lbl}>Reason :</label>
-                                <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inp} />
+                                <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inp} placeholder='Insert overtime reasons here...' />
                             </div>
 
                             <div>
                                 <label className={lbl}>Remarks :</label>
-                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} />
+                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} placeholder='Insert your remarks here...'/>
                             </div>
                         </div>
 
@@ -1618,7 +1626,7 @@ export function OtherEarningsModal({
 
           {/* Modal Content */}
           <div className="p-4">
-            <h3 className="text-blue-600 mb-3">Overtime</h3>
+            <h3 className="text-blue-600 mb-3">Other Earnings and Allowances</h3>
 
             {/* Form Fields */}
             <div className="space-y-3">
@@ -1629,7 +1637,7 @@ export function OtherEarningsModal({
                 <input
                   type="text"
                   value={empCode}
-                  readOnly
+                  readOnly style={{ cursor: 'not-allowed' }}
                   className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                 />
               </div>
@@ -1643,6 +1651,7 @@ export function OtherEarningsModal({
                   onChange={(e) => setDate(e.target.value)}
                   placeholder="MM/DD/YYYY"
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  readOnly style={{ cursor: 'not-allowed' }}
                 />
                 {/* ── Position-anchored calendar button ── */}
                 <button
@@ -1676,6 +1685,8 @@ export function OtherEarningsModal({
                   value={allowanceCode}
                   onChange={(e) => setAllowanceCode(e.target.value)}
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  readOnly style={{ cursor: 'not-allowed' }}
+                  placeholder='Select an Allowance Code'
                 />
                 <button
                   onClick={onOpenAllowanceSearch}
@@ -1699,6 +1710,8 @@ export function OtherEarningsModal({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  readOnly style={{ cursor: 'not-allowed' }}
+                  placeholder='Allowance Description is auto-filled'
                 />
               </div>
 
@@ -1710,6 +1723,7 @@ export function OtherEarningsModal({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder='e.g. 100.00'
                 />
               </div>
 
@@ -1721,6 +1735,7 @@ export function OtherEarningsModal({
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder='Insert your remarks here...'
                 />
               </div>
             </div>
@@ -1872,7 +1887,7 @@ export function AdjustmentModal({
                           <input
                             type="text"
                             value={empCode}
-                            readOnly
+                            readOnly style={{ cursor: 'not-allowed' }}
                             className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                           />
                         </div>
@@ -1886,7 +1901,7 @@ export function AdjustmentModal({
                                     <label className={lbl}>Transaction Date :</label>
                                     <div className="flex gap-1">
                                         <input type="text" value={transactionDate} onChange={e => setTransactionDate(e.target.value)}
-                                            placeholder="MM/DD/YYYY" className={inp} />
+                                            placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }} />
                                         {/* ── Position-anchored calendar button ── */}
                                         <button
                                             type="button"
@@ -1940,7 +1955,8 @@ export function AdjustmentModal({
                             <div>
                                 <label className={lbl}>Leave Type :</label>
                                 <div className="flex gap-1">
-                                    <input type="text" value={leaveType} onChange={e => setLeaveType(e.target.value)} className={inp} />
+                                    <input type="text" value={leaveType} onChange={e => setLeaveType(e.target.value)} className={inp} 
+                                        readOnly style={{ cursor: 'not-allowed' }} placeholder='Select a Leave Type Code'/>
                                     <button onClick={onLeaveTypeSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                         <Search className="w-4 h-4" />
                                     </button>
@@ -1952,7 +1968,8 @@ export function AdjustmentModal({
                             <div>
                                 <label className={lbl}>OT Code :</label>
                                 <div className="flex gap-1">
-                                    <input type="text" value={overtimeCode} onChange={e => setOvertimeCode(e.target.value)} className={inp} />
+                                    <input type="text" value={overtimeCode} onChange={e => setOvertimeCode(e.target.value)} className={inp} 
+                                        readOnly style={{ cursor: 'not-allowed' }} placeholder='Select an Overtime Code'/>
                                     <button onClick={onOTCodeSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                         <Search className="w-4 h-4" />
                                     </button>
@@ -1977,7 +1994,7 @@ export function AdjustmentModal({
                                 <label className={lbl}>Late Filing Actual Date :</label>
                                 <div className="flex gap-1">
                                     <input type="text" value={isLateFilingActualDate} onChange={e => setIsLateFilingActualDate(e.target.value)}
-                                        placeholder="MM/DD/YYYY" className={inp} />
+                                        placeholder="MM/DD/YYYY" className={inp} readOnly style={{ cursor: 'not-allowed' }}/>
                                     {/* ── Position-anchored calendar button ── */}
                                     <button
                                         type="button"
@@ -2003,7 +2020,8 @@ export function AdjustmentModal({
                             <div>
                                 <label className={lbl}>Borrowed Device Name :</label>
                                 <div className="flex gap-1">
-                                    <input type="text" value={borrowedDeviceName} onChange={e => setBorrowedDeviceName(e.target.value)} className={inp} />
+                                    <input type="text" value={borrowedDeviceName} onChange={e => setBorrowedDeviceName(e.target.value)} className={inp} 
+                                        readOnly style={{ cursor: 'not-allowed' }}placeholder='Select a Borrowed Device Name'/>
                                     <button onClick={onBorrowedDeviceSearch} className={iBtn('bg-green-600 hover:bg-green-700')}>
                                         <Search className="w-4 h-4" />
                                     </button>
@@ -2020,7 +2038,7 @@ export function AdjustmentModal({
 
                             <div>
                                 <label className={lbl}>Remarks :</label>
-                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} />
+                                <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} className={inp} placeholder='Insert your remarks here...'/>
                             </div>
                         </div>
 
@@ -2146,7 +2164,7 @@ export function AdvancedModal({
                               <input
                                 type="text"
                                 value={empCode}
-                                readOnly
+                                readOnly style={{ cursor: 'not-allowed' }}
                                 className="flex-1 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed select-none focus:outline-none"
                               />
                             </div>
@@ -2156,7 +2174,8 @@ export function AdvancedModal({
                                 <label className="w-40 text-gray-700">Transaction Date :</label>
                                 <input type="text" value={transactionDate} onChange={e => setTransactionDate(e.target.value)}
                                     placeholder="MM/DD/YYYY"
-                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                    readOnly style={{ cursor: 'not-allowed' }}/>
                                 {/* ── Position-anchored calendar button ── */}
                                 <button
                                     type="button"
@@ -2203,7 +2222,8 @@ export function AdvancedModal({
                             <div className="flex items-center gap-2">
                                 <label className="w-40 text-gray-700">Overtime Code :</label>
                                 <input type="text" value={overtimeCode} onChange={e => setOvertimeCode(e.target.value)}
-                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    readOnly style={{ cursor: 'not-allowed' }} placeholder='Select an Overtime Code'/>
                                 <button onClick={onOTCodeSearch}
                                     className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                                     <Search className="w-4 h-4" />

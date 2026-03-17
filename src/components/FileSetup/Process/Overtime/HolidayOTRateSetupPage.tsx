@@ -77,6 +77,7 @@ export function HolidayOTRateSetupPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState("");
 
+
   // OT Codes from API
   const [otCodesData, setOTCodesData] = useState<OTCode[]>([]);
   const [loadingOTCodes, setLoadingOTCodes] = useState(false);

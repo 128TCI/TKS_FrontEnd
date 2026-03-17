@@ -779,7 +779,7 @@ export function ExportNAVPage() {
           position={calendarPosition}
         />
       )}
-       <Footer />
+ <Footer />
      </div>
    );
- }
+ }  

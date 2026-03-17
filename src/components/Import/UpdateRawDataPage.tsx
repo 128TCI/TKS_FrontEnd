@@ -203,7 +203,7 @@ export function UpdateRawDataPage() {
     setLoading(true);
       error;
       try {
-      const response = await apiClient.post("/Import/ImportUpdateRawData/GetDTRLogs/GetDTRLogs", {
+      const response = await apiClient.post("/Import/GetDTRLogs", {
         dateFrom: dateFrom,
         dateTo: dateTo,
         userName: getLoggedInUsername(),
@@ -560,7 +560,7 @@ const onClickImport = async ( ) => {
       formData.append("file", xlsxFile, fileName)
       console.log(xlsxFile);
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData, {
+        const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/ImportLogsFromDevice`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }

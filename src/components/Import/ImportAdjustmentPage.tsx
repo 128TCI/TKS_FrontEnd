@@ -166,7 +166,7 @@ const onClickImport = async ( ) => {
     formData.append("file", xlsxFile, fileName)
 
     try {
-      const data = await apiClient.post<ResponseResultDto<ImportAdjustmentDto[]>>(`/Utilities/Import/ImportAdjustment`, formData, {
+      const data = await apiClient.post<ResponseResultDto<ImportAdjustmentDto[]>>(`/Import/ImportAdjustment`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
@@ -212,7 +212,7 @@ const onClickImport = async ( ) => {
     console.log(param, dateFrom, dateTo);
     console.log(xlsxFile);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportAdjustmentDto[]>>(`/Utilities/Import/UpdateImportAdjustment`, param)
+        const data = await apiClient.post<ResponseResultDto<ImportAdjustmentDto[]>>(`/Import/UpdateImportAdjustment`, param)
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
             setImportDataResult([]);

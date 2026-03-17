@@ -336,7 +336,7 @@ const handleSendTestEmail = async () => {
           </div>
         </div>
       </div>
-      <Footer />
+<Footer />
     </div>
   );
 }
