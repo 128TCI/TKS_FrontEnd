@@ -31,40 +31,38 @@ export function ClassificationSetupPage() {
   const itemsPerPage = 100;
 
   // Permissions
-    const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-    const hasPermission = (accessType: string) => permissions[accessType] === true;
-  
-    useEffect(() => {
-      getClassificationSetupPermissions();
-    }, []);
-  
-    const getClassificationSetupPermissions = () => {
-      const rawPayload = localStorage.getItem("loginPayload");
-      if (!rawPayload) return;
-  
-      try {
-        const parsedPayload = JSON.parse(rawPayload);
-        const encryptedArray: any[] = parsedPayload.permissions || [];
-  
-        const branchEntries = encryptedArray.filter(
-          (p) => decryptData(p.formName) === "ClassificationSetUp"
-        );
-  
-        // Build a map: { Add: true, Edit: true, ... }
-        const permMap: Record<string, boolean> = {};
-        branchEntries.forEach((p) => {
-          const accessType = decryptData(p.accessTypeName);
-          if (accessType) permMap[accessType] = true;
-        });
-  
-        setPermissions(permMap);
-  
-      } catch (e) {
-        console.error("Error parsing or decrypting payload", e);
-      }
-    };
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const hasPermission = (accessType: string) => permissions[accessType] === true;
 
-  // Fetch classification data from API
+  useEffect(() => {
+    getClassificationSetupPermissions();
+  }, []);
+
+  const getClassificationSetupPermissions = () => {
+    const rawPayload = localStorage.getItem("loginPayload");
+    if (!rawPayload) return;
+
+    try {
+      const parsedPayload = JSON.parse(rawPayload);
+      const encryptedArray: any[] = parsedPayload.permissions || [];
+
+      const branchEntries = encryptedArray.filter(
+        (p) => decryptData(p.formName) === "ClassificationSetUp"
+      );
+
+      const permMap: Record<string, boolean> = {};
+      branchEntries.forEach((p) => {
+        const accessType = decryptData(p.accessTypeName);
+        if (accessType) permMap[accessType] = true;
+      });
+
+      setPermissions(permMap);
+
+    } catch (e) {
+      console.error("Error parsing or decrypting payload", e);
+    }
+  };
+
   useEffect(() => {
     fetchClassificationData();
   }, []);
@@ -75,7 +73,6 @@ export function ClassificationSetupPage() {
     try {
       const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp');
       if (response.status === 200 && response.data) {
-        // Map API response to expected format
         const mappedData = response.data.map((classification: any) => ({
           id: classification.classId || '',
           code: classification.classCode || '',
@@ -91,7 +88,7 @@ export function ClassificationSetupPage() {
       setLoading(false);
     }
   };
-  
+
   const filteredData = classifications.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -101,7 +98,6 @@ export function ClassificationSetupPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
@@ -167,7 +163,6 @@ export function ClassificationSetupPage() {
     }
   };
 
-  // Mirrors C# regex: ^[a-zA-Z0-9%_ -ñÑ]*$
   const checkCodeIfRegularExpressionWithSpace = (code: string): boolean => {
     const regex = /^[a-zA-Z0-9%_ \-ñÑ]*$/;
     return regex.test(code);
@@ -175,20 +170,16 @@ export function ClassificationSetupPage() {
 
   const validateCode = (value: string, isEdit = false, currentEditingItem: Classification | null = null): string => {
     if (!value.trim()) return '';
-
     if (value.length > 10) return 'Code maximum 10 characters';
-
     if (!checkCodeIfRegularExpressionWithSpace(value)) {
       return 'Code only allows letters, numbers, %, _, -, space, ñ/Ñ';
     }
-
     const isDuplicate = classifications.some(
       (c) =>
         (isEdit ? c.id !== currentEditingItem?.id : true) &&
         c.code.toLowerCase() === value.trim().toLowerCase()
     );
     if (isDuplicate) return 'This code already exists. Please use a different code.';
-
     return '';
   };
 
@@ -281,39 +272,6 @@ export function ClassificationSetupPage() {
 
     if (!editingItem) return;
 
-    if (!formData.code.trim() || formData.code.length > 10) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Code must be between 1 and 10 characters.',
-      });
-      return;
-    }
-
-    if (!checkCodeIfRegularExpressionWithSpace(formData.code)) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Validation Error',
-        text: 'Code only allows letters, numbers, %, _, -, space, ñ/Ñ.',
-      });
-      return;
-    }
-
-    const isDuplicate = classifications.some(
-      (classification) =>
-        classification.id !== editingItem.id &&
-        classification.code.toLowerCase() === formData.code.trim().toLowerCase()
-    );
-
-    if (isDuplicate) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Duplicate Code',
-        text: 'This code is already in use. Please use a different code.',
-      });
-      return;
-    }
-
     setSubmitting(true);
     try {
       const payload = {
@@ -369,7 +327,6 @@ export function ClassificationSetupPage() {
     setCodeError('');
   };
 
-  // Handle ESC key press with hierarchy
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -393,7 +350,6 @@ export function ClassificationSetupPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Page Header */}
@@ -448,17 +404,16 @@ export function ClassificationSetupPage() {
                   Create New
                 </button>
               )}
-
               {hasPermission('View') && (
                 <div className="flex items-center gap-2">
-                <label className="text-gray-700 text-sm">Search:</label>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                />
-              </div>
+                  <label className="text-gray-700 text-sm">Search:</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                  />
+                </div>
               )}
             </div>
 
@@ -525,49 +480,51 @@ export function ClassificationSetupPage() {
                       </tr>
                     )}
                   </tbody>
-                </table> ) : (
-                  <div className="text-center py-10 text-gray-500">
-                    You do not have permission to view this list.
-                  </div>
+                </table>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  You do not have permission to view this list.
+                </div>
               )}
             </div>
 
             {/* Pagination */}
             {hasPermission('View') && (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-gray-600">
-                Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="text-gray-600">
+                  Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                </span>
+                <div className="flex items-center gap-2">
                   <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded transition-colors ${
-                      currentPage === page
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-gray-300 hover:bg-gray-100'
-                    }`}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {page}
+                    Previous
                   </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
-                  disabled={currentPage >= totalPages || filteredData.length === 0}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded transition-colors ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                    disabled={currentPage >= totalPages || filteredData.length === 0}
+                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>)}
+            )}
           </div>
         </div>
       </div>
@@ -578,21 +535,17 @@ export function ClassificationSetupPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
               <h2 className="text-gray-900">Create New Classification</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSubmitCreate} className="p-6">
               <h3 className="text-blue-600 mb-6">Classification Setup</h3>
-              
               <div className="space-y-4">
+
+                {/* Code - EDITABLE in Create */}
                 <div className="flex items-start gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28 pt-2.5">
-                    Code :
-                  </label>
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-28 pt-2.5">Code :</label>
                   <div className="flex-1">
                     <input
                       type="text"
@@ -600,22 +553,19 @@ export function ClassificationSetupPage() {
                       onChange={(e) => handleCodeChange(e.target.value, false)}
                       maxLength={10}
                       className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                        codeError 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        codeError
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-blue-500'
                       }`}
                       required
                     />
-                    {codeError && (
-                      <p className="text-red-500 text-xs mt-1">{codeError}</p>
-                    )}
+                    {codeError && <p className="text-red-500 text-xs mt-1">{codeError}</p>}
                   </div>
                 </div>
 
+                {/* Description */}
                 <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Description :
-                  </label>
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">Description :</label>
                   <input
                     type="text"
                     value={formData.description}
@@ -654,21 +604,17 @@ export function ClassificationSetupPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
               <h2 className="text-gray-900">Edit Classification</h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSubmitEdit} className="p-6">
               <h3 className="text-blue-600 mb-6">Classification Setup</h3>
-              
               <div className="space-y-4">
+
+                {/* Code - READ-ONLY in Edit */}
                 <div className="flex items-start gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28 pt-2.5">
-                    Code :
-                  </label>
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-28 pt-2.5">Code :</label>
                   <div className="flex-1">
                     <input
                       type="text"
@@ -689,10 +635,9 @@ export function ClassificationSetupPage() {
                   </div>
                 </div>
 
+                {/* Description */}
                 <div className="flex items-center gap-3">
-                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">
-                    Description :
-                  </label>
+                  <label className="text-gray-700 text-sm whitespace-nowrap w-28">Description :</label>
                   <input
                     type="text"
                     value={formData.description}
@@ -706,7 +651,7 @@ export function ClassificationSetupPage() {
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  disabled={submitting || !!codeError}
+                  disabled={submitting}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
                   {submitting ? 'Updating...' : 'Update'}
