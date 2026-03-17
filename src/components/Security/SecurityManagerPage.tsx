@@ -566,25 +566,28 @@ const handleEditUser = (user: User) => {
   };
 
   const handleSaveChangePassword = async () => {
-    if (!passwordForm.oldPassword.trim()) { showErrorModal('Please enter your old password.'); return; }
-    if (passwordForm.oldPassword !== getLoggedInPassword()) { showErrorModal('The entered old password is incorrect.'); return; }
+    if (!passwordForm.oldPassword.trim()) { showErrorModal('The current password is incorrect.'); return; }
     if (!passwordForm.newPassword.trim()) { showErrorModal('Please enter a new password.'); return; }
     if (passwordForm.newPassword !== passwordForm.confirmNewPassword) { showErrorModal('New passwords do not match.'); return; }
     if (passwordForm.newPassword === passwordForm.oldPassword) { await showErrorModal('New password must be different from the current one.'); return; }
     try {
-      const res = await securityService.changePassword(selectedUser!.username, {
-        oldPassword: passwordForm.oldPassword,
-        newPassword: passwordForm.newPassword,
-      });
-      if (res.success) { 
-        await auditTrail.log({
-          accessType: 'Edit',
-          trans: `Changed Password for account '${selectedUser!.username}'`,
-          messages: `Security Manager - Users update record: ${selectedUser!.username}`,
-          formName: 'Security Manager - Users',
+        const userRes = await apiClient.get(`/User/by-username/${selectedUser!.username}`);
+        const currentPassword = userRes.data.password;
+        if (passwordForm.oldPassword !== currentPassword) { showErrorModal('The Old password is incorrect.'); return; }
+
+        const res = await securityService.changePassword(selectedUser!.username, {
+          oldPassword: passwordForm.oldPassword,
+          newPassword: passwordForm.newPassword,
         });
-        showSuccessModal(res.message); setShowChangePasswordModal(false); }
-      else showErrorModal(res.message);
+        if (res.success) { 
+          await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Changed Password for account '${selectedUser!.username}'`,
+            messages: `Security Manager - Users update record: ${selectedUser!.username}`,
+            formName: 'Security Manager - Users',
+          });
+          showSuccessModal(res.message); setShowChangePasswordModal(false); }
+        else showErrorModal(res.message);
     } catch {
       showErrorModal('Failed to change password.');
     }
