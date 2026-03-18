@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowRight,
   BarChart3,
-  Grid,
-  Users,
+  Play,
+  Settings,
   RefreshCw,
 } from 'lucide-react';
 import { Chart, registerables } from 'chart.js';
@@ -108,7 +108,9 @@ function formatTime(iso: string): string {
 
 export function Dashboard() {
   const username = getLoggedInUsername() ?? 'User';
-  const userId = getLoggedInUserId();
+  const userId = getLoggedInUserId();  
+  const BASENAME = '/DEMO_128TIMEKEEP_NEO';
+
 
   // Employee data
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -296,25 +298,25 @@ export function Dashboard() {
         <h2 className="text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <QuickActionCard
-            icon={Grid}
-            title="TimeKeep Group Setup"
-            description="Configure time keeping groups"
-            action="Go to TK Setup"
-            href="/tksetup"
+            icon={Play}
+            title="Process Raw Data"
+            description="Process and validate employee raw timekeeping data"
+            action="Process Now"
+            href={`${BASENAME}/process/process-data`}
           />
           <QuickActionCard
-            icon={Users}
-            title="Manage Employees"
-            description="Add, edit, or deactivate employees"
-            action="Manage Employees"
-            href="/employees"
+            icon={Settings}
+            title="Employee TimeKeep Configuration"
+            description="Configure timekeeping settings per employee"
+            action="Go to Configuration"
+            href={`${BASENAME}/maintenance/employee-timekeep-configuration`}
           />
           <QuickActionCard
             icon={BarChart3}
             title="Generate Reports"
             description="Create TK reports and export"
             action="View Reports"
-            href="/reports"
+            href={`${BASENAME}/reports/daily-time-record-monitoring`}
           />
         </div>
       </div>

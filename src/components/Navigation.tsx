@@ -16,7 +16,7 @@ import { ROUTE_PERMISSIONS } from '../config/routePermissions';
 import { SystemInfo } from './Types/system';
 import { systemService } from '../services/systemService';
 
-const BASENAME = '/128_TKS_LATEST';
+const BASENAME = '/DEMO_128TIMEKEEP_NEO';
 
 interface NavigationProps {
   onLogout: () => void;

@@ -42,7 +42,7 @@ export function Footer() {
     <footer className="bg-green-600 border-t border-green-700">
       <div className="flex items-center justify-center h-8 px-4 relative">
         <p className="text-white text-xs text-center">
-          © {currentYear} 128 Tech Consulting Inc. All rights reserved.
+         {currentYear} · 128 Tech Consulting Inc. ™ All rights reserved.
           {systemInfo && (
             <>
               {' '}|{' '}
