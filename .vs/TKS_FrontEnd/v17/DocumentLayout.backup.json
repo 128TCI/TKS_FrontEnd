@@ -142,8 +142,7 @@
               "RelativeToolTip": "src\\services\\apiClient.ts",
               "ViewState": "AgIAAI8AAAAAAAAAAAAYwJoAAAAOAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
-              "WhenOpened": "2026-03-17T06:39:24.51Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-03-17T06:39:24.51Z"
             },
             {
               "$type": "Document",
@@ -155,8 +154,7 @@
               "RelativeToolTip": "src\\components\\Security\\ChangePasswordPage.tsx",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAMAAAAHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
-              "WhenOpened": "2026-03-17T06:39:12.276Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-03-17T06:39:12.276Z"
             },
             {
               "$type": "Document",
@@ -168,8 +166,7 @@
               "RelativeToolTip": "dist\\assets\\index.js",
               "ViewState": "AgIAADACAAAAAAAAAAAtwDwCAABMAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
-              "WhenOpened": "2026-03-16T07:57:57.133Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-03-16T07:57:57.133Z"
             },
             {
               "$type": "Document",
@@ -203,7 +200,7 @@
               "RelativeDocumentMoniker": "src\\components\\Security\\SecurityManagerPage.tsx",
               "ToolTip": "C:\\Users\\michaell.inciong\\source\\newrepos\\mikejoross\\TKS_FrontEnd\\src\\components\\Security\\SecurityManagerPage.tsx",
               "RelativeToolTip": "src\\components\\Security\\SecurityManagerPage.tsx",
-              "ViewState": "AgIAACkCAAAAAAAAAAAmwDkCAAAFAAAAAAAAAA==",
+              "ViewState": "AgIAACkCAAAAAAAAAAAmwDMCAAAvAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2026-03-12T06:40:19.127Z",
               "EditorCaption": ""
