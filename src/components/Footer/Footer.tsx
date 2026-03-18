@@ -42,7 +42,7 @@ export function Footer() {
     <footer className="bg-green-600 border-t border-green-700">
       <div className="flex items-center justify-center h-8 px-4 relative">
         <p className="text-white text-xs text-center">
-         {currentYear} · 128 Tech Consulting Inc. ™ All rights reserved.
+         128 Tech Consulting Inc.™ | {currentYear} | All rights reserved.
           {systemInfo && (
             <>
               {' '}|{' '}
@@ -51,7 +51,7 @@ export function Footer() {
                 title="Click to copy build date"
                 className="underline underline-offset-2 decoration-dotted hover:text-green-200 transition-colors duration-150 cursor-pointer"
               >
-                <u>{systemInfo.appVersion}</u>
+                {systemInfo.appVersion}
               </button>
             </>
           )}
