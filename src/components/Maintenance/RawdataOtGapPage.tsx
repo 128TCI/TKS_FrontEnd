@@ -39,7 +39,10 @@ interface WorkShift {
 // ─── API Endpoints ────────────────────────────────────────────────────────────
 
 const OT_GAP_BASE_URL     = '/Maintenance/EmployeeRawDataOTGap';
-const EMPLOYEE_MASTER_URL = '/Maintenance/EmployeeMasterFile';
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 10;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -48,59 +51,73 @@ const todayStr = () => {
     return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
-/** MM/DD/YYYY → ISO date-only string (00:00 UTC) */
-const toISODate = (dateStr: string): string => {
-    if (!dateStr) return new Date().toISOString();
+/**
+ * Converts MM/DD/YYYY + optional "HH:MM AM/PM" into a LOCAL-time ISO string
+ * WITHOUT a trailing "Z".
+ * Omitting "Z" prevents the server/DB from interpreting the value as UTC and
+ * shifting it by the server's UTC offset (e.g. UTC+8 would subtract 8 h).
+ */
+const toISOSafe = (dateStr: string, timeStr: string = ''): string => {
+    if (!dateStr || !dateStr.trim()) return '';
     try {
-        if (dateStr.includes('/')) {
-            const [m, d, y] = dateStr.split('/');
-            return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00.000Z`;
+        let base = dateStr.trim();
+        // Accept MM/DD/YYYY → YYYY-MM-DD
+        if (base.includes('/')) {
+            const parts = base.split('/');
+            if (parts.length === 3) {
+                const [m, d, y] = parts;
+                base = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+            }
         }
-        return new Date(dateStr).toISOString();
-    } catch {
-        return new Date().toISOString();
-    }
-};
-
-/** MM/DD/YYYY + "HH:MM AM/PM" → full ISO datetime string */
-const toISODateTime = (dateStr: string, timeStr: string = ''): string => {
-    if (!dateStr) return new Date().toISOString();
-    try {
-        let base = dateStr;
-        if (dateStr.includes('/')) {
-            const [m, d, y] = dateStr.split('/');
-            base = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-        }
-        if (timeStr) {
+        if (timeStr && timeStr.trim()) {
             const upper = timeStr.toUpperCase().trim();
             const match = upper.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
             if (match) {
-                let hours = parseInt(match[1]);
+                let hours = parseInt(match[1], 10);
                 const mins = match[2];
-                if (match[3] === 'PM' && hours !== 12) hours += 12;
-                if (match[3] === 'AM' && hours === 12) hours = 0;
-                return `${base}T${String(hours).padStart(2, '0')}:${mins}:00.000Z`;
+                const period = match[3];
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                // No "Z" — server receives it as local time
+                return `${base}T${String(hours).padStart(2, '0')}:${mins}:00`;
             }
         }
-        return `${base}T00:00:00.000Z`;
+        // Date only — no "Z" so it stays local midnight
+        return `${base}T00:00:00`;
     } catch {
-        return new Date().toISOString();
+        return '';
     }
 };
 
-/** ISO → { date: 'MM/DD/YYYY', time: 'HH:MM AM/PM' } */
+/**
+ * Parses an ISO string (possibly UTC-suffixed from the server) back into a
+ * local MM/DD/YYYY date and HH:MM AM/PM time.
+ *
+ * The server stores values in local time but may return them with a "Z" or
+ * "+00:00" suffix. We intentionally strip the offset and parse as local so
+ * the displayed value matches exactly what was saved.
+ */
 const fromISO = (iso: string): { date: string; time: string } => {
-    if (!iso) return { date: '', time: '' };
+    if (!iso || !iso.trim()) return { date: '', time: '' };
     try {
-        const d = new Date(iso);
-        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-        const day   = String(d.getUTCDate()).padStart(2, '0');
-        const year  = d.getUTCFullYear();
-        let hours   = d.getUTCHours();
-        const mins  = String(d.getUTCMinutes()).padStart(2, '0');
+        // Strip Z / offset so JS parses as local time
+        const cleaned = iso.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+        const d = new Date(cleaned);
+        if (isNaN(d.getTime())) return { date: '', time: '' };
+
+        // Treat default/unset .NET DateTime (year 1 or < 1900) as empty
+        if (d.getFullYear() < 1900 || d.getFullYear() === 1) return { date: '', time: '' };
+
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day   = String(d.getDate()).padStart(2, '0');
+        const year  = d.getFullYear();
+
+        let hours    = d.getHours();
+        const mins   = String(d.getMinutes()).padStart(2, '0');
         const period = hours >= 12 ? 'PM' : 'AM';
         if (hours > 12) hours -= 12;
         if (hours === 0) hours = 12;
+
         return {
             date: `${month}/${day}/${year}`,
             time: `${String(hours).padStart(2, '0')}:${mins} ${period}`,
@@ -143,6 +160,9 @@ export function RawdataOtGapPage() {
     const [loading, setLoading]       = useState(false);
     const [tableError, setTableError] = useState('');
 
+    // ── Pagination ──
+    const [currentPage, setCurrentPage] = useState(1);
+
     // ── Sorting ──
     type SortKey = 'empCode' | 'empName' | 'workShiftCode' | 'actualDateIn' | 'dateIn' | 'timeIn' | 'dateOut' | 'timeOut' | 'dayType' | 'otGap';
     const [sortKey, setSortKey] = useState<SortKey>('empCode');
@@ -155,6 +175,7 @@ export function RawdataOtGapPage() {
             setSortKey(key);
             setSortDir('asc');
         }
+        setCurrentPage(1);
     };
 
     // ── Create / Edit modal ──
@@ -202,10 +223,11 @@ export function RawdataOtGapPage() {
     const fetchRecords = useCallback(async () => {
         setLoading(true);
         setTableError('');
+        setCurrentPage(1);
         try {
             const params: Record<string, string> = {
-                dateFrom: toISODate(dateFrom),
-                dateTo:   toISODate(dateTo),
+                dateFrom: toISOSafe(dateFrom),
+                dateTo:   toISOSafe(dateTo),
             };
             if (filterType === 'specific' && specificEmpCode) {
                 params.empCode = specificEmpCode;
@@ -215,13 +237,19 @@ export function RawdataOtGapPage() {
             if (response.status === 200 && response.data) {
                 const list: OTGapRecord[] = Array.isArray(response.data) ? response.data : [];
 
-                const fromMs = new Date(toISODate(dateFrom)).setUTCHours(0, 0, 0, 0);
-                const toMs   = new Date(toISODate(dateTo)).setUTCHours(23, 59, 0, 0);
+                // Parse filter bounds as local dates (strip Z so JS treats as local)
+                const fromLocal = new Date(toISOSafe(dateFrom));
+                fromLocal.setHours(0, 0, 0, 0);
+                const toLocal = new Date(toISOSafe(dateTo));
+                toLocal.setHours(23, 59, 59, 999);
 
                 const filtered = list.filter(entry => {
                     if (!entry.dateIn) return false;
-                    const dateInMs = new Date(entry.dateIn).getTime();
-                    if (dateInMs < fromMs || dateInMs > toMs) return false;
+                    // Strip Z from server value so comparison is local-vs-local
+                    const cleaned = entry.dateIn.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+                    const entryDate = new Date(cleaned);
+                    if (isNaN(entryDate.getTime())) return false;
+                    if (entryDate < fromLocal || entryDate > toLocal) return false;
 
                     const hasDateOut = !!entry.dateOut && entry.dateOut.trim() !== '';
                     const hasTimeIn  = !!entry.timeIn;
@@ -242,24 +270,24 @@ export function RawdataOtGapPage() {
         }
     }, [dateFrom, dateTo, incompleteLogs, filterType, specificEmpCode]);
 
- const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError('');
-    try {
-        const { employees } = await fetchEmployeesService();
-        setEmployeeData(employees.map((emp) => ({
-            empCode: emp.empCode || '',
-            name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-            groupCode: emp.grpCode || '',
-        })));
-    } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-        setEmployeeError(errorMsg);
-        console.error('Error fetching employees:', error);
-    } finally {
-        setLoadingEmployees(false);
-    }
-};
+    const fetchEmployeeData = async () => {
+        setLoadingEmployees(true);
+        setEmployeeError('');
+        try {
+            const { employees } = await fetchEmployeesService();
+            setEmployeeData(employees.map((emp) => ({
+                empCode: emp.empCode || '',
+                name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+                groupCode: emp.grpCode || '',
+            })));
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+            setEmployeeError(errorMsg);
+            console.error('Error fetching employees:', error);
+        } finally {
+            setLoadingEmployees(false);
+        }
+    };
 
     const fetchWorkshifts = useCallback(async () => {
         setLoadingWorkshifts(true);
@@ -267,8 +295,8 @@ export function RawdataOtGapPage() {
         try {
             const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
             if (response.status === 200 && response.data) {
-                const workshifts = response.data.data || [];
-                const mappedData = workshifts.map((w: any) => ({
+                const list = response.data.data || [];
+                const mappedData = list.map((w: any) => ({
                     code: w.code || '',
                     description: w.description || '',
                 }));
@@ -287,95 +315,130 @@ export function RawdataOtGapPage() {
     // CRUD
     // ─────────────────────────────────────────────────────────────────────────
 
- const handleSubmit = async () => {
-    if (!empCode.trim()) { setFormError('Please select an Employee Code.'); return; }
-    if (!dateIn.trim())  { setFormError('Date In is required.'); return; }
+    const handleSubmit = async () => {
+        if (!empCode.trim()) { setFormError('Please select an Employee Code.'); return; }
+        if (!dateIn.trim())  { setFormError('Date In is required.'); return; }
 
-    // Validate: Date In must not be greater than Date Out
-    if (dateOut.trim() && timeOut.trim()) {
-        const dtIn  = new Date(toISODateTime(dateIn, timeIn));
-        const dtOut = new Date(toISODateTime(dateOut, timeOut));
-        if (dtIn > dtOut) {
-            setFormError("Invalid DateTime 'In' and DateTime 'Out'. Date In must not be later than Date Out.");
-            return;
-        }
-    }
+        // Validate: Date In must not be greater than Date Out
+        if (dateOut.trim() && timeIn.trim() && timeOut.trim()) {
+            const dtIn  = new Date(toISOSafe(dateIn, timeIn));
+            const dtOut = new Date(toISOSafe(dateOut, timeOut));
 
-    // Validate: Duplicate Date In (same empCode + same date) — skips current record when editing
-    const dateInDateOnly = toISODate(dateIn).slice(0, 10);
-    const duplicate = recordList.find(entry => {
-        if (editingId !== null && entry.id === editingId) return false;
-        const existingDate = entry.dateIn
-            ? new Date(entry.dateIn).toISOString().slice(0, 10)
-            : '';
-        return entry.empCode === empCode && existingDate === dateInDateOnly;
-    });
-    if (duplicate) {
-        setFormError('Date In already exists for this employee.');
-        return;
-    }
+            const fmt = (d: Date): string => {
+                const mo  = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const yr  = d.getFullYear();
+                let h     = d.getHours();
+                const min = String(d.getMinutes()).padStart(2, '0');
+                const per = h >= 12 ? 'PM' : 'AM';
+                if (h > 12) h -= 12;
+                if (h === 0) h = 12;
+                return `${mo}/${day}/${yr} ${String(h).padStart(2, '0')}:${min} ${per}`;
+            };
 
-    setFormError('');
-    setSubmitLoading(true);
-
-    const payload = {
-        empCode,
-        actualDateIn:         toISODate(actualDateIn || dateIn),
-        dateIn:               toISODate(dateIn),
-        timeIn:               toISODateTime(dateIn, timeIn),
-        dateOut:              toISODate(dateOut || dateIn),
-        timeOut:              toISODateTime(dateOut || dateIn, timeOut),
-        workShiftCode:        workshiftCode,
-        dayType:              '',
-        otGap,
-        isLateFilingProcessed,
-    };
-
-    try {
-        if (editingId !== null) {
-
-            // Null check — verify record still exists
-            const existingRecord = recordList.find(e => e.id === editingId);
-            if (!existingRecord) {
-                setFormError('Something is wrong with your transaction. Please refresh the page and try again.');
-                setSubmitLoading(false);
+            if (!isNaN(dtIn.getTime()) && !isNaN(dtOut.getTime()) && dtIn > dtOut) {
+                setFormError(`Invalid DateTime 'In' and DateTime 'Out'. Date In (${fmt(dtIn)}) must not be later than Date Out (${fmt(dtOut)}).`);
                 return;
             }
-
-            await apiClient.put(`${OT_GAP_BASE_URL}/${editingId}`, { ...payload, id: editingId });
-
-        } else {
-            await apiClient.post(OT_GAP_BASE_URL, payload);
         }
 
-        await Swal.fire({
-            icon:            'success',
-            title:           editingId !== null ? 'Updated Successfully' : 'Created Successfully',
-            text:            editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
-            timer:           2000,
-            timerProgressBar: true,
-            showConfirmButton: false,
+        // Validate: Duplicate Date In (same empCode + same date) — skips current record when editing
+        // Fetch all records for this empCode + dateIn to do a proper duplicate check
+        let allRawList: OTGapRecord[] = [];
+        try {
+            const checkResponse = await apiClient.get(OT_GAP_BASE_URL, {
+                params: {
+                    dateFrom: toISOSafe(dateIn),
+                    dateTo:   toISOSafe(dateIn),
+                    empCode:  empCode.trim(),
+                },
+            });
+            allRawList = Array.isArray(checkResponse.data) ? checkResponse.data : [];
+        } catch (fetchError: any) {
+            console.warn('[handleSubmit] Could not fetch records for duplicate check:', fetchError.message);
+        }
+
+        const targetDateStart = new Date(toISOSafe(dateIn));
+        targetDateStart.setHours(0, 0, 0, 0);
+        const targetDateEnd = new Date(toISOSafe(dateIn));
+        targetDateEnd.setHours(23, 59, 59, 999);
+
+        const isDuplicate = allRawList.some(entry => {
+            if (editingId !== null && entry.id === editingId) return false;
+            if (entry.empCode.trim().toUpperCase() !== empCode.trim().toUpperCase()) return false;
+            if (!entry.dateIn) return false;
+            const cleaned = entry.dateIn.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+            const entryDate = new Date(cleaned);
+            return entryDate >= targetDateStart && entryDate <= targetDateEnd;
         });
 
-        setShowCreateModal(false);
-        setEditingId(null);
-        await fetchRecords();
+        if (isDuplicate) {
+            setFormError('Date In already exists for this employee.');
+            return;
+        }
 
-    } catch (error: any) {
-        const msg = error.response?.data?.message || error.message || 'Failed to save record';
-        await Swal.fire({
-            icon:               'error',
-            title:              editingId !== null ? 'Update Failed' : 'Create Failed',
-            text:               msg,
-            confirmButtonColor: '#d33',
-            confirmButtonText:  'Close',
-        });
-        setFormError(msg);
-        console.error('Error saving OT gap record:', error);
-    } finally {
-        setSubmitLoading(false);
-    }
-};
+        setFormError('');
+        setSubmitLoading(true);
+
+        // Build payload using toISOSafe (no Z — local time)
+        const payload = {
+            empCode,
+            // FIX: Use toISOSafe for date-only fields (no UTC shift)
+            actualDateIn:         toISOSafe(actualDateIn || dateIn),
+            dateIn:               toISOSafe(dateIn),
+            // FIX: Use toISOSafe for datetime fields (no UTC shift)
+            timeIn:               timeIn.trim()  ? toISOSafe(dateIn, timeIn)           : toISOSafe(dateIn),
+            dateOut:              toISOSafe(dateOut || dateIn),
+            timeOut:              timeOut.trim()  ? toISOSafe(dateOut || dateIn, timeOut) : toISOSafe(dateOut || dateIn),
+            workShiftCode:        workshiftCode,
+            dayType:              '',
+            otGap,
+            isLateFilingProcessed,
+        };
+
+        try {
+            if (editingId !== null) {
+                // Null check — verify record still exists
+                const existingRecord = recordList.find(e => e.id === editingId);
+                if (!existingRecord) {
+                    setFormError('Something is wrong with your transaction. Please refresh the page and try again.');
+                    setSubmitLoading(false);
+                    return;
+                }
+                await apiClient.put(`${OT_GAP_BASE_URL}/${editingId}`, { ...payload, id: editingId });
+            } else {
+                await apiClient.post(OT_GAP_BASE_URL, payload);
+            }
+
+            await Swal.fire({
+                icon:             'success',
+                title:            editingId !== null ? 'Updated Successfully' : 'Created Successfully',
+                text:             editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
+                timer:            2000,
+                timerProgressBar: true,
+                showConfirmButton: false,
+            });
+
+            setShowCreateModal(false);
+            setEditingId(null);
+            await fetchRecords();
+
+        } catch (error: any) {
+            const msg = error.response?.data?.message || error.message || 'Failed to save record';
+            await Swal.fire({
+                icon:               'error',
+                title:              editingId !== null ? 'Update Failed' : 'Create Failed',
+                text:               msg,
+                confirmButtonColor: '#d33',
+                confirmButtonText:  'Close',
+            });
+            setFormError(msg);
+            console.error('Error saving OT gap record:', error);
+        } finally {
+            setSubmitLoading(false);
+        }
+    };
+
     const handleEdit = (record: OTGapRecord) => {
         setEditingId(record.id);
         setEmpCode(record.empCode);
@@ -385,6 +448,7 @@ export function RawdataOtGapPage() {
 
         setWorkshiftCode(record.workShiftCode);
 
+        // FIX: Use fromISO which strips Z/offset before parsing → no UTC shift
         const adi = fromISO(record.actualDateIn);
         const di  = fromISO(record.dateIn);
         const ti  = fromISO(record.timeIn);
@@ -402,55 +466,55 @@ export function RawdataOtGapPage() {
         setShowCreateModal(true);
     };
 
- const handleDelete = async (id: number) => {
+    const handleDelete = async (id: number) => {
+        // Null check — verify record exists locally
+        const record = recordList.find(e => e.id === id);
+        if (!record) {
+            await Swal.fire({
+                icon:  'error',
+                title: 'Error',
+                text:  'Something is wrong with your transaction. Please refresh the page and try again.',
+            });
+            return;
+        }
 
-    // Null check — verify record exists locally
-    const record = recordList.find(e => e.id === id);
-    if (!record) {
-        await Swal.fire({
-            icon:  'error',
-            title: 'Error',
-            text:  'Something is wrong with your transaction. Please refresh the page and try again.',
-        });
-        return;
-    }
-
-    const result = await Swal.fire({
-        icon:               'warning',
-        title:              'Are you sure?',
-        text:               'This entry will be permanently deleted.',
-        showCancelButton:   true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor:  '#6c757d',
-        confirmButtonText:  'Yes, delete it',
-        cancelButtonText:   'Cancel',
-    });
-
-    if (!result.isConfirmed) return;
-
-    try {
-        await apiClient.delete(`${OT_GAP_BASE_URL}/${id}`);
-        setRecordList(prev => prev.filter(r => r.id !== id));
-
-        await Swal.fire({
-            icon:             'success',
-            title:            'Deleted',
-            text:             'The entry has been deleted.',
-            timer:            1500,
-            timerProgressBar: true,
-            showConfirmButton: false,
-        });
-    } catch (error: any) {
-        const msg = error.response?.data?.message || error.message || 'Failed to delete record';
-        await Swal.fire({
-            icon:               'error',
-            title:              'Delete Failed',
-            text:               msg,
+        const result = await Swal.fire({
+            icon:               'warning',
+            title:              'Are you sure?',
+            text:               'This entry will be permanently deleted.',
+            showCancelButton:   true,
             confirmButtonColor: '#d33',
+            cancelButtonColor:  '#6c757d',
+            confirmButtonText:  'Yes, delete it',
+            cancelButtonText:   'Cancel',
         });
-        console.error('Error deleting OT gap record:', error);
-    }
-};
+
+        if (!result.isConfirmed) return;
+
+        try {
+            await apiClient.delete(`${OT_GAP_BASE_URL}/${id}`);
+            setRecordList(prev => prev.filter(r => r.id !== id));
+
+            await Swal.fire({
+                icon:             'success',
+                title:            'Deleted',
+                text:             'The entry has been deleted.',
+                timer:            1500,
+                timerProgressBar: true,
+                showConfirmButton: false,
+            });
+        } catch (error: any) {
+            const msg = error.response?.data?.message || error.message || 'Failed to delete record';
+            await Swal.fire({
+                icon:               'error',
+                title:              'Delete Failed',
+                text:               msg,
+                confirmButtonColor: '#d33',
+            });
+            console.error('Error deleting OT gap record:', error);
+        }
+    };
+
     const handleCreateNew = () => {
         setEditingId(null);
         setEmpCode(''); setEmpName(''); setWorkshiftCode('');
@@ -499,6 +563,11 @@ export function RawdataOtGapPage() {
     useEffect(() => {
         if (showWorkshiftModal && workshifts.length === 0) fetchWorkshifts();
     }, [showWorkshiftModal, workshifts.length, fetchWorkshifts]);
+
+    // Reset to page 1 whenever the data set changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [recordList.length]);
 
     useEffect(() => {
         const onEsc = (e: KeyboardEvent) => {
@@ -553,8 +622,8 @@ export function RawdataOtGapPage() {
             aVal = a.otGap ? 1 : 0;
             bVal = b.otGap ? 1 : 0;
         } else if (['actualDateIn', 'dateIn', 'timeIn', 'dateOut', 'timeOut'].includes(sortKey)) {
-            aVal = a[sortKey] ? new Date(a[sortKey]).getTime() : 0;
-            bVal = b[sortKey] ? new Date(b[sortKey]).getTime() : 0;
+            aVal = a[sortKey] ? new Date(a[sortKey].replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '')).getTime() : 0;
+            bVal = b[sortKey] ? new Date(b[sortKey].replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '')).getTime() : 0;
         } else {
             aVal = (a[sortKey as keyof OTGapRecord] as string) ?? '';
             bVal = (b[sortKey as keyof OTGapRecord] as string) ?? '';
@@ -564,6 +633,24 @@ export function RawdataOtGapPage() {
         if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
         return 0;
     });
+
+    // ── Pagination derived values ──
+    const totalEntries = sortedRecords.length;
+    const totalPages   = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE));
+    const safePage     = Math.min(currentPage, totalPages);
+    const pageStart    = (safePage - 1) * PAGE_SIZE;
+    const pageEnd      = Math.min(pageStart + PAGE_SIZE, totalEntries);
+    const pagedRecords = sortedRecords.slice(pageStart, pageEnd);
+
+    const goToPage = (page: number) => {
+        setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    };
+
+    // Build page number buttons (max 5 around current)
+    const pageNumbers: number[] = [];
+    const rangeStart = Math.max(1, safePage - 2);
+    const rangeEnd   = Math.min(totalPages, rangeStart + 4);
+    for (let i = rangeStart; i <= rangeEnd; i++) pageNumbers.push(i);
 
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER
@@ -788,14 +875,17 @@ export function RawdataOtGapPage() {
                                                 </div>
                                             </td>
                                         </tr>
-                                    ) : recordList.length === 0 ? (
+                                    ) : pagedRecords.length === 0 ? (
                                         <tr>
                                             <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
-                                                No data available. Use Search to load records.
+                                                {totalEntries === 0
+                                                    ? 'No data available. Use Search to load records.'
+                                                    : 'No records on this page.'}
                                             </td>
                                         </tr>
                                     ) : (
-                                        sortedRecords.map(record => {
+                                        // FIX Issue 3: use fromISO (strips Z before parse) for display
+                                        pagedRecords.map(record => {
                                             const adi = fromISO(record.actualDateIn);
                                             const di  = fromISO(record.dateIn);
                                             const ti  = fromISO(record.timeIn);
@@ -830,7 +920,16 @@ export function RawdataOtGapPage() {
                                                     <td className="px-4 py-2 whitespace-nowrap">{ti.time}</td>
                                                     <td className="px-4 py-2 whitespace-nowrap">{doD.date}</td>
                                                     <td className="px-4 py-2 whitespace-nowrap">{tot.time}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{record.dayType}</td>
+                                                    {/* FIX Issue 3: display dayType from record */}
+                                                    <td className="px-4 py-2 whitespace-nowrap">
+                                                        {record.dayType ? (
+                                                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                                                                {record.dayType}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs">—</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-4 py-2 whitespace-nowrap">
                                                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${record.otGap ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
                                                             {record.otGap ? 'Yes' : 'No'}
@@ -844,17 +943,72 @@ export function RawdataOtGapPage() {
                             </table>
                         </div>
 
-                        {/* Pagination */}
-                        <div className="flex items-center justify-between mt-4">
+                        {/* ── Pagination ── */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                            {/* Entry count info */}
                             <div className="text-gray-600 text-sm">
-                                {recordList.length > 0
-                                    ? `Showing 1 to ${recordList.length} of ${recordList.length} entries`
-                                    : 'No entries'}
+                                {totalEntries === 0
+                                    ? 'No entries'
+                                    : `Showing ${pageStart + 1} to ${pageEnd} of ${totalEntries} entr${totalEntries === 1 ? 'y' : 'ies'}`}
                             </div>
-                            <div className="flex gap-2">
-                                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50" disabled>Previous</button>
-                                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50" disabled>Next</button>
-                            </div>
+
+                            {/* Page controls */}
+                            {totalEntries > 0 && (
+                                <div className="flex items-center gap-1">
+                                    {/* First */}
+                                    <button
+                                        onClick={() => goToPage(1)}
+                                        disabled={safePage === 1}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title="First page"
+                                    >
+                                        «
+                                    </button>
+
+                                    {/* Previous */}
+                                    <button
+                                        onClick={() => goToPage(safePage - 1)}
+                                        disabled={safePage === 1}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        Previous
+                                    </button>
+
+                                    {/* Page number buttons */}
+                                    {pageNumbers.map(n => (
+                                        <button
+                                            key={n}
+                                            onClick={() => goToPage(n)}
+                                            className={`px-3 py-1 border rounded text-sm transition-colors ${
+                                                n === safePage
+                                                    ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                                                    : 'border-gray-300 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            {n}
+                                        </button>
+                                    ))}
+
+                                    {/* Next */}
+                                    <button
+                                        onClick={() => goToPage(safePage + 1)}
+                                        disabled={safePage === totalPages}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        Next
+                                    </button>
+
+                                    {/* Last */}
+                                    <button
+                                        onClick={() => goToPage(totalPages)}
+                                        disabled={safePage === totalPages}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title="Last page"
+                                    >
+                                        »
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* ══════════════════════════════════════════════════════════
@@ -1154,8 +1308,6 @@ export function RawdataOtGapPage() {
 
             {/* ══════════════════════════════════════════════════════════════════
                 WORKSHIFT SEARCH MODAL — portaled to document.body
-                Fully escapes the main modal's stacking context so it always
-                renders on top regardless of parent z-index / transform.
             ══════════════════════════════════════════════════════════════════ */}
             {showWorkshiftModal && createPortal(
                 <>
