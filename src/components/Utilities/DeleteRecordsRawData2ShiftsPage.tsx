@@ -33,7 +33,7 @@ const EMPTY_SELECTION: Record<TabName, number[]> = {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export function DeleteRawdata2ShiftsPage() {
+export function DeleteRecordsRawData2ShiftsPage() {
   const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
   const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom,           setDateFrom]           = useState('');
