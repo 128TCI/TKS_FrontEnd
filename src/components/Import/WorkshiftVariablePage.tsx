@@ -182,7 +182,6 @@ export function WorkshiftVariablePage() {
     formData.append("GroupCodes", JSON.stringify(selectedCodes));
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
-    console.log(dateFrom, dateTo);
 
     Swal.fire({
       icon: 'info',
@@ -208,11 +207,27 @@ export function WorkshiftVariablePage() {
           console.log(data.data.errors)
           setImportDataResult([]);
           Swal.close();
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.data.resultData?.[0]?.message ?? data.data.errors,
-          });
+          // Swal.fire({
+          //   icon: 'error',
+          //   title: 'Error',
+          //   text: data.data.resultData?.[0]?.message ?? data.data.errors,
+          // });
+          const errors = data.data.resultData || [];
+
+          const allMessages = errors
+            .filter(x => x.message?.trim())
+            .map(x => `${x.message}`)
+            .join('<br>');
+
+          if (allMessages) {
+            await Swal.fire({
+              icon: 'error',
+              title: 'Error Found',
+              html: `<div style="text-align:center; max-height:300px; overflow:auto;">
+             ${allMessages}
+           </div>`,
+            });
+          }
           setErrors(data.data.errors);
         }
         else {
@@ -243,11 +258,27 @@ export function WorkshiftVariablePage() {
         if (response.errors && response.errors.length) {
           setImportDataResult([]);
           Swal.close();
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.data.resultData?.[0]?.message ?? data.data.errors,
-          });
+          // Swal.fire({
+          //   icon: 'error',
+          //   title: 'Error',
+          //   text: data.data.resultData?.[0]?.message ?? data.data.errors,
+          // });
+          const errors = data.data.resultData || [];
+
+          const allMessages = errors
+            .filter(x => x.message?.trim())
+            .map(x => `${x.message}`)
+            .join('<br>');
+
+          if (allMessages) {
+            await Swal.fire({
+              icon: 'error',
+              title: 'Error Found',
+              html: `<div style="text-align:center; max-height:300px; overflow:auto;">
+             ${allMessages}
+           </div>`,
+            });
+          }
 
           setErrors(data.data.errors);
         }
@@ -292,7 +323,6 @@ export function WorkshiftVariablePage() {
       isDeleteExistingRecord: deleteExisting,
       imports: importDataResult.filter(x => !x.message) // only valid records
     }
-    console.log(param)
     if (importType == "workshift-variable") {
       try {
         const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/UpdateWorkshiftVariable`, param)
