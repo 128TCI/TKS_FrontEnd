@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Check, FileText, CheckCircle, Info, Save } from 'lucide-react';
+import { Upload, Download, Check, Info, Save } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { TKSGroupTable } from '../TKSGroupTable';
 import apiClient from '../../services/apiClient';
-import * as XLSX from "xlsx";
 import Swal from 'sweetalert2';
 
 interface ImportEmployeeMasterFileDto {
@@ -82,15 +81,12 @@ interface ImportEmployeeMasterFileDto {
   rowNumber: number;
   columnNumber: number;
 }
-interface ImportEmployeeMasterFileFormDto {
-    isDeleteExistingRecord: false,
-    imports: ImportEmployeeMasterFileDto[]
-}
+
 type ResponseResultDto<T> = {
-    isSuccess: boolean,
-    resultData: T,
-    errors: string[],
-    messages: string
+  isSuccess: boolean,
+  resultData: T,
+  errors: string[],
+  messages: string
 }
 
 export function ImportEmployeeMasterfilePage() {
@@ -99,7 +95,7 @@ export function ImportEmployeeMasterfilePage() {
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
+  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string; }>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -108,10 +104,6 @@ export function ImportEmployeeMasterfilePage() {
   const itemsPerPage = 10;
   const [error, setError] = useState<string | null>(null);
   const [importDataResult, setImportDataResult] = useState<ImportEmployeeMasterFileDto[]>([]);
-  const [form, setForm] = useState<ImportEmployeeMasterFileFormDto>({
-    isDeleteExistingRecord: false,
-    imports: [] as ImportEmployeeMasterFileDto[],
-  });
 
   useEffect(() => {
     fetchData();
@@ -119,8 +111,8 @@ export function ImportEmployeeMasterfilePage() {
 
   const fetchData = async () => {
     setLoading(true);
-      error;
-      try {
+    error;
+    try {
       const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
@@ -130,21 +122,21 @@ export function ImportEmployeeMasterfilePage() {
         }));
         setTKSGroupList(mappedData);
       }
-      } catch (error: any) {
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-          setError(errorMsg);
-          console.error('Error fetching TKSGroup:', error);
-        } finally {
-          loading;
-        }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+      setError(errorMsg);
+      console.error('Error fetching TKSGroup:', error);
+    } finally {
+      loading;
+    }
   };
 
   const handleCodeToggle = (id: string) => {
-    setSelectedCodes(prev => 
+    setSelectedCodes(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
-  
+
   const handleSelectAll = () => {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
@@ -152,31 +144,32 @@ export function ImportEmployeeMasterfilePage() {
       setSelectedCodes(tksGroupList.map(w => w.groupCode));
     }
   };
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (!file) return;
-    
-    setXlsxFile(file);  
-    setFileName(file!.name);    
+
+    const allowedTypes = [
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xls and .xlsx files are allowed.",
+        //confirmButtonColor: "#14b8a6"
+      });
+
+      e.target.value = ""; // reset input
+      return;
+    }
+
+    setXlsxFile(file);
+    setFileName(file!.name);
   };
 
-  // const handleImport = () => {
-  //   setIsProcessing(true);
-  //   setProcessingProgress(0);
-    
-  //   // Simulate processing
-  //   const interval = setInterval(() => {
-  //     setProcessingProgress(prev => {
-  //       if (prev >= 100) {
-  //         clearInterval(interval);
-  //         setIsProcessing(false);
-  //         return 100;
-  //       }
-  //       return prev + 10;
-  //     });
-  //   }, 500);
-  // };
   const fileLinkCreate = (blob: Blob, filename: string): void => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -188,20 +181,20 @@ export function ImportEmployeeMasterfilePage() {
     window.URL.revokeObjectURL(url);
   };
   const downloadTemplate = async () => {
-     setIsProcessing(true);
-     try {
-          const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportTKSMasterFile_Template.xlsx`, {
-               responseType: 'blob'
-          });
-          const mimeType = response.headers['content-type'];
-          const blob = new Blob([response.data], { type: mimeType });
-          fileLinkCreate(blob, `ImportTKSMasterFile_Template.xlsx`);
-     } finally {
-          isProcessing;
-     }
+    setIsProcessing(true);
+    try {
+      const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportTKSMasterFile_Template.xlsx`, {
+        responseType: 'blob'
+      });
+      const mimeType = response.headers['content-type'];
+      const blob = new Blob([response.data], { type: mimeType });
+      fileLinkCreate(blob, `ImportTKSMasterFile_Template.xlsx`);
+    } finally {
+      isProcessing;
+    }
   }
-const onClickImport = async ( ) => {
-    if(!xlsxFile) {
+  const onClickImport = async () => {
+    if (!xlsxFile) {
       setError("Please select a file to import.");
       Swal.fire({
         icon: 'error',
@@ -210,7 +203,7 @@ const onClickImport = async ( ) => {
       });
       return;
     }
-    if(selectedCodes.length === 0){
+    if (selectedCodes.length === 0) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -222,36 +215,47 @@ const onClickImport = async ( ) => {
     const formData = new FormData();
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
+    Swal.fire({
+      icon: 'info',
+      title: 'Importing Data',
+      text: 'Importing data please wait.',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
     try {
       const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Import/ImportEmployeeMasterfile`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        })
-        setImportDataResult(data.data.resultData);
-        if (data.data.errors.length > 0){
-          console.log(data.data.errors)
-          setImportDataResult([]);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.data.resultData?.[0]?.message ?? data.data.errors,
-          });            
-          setErrors(data.data.errors);
+        headers: {
+          "Content-Type": "multipart/form-data"
         }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Import done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
-      } finally {
-          setIsProcessing(false);
-          setFileLoaded(true);
-        }
+      })
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        console.log(data.data.errors)
+        setImportDataResult([]);
+        Swal.close();
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Import done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      setIsProcessing(false);
+      setFileLoaded(true);
+    }
   }
 
   const onClickInsertUpdate = async () => {
@@ -259,31 +263,29 @@ const onClickImport = async ( ) => {
       isDeleteExistingRecord: deleteExisting,
       imports: importDataResult.filter(x => !x.message) // only valid records
     }
-    console.log(param);
-    console.log(xlsxFile);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Import/UpdateImportEmployeeMasterfile`, param)
-        setImportDataResult(data.data.resultData);
-        if(data.data.errors.length > 0){
-            setImportDataResult([]);
-            Swal.fire({
-              icon: 'error',
-              title: 'Error',
-              text: data.data.resultData?.[0]?.message ?? data.data.errors,
-            });             
-            setErrors(data.data.errors);
-        }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Update done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
+      const data = await apiClient.post<ResponseResultDto<ImportEmployeeMasterFileDto[]>>(`/Import/UpdateImportEmployeeMasterfile`, param)
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        setImportDataResult([]);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Update done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   }
   const totalPages = Math.ceil(importDataResult.length / itemsPerPage);
@@ -425,7 +427,7 @@ const onClickImport = async ( ) => {
                   {/* Download Template */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start gap-2">
-                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate}/>
+                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate} />
                       <a href="#" className="text-sm text-blue-600 hover:text-blue-700" onClick={downloadTemplate}>
                         Download Template
                       </a>
@@ -435,15 +437,15 @@ const onClickImport = async ( ) => {
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
                     <button className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      onClick={onClickImport}                    
+                      onClick={onClickImport}
                     >
-                      <Upload className="w-4 h-4" onClick={onClickImport}/>
+                      <Upload className="w-4 h-4" onClick={onClickImport} />
                       Import Data
                     </button>
                     <button className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <Save className="w-4 h-4" onClick={onClickInsertUpdate}/>
+                      <Save className="w-4 h-4" onClick={onClickInsertUpdate} />
                       Update Data
                     </button>
                   </div>
@@ -464,7 +466,7 @@ const onClickImport = async ( ) => {
                       <th className="px-4 py-3 text-left text-xs text-gray-600">EmpCode</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">EmpStatusActive</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">EmpStatus</th>
-                      <th className="px-4 py-3 text-left text-xs text-gray-600">Country</th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-600">Courtesy</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">LastName</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">FirstName</th>
                       <th className="px-4 py-3 text-left text-xs text-gray-600">MiddleName</th>
@@ -528,81 +530,81 @@ const onClickImport = async ( ) => {
                   </thead>
                   <tbody>
                     {Array.isArray(currentData) && currentData.map((item, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2">{item.remarks}</td>                  
-                      <td className="px-4 py-2">{item.empCode}</td>
-                      <td className="px-4 py-2">{item.statusActive}</td>
-                      <td className="px-4 py-2">{item.empStatCode}</td>
-                      <td className="px-4 py-2">{item.courtesy}</td>
-                      <td className="px-4 py-2">{item.lName}</td>
-                      <td className="px-4 py-2">{item.fName}</td>
-                      <td className="px-4 py-2">{item.mName}</td>
-                      <td className="px-4 py-2">{item.suffix}</td>
-                      <td className="px-4 py-2">{item.nickName}</td>
-                      <td className="px-4 py-2">{item.hAddress}</td>
-                      <td className="px-4 py-2">{item.pAddress}</td>
-                      <td className="px-4 py-2">{item.city}</td>
-                      <td className="px-4 py-2">{item.province}</td>
-                      <td className="px-4 py-2">{item.postalCode}</td>
-                      <td className="px-4 py-2">{item.civilStatus}</td>
-                      <td className="px-4 py-2">{item.citizenship}</td>
-                      <td className="px-4 py-2">{item.religion}</td>
-                      <td className="px-4 py-2">{item.sex}</td>
-                      <td className="px-4 py-2">{item.email}</td>
-                      <td className="px-4 py-2">{item.weight}</td>
-                      <td className="px-4 py-2">{item.height}</td>
-                      <td className="px-4 py-2">{item.mobilePhone}</td>
-                      <td className="px-4 py-2">{item.homePhone}</td>
-                      <td className="px-4 py-2">{item.presentPhone}</td>
-                      <td className="px-4 py-2">{item.birthPlace}</td>
-                      <td className="px-4 py-2">{item.braCode}</td>
-                      <td className="px-4 py-2">{item.divCode}</td>
-                      <td className="px-4 py-2">{item.depCode}</td>
-                      <td className="px-4 py-2">{item.secCode}</td>
-                      <td className="px-4 py-2">{item.unitCode}</td>
-                      <td className="px-4 py-2">{item.lineCode}</td>
-                      <td className="px-4 py-2">{}</td>
-                      <td className="px-4 py-2">{item.superior}</td>
-                      <td className="px-4 py-2">{item.grdCode}</td>
-                      <td className="px-4 py-2">{item.sssNo}</td>
-                      <td className="px-4 py-2">{item.philHealthNo}</td>
-                      <td className="px-4 py-2">{item.tin}</td>
-                      <td className="px-4 py-2">{item.dateHired ? new Date(item.dateHired).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.dateRegularized ? new Date(item.dateRegularized).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.dateResigned ? new Date(item.dateResigned).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.dateSuspended ? new Date(item.dateSuspended).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.probeStart ? new Date(item.probeStart).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.probeEnd ? new Date(item.probeEnd).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.birthDate ? new Date(item.birthDate).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.tksGroup}</td>
-                      <td className="px-4 py-2">{item.groupSchedCode}</td>
-                      <td className="px-4 py-2">{item.allowOTDefault}</td>
-                      <td className="px-4 py-2">{item.tardyExemp}</td>
-                      <td className="px-4 py-2">{item.utExempt}</td>
-                      <td className="px-4 py-2">{item.ndExempt}</td>
-                      <td className="px-4 py-2">{item.otExempt}</td>
-                      <td className="px-4 py-2">{item.absenceExempt}</td>
-                      <td className="px-4 py-2">{item.otherEarnExempt}</td>
-                      <td className="px-4 py-2">{item.holidayExempt}</td>
-                      <td className="px-4 py-2">{item.unproductiveExempt}</td>
-                      <td className="px-4 py-2">{item.deviceCode}</td>
-                      <td className="px-4 py-2">{item.fixedRestDay1}</td>
-                      <td className="px-4 py-2">{item.fixedRestDay2}</td>
-                      <td className="px-4 py-2">{item.fixedRestDay3}</td>
-                      <td className="px-4 py-2">{item.dailySchedule}</td>
-                      <td className="px-4 py-2">{item.classificationCode}</td>
-                      <td className="px-4 py-2">{item.gsisNo}</td>
-                      <td className="px-4 py-2">{item.onlineAppCode}</td>
-                    </tr>
+                      <tr key={index}>
+                        <td className="px-4 py-2">{item.remarks}</td>
+                        <td className="px-4 py-2">{item.empCode}</td>
+                        <td className="px-4 py-2">{item.statusActive}</td>
+                        <td className="px-4 py-2">{item.empStatCode}</td>
+                        <td className="px-4 py-2">{item.courtesy}</td>
+                        <td className="px-4 py-2">{item.lName}</td>
+                        <td className="px-4 py-2">{item.fName}</td>
+                        <td className="px-4 py-2">{item.mName}</td>
+                        <td className="px-4 py-2">{item.suffix}</td>
+                        <td className="px-4 py-2">{item.nickName}</td>
+                        <td className="px-4 py-2">{item.hAddress}</td>
+                        <td className="px-4 py-2">{item.pAddress}</td>
+                        <td className="px-4 py-2">{item.city}</td>
+                        <td className="px-4 py-2">{item.province}</td>
+                        <td className="px-4 py-2">{item.postalCode}</td>
+                        <td className="px-4 py-2">{item.civilStatus}</td>
+                        <td className="px-4 py-2">{item.citizenship}</td>
+                        <td className="px-4 py-2">{item.religion}</td>
+                        <td className="px-4 py-2">{item.sex}</td>
+                        <td className="px-4 py-2">{item.email}</td>
+                        <td className="px-4 py-2">{item.weight}</td>
+                        <td className="px-4 py-2">{item.height}</td>
+                        <td className="px-4 py-2">{item.mobilePhone}</td>
+                        <td className="px-4 py-2">{item.homePhone}</td>
+                        <td className="px-4 py-2">{item.presentPhone}</td>
+                        <td className="px-4 py-2">{item.birthPlace}</td>
+                        <td className="px-4 py-2">{item.braCode}</td>
+                        <td className="px-4 py-2">{item.divCode}</td>
+                        <td className="px-4 py-2">{item.depCode}</td>
+                        <td className="px-4 py-2">{item.secCode}</td>
+                        <td className="px-4 py-2">{item.unitCode}</td>
+                        <td className="px-4 py-2">{item.lineCode}</td>
+                        <td className="px-4 py-2">{item.desCode}</td>
+                        <td className="px-4 py-2">{item.superior}</td>
+                        <td className="px-4 py-2">{item.grdCode}</td>
+                        <td className="px-4 py-2">{item.sssNo}</td>
+                        <td className="px-4 py-2">{item.philHealthNo}</td>
+                        <td className="px-4 py-2">{item.tin}</td>
+                        <td className="px-4 py-2">{item.dateHired ? new Date(item.dateHired).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.dateRegularized ? new Date(item.dateRegularized).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.dateResigned ? new Date(item.dateResigned).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.dateSuspended ? new Date(item.dateSuspended).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.probeStart ? new Date(item.probeStart).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.probeEnd ? new Date(item.probeEnd).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.birthDate ? new Date(item.birthDate).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.tksGroup}</td>
+                        <td className="px-4 py-2">{item.groupSchedCode}</td>
+                        <td className="px-4 py-2">{item.allowOTDefault}</td>
+                        <td className="px-4 py-2">{item.tardyExemp}</td>
+                        <td className="px-4 py-2">{item.utExempt}</td>
+                        <td className="px-4 py-2">{item.ndExempt}</td>
+                        <td className="px-4 py-2">{item.otExempt}</td>
+                        <td className="px-4 py-2">{item.absenceExempt}</td>
+                        <td className="px-4 py-2">{item.otherEarnExempt}</td>
+                        <td className="px-4 py-2">{item.holidayExempt}</td>
+                        <td className="px-4 py-2">{item.unproductiveExempt}</td>
+                        <td className="px-4 py-2">{item.deviceCode}</td>
+                        <td className="px-4 py-2">{item.fixedRestDay1}</td>
+                        <td className="px-4 py-2">{item.fixedRestDay2}</td>
+                        <td className="px-4 py-2">{item.fixedRestDay3}</td>
+                        <td className="px-4 py-2">{item.dailySchedule}</td>
+                        <td className="px-4 py-2">{item.classificationCode}</td>
+                        <td className="px-4 py-2">{item.gsisNo}</td>
+                        <td className="px-4 py-2">{item.onlineAppCode}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center text-xs text-gray-500 justify-between">
-                {!fileLoaded &&(<span>
+                {!fileLoaded && (<span>
                   Showing {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
-                {fileLoaded &&(<span>
+                {fileLoaded && (<span>
                   Showing {startIndex + 1} to {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
                 <div className="flex items-center gap-1">
@@ -618,11 +620,10 @@ const onClickImport = async ( ) => {
                       <button
                         key={index}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-2 py-1 rounded text-xs ${
-                          currentPage === page
-                            ? 'bg-blue-500 text-white'
-                            : 'border border-gray-300 hover:bg-gray-100'
-                        }`}
+                        className={`px-2 py-1 rounded text-xs ${currentPage === page
+                          ? 'bg-blue-500 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100'
+                          }`}
                       >
                         {page}
                       </button>

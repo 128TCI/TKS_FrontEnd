@@ -1,85 +1,107 @@
-import { useState } from 'react';
-import * as Popover from '@radix-ui/react-popover';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 
 interface DatePickerWithButtonProps {
   date: string;
   onChange: (date: string) => void;
   label: string;
+  minDate?: string;
 }
 
-export function DatePickerWithButton({ date, onChange, label }: DatePickerWithButtonProps) {
+export function DatePickerWithButton({
+  date,
+  onChange,
+  label,
+  minDate
+}: DatePickerWithButtonProps) {
+  const today = new Date();
   const [open, setOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
+  const monthNames = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  const parseDate = (value?: string) => {
+    if (!value) return null;
+    const [m, d, y] = value.split("/");
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  };
+
+  const formatDate = (date: Date) => {
+    const m = (date.getMonth() + 1).toString().padStart(2,"0");
+    const d = date.getDate().toString().padStart(2,"0");
+    const y = date.getFullYear();
+    return `${m}/${d}/${y}`;
+  };
+
+  const selectedDate = parseDate(date);
+  const min = parseDate(minDate);
+
   const daysInMonth = new Date(
     currentMonth.getFullYear(),
-    currentMonth.getMonth() + 1,
+    currentMonth.getMonth()+1,
     0
   ).getDate();
 
-  const firstDayOfMonth = new Date(
+  const firstDay = new Date(
     currentMonth.getFullYear(),
     currentMonth.getMonth(),
     1
   ).getDay();
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  // Generate year options (from 1900 to current year + 10)
-  const currentYear = new Date().getFullYear();
-  const years = [];
-  for (let year = 1900; year <= currentYear + 10; year++) {
-    years.push(year);
-  }
-
-  const previousMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+  const isDisabled = (day:number) => {
+    if (!min) return false;
+    const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    return d < min;
   };
 
-  const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+  const isSelected = (day:number) => {
+    if (!selectedDate) return false;
+    return (
+      selectedDate.getDate() === day &&
+      selectedDate.getMonth() === currentMonth.getMonth() &&
+      selectedDate.getFullYear() === currentMonth.getFullYear()
+    );
   };
 
-  const handleMonthChange = (monthIndex: number) => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), monthIndex, 1));
-  };
-
-  const handleYearChange = (year: number) => {
-    setCurrentMonth(new Date(year, currentMonth.getMonth(), 1));
-  };
-
-  const handleDateClick = (day: number) => {
-    const month = (currentMonth.getMonth() + 1).toString().padStart(2, '0');
-    const dayStr = day.toString().padStart(2, '0');
-    const year = currentMonth.getFullYear();
-    onChange(`${month}/${dayStr}/${year}`);
-    setOpen(false);
-  };
-
-  const handleToday = () => {
-    const today = new Date();
-    const month = (today.getMonth() + 1).toString().padStart(2, '0');
-    const day = today.getDate().toString().padStart(2, '0');
-    const year = today.getFullYear();
-    onChange(`${month}/${day}/${year}`);
-    setOpen(false);
+  const isToday = (day:number) => {
+    return (
+      today.getDate() === day &&
+      today.getMonth() === currentMonth.getMonth() &&
+      today.getFullYear() === currentMonth.getFullYear()
+    );
   };
 
   const days = [];
-  for (let i = 0; i < firstDayOfMonth; i++) {
-    days.push(<div key={`empty-${i}`} className="h-8"></div>);
+
+  for(let i=0;i<firstDay;i++){
+    days.push(<div key={`empty-${i}`} />);
   }
-  for (let day = 1; day <= daysInMonth; day++) {
+
+  for(let day=1;day<=daysInMonth;day++){
+
+    const disabled = isDisabled(day);
+    const selected = isSelected(day);
+    const todayMark = isToday(day);
+
     days.push(
       <button
         key={day}
-        onClick={() => handleDateClick(day)}
-        type="button"
-        className="h-8 flex items-center justify-center rounded hover:bg-blue-100 text-sm text-gray-700 hover:text-blue-600 transition-colors"
+        disabled={disabled}
+        onClick={()=>{
+          if(disabled) return;
+          const d = new Date(currentMonth.getFullYear(),currentMonth.getMonth(),day);
+          onChange(formatDate(d));
+          setOpen(false);
+        }}
+        className={`h-8 rounded text-sm flex items-center justify-center
+        ${disabled ? "text-gray-300 cursor-not-allowed"
+        : selected ? "bg-blue-600 text-white"
+        : todayMark ? "border border-blue-500 text-blue-600"
+        : "hover:bg-blue-100 text-gray-700"}`}
       >
         {day}
       </button>
@@ -88,101 +110,115 @@ export function DatePickerWithButton({ date, onChange, label }: DatePickerWithBu
 
   return (
     <div>
-      <label className="block text-gray-700 text-sm mb-2">{label}</label>
-      <div className="flex items-center gap-2">
+      <label className="text-sm text-gray-700 mb-2 block">{label}</label>
+
+      <div className="flex gap-2 items-center">
+
         <div className="relative flex-1 flex items-center">
-          <Calendar className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" />
+          <Calendar className="absolute left-3 top-3 w-4 h-4 text-gray-400"/>
           <input
-            type="text"
             value={date}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            onChange={(e)=>onChange(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm
+            focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
         <Popover.Root open={open} onOpenChange={setOpen}>
           <Popover.Trigger asChild>
-            <button
-              type="button"
-              className="p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
-            >
-              <Calendar className="w-5 h-5" />
+            <button className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <Calendar className="w-5 h-5"/>
             </button>
           </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              className="z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl p-4 w-72 animate-in fade-in-0 zoom-in-95"
-              align="end"
-              sideOffset={5}
+
+          <Popover.Content
+            align="end"
+            sideOffset={6}
+            className="bg-white shadow-xl border rounded-lg p-4 w-72 z-[9999]"
+          >
+
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+
+              <button
+            onClick={() =>
+              setCurrentMonth(
+                new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
+              )
+            }
+            className="p-1 hover:bg-gray-100 rounded"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600"/>
+          </button>
+
+          <div className="flex gap-2 items-center">
+
+            {/* Month Select */}
+            <select
+              value={currentMonth.getMonth()}
+              onChange={(e) =>
+                setCurrentMonth(
+                  new Date(currentMonth.getFullYear(), Number(e.target.value), 1)
+                )
+              }
+              className="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  onClick={previousMonth}
-                  type="button"
-                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <ChevronLeft className="w-5 h-5 text-gray-600" />
-                </button>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={currentMonth.getMonth()}
-                    onChange={(e) => handleMonthChange(Number(e.target.value))}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
-                  >
-                    {monthNames.map((month, index) => (
-                      <option key={month} value={index}>
-                        {month}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={currentMonth.getFullYear()}
-                    onChange={(e) => handleYearChange(Number(e.target.value))}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
-                  >
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={nextMonth}
-                  type="button"
-                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <ChevronRight className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
+              {monthNames.map((m, i) => (
+                <option key={m} value={i}>{m}</option>
+              ))}
+            </select>
 
-              {/* Days of week */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-                  <div key={day} className="h-8 flex items-center justify-center text-xs text-gray-500">
-                    {day}
-                  </div>
-                ))}
-              </div>
+            {/* Year Select */}
+            <select
+              value={currentMonth.getFullYear()}
+              onChange={(e) =>
+                setCurrentMonth(
+                  new Date(Number(e.target.value), currentMonth.getMonth(), 1)
+                )
+              }
+              className="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Array.from({ length: 100 }, (_, i) => today.getFullYear() - 50 + i).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
 
-              {/* Calendar days */}
-              <div className="grid grid-cols-7 gap-1">
-                {days}
-              </div>
+  </div>
 
-              {/* Today button */}
-              <div className="mt-4 pt-3 border-t border-gray-200">
-                <button
-                  onClick={handleToday}
-                  type="button"
-                  className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm transition-colors"
-                >
-                  Today
-                </button>
-              </div>
-            </Popover.Content>
-          </Popover.Portal>
+  <button
+    onClick={() =>
+      setCurrentMonth(
+        new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
+      )
+    }
+    className="p-1 hover:bg-gray-100 rounded"
+  >
+    <ChevronRight className="w-5 h-5 text-gray-600"/>
+  </button>
+
+            </div>
+
+            {/* Days */}
+            <div className="grid grid-cols-7 text-xs text-gray-500 mb-2">
+              {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>
+                <div key={d} className="text-center">{d}</div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {days}
+            </div>
+
+            <button
+              onClick={()=>onChange(formatDate(new Date()))}
+              className="w-full mt-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Today
+            </button>
+
+          </Popover.Content>
         </Popover.Root>
+
       </div>
     </div>
   );
