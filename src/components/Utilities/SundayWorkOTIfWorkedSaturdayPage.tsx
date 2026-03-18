@@ -4,6 +4,7 @@ import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { toISO } from '../../services/utilityService';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
@@ -130,20 +131,31 @@ export function SundayWorkOTIfWorkedSaturdayPage() {  const [activeTab,         
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length===filteredEmployees.length?[]:filteredEmployees.map(e=>e.id));
 
   const resetForm = () => { setSelectedGroupsMap({...EMPTY_SELECTION}); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); };
-  const handleAction = async () => {
-    if (!selectedEmployees.length) { await showErrorModal('Please select employee(s) to update.'); return; }
+  const handleUpdate = async () => {
+    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
     if (!dateFrom || !dateTo)      { await showErrorModal('Please select Date From and Date To.'); return; }
+
     try {
       setIsUpdating(true);
       const payload = {
-        empCodes: selectedEmployees.map(id=>employeeItems.find(e=>e.id===id)?.code??String(id)),
-        dateFrom: new Date(dateFrom).toISOString(),
-        dateTo:   new Date(dateTo).toISOString(),
+        EmpCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        DateFrom: toISO(dateFrom),
+        DateTo:   toISO(dateTo),
       };
-      const res = await apiClient.post('/Utilities/SundayWorkOTIfWorkedSaturday', payload);
-      if (ApiService.isApiSuccess(res)) { await showSuccessModal('Sunday Work OT If Worked Saturday successfully updated.'); resetForm(); }
-    } catch { await showErrorModal('Failed to update records.'); }
-    finally { setIsUpdating(false); }
+
+      const res = await apiClient.post('/Utilities/SundayPaidRegularHours', payload);
+      if (ApiService.isApiSuccess(res)) {
+        await showSuccessModal('Sunday Paid Hours settings successfully updated.');
+        setSelectedGroupsMap({ ...EMPTY_SELECTION });
+        setSelectedEmployees([]);
+        setDateFrom('');
+        setDateTo('');
+      }
+    } catch {
+      await showErrorModal('Failed to update records.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const renderPagination = (current: number, total: number, setPage: (p:number)=>void, startIdx: number, totalCount: number) => (
@@ -272,7 +284,7 @@ export function SundayWorkOTIfWorkedSaturdayPage() {  const [activeTab,         
                     <CalendarPopover date={dateTo} onChange={setDateTo}/>
                   </div>
                   <div className="flex justify-end pt-4 border-t border-gray-200">
-                    <button onClick={handleAction} disabled={isUpdating} className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={handleUpdate} disabled={isUpdating} className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                       <Save className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
                     </button>
                   </div>
