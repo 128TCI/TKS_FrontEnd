@@ -104,7 +104,7 @@ export function AreaSetupPage() {
     setLoadingAreas(true);
     setAreaError("");
     try {
-      const response = await apiClient.get("/Fs/EmploymentAreaSetUp");
+      const response = await apiClient.get("/Fs/Employment/AreaSetUp");
       if (response.status === 200 && response.data) {
         const mappedData = response.data.map((area: any) => ({
           id: area.id || area.ID || "",
@@ -796,6 +796,7 @@ const fetchEmployeeData = async () => {
                               handleAreaCodeChange(e.target.value)
                             }
                             maxLength={10}
+                            readOnly={isEditMode}
                             className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
                               areaCodeError
                                 ? "border-red-500 focus:ring-red-500"

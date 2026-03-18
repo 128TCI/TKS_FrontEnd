@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Lock, Eye, EyeOff, Save } from 'lucide-react';
 import apiClient, { getLoggedInUsername } from '../../services/apiClient';
+import { getLoggedInPassword } from '../../services/apiClient';
 import { showSuccessModal, showErrorModal } from '../../services/apiService';
 import auditTrail from '../../services/auditTrail';
 import { securityService } from '../../services/securityService';
 import { decryptData } from '../../services/encryptionService';
+import { Footer } from '../Footer/Footer';
 
 interface ChangePasswordPageProps {
   onBack: () => void;
@@ -26,7 +28,8 @@ export function ChangePasswordPage({ onBack }: ChangePasswordPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword)                { await showErrorModal('Please enter your old password.');                      return; }
-    if (!newPassword)                    { await showErrorModal('Please enter a new password.');                         return; }
+      if (currentPassword !== getLoggedInPassword()) { await showErrorModal('The entered old password is incorrect.'); return; }
+      if (!newPassword) { await showErrorModal('Please enter a new password.'); return; }
     if (newPassword !== confirmPassword) { await showErrorModal('New passwords do not match.');                          return; }
     if (newPassword === currentPassword) { await showErrorModal('New password must be different from the current one.'); return; }
 
@@ -179,6 +182,7 @@ function PasswordField({ label, placeholder, value, show, onChange, onToggle, on
           {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
       </div>
+
     </div>
   );
 }

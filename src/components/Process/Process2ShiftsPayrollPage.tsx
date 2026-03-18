@@ -571,12 +571,21 @@ const parseDateToISO = (dateStr: string): string => {
       userName: 'currentUser',
     };
 
-    setPopulating(true);
+setPopulating(true);
     setShowResults(false);
     setPopulateResult(null);
     setProcessPayload(null);
 
     const startTime = Date.now();
+
+    Swal.fire({
+      title: 'Populating...',
+      html: 'Please wait while data is being populated.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => { Swal.showLoading(); },
+    });
 
     try {
       const response = await apiClient.post('/Populate2Shifts/Populate', payload);
@@ -647,8 +656,17 @@ const parseDateToISO = (dateStr: string): string => {
       return;
     }
 
-    setProcessing(true);
+setProcessing(true);
     const startTime = Date.now();
+
+    Swal.fire({
+      title: 'Processing...',
+      html: 'Please wait while data is being processed.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => { Swal.showLoading(); },
+    });
 
     try {
       const response = await apiClient.post('/Populate2Shifts/Process', processPayload);
@@ -1114,11 +1132,7 @@ const parseDateToISO = (dateStr: string): string => {
                   disabled={populating || processing}
                   className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {populating ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" />Populating...</>
-                  ) : (
-                    <><Users className="w-4 h-4" />Populate</>
-                  )}
+                  <Users className="w-4 h-4" />Populate
                 </button>
                 <button
                   onClick={handleProcess}
@@ -1126,11 +1140,7 @@ const parseDateToISO = (dateStr: string): string => {
                   className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!processPayload ? 'Run Populate first' : ''}
                 >
-                  {processing ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" />Processing...</>
-                  ) : (
-                    <><Play className="w-4 h-4" />Process</>
-                  )}
+                  <Play className="w-4 h-4" />Process
                 </button>
               </div>
               {!processPayload && (
@@ -1262,7 +1272,7 @@ const parseDateToISO = (dateStr: string): string => {
                       {activeResultTab === 'tardiness' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                          {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateFrom)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateTo)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtTime(r.timeIn)}</td>
@@ -1275,8 +1285,8 @@ const parseDateToISO = (dateStr: string): string => {
                       ))}
                       {activeResultTab === 'undertime' && pagedResultData.map((r: any, i) => (
                         <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
-                         {r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}
+                        <td className="px-4 py-3 text-gray-900">{r.empCode}</td>
+                          <td className="px-4 py-3 text-gray-900">{r.empName || r.formattedName || employeeItems.find(e => e.code === r.empCode)?.name || ""}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateFrom)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtDate(r.dateTo)}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtTime(r.timeIn)}</td>

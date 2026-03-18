@@ -16,6 +16,8 @@ import { ROUTE_PERMISSIONS } from '../config/routePermissions';
 import { SystemInfo } from './Types/system';
 import { systemService } from '../services/systemService';
 
+const BASENAME = '/DEMO_128TIMEKEEP_NEO';
+
 interface NavigationProps {
   onLogout: () => void;
 }
@@ -41,29 +43,24 @@ export function Navigation({ onLogout }: NavigationProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [systemInfo, setSystemInfo]   = useState<SystemInfo | null>(null);
-  const [loadingInfo, setLoadingInfo] = useState(false);
-
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [hoveredSubmenu, setHoveredSubmenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showVersionTooltip, setShowVersionTooltip] = useState(false);
-  const [navToast,           setNavToast]           = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileExpandedSubmenus, setMobileExpandedSubmenus] = useState<Set<string>>(new Set());
   const [mobileExpandedMainMenu, setMobileExpandedMainMenu] = useState<string | null>(null);
   const [buttonPositions, setButtonPositions] = useState<{ [key: string]: { left: number; top: number; width: number } }>({});
 
-  const dropdownRef      = useRef<HTMLDivElement>(null);
-  const closeTimeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef          = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // ✅ FIX 1: declare fetchedRef so data is only fetched once
-  const fetchedRef       = useRef(false);
-const [companyDisplayName, setCompanyDisplayName] = useState('');
+  const [companyDisplayName, setCompanyDisplayName] = useState('');
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
   const token = localStorage.getItem('token');
 
   const { canView } = usePermissions();
+
+  const href = (path: string) => `${BASENAME}${path}`;
 
   const canViewPath = (path?: string): boolean => {
     if (!path) return true;
@@ -175,53 +172,19 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
     }
   };
 
-  // ✅ FIX 2: setLoadingInfo(true) BEFORE await; fetchedRef prevents re-fetch;
-  //           reset fetchedRef on failure so it can retry
   useEffect(() => {
-  const fetchCompanyName = async () => {
-    try {
-      const response = await apiClient.get('/Fs/System/CompanyInformation');
-      const infoList = Array.isArray(response.data) ? response.data : [];
-      const name = infoList[0]?.companyName ?? '';
-      setCompanyDisplayName(name);
-    } catch {
-      setCompanyDisplayName('');
-    }
-  };
-
-  fetchCompanyName();
-}, []);
-  const fetchSystemInfo = async () => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
-    setLoadingInfo(true);
-    try {
-      const data = await systemService.getSystemInfo();
-      setSystemInfo(data);
-    } catch {
-      fetchedRef.current = false; // allow retry on error
-      setSystemInfo(null);
-    } finally {
-      setLoadingInfo(false);
-    }
-  };
-
-  // ── Copy build info to clipboard ─────────────────────────────────────────
-  const handleCopyBuildInfo = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!systemInfo) return;
-    const text = `${systemInfo.appVersion} ${systemInfo.buildDate}`;
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
-    }
-    setNavToast(true);
-    setTimeout(() => setNavToast(false), 2500);
-  };
+    const fetchCompanyName = async () => {
+      try {
+        const response = await apiClient.get('/Fs/System/CompanyInformation');
+        const infoList = Array.isArray(response.data) ? response.data : [];
+        const name = infoList[0]?.companyName ?? '';
+        setCompanyDisplayName(name);
+      } catch {
+        setCompanyDisplayName('');
+      }
+    };
+    fetchCompanyName();
+  }, []);
 
   // ── Menu definition ────────────────────────────────────────────────────────
   const menuItems: MenuItem[] = [
@@ -499,21 +462,30 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
                 if (child.hasSubmenu && child.children) {
                   return (
                     <div key={childIndex} className="relative group">
-                      <div className="w-full text-left px-2 py-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors duration-150 text-sm rounded flex items-center justify-between cursor-pointer"
+                      <button
+                        type="button"
+                        className="w-full text-left px-2 py-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors duration-150 text-sm rounded flex items-center justify-between cursor-pointer"
                         onMouseEnter={() => setHoveredSubmenu(`file-setup-${catIndex}-${childIndex}`)}
-                        onMouseLeave={() => setHoveredSubmenu(null)}>
+                        onMouseLeave={() => setHoveredSubmenu(null)}
+                      >
                         <span>{child.label}</span>
                         <ChevronRight className="w-3 h-3" />
-                      </div>
+                      </button>
                       {hoveredSubmenu === `file-setup-${catIndex}-${childIndex}` && (
-                        <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-72 z-50 animate-slideRight"
+                        <div
+                          className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-72 z-50 animate-slideRight"
                           onMouseEnter={() => setHoveredSubmenu(`file-setup-${catIndex}-${childIndex}`)}
-                          onMouseLeave={() => setHoveredSubmenu(null)}>
+                          onMouseLeave={() => setHoveredSubmenu(null)}
+                        >
                           {child.children.map((sub, subIdx) => (
-                            <button key={subIdx} onClick={() => goTo(sub.path || '')}
-                              className={`w-full text-left px-4 py-2 transition-colors duration-150 text-sm ${isSubItemActive(sub.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}>
+                            <a
+                              key={subIdx}
+                              href={href(sub.path || '')}
+                              onClick={(e) => { e.preventDefault(); goTo(sub.path || ''); }}
+                              className={`block w-full px-4 py-2 transition-colors duration-150 text-sm ${isSubItemActive(sub.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}
+                            >
                               {sub.label}
-                            </button>
+                            </a>
                           ))}
                         </div>
                       )}
@@ -526,20 +498,28 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
                       <div className="text-gray-800 font-medium text-sm mb-1 px-2">{child.label}</div>
                       <div className="space-y-0.5 pl-2">
                         {child.children.map((sub, subIdx) => (
-                          <button key={subIdx} onClick={() => goTo(sub.path || '')}
-                            className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${isSubItemActive(sub.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}>
+                          <a
+                            key={subIdx}
+                            href={href(sub.path || '')}
+                            onClick={(e) => { e.preventDefault(); goTo(sub.path || ''); }}
+                            className={`block w-full px-2 py-1 transition-colors duration-150 text-sm rounded ${isSubItemActive(sub.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}
+                          >
                             {sub.label}
-                          </button>
+                          </a>
                         ))}
                       </div>
                     </div>
                   );
                 }
                 return (
-                  <button key={childIndex} onClick={() => goTo(child.path || '')}
-                    className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${isSubItemActive(child.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}>
+                  <a
+                    key={childIndex}
+                    href={href(child.path || '')}
+                    onClick={(e) => { e.preventDefault(); goTo(child.path || ''); }}
+                    className={`block w-full px-2 py-1 transition-colors duration-150 text-sm rounded ${isSubItemActive(child.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}
+                  >
                     {child.label}
-                  </button>
+                  </a>
                 );
               })}
             </div>
@@ -560,10 +540,14 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
               {category.children?.map((child, childIndex) => {
                 if (child.separator) return <div key={childIndex} className="my-2 border-t border-gray-300" />;
                 return (
-                  <button key={childIndex} onClick={() => goTo(child.path || '')}
-                    className={`w-full text-left px-2 py-1 transition-colors duration-150 text-sm rounded ${isSubItemActive(child.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}>
+                  <a
+                    key={childIndex}
+                    href={href(child.path || '')}
+                    onClick={(e) => { e.preventDefault(); goTo(child.path || ''); }}
+                    className={`block w-full px-2 py-1 transition-colors duration-150 text-sm rounded ${isSubItemActive(child.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}`}
+                  >
                     {child.label}
-                  </button>
+                  </a>
                 );
               })}
             </div>
@@ -583,13 +567,20 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
     if (subItem.isCategory && subItem.children) {
       return (
         <div key={itemKey} className="relative group">
-          <div className="px-4 py-2 text-gray-900 font-semibold text-sm flex items-center justify-between hover:bg-gray-50 cursor-default"
-            onMouseEnter={() => handleFlyoutEnter(itemKey)} onMouseLeave={handleFlyoutLeave}>
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-gray-900 font-semibold text-sm flex items-center justify-between hover:bg-gray-50"
+            onMouseEnter={() => handleFlyoutEnter(itemKey)}
+            onMouseLeave={handleFlyoutLeave}
+          >
             {subItem.label}<ChevronRight className="w-4 h-4 text-gray-400" />
-          </div>
+          </button>
           {expandedMenu === itemKey && (
-            <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-80 max-h-[70vh] overflow-y-auto animate-slideRight z-50"
-              onMouseEnter={() => handleFlyoutEnter(itemKey)} onMouseLeave={handleFlyoutLeave}>
+            <div
+              className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-80 max-h-[70vh] overflow-y-auto animate-slideRight z-50"
+              onMouseEnter={() => handleFlyoutEnter(itemKey)}
+              onMouseLeave={handleFlyoutLeave}
+            >
               {subItem.children.map((child, i) => renderSubmenuItem(child, i, itemKey))}
             </div>
           )}
@@ -599,13 +590,20 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
     if (subItem.children) {
       return (
         <div key={itemKey} className="relative group">
-          <div className="px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150 text-sm flex items-center justify-between cursor-pointer"
-            onMouseEnter={() => handleFlyoutEnter(itemKey)} onMouseLeave={handleFlyoutLeave}>
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150 text-sm flex items-center justify-between"
+            onMouseEnter={() => handleFlyoutEnter(itemKey)}
+            onMouseLeave={handleFlyoutLeave}
+          >
             {subItem.label}<ChevronRight className="w-4 h-4" />
-          </div>
+          </button>
           {expandedMenu === itemKey && (
-            <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-80 max-h-[70vh] overflow-y-auto animate-slideRight z-50"
-              onMouseEnter={() => handleFlyoutEnter(itemKey)} onMouseLeave={handleFlyoutLeave}>
+            <div
+              className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-80 max-h-[70vh] overflow-y-auto animate-slideRight z-50"
+              onMouseEnter={() => handleFlyoutEnter(itemKey)}
+              onMouseLeave={handleFlyoutLeave}
+            >
               {subItem.children.map((child, i) => renderSubmenuItem(child, i, itemKey))}
             </div>
           )}
@@ -614,10 +612,14 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
     }
     if (subItem.path) {
       return (
-        <button key={itemKey} onClick={() => goTo(subItem.path!)}
-          className={`w-full text-left px-4 py-2 transition-colors duration-150 text-sm ${isSubItemActive(subItem.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'}`}>
+        <a
+          key={itemKey}
+          href={href(subItem.path)}
+          onClick={(e) => { e.preventDefault(); goTo(subItem.path!); }}
+          className={`block w-full px-4 py-2 transition-colors duration-150 text-sm ${isSubItemActive(subItem.path) ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'}`}
+        >
           {subItem.label}
-        </button>
+        </a>
       );
     }
     return null;
@@ -631,9 +633,12 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
       const isExpanded = mobileExpandedSubmenus.has(itemKey);
       return (
         <div key={itemKey} className="w-full">
-          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMobileSubmenu(itemKey); }}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMobileSubmenu(itemKey); }}
             className={`w-full text-left px-3 py-2.5 text-sm flex items-center justify-between hover:bg-slate-600 active:bg-slate-700 rounded transition-colors touch-manipulation ${subItem.isCategory ? 'text-slate-200 font-semibold' : 'text-slate-200'}`}
-            style={{ paddingLeft }}>
+            style={{ paddingLeft }}
+          >
             <span className="flex-1">{subItem.label}</span>
             <ChevronDown className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 ${isExpanded ? 'rotate-180' : ''}`} />
           </button>
@@ -647,11 +652,15 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
     }
     if (subItem.path) {
       return (
-        <button key={itemKey} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); goTo(subItem.path!); }}
-          className={`w-full text-left px-3 py-2.5 text-sm rounded transition-colors touch-manipulation ${isSubItemActive(subItem.path) ? 'bg-blue-500 text-white font-medium' : 'text-slate-200 hover:bg-slate-600 active:bg-slate-700'}`}
-          style={{ paddingLeft }}>
+        <a
+          key={itemKey}
+          href={href(subItem.path)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); goTo(subItem.path!); }}
+          className={`block w-full px-3 py-2.5 text-sm rounded transition-colors touch-manipulation ${isSubItemActive(subItem.path) ? 'bg-blue-500 text-white font-medium' : 'text-slate-200 hover:bg-slate-600 active:bg-slate-700'}`}
+          style={{ paddingLeft }}
+        >
           {subItem.label}
-        </button>
+        </a>
       );
     }
     return null;
@@ -664,14 +673,14 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
         <div className="flex items-center justify-between h-14">
 
           {/* Logo */}
-<div className="flex items-center space-x-3">
-  <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
-    <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
-  </div>
-  <h1 className="text-white text-lg">
-    {companyDisplayName || 'DEMO ACCOUNT'}
-  </h1>
-</div>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
+              <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
+            </div>
+            <h1 className="text-white text-lg">
+              {companyDisplayName || 'DEMO ACCOUNT'}
+            </h1>
+          </div>
 
           {/* Desktop menu buttons */}
           <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center relative">
@@ -681,12 +690,14 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
                 if (item.submenu && visibleSubmenu!.length === 0) return null;
                 return (
                   <div key={item.id} className="flex-shrink-0">
-                    <button onClick={(e) => handleMenuClick(item, e)}
+                    <button
+                      onClick={(e) => handleMenuClick(item, e)}
                       className={`flex items-center space-x-2 px-3 py-3 rounded-lg transition-all duration-200 whitespace-nowrap ${
                         expandedMenu === item.id || isMenuItemActive(item)
                           ? 'bg-amber-100 text-gray-800 font-semibold'
                           : 'text-slate-200 hover:bg-green-700 hover:text-white'
-                      }`}>
+                      }`}
+                    >
                       <item.icon className="w-4 h-4" />
                       <span className="text-sm">{item.label}</span>
                       {item.submenu && <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedMenu === item.id ? 'rotate-180' : ''}`} />}
@@ -704,11 +715,13 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
               {menuItems.map((item) => {
                 if (expandedMenu !== item.id || !item.submenu) return null;
                 return (
-                  <div key={`dropdown-${item.id}`}
+                  <div
+                    key={`dropdown-${item.id}`}
                     className={`bg-white rounded-lg shadow-xl border border-gray-200 animate-slideDown ${
                       ['file-setup', 'maintenance', 'utilities', 'import'].includes(item.id) ? '' :
                       item.id === 'process' ? 'py-2 w-80' : 'py-2 w-56'
-                    }`}>
+                    }`}
+                  >
                     {item.id === 'file-setup'  ? renderFileSetupMegaMenu(filterSubmenu(item.submenu)) :
                      item.id === 'maintenance' ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[800px]') :
                      item.id === 'utilities'   ? renderCategoryMegaMenu(filterSubmenu(item.submenu), 'min-w-[900px]') :
@@ -721,64 +734,30 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
             </div>
           )}
 
-          {/* User menu */}
+          {/* User menu — tooltip removed, navigate to change password on click */}
           <div className="flex items-center space-x-3">
-
-            {/* ✅ FIX 3: onMouseEnter now calls fetchSystemInfo() AND shows tooltip */}
-            <div
-              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-700 hover:bg-green-800 rounded-lg relative cursor-pointer transition-colors duration-150"
-              onMouseEnter={() => { fetchSystemInfo(); setShowVersionTooltip(true); }}
-              onMouseLeave={() => setShowVersionTooltip(false)}
+            <button
               onClick={() => goTo('/security/change-password')}
+              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-700 hover:bg-green-800 rounded-lg transition-colors duration-150"
             >
               <User className="w-4 h-4 text-slate-200" />
               <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>
               <span className="text-green-300 text-xs">🔑</span>
+            </button>
 
-              {/* Tooltip + copy toast */}
-              {showVersionTooltip && (
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fadeIn min-w-[180px]">
-                  {loadingInfo ? (
-                    <div className="text-sm text-green-200">Loading...</div>
-                  ) : systemInfo ? (
-                    <button
-                      type="button"
-                      onClick={handleCopyBuildInfo}
-                      onMouseDown={e => e.preventDefault()}
-                      title="Click to copy build info"
-                      className="w-full text-left focus:outline-none group"
-                    >
-                      <div className="text-sm font-semibold tracking-wide group-hover:text-green-100 transition-colors">
-                        {systemInfo.appVersion} {systemInfo.buildDate}
-                      </div>
-                      <div className="text-xs text-green-200 mt-0.5">
-                        SQL {systemInfo.sqlVersion}
-                      </div>
-                    </button>
-                  ) : (
-                    <div className="text-sm text-green-200">Unable to load</div>
-                  )}
-                  <div className="mt-2 pt-2 border-t border-green-500 text-xs text-green-200 text-center">
-                    Click to change password
-                  </div>
-                  {/* Toast inside tooltip */}
-                  <div className={`mt-2 text-center text-xs transition-all duration-300 ${
-                    navToast ? 'text-green-300 opacity-100' : 'opacity-0 h-0 mt-0 overflow-hidden'
-                  }`}>
-                    ✓ Build info copied
-                  </div>
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45" />
-                </div>
-              )}
-            </div>
-
-            <button onClick={handleLogout} disabled={isLoggingOut}
-              className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <LogOut className="w-4 h-4" />
               <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
             </button>
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden flex items-center justify-center w-10 h-10 text-slate-200 hover:text-white hover:bg-slate-600 rounded-lg transition-all duration-200">
+
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden flex items-center justify-center w-10 h-10 text-slate-200 hover:text-white hover:bg-slate-600 rounded-lg transition-all duration-200"
+            >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
@@ -792,12 +771,14 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
               if (item.submenu && visibleSubmenu!.length === 0) return null;
               return (
                 <div key={item.id}>
-                  <button onClick={() => handleMobileMenuClick(item)}
+                  <button
+                    onClick={() => handleMobileMenuClick(item)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 ${
                       mobileExpandedMainMenu === item.id || isMenuItemActive(item)
                         ? 'bg-slate-700 text-white font-semibold'
                         : 'text-slate-200 hover:bg-slate-600'
-                    }`}>
+                    }`}
+                  >
                     <div className="flex items-center space-x-2">
                       <item.icon className="w-4 h-4" />
                       <span className="text-sm">{item.label}</span>
@@ -814,8 +795,11 @@ const [companyDisplayName, setCompanyDisplayName] = useState('');
                 </div>
               );
             })}
-            <button onClick={handleLogout} disabled={isLoggingOut}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-4">
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+            >
               <LogOut className="w-4 h-4" />
               <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
             </button>

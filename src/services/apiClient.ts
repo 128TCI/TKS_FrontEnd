@@ -12,10 +12,14 @@ import axios, {
 } from 'axios';
 import { decryptData } from './encryptionService';
 
-
+//Local
 const BASE_URL = 'https://localhost:7264/api';
-//server 2
-  // const BASE_URL = 'https://demo.128techconsultinginc.com/128_TKS_LATEST/api';
+//Demo
+// const BASE_URL = 'https://demo.128techconsultinginc.com/DEMO_128TIMEKEEP_NEO/api'
+//Sir Marc
+// const BASE_URL = 'http://128pc-42.128dom/DEMO_128TIMEKEEP_NEO/api';
+//Mam Robby
+// const BASE_URL = 'https://128pc-82.128dom/DEMO_128TIMEKEEP_NEO/api';
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 const TOKEN_KEY = '128bl3$$1ng$';
@@ -73,7 +77,7 @@ apiClient.interceptors.response.use(
 
     // Skip redirect for auth endpoints to prevent infinite loops
     const isAuthEndpoint =
-      originalRequest?.url?.includes('/128_TKS/Login') ||
+      originalRequest?.url?.includes('/DEMO_128TIMEKEEP_NEO/Login') ||
       originalRequest?.url?.includes('/Auth/refresh-token');
 
     // ── 401 Unauthorized — attempt token refresh ──────────────────────────────
@@ -126,8 +130,8 @@ apiClient.interceptors.response.use(
 
 function redirectToLogin() {
   tokenStorage.clear();
-  if (window.location.pathname !== '/128_TKS/Login') {
-    window.location.href = '/128_TKS/Login';
+  if (window.location.pathname !== '/DEMO_128TIMEKEEP_NEO/Login') {
+    window.location.href = '/DEMO_128TIMEKEEP_NEO/Login';
   }
 }
 
@@ -147,5 +151,24 @@ export function getLoggedInUsername(): string {
     return 'Guest';
   }
 }
+
+// ── Password helper — reads from userData in localStorage ─────────────────────
+export function getLoggedInPassword(): string {
+    try {
+        const raw = localStorage.getItem('userData') || '';
+        if (!raw) return 'Guest';
+        // Handles both plain string and JSON object
+        if (raw.startsWith('{')) {
+            const parsed = JSON.parse(raw);
+            console.log('Parsed userData for password retrieval:', parsed?.password);
+            return decryptData(parsed?.password ?? 'Guest');
+        }
+        return raw;
+    } catch (error) {
+        console.error('Error decrypting password:', error);
+        return 'Guest';
+    }
+}
+
 
 export default apiClient;

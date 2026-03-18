@@ -487,20 +487,23 @@ const handleSubmit = async () => {
 
                       {/* Form Fields */}
                       <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <label className="w-32 text-gray-700 text-sm">Code :</label>
-                          <input
-                            type="text"
-                            value={code}
-                            onChange={(e) => handleCodeChange(e.target.value)}
-                            maxLength={10}
-                            className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
-                              codeError 
-                                ? 'border-red-500 focus:ring-red-500' 
-                                : 'border-gray-300 focus:ring-blue-500'
-                            }`}
-                          />
-                        </div>
+                 <div className="flex items-center gap-3">
+  <label className="w-32 text-gray-700 text-sm">Code :</label>
+  <input
+    type="text"
+    value={code}
+    onChange={(e) => !isEditMode && handleCodeChange(e.target.value)}
+    maxLength={10}
+    readOnly={isEditMode}
+    className={`flex-1 px-3 py-1.5 border rounded focus:outline-none focus:ring-2 text-sm ${
+      isEditMode
+        ? 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed'
+        : codeError
+          ? 'border-red-500 focus:ring-red-500'
+          : 'border-gray-300 focus:ring-blue-500'
+    }`}
+  />
+</div>
                         {codeError && (
                           <p className="ml-32 text-red-500 text-xs mt-1">{codeError}</p>
                         )}

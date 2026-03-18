@@ -4,8 +4,10 @@
     "\\src",
     "\\src\\components",
     "\\src\\components\\Security",
-    "\\src\\routes"
+    "\\src\\hooks",
+    "\\src\\routes",
+    "\\src\\services"
   ],
-  "SelectedNode": "\\src\\routes\\AppRoutes.tsx",
+  "SelectedNode": "\\src\\components\\Navigation.tsx",
   "PreviewInSolutionExplorer": false
 }
