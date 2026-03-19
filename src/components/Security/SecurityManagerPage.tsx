@@ -579,7 +579,7 @@ const handleEditUser = (user: User) => {
           oldPassword: passwordForm.oldPassword,
           newPassword: passwordForm.newPassword,
         });
-        if (res.success) { 
+        if (res.success) {
           await auditTrail.log({
             accessType: 'Edit',
             trans: `Changed Password for account '${selectedUser!.username}'`,

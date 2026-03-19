@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Search, X, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box, RefreshCw } from 'lucide-react';
+import { Check, Search, X, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { EmpClassSearchModal } from './../Modals/EmpClassificationSearchModal';
 import { Footer } from '../Footer/Footer';
@@ -8,7 +8,6 @@ import apiClient from '../../services/apiClient';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
-interface EmployeeClassItem { id: number; code: string; description: string; }
 
 type TabName = 'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit';
 
@@ -25,24 +24,20 @@ const EMPTY_SELECTION: Record<TabName, number[]> = {
 };
 
 export function UpdateEmployeeClassificationPage() {
-  const [activeTab,            setActiveTab]            = useState<TabName>('TK Group');
-  const [statusFilter,         setStatusFilter]         = useState<'active' | 'inactive' | 'all'>('active');
-  const [dateFrom,             setDateFrom]             = useState('');
-  const [dateTo,               setDateTo]               = useState('');
-  const [groupSearchTerm,      setGroupSearchTerm]      = useState('');
-  const [employeeSearchTerm,   setEmployeeSearchTerm]   = useState('');
-  const [classificationType,   setClassificationType]   = useState<'fixed' | 'variable'>('fixed');
-  const [empClass,             setEmpClass]             = useState('');
-  const [classification,       setClassification]       = useState('');
-  const [empClassItems,        setEmpClassItems]        = useState<EmployeeClassItem[]>([]);
-  const [loadingEmpClassCodes, setLoadingEmpClassCodes] = useState(false);
-  const [empClassError,        setEmpClassError]        = useState('');
-  const [showEmpClassModal,    setShowEmpClassModal]    = useState(false);
-  const [isUpdating,           setIsUpdating]           = useState(false);
+  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
+  const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
+  const [dateFrom,           setDateFrom]           = useState('');
+  const [dateTo,             setDateTo]             = useState('');
+  const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [classificationType, setClassificationType] = useState<'fixed' | 'variable'>('fixed');
+  const [classification,     setClassification]     = useState('');
+  const [showEmpClassModal,  setShowEmpClassModal]  = useState(false);
+  const [isUpdating,         setIsUpdating]         = useState(false);
   const itemsPerPage = 10;
 
   const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
-  const selectedGroups = selectedGroupsMap[activeTab] ?? [];
+  const selectedGroups    = selectedGroupsMap[activeTab] ?? [];
   const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) =>
     setSelectedGroupsMap(prev => ({ ...prev, [activeTab]: typeof updater === 'function' ? updater(prev[activeTab]) : updater }));
 
@@ -50,16 +45,16 @@ export function UpdateEmployeeClassificationPage() {
   const [currentGroupPage,  setCurrentGroupPage]  = useState(1);
   const [currentEmpPage,    setCurrentEmpPage]    = useState(1);
 
-  const [tkGroupItems,        setTKSGroupItems]      = useState<GroupItem[]>([]);
-  const [branchItems,         setBranchItems]        = useState<GroupItem[]>([]);
-  const [departmentItems,     setDepartmentItems]    = useState<GroupItem[]>([]);
-  const [divisionItems,       setDivisionItems]      = useState<GroupItem[]>([]);
-  const [groupScheduleItems,  setGroupScheduleItems] = useState<GroupItem[]>([]);
-  const [payHouseItems,       setPayHouseItems]      = useState<GroupItem[]>([]);
-  const [sectionItems,        setSectionItems]       = useState<GroupItem[]>([]);
-  const [unitItems,           setUnitItems]          = useState<GroupItem[]>([]);
-  const [employeeItems,       setEmployeeItems]      = useState<EmployeeItem[]>([]);
-  const [loadingEmployees,    setLoadingEmployees]   = useState(false);
+  const [tkGroupItems,       setTKSGroupItems]      = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [divisionItems,      setDivisionItems]      = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
+  const [unitItems,          setUnitItems]          = useState<GroupItem[]>([]);
+  const [employeeItems,      setEmployeeItems]      = useState<EmployeeItem[]>([]);
+  const [loadingEmployees,   setLoadingEmployees]   = useState(false);
 
   useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
 
@@ -74,10 +69,10 @@ export function UpdateEmployeeClassificationPage() {
         ]);
         const map = (data: any[], idKey: string, codeKey: string, descKey: string): GroupItem[] =>
           (Array.isArray(data) ? data : []).map(i => ({ id: i[idKey] ?? i.ID ?? i.id ?? 0, code: i[codeKey] ?? i.code ?? '', description: i[descKey] ?? i.description ?? '' }));
-        setTKSGroupItems(map(tks.data,'ID','groupCode','groupDescription')); setBranchItems(map(bra.data,'braID','braCode','braDesc'));
-        setDepartmentItems(map(dep.data,'depID','depCode','depDesc'));       setDivisionItems(map(div.data,'divID','divCode','divDesc'));
-        setGroupScheduleItems(map(grp.data,'grpSchID','grpCode','grpDesc')); setPayHouseItems(map(pay.data,'lineID','lineCode','lineDesc'));
-        setSectionItems(map(sec.data,'secID','secCode','secDesc'));           setUnitItems(map(unit.data,'unitID','unitCode','unitDesc'));
+        setTKSGroupItems(map(tks.data, 'ID', 'groupCode', 'groupDescription')); setBranchItems(map(bra.data, 'braID', 'braCode', 'braDesc'));
+        setDepartmentItems(map(dep.data, 'depID', 'depCode', 'depDesc'));        setDivisionItems(map(div.data, 'divID', 'divCode', 'divDesc'));
+        setGroupScheduleItems(map(grp.data, 'grpSchID', 'grpCode', 'grpDesc')); setPayHouseItems(map(pay.data, 'lineID', 'lineCode', 'lineDesc'));
+        setSectionItems(map(sec.data, 'secID', 'secCode', 'secDesc'));           setUnitItems(map(unit.data, 'unitID', 'unitCode', 'unitDesc'));
       } catch (err) { console.error('Failed to load group lists:', err); }
     };
     load();
@@ -85,21 +80,31 @@ export function UpdateEmployeeClassificationPage() {
 
   const getCurrentData = useCallback((): GroupItem[] => {
     switch (activeTab) {
-      case 'Branch': return branchItems; case 'Department': return departmentItems;
-      case 'Division': return divisionItems; case 'Group Schedule': return groupScheduleItems;
-      case 'Pay House': return payHouseItems; case 'Section': return sectionItems;
-      case 'Unit': return unitItems; default: return tkGroupItems;
+      case 'Branch':         return branchItems;
+      case 'Department':     return departmentItems;
+      case 'Division':       return divisionItems;
+      case 'Group Schedule': return groupScheduleItems;
+      case 'Pay House':      return payHouseItems;
+      case 'Section':        return sectionItems;
+      case 'Unit':           return unitItems;
+      default:               return tkGroupItems;
     }
   }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems, groupScheduleItems, payHouseItems, sectionItems, unitItems]);
 
   const buildSpParams = useCallback((tab: TabName, selectedIds: number[], allItems: GroupItem[], status: 'active' | 'inactive' | 'all') => {
     const codes = allItems.filter(i => selectedIds.includes(i.id)).map(i => i.code).join(',');
     return {
-      Transaction: status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
-      GroupCodes: tab === 'TK Group' ? codes : '', Branches: tab === 'Branch' ? codes : '',
-      Divisions: tab === 'Division' ? codes : '', Departments: tab === 'Department' ? codes : '',
-      Sections: tab === 'Section' ? codes : '', Units: tab === 'Unit' ? codes : '',
-      Lines: '', Areas: '', Locations: '', GroupSchedules: tab === 'Group Schedule' ? codes : '',
+      Transaction:    status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
+      GroupCodes:     tab === 'TK Group'       ? codes : '',
+      Branches:       tab === 'Branch'         ? codes : '',
+      Divisions:      tab === 'Division'       ? codes : '',
+      Departments:    tab === 'Department'     ? codes : '',
+      Sections:       tab === 'Section'        ? codes : '',
+      Units:          tab === 'Unit'           ? codes : '',
+      Lines:          '',
+      Areas:          '',
+      Locations:      '',
+      GroupSchedules: tab === 'Group Schedule' ? codes : '',
     };
   }, []);
 
@@ -109,17 +114,20 @@ export function UpdateEmployeeClassificationPage() {
       if (selectedIds.length === 0) {
         const res = await apiClient.get('/Maintenance/EmployeeMasterFile');
         setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((item: any): EmployeeItem => ({
-          id: item.empID ?? item.ID ?? item.id ?? 0, code: item.empCode ?? item.code ?? '',
+          id:   item.empID ?? item.ID ?? item.id ?? 0,
+          code: item.empCode ?? item.code ?? '',
           name: `${item.lName ?? ''}, ${item.fName ?? ''} ${item.mName ?? ''}`.trim(),
         })));
       } else {
         const res = await apiClient.post('/Utilities/GetFilteredEmployees', buildSpParams(tab, selectedIds, allItems, status));
         setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((item: any): EmployeeItem => ({
-          id: item.empID ?? item.ID ?? item.id ?? 0, code: item.empCode ?? item.EmpCode ?? item.code ?? '',
+          id:   item.empID ?? item.ID ?? item.id ?? 0,
+          code: item.empCode ?? item.EmpCode ?? item.code ?? '',
           name: `${item.lName ?? item.LName ?? ''}, ${item.fName ?? item.FName ?? ''} ${item.mName ?? item.MName ?? ''}`.trim(),
         })));
       }
-    } catch { setEmployeeItems([]); } finally { setLoadingEmployees(false); }
+    } catch { setEmployeeItems([]); }
+    finally { setLoadingEmployees(false); }
   }, [buildSpParams]);
 
   useEffect(() => {
@@ -128,19 +136,15 @@ export function UpdateEmployeeClassificationPage() {
   }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
 
   const getSelectionTitle = () => {
-    switch (activeTab) {
-      case 'TK Group': return 'TK Group Selection';
-      case 'Branch': return 'Branch Selection';
-      case 'Department': return 'Department Selection';
-      case 'Division': return 'Division Selection';
-      case 'Group Schedule': return 'Group Schedule Selection';
-      case 'Pay House': return 'Pay House Selection';
-      case 'Section': return 'Section Selection';
-      case 'Unit': return 'Unit Selection';
-      default: return 'Selection';
-    }
-  }; 
-    
+    const titles: Record<TabName, string> = {
+      'TK Group': 'TK Group Selection', 'Branch': 'Branch Selection',
+      'Department': 'Department Selection', 'Division': 'Division Selection',
+      'Group Schedule': 'Group Schedule Selection', 'Pay House': 'Pay House Selection',
+      'Section': 'Section Selection', 'Unit': 'Unit Selection',
+    };
+    return titles[activeTab] ?? 'Selection';
+  };
+
   const currentItems    = getCurrentData();
   const filteredGroups  = currentItems.filter(i => i.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) || i.description.toLowerCase().includes(groupSearchTerm.toLowerCase()));
   const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
@@ -157,9 +161,9 @@ export function UpdateEmployeeClassificationPage() {
   const getPageNumbers = (current: number, total: number) => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: (number | string)[] = [];
-    if (current <= 4) { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(total); }
-    else if (current >= total - 3) { pages.push(1); pages.push('...'); for (let i = total - 4; i <= total; i++) pages.push(i); }
-    else { pages.push(1); pages.push('...'); for (let i = current - 1; i <= current + 1; i++) pages.push(i); pages.push('...'); pages.push(total); }
+    if (current <= 4)            { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(total); }
+    else if (current >= total-3) { pages.push(1); pages.push('...'); for (let i = total - 4; i <= total; i++) pages.push(i); }
+    else                         { pages.push(1); pages.push('...'); for (let i = current - 1; i <= current + 1; i++) pages.push(i); pages.push('...'); pages.push(total); }
     return pages;
   };
 
@@ -168,40 +172,96 @@ export function UpdateEmployeeClassificationPage() {
   const handleSelectAllGroups    = () => setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
-  const handleEmpClassSelect = (code: string, description: string) => { setEmpClass(code); setClassification(description); setShowEmpClassModal(false); };
+  // ── Updated: receives (code, description) from the new self-fetching modal ──
+  const handleEmpClassSelect = (code: string, description: string) => {
+    setClassification(code);
+  };
 
-  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); };
+  const resetForm = () => {
+    setSelectedGroupsMap({ ...EMPTY_SELECTION });
+    setSelectedEmployees([]);
+    setDateFrom('');
+    setDateTo('');
+  };
 
+  const toLocalISOString = (raw: string): string | null => {
+      if (!raw) return null;
+      const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (slashMatch) {
+        const [, month, day, year] = slashMatch;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+      }
+      const date = new Date(raw);
+      if (isNaN(date.getTime())) return null;
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}T00:00:00`;
+    };
+ 
   const handleUpdate = async () => {
-    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
-    if (classificationType === 'fixed' && !classification) { await showErrorModal('Classification should not be empty.'); return; }
-    if (classificationType === 'variable' && (!dateFrom || !dateTo)) { await showErrorModal('Please select Date From and Date To.'); return; }
-
+    if (!selectedEmployees.length) {
+      await showErrorModal('Please select employee/s to update.');
+      return;
+    }
+ 
+    if (!classification) {
+      await showErrorModal('Classification should not be empty.');
+      return;
+    }
+ 
+    if (classificationType === 'variable') {
+      if (!dateFrom) { await showErrorModal('Date From should not be empty.'); return; }
+      if (!dateTo)   { await showErrorModal('Date To should not be empty.'); return; }
+ 
+      const isoFrom = toLocalISOString(dateFrom);
+      const isoTo   = toLocalISOString(dateTo);
+      if (!isoFrom || !isoTo) { await showErrorModal('Invalid date format. Please re-select dates.'); return; }
+      if (isoTo < isoFrom)    { await showErrorModal('Date To cannot be earlier than Date From.'); return; }
+    }
+ 
     try {
       setIsUpdating(true);
-      const toISO = (d: string) => new Date(d).toISOString();
+ 
       const payload = {
         empCode:     selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
         classCode:   classification,
-        dateFrom:    dateFrom ? toISO(dateFrom) : '',
-        dateTo:      dateTo   ? toISO(dateTo)   : '',
+        dateFrom:    dateFrom ? toLocalISOString(dateFrom) : null,
+        dateTo:      dateTo   ? toLocalISOString(dateTo)   : null,
         classOption: classificationType,
       };
-
+ 
       if (classificationType === 'fixed') {
-        const res = await apiClient.post('/Utilities/UpdateEmployeeClassification_UpdateClassFixed', payload);
-        if (ApiService.isApiSuccess(res)) { await showSuccessModal('Successfully updated Employee Classification.'); resetForm(); }
+        // Fixed: single endpoint — UPSERT ClassCode per employee
+        const res = await apiClient.post(
+          '/Utilities/UpdateEmployeeClassification_UpdateClassFixed', payload
+        );
+        if (ApiService.isApiSuccess(res)) {
+          await showSuccessModal(res.data?.messages ?? 'Successfully updated Employee Classification.');
+          resetForm();
+        } else {
+          await showErrorModal(
+            res.data?.errors?.[0] ?? res.data?.messages ?? 'Failed to update Employee Classification.'
+          );
+        }
       } else {
-        const [res1, res2] = await Promise.all([
-          apiClient.post('/Utilities/UpdateEmployeeClassification_DeleteClassVariable', payload),
-          apiClient.post('/Utilities/UpdateEmployeeClassification_UpdateClassVariable', payload),
-        ]);
-        if (ApiService.isApiSuccess(res1) && ApiService.isApiSuccess(res2)) {
-          await showSuccessModal('Successfully updated Employee Workshift.'); resetForm();
+        const res = await apiClient.post(
+          '/Utilities/UpdateEmployeeClassification_UpdateClassVariable', payload
+        );
+        if (ApiService.isApiSuccess(res)) {
+          await showSuccessModal(res.data?.messages ?? 'Successfully updated Employee Classification.');
+          resetForm();
+        } else {
+          await showErrorModal(
+            res.data?.errors?.[0] ?? res.data?.messages ?? 'Failed to update Employee Classification.'
+          );
         }
       }
-    } catch { await showErrorModal('Failed to update records'); }
-    finally { setIsUpdating(false); }
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.messages ?? 'Failed to update records.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const renderPagination = (current: number, total: number, setPage: (p: number) => void, startIdx: number, endIdx: number, totalCount: number) => (
@@ -233,7 +293,7 @@ export function UpdateEmployeeClassificationPage() {
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-3">Update employee classification records. Choose between fixed or variable classification types and set effective date ranges.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    {['Fixed or variable classifications','Bulk update with date range','Filter by employee status','Select groups and employees'].map(t => (
+                    {['Fixed or variable classifications', 'Bulk update with date range', 'Filter by employee status', 'Select groups and employees'].map(t => (
                       <div key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /><span className="text-gray-600">{t}</span></div>
                     ))}
                   </div>
@@ -256,7 +316,7 @@ export function UpdateEmployeeClassificationPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                 
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm} onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
@@ -288,7 +348,7 @@ export function UpdateEmployeeClassificationPage() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-gray-900">Employees</h3>
                     <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
-                  </div>                    
+                  </div>
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input type="text" value={employeeSearchTerm} onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
@@ -315,7 +375,7 @@ export function UpdateEmployeeClassificationPage() {
                   </div>
                   {renderPagination(currentEmpPage, totalEmployeePages, setCurrentEmpPage, startEmpIndex, endEmpIndex, filteredEmployees.length)}
                   <div className="mt-4 flex items-center gap-6">
-                    {(['active','inactive','all'] as const).map(s => (
+                    {(['active', 'inactive', 'all'] as const).map(s => (
                       <label key={s} className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="statusFilter" value={s} checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                         <span className="text-sm text-gray-700">{s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}</span>
@@ -326,39 +386,86 @@ export function UpdateEmployeeClassificationPage() {
 
                 {/* Form */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4 flex-wrap">
+                  <div className="space-y-3">
+                    {/* Shared Classification — required for both fixed and variable */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="text-sm text-gray-700">Classification</label>
+                      <input
+                        type="text"
+                        readOnly
+                        placeholder="Select via search…"
+                        value={classification}
+                        className="px-3 py-2 border border-gray-300 bg-white rounded text-sm w-40 cursor-default"
+                      />
+                      <button
+                        onClick={() => setShowEmpClassModal(true)}
+                        className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <Search className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setClassification('')}
+                        className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Fixed row */}
+                    <div className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${classificationType === 'fixed' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="classificationType" value="fixed" checked={classificationType === 'fixed'} onChange={() => setClassificationType('fixed')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                        <span className="text-sm text-gray-700">Fixed</span>
+                        <input
+                          type="radio"
+                          name="classificationType"
+                          value="fixed"
+                          checked={classificationType === 'fixed'}
+                          onChange={() => { setClassificationType('fixed'); setDateFrom(''); setDateTo(''); }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 font-medium">Fixed</span>
                       </label>
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-700">Classification</label>
-                        <input type="text" readOnly value={classification}
-                          className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-40 bg-gray-50" />
-                        <button onClick={() => setShowEmpClassModal(true)} className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"><Search className="w-4 h-4" /></button>
-                        <button onClick={() => { setEmpClass(''); setClassification(''); }} className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"><X className="w-4 h-4" /></button>
-                      </div>
                     </div>
 
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="classificationType" value="variable" checked={classificationType === 'variable'} onChange={() => setClassificationType('variable')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                      <span className="text-sm text-gray-700">Variable</span>
-                    </label>
-
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-700">Date From</label>
-                        <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                        <CalendarPopover date={dateFrom} onChange={setDateFrom} />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-700">Date To</label>
-                        <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
-                        <CalendarPopover date={dateTo} onChange={setDateTo} />
-                      </div>
+                    {/* Variable row */}
+                    <div className={`flex flex-col gap-3 p-3 rounded-lg border transition-colors ${classificationType === 'variable' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="classificationType"
+                          value="variable"
+                          checked={classificationType === 'variable'}
+                          onChange={() => { setClassificationType('variable'); setDateFrom(''); setDateTo(''); }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 font-medium">Variable</span>
+                      </label>
+                      {classificationType === 'variable' && (
+                        <div className="flex items-center gap-4 flex-wrap pl-6">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm text-gray-700">Date From</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={dateFrom}
+                              placeholder="MM/DD/YYYY"
+                              className="px-3 py-2 border border-gray-300 bg-white rounded text-sm w-32 cursor-default"
+                            />
+                            <CalendarPopover date={dateFrom} onChange={setDateFrom} />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm text-gray-700">Date To</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={dateTo}
+                              placeholder="MM/DD/YYYY"
+                              className="px-3 py-2 border border-gray-300 bg-white rounded text-sm w-32 cursor-default"
+                            />
+                            <CalendarPopover date={dateTo} onChange={setDateTo} />
+                          </div>
+                        </div>
+                      )}
                     </div>
-
                     <div className="flex justify-end pt-4 border-t border-gray-200">
                       <button onClick={handleUpdate} disabled={isUpdating}
                         className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -373,9 +480,13 @@ export function UpdateEmployeeClassificationPage() {
         </div>
       </div>
       <Footer />
-      <EmpClassSearchModal isOpen={showEmpClassModal} onClose={() => setShowEmpClassModal(false)}
-        onSelect={handleEmpClassSelect} employeeClassItems={empClassItems}
-        loading={loadingEmpClassCodes} error={empClassError} />
+
+      {/* ── EmpClass Search Modal (self-fetching) ── */}
+      <EmpClassSearchModal
+        isOpen={showEmpClassModal}
+        onClose={() => setShowEmpClassModal(false)}
+        onSelect={handleEmpClassSelect}
+      />
     </div>
   );
 }

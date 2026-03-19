@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, Check, Save, RotateCcw, X, Search } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { EmployeeSearchModal } from './../Modals/EmployeeSearchModal';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
-import { toISO } from '../../services/utilityService';
 
 interface GroupItem {
   id: number;
@@ -19,6 +18,22 @@ interface EmployeeModalItem {
   groupCode: string;
 }
 
+// ── toLocalISOString (inline) — avoids UTC shift from new Date().toISOString() ──
+const toLocalISOString = (raw: string): string | null => {
+  if (!raw) return null;
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+  }
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T00:00:00`;
+};
+
 export function UpdateSssNotificationPage() {
   const [dateFrom,      setDateFrom]      = useState('');
   const [dateTo,        setDateTo]        = useState('');
@@ -29,9 +44,9 @@ export function UpdateSssNotificationPage() {
   const [isUpdating,    setIsUpdating]    = useState(false);
   const itemsPerPage = 10;
 
-  const [headCode,           setHeadCode]           = useState('');
-  const [head,               setHead]               = useState('');
-  const [showHeadCodeModal,  setShowHeadCodeModal]  = useState(false);
+  const [headCode,          setHeadCode]          = useState('');
+  const [head,              setHead]              = useState('');
+  const [showHeadCodeModal, setShowHeadCodeModal] = useState(false);
 
   const [tkGroupItems,     setTKSGroupItems]    = useState<GroupItem[]>([]);
   const [employeeData,     setEmployeeData]     = useState<EmployeeModalItem[]>([]);
@@ -84,6 +99,8 @@ export function UpdateSssNotificationPage() {
     .map(id => tkGroupItems.find(g => g.id === id)?.code ?? '')
     .filter(Boolean);
 
+  // Filter employees by selected TK groups — mirrors old MVC SearchEmployeeCode
+  // which joins on GroupCode from session["UpdateSSSNotifGroupCode"]
   const filteredEmployees = selectedGroupCodes.length > 0
     ? employeeData.filter(emp => selectedGroupCodes.includes(emp.groupCode))
     : employeeData;
@@ -115,55 +132,67 @@ export function UpdateSssNotificationPage() {
     return pages;
   };
 
-
   const resetForm = () => {
     setSelectedItems([]);
     setDateFrom('');
     setDateTo('');
+    setAppliedDate('');
+    setHeadCode('');
+    setHead('');
+  };
+
+  // ── Common validation — mirrors old MVC iFormValid ────────────────────────
+  const validate = async (requireAppliedDate: boolean): Promise<boolean> => {
+    if (!selectedItems.length)    { await showErrorModal('Please select Group.'); return false; }
+    if (!headCode)                { await showErrorModal('Please select employee.'); return false; }
+    if (!dateFrom || !dateTo)     { await showErrorModal('Please select Date From and Date To.'); return false; }
+    if (requireAppliedDate && !appliedDate) { await showErrorModal('Please select Applied Date.'); return false; }
+    return true;
   };
 
   const handleUpdate = async () => {
-    if (!selectedItems.length) { await showErrorModal('Please select TK Group item/s.'); return; }
-    if (!headCode)             { await showErrorModal('Please select an employee.'); return; }
-    if (!dateFrom || !dateTo)  { await showErrorModal('Please select Date From and Date To.'); return; }
-    if (!appliedDate)          { await showErrorModal('Please select Applied Date.'); return; }
+    if (!await validate(true)) return;
     try {
       setIsUpdating(true);
       const res = await apiClient.post('/Utilities/UpdateSSSNotification', {
-        DateFrom: toISO(dateFrom),
-        DateTo:   toISO(dateTo),
-        AppliedDate: toISO(appliedDate),
-        EmpCode:  headCode,
-        Mode:     'Update',
+        empCode:     headCode,
+        dateFrom:    toLocalISOString(dateFrom),
+        dateTo:      toLocalISOString(dateTo),
+        appliedDate: toLocalISOString(appliedDate),
+        mode:        'Update',
       });
       if (ApiService.isApiSuccess(res)) {
         await showSuccessModal('SSS Notification successfully updated.');
         resetForm();
+      } else {
+        await showErrorModal(res.data?.errors?.[0] ?? res.data?.messages ?? 'Failed to update records.');
       }
-    } catch {
-      await showErrorModal('Failed to update records.');
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.messages ?? 'Failed to update records.');
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleUnpost = async () => {
-    if (!selectedItems.length) { await showErrorModal('Please select TK Group item/s.'); return; }
-    if (!dateFrom || !dateTo)  { await showErrorModal('Please select Date From and Date To.'); return; }
+    // Unpost: AppliedDate not required — SP doesn't use it for Unpost mode
+    if (!await validate(false)) return;
     try {
       setIsUpdating(true);
       const res = await apiClient.post('/Utilities/UpdateSSSNotification', {
-        DateFrom: toISO(dateFrom),
-        DateTo:   toISO(dateTo),
-        EmpCode:  headCode,
-        Mode:     'Unpost',
+        empCode:  headCode,
+        dateFrom: toLocalISOString(dateFrom),
+        dateTo:   toLocalISOString(dateTo),
+        mode:     'Unpost',
       });
       if (ApiService.isApiSuccess(res)) {
         await showSuccessModal('SSS Notification successfully unposted.');
         resetForm();
+      } else {
+        await showErrorModal(res.data?.errors?.[0] ?? res.data?.messages ?? 'Failed to unpost records.');
       }
-    } catch {
-      await showErrorModal('Failed to unpost records.');
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.messages ?? 'Failed to unpost records.');
     } finally {
       setIsUpdating(false);
     }
@@ -236,8 +265,9 @@ export function UpdateSssNotificationPage() {
               {/* Left — TK Group list */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                 <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">TK Group Selection</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedItems.length} selected</span>
-                </div>                 
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <Search className="w-4 h-4 text-gray-500 flex-shrink-0" />
                   <input type="text" placeholder="Search..." value={searchTerm}
@@ -251,7 +281,11 @@ export function UpdateSssNotificationPage() {
                         <th className="px-4 py-2 text-left text-xs text-gray-600">
                           <input type="checkbox"
                             checked={paginatedItem.length > 0 && paginatedItem.every(i => selectedItems.includes(i.id))}
-                            onChange={e => setSelectedItems(e.target.checked ? paginatedItem.map(i => i.id) : [])}
+                            onChange={e => setSelectedItems(
+                              e.target.checked
+                                ? [...new Set([...selectedItems, ...paginatedItem.map(i => i.id)])]
+                                : selectedItems.filter(id => !paginatedItem.map(i => i.id).includes(id))
+                            )}
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                         </th>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
@@ -281,22 +315,24 @@ export function UpdateSssNotificationPage() {
 
               {/* Right — Date range + employee picker */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                <h2 className="text-sm font-medium text-gray-700 mb-4">Date Range and Processed Employee</h2>
+                <h3 className="text-gray-900 mb-4">Date Range and Processed Employee</h3>
                 <div className="space-y-4">
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm text-gray-700">From:</label>
+                      <label className="text-sm text-gray-700">Date From</label>
                       <div className="flex items-center gap-2">
-                        <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                        <input readOnly type="text" value={dateFrom}
+                          placeholder="MM/DD/YYYY"
                           className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-1" />
                         <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm text-gray-700">To:</label>
+                      <label className="text-sm text-gray-700">Date To</label>
                       <div className="flex items-center gap-2">
-                        <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                        <input readOnly type="text" value={dateTo}
+                          placeholder="MM/DD/YYYY"
                           className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-1" />
                         <CalendarPopover date={dateTo} onChange={setDateTo} />
                       </div>
@@ -304,10 +340,11 @@ export function UpdateSssNotificationPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-700 w-28 flex-shrink-0">Employee:</label>
+                    <label className="text-sm text-gray-700 w-28 flex-shrink-0">Employee</label>
                     <input type="text" readOnly
                       value={headCode && head ? `${headCode} - ${head}` : ''}
-                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-1 bg-gray-50" />
+                      placeholder="Select via search…"
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-1 bg-white" />
                     <button onClick={() => setShowHeadCodeModal(true)}
                       className="p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex-shrink-0">
                       <Search className="w-4 h-4" />
@@ -317,17 +354,14 @@ export function UpdateSssNotificationPage() {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
+
                   <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-700 w-24">Date Applied:</label>
-                    <input
-                      type="text"
-                      value={appliedDate}
-                      onChange={(e) => setAppliedDate(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-43"
-                    />
+                    <label className="text-sm text-gray-700 w-28 flex-shrink-0">Date Applied</label>
+                    <input readOnly type="text" value={appliedDate}
+                      placeholder="MM/DD/YYYY"
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-1" />
                     <CalendarPopover date={appliedDate} onChange={setAppliedDate} />
-                    
-                  </div>                  
+                  </div>
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                     <button onClick={handleUpdate} disabled={isUpdating}

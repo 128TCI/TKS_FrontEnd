@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useHref } from 'react-router-dom';
 import apiClient, { getLoggedInUsername } from '../services/apiClient';
 import auditTrail from '../services/auditTrail';
 import Swal from 'sweetalert2';
@@ -16,7 +16,11 @@ import { ROUTE_PERMISSIONS } from '../config/routePermissions';
 import { SystemInfo } from './Types/system';
 import { systemService } from '../services/systemService';
 
-const BASENAME = '/DEMO_128TIMEKEEP_NEO';
+// ── Basename-aware href hook ───────────────────────────────────────────────
+function useBasename(): string {
+  const root = useHref('/');
+  return root.endsWith('/') ? root.slice(0, -1) : root;
+}
 
 interface NavigationProps {
   onLogout: () => void;
@@ -40,27 +44,36 @@ interface SubMenuItem {
 }
 
 export function Navigation({ onLogout }: NavigationProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const basename  = useBasename();
 
-  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
-  const [hoveredSubmenu, setHoveredSubmenu] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [mobileExpandedSubmenus, setMobileExpandedSubmenus] = useState<Set<string>>(new Set());
-  const [mobileExpandedMainMenu, setMobileExpandedMainMenu] = useState<string | null>(null);
-  const [buttonPositions, setButtonPositions] = useState<{ [key: string]: { left: number; top: number; width: number } }>({});
+  // href helper — always in sync with BrowserRouter basename
+  const href = (path: string) => `${basename}${path}`;
+
+  const [systemInfo, setSystemInfo]   = useState<SystemInfo | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState(false);
+
+  const [expandedMenu, setExpandedMenu]                       = useState<string | null>(null);
+  const [hoveredSubmenu, setHoveredSubmenu]                   = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen]                   = useState(false);
+  const [showVersionTooltip, setShowVersionTooltip]           = useState(false);
+  const [navToast, setNavToast]                               = useState(false);
+  const [isLoggingOut, setIsLoggingOut]                       = useState(false);
+  const [mobileExpandedSubmenus, setMobileExpandedSubmenus]   = useState<Set<string>>(new Set());
+  const [mobileExpandedMainMenu, setMobileExpandedMainMenu]   = useState<string | null>(null);
+  const [buttonPositions, setButtonPositions]                 = useState<{ [key: string]: { left: number; top: number; width: number } }>({});
+  const [companyDisplayName, setCompanyDisplayName]           = useState('');
 
   const dropdownRef          = useRef<HTMLDivElement>(null);
   const closeTimeoutRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [companyDisplayName, setCompanyDisplayName] = useState('');
+  const fetchedRef           = useRef(false);
+
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
   const token = localStorage.getItem('token');
 
   const { canView } = usePermissions();
-
-  const href = (path: string) => `${BASENAME}${path}`;
 
   const canViewPath = (path?: string): boolean => {
     if (!path) return true;
@@ -115,7 +128,7 @@ export function Navigation({ onLogout }: NavigationProps) {
     setIsLoggingOut(true);
     try {
       const loginPayloadStr = localStorage.getItem('userData');
-      const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+      const loginPayload    = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
       const username = loginPayload.username || loginPayload.userName || 'Unknown';
       const userId   = loginPayload.userID   || loginPayload.userId   || loginPayload.id || 0;
       await apiClient.post('UserLogin/logout', { userId });
@@ -147,7 +160,7 @@ export function Navigation({ onLogout }: NavigationProps) {
     setIsLoggingOut(true);
     try {
       const loginPayloadStr = localStorage.getItem('userData');
-      const loginPayload = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
+      const loginPayload    = loginPayloadStr ? JSON.parse(loginPayloadStr) : {};
       const username = loginPayload.username || loginPayload.userName || 'Unknown';
       const userId   = loginPayload.userID   || loginPayload.userId   || loginPayload.id || 0;
       await apiClient.post('UserLogin/logout', { userId }, { headers: { Authorization: `Bearer ${token}` } });
@@ -177,14 +190,45 @@ export function Navigation({ onLogout }: NavigationProps) {
       try {
         const response = await apiClient.get('/Fs/System/CompanyInformation');
         const infoList = Array.isArray(response.data) ? response.data : [];
-        const name = infoList[0]?.companyName ?? '';
-        setCompanyDisplayName(name);
+        setCompanyDisplayName(infoList[0]?.companyName ?? '');
       } catch {
         setCompanyDisplayName('');
       }
     };
     fetchCompanyName();
   }, []);
+
+  const fetchSystemInfo = async () => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    setLoadingInfo(true);
+    try {
+      const data = await systemService.getSystemInfo();
+      setSystemInfo(data);
+    } catch {
+      fetchedRef.current = false;
+      setSystemInfo(null);
+    } finally {
+      setLoadingInfo(false);
+    }
+  };
+
+  // ── Copy build info to clipboard ──────────────────────────────────────────
+  const handleCopyBuildInfo = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!systemInfo) return;
+    const text = `${systemInfo.appVersion} ${systemInfo.buildDate}`;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    setNavToast(true);
+    setTimeout(() => setNavToast(false), 2500);
+  };
 
   // ── Menu definition ────────────────────────────────────────────────────────
   const menuItems: MenuItem[] = [
@@ -197,63 +241,63 @@ export function Navigation({ onLogout }: NavigationProps) {
         ]},
         { label: 'Process', isCategory: true, children: [
           { label: 'Allowance and Earnings', hasSubmenu: true, children: [
-            { label: 'Allowance Bracket Code Setup', path: '/file-setup/process/allowance-and-earnings/allowance-bracket-code-setup' },
-            { label: 'Allowance Bracketing Setup', path: '/file-setup/process/allowance-and-earnings/allowance-bracketing-setup' },
-            { label: 'Allowance per Classification Setup', path: '/file-setup/process/allowance-and-earnings/allowance-per-classification-setup' },
-            { label: 'Classification Setup', path: '/file-setup/process/allowance-and-earnings/classification-setup' },
-            { label: 'Earning Setup', path: '/file-setup/process/allowance-and-earnings/earning-setup' },
+            { label: 'Allowance Bracket Code Setup',           path: '/file-setup/process/allowance-and-earnings/allowance-bracket-code-setup' },
+            { label: 'Allowance Bracketing Setup',             path: '/file-setup/process/allowance-and-earnings/allowance-bracketing-setup' },
+            { label: 'Allowance per Classification Setup',     path: '/file-setup/process/allowance-and-earnings/allowance-per-classification-setup' },
+            { label: 'Classification Setup',                   path: '/file-setup/process/allowance-and-earnings/classification-setup' },
+            { label: 'Earning Setup',                          path: '/file-setup/process/allowance-and-earnings/earning-setup' },
           ]},
-          { label: 'Calendar Setup', path: '/file-setup/process/calendar-setup' },
-          { label: 'Day Type Setup', path: '/file-setup/process/day-type-setup' },
+          { label: 'Calendar Setup',                           path: '/file-setup/process/calendar-setup' },
+          { label: 'Day Type Setup',                           path: '/file-setup/process/day-type-setup' },
           { label: 'Device', hasSubmenu: true, children: [
-            { label: 'AMS Database Configuration Setup', path: '/file-setup/process/device/ams-database-configuration-setup' },
-            { label: 'Borrowed Device Name', path: '/file-setup/process/device/borrowed-device-name' },
-            { label: 'Coordinates Setup', path: '/file-setup/process/device/coordinates-setup' },
-            { label: 'Device Type Setup', path: '/file-setup/process/device/device-type-setup' },
-            { label: 'DTR Flag Setup', path: '/file-setup/process/device/dtr-flag-setup' },
-            { label: 'DTR Log Fields Setup', path: '/file-setup/process/device/dtr-log-fields-setup' },
-            { label: 'SDK List Setup', path: '/file-setup/process/device/sdk-list-setup' },
-            { label: 'MYSQL Database Configuration Setup', path: '/file-setup/process/device/mysql-database-configuration-setup' },
+            { label: 'AMS Database Configuration Setup',       path: '/file-setup/process/device/ams-database-configuration-setup' },
+            { label: 'Borrowed Device Name',                   path: '/file-setup/process/device/borrowed-device-name' },
+            { label: 'Coordinates Setup',                      path: '/file-setup/process/device/coordinates-setup' },
+            { label: 'Device Type Setup',                      path: '/file-setup/process/device/device-type-setup' },
+            { label: 'DTR Flag Setup',                         path: '/file-setup/process/device/dtr-flag-setup' },
+            { label: 'DTR Log Fields Setup',                   path: '/file-setup/process/device/dtr-log-fields-setup' },
+            { label: 'SDK List Setup',                         path: '/file-setup/process/device/sdk-list-setup' },
+            { label: 'MYSQL Database Configuration Setup',     path: '/file-setup/process/device/mysql-database-configuration-setup' },
           ]},
-          { label: 'Equivalent Hours Deduction Setup', path: '/file-setup/process/equivalent-hours-deduction-setup' },
-          { label: 'Group Schedule Setup', path: '/file-setup/process/group-schedule-setup' },
-          { label: 'Help Setup', path: '/file-setup/process/help-setup' },
-          { label: 'Leave Type Setup', path: '/file-setup/process/leave-type-setup' },
+          { label: 'Equivalent Hours Deduction Setup',         path: '/file-setup/process/equivalent-hours-deduction-setup' },
+          { label: 'Group Schedule Setup',                     path: '/file-setup/process/group-schedule-setup' },
+          { label: 'Help Setup',                               path: '/file-setup/process/help-setup' },
+          { label: 'Leave Type Setup',                         path: '/file-setup/process/leave-type-setup' },
           { label: 'Overtime', hasSubmenu: true, children: [
-            { label: 'Additional OT Hours Per Week', path: '/file-setup/process/overtime/additional-ot-hours-per-week' },
-            { label: 'Holiday OT Rates Setup', path: '/file-setup/process/overtime/holiday-ot-rates-setup' },
-            { label: 'Overtime Setup', path: '/file-setup/process/overtime/overtime-setup' },
-            { label: 'Regular Overtime Setup', path: '/file-setup/process/overtime/regular-overtime-setup' },
-            { label: 'RestDay Overtime Setup', path: '/file-setup/process/overtime/rest-day-overtime-setup' },
+            { label: 'Additional OT Hours Per Week',           path: '/file-setup/process/overtime/additional-ot-hours-per-week' },
+            { label: 'Holiday OT Rates Setup',                 path: '/file-setup/process/overtime/holiday-ot-rates-setup' },
+            { label: 'Overtime Setup',                         path: '/file-setup/process/overtime/overtime-setup' },
+            { label: 'Regular Overtime Setup',                 path: '/file-setup/process/overtime/regular-overtime-setup' },
+            { label: 'RestDay Overtime Setup',                 path: '/file-setup/process/overtime/rest-day-overtime-setup' },
           ]},
-          { label: 'Payroll Location Setup', path: '/file-setup/process/payroll-location-setup' },
-          { label: 'System Configuration Setup', path: '/file-setup/process/system-configuration-setup' },
+          { label: 'Payroll Location Setup',                   path: '/file-setup/process/payroll-location-setup' },
+          { label: 'System Configuration Setup',               path: '/file-setup/process/system-configuration-setup' },
           { label: 'Tardiness/Undertime/Accumulation Bracket', hasSubmenu: true, children: [
-            { label: 'Bracket Code Setup', path: '/file-setup/process/tardiness/bracket-code-setup' },
-            { label: 'Tardiness/Undertime/Accumulation Table Setup', path: '/file-setup/process/tardiness/tardiness-undertime-accumulation-table-setup' },
+            { label: 'Bracket Code Setup',                                        path: '/file-setup/process/tardiness/bracket-code-setup' },
+            { label: 'Tardiness/Undertime/Accumulation Table Setup',              path: '/file-setup/process/tardiness/tardiness-undertime-accumulation-table-setup' },
           ]},
-          { label: 'Timekeep Group Setup', path: '/file-setup/process/timekeep-group-setup' },
+          { label: 'Timekeep Group Setup',                     path: '/file-setup/process/timekeep-group-setup' },
           { label: 'Workshift and Restday', hasSubmenu: true, children: [
-            { label: 'Daily Schedule Setup', path: '/file-setup/process/workshift-and-restday/daily-schedule-setup' },
-            { label: 'Restday Setup', path: '/file-setup/process/workshift-and-restday/rest-day-setup' },
-            { label: 'Workshift Setup', path: '/file-setup/process/workshift-and-restday/workshift-setup' },
+            { label: 'Daily Schedule Setup',                   path: '/file-setup/process/workshift-and-restday/daily-schedule-setup' },
+            { label: 'Restday Setup',                          path: '/file-setup/process/workshift-and-restday/rest-day-setup' },
+            { label: 'Workshift Setup',                        path: '/file-setup/process/workshift-and-restday/workshift-setup' },
           ]},
-          { label: 'Unpaid Lunch Deduction Bracket Setup', path: '/file-setup/process/unpaid-lunch-deduction-bracket-setup' },
+          { label: 'Unpaid Lunch Deduction Bracket Setup',     path: '/file-setup/process/unpaid-lunch-deduction-bracket-setup' },
         ]},
         { label: 'Employment', isCategory: true, children: [
-          { label: 'Area Setup', path: '/file-setup/employment/area-setup' },
-          { label: 'Branch Setup', path: '/file-setup/employment/branch-setup' },
-          { label: 'Department Setup', path: '/file-setup/employment/department-setup' },
-          { label: 'Division Setup', path: '/file-setup/employment/division-setup' },
-          { label: 'Employee Designation Setup', path: '/file-setup/employment/employee-designation-setup' },
-          { label: 'Employee Status Setup', path: '/file-setup/employment/employee-status-setup' },
-          { label: 'Group Setup', path: '/file-setup/employment/group-setup' },
-          { label: 'Job Level Setup', path: '/file-setup/employment/job-level-setup' },
-          { label: 'Location Setup', path: '/file-setup/employment/location-setup' },
-          { label: 'Pay House Setup', path: '/file-setup/employment/pay-house-setup' },
-          { label: 'Online Approval Setup', path: '/file-setup/employment/online-approval-setup' },
-          { label: 'Section Setup', path: '/file-setup/employment/section-setup' },
-          { label: 'Unit Setup', path: '/file-setup/employment/unit-setup' },
+          { label: 'Area Setup',                   path: '/file-setup/employment/area-setup' },
+          { label: 'Branch Setup',                 path: '/file-setup/employment/branch-setup' },
+          { label: 'Department Setup',             path: '/file-setup/employment/department-setup' },
+          { label: 'Division Setup',               path: '/file-setup/employment/division-setup' },
+          { label: 'Employee Designation Setup',   path: '/file-setup/employment/employee-designation-setup' },
+          { label: 'Employee Status Setup',        path: '/file-setup/employment/employee-status-setup' },
+          { label: 'Group Setup',                  path: '/file-setup/employment/group-setup' },
+          { label: 'Job Level Setup',              path: '/file-setup/employment/job-level-setup' },
+          { label: 'Location Setup',               path: '/file-setup/employment/location-setup' },
+          { label: 'Pay House Setup',              path: '/file-setup/employment/pay-house-setup' },
+          { label: 'Online Approval Setup',        path: '/file-setup/employment/online-approval-setup' },
+          { label: 'Section Setup',                path: '/file-setup/employment/section-setup' },
+          { label: 'Unit Setup',                   path: '/file-setup/employment/unit-setup' },
         ]},
       ],
     },
@@ -261,25 +305,25 @@ export function Navigation({ onLogout }: NavigationProps) {
       id: 'maintenance', label: 'Maintenance', icon: Settings, path: '/maintenance',
       submenu: [
         { label: 'Employee Management', isCategory: true, children: [
-          { label: 'Employee Master File', path: '/maintenance/employee-master-file' },
-          { label: 'Employee Timekeep Configuration', path: '/maintenance/employee-timekeep-configuration' },
+          { label: 'Employee Master File',                path: '/maintenance/employee-master-file' },
+          { label: 'Employee Timekeep Configuration',     path: '/maintenance/employee-timekeep-configuration' },
           { separator: true },
-          { label: 'Rawdata', path: '/maintenance/raw-data' },
-          { label: 'Rawdata Ot Gap', path: '/maintenance/rawdata-ot-gap' },
-          { label: 'Rawdata On Straight Duty', path: '/maintenance/rawdata-on-straight-duty' },
+          { label: 'Rawdata',                             path: '/maintenance/raw-data' },
+          { label: 'Rawdata Ot Gap',                      path: '/maintenance/rawdata-ot-gap' },
+          { label: 'Rawdata On Straight Duty',            path: '/maintenance/rawdata-on-straight-duty' },
           { separator: true },
-          { label: 'Processed Data', path: '/maintenance/processed-data' },
+          { label: 'Processed Data',                      path: '/maintenance/processed-data' },
         ]},
         { label: '2 Shifts In A Day', isCategory: true, children: [
           { label: '2 Shifts In A Day - Employee Timekeep Configuration', path: '/maintenance/2-shifts/employee-timekeep-config' },
-          { label: '2 Shifts In A Day - Rawdata', path: '/maintenance/2-shifts/raw-data' },
+          { label: '2 Shifts In A Day - Rawdata',                         path: '/maintenance/2-shifts/raw-data' },
         ]},
       ],
     },
     {
       id: 'process', label: 'Process', icon: Play, path: '/process',
       submenu: [
-        { label: 'Process Data', path: '/process/process-data' },
+        { label: 'Process Data',                      path: '/process/process-data' },
         { label: 'Process 2 Shifts In A Day Payroll', path: '/process/process-2-shifts-payroll' },
       ],
     },
@@ -287,54 +331,54 @@ export function Navigation({ onLogout }: NavigationProps) {
       id: 'utilities', label: 'Utilities', icon: Wrench, path: '/utilities',
       submenu: [
         { isCategory: true, label: 'Utility On Employee Configuration', children: [
-          { label: 'Update Status', path: '/utilities/employee/update-status' },
-          { label: 'Update Employee Overtime Application', path: '/utilities/employee/update-overtime-application' },
-          { label: 'Update Employee Workshift', path: '/utilities/employee/update-workshift' },
-          { label: 'Update Employee Leave Application', path: '/utilities/employee/update-leave-application' },
-          { label: 'Update Employee Pay House', path: '/utilities/employee/update-pay-house' },
-          { label: 'Update Batch Restday', path: '/utilities/employee/update-batch-rest-day' },
-          { label: 'Update Employee Classification', path: '/utilities/employee/update-classification' },
-          { label: 'Delete Employee Transactions', path: '/utilities/employee/delete-transactions' },
-          { label: 'Update Rawdata Online', path: '/utilities/employee/update-rawdata-online' },
+          { label: 'Update Status',                          path: '/utilities/employee/update-status' },
+          { label: 'Update Employee Overtime Application',   path: '/utilities/employee/update-overtime-application' },
+          { label: 'Update Employee Workshift',              path: '/utilities/employee/update-workshift' },
+          { label: 'Update Employee Leave Application',      path: '/utilities/employee/update-leave-application' },
+          { label: 'Update Employee Pay House',              path: '/utilities/employee/update-pay-house' },
+          { label: 'Update Batch Restday',                   path: '/utilities/employee/update-batch-rest-day' },
+          { label: 'Update Employee Classification',         path: '/utilities/employee/update-classification' },
+          { label: 'Delete Employee Transactions',           path: '/utilities/employee/delete-transactions' },
+          { label: 'Update Rawdata Online',                  path: '/utilities/employee/update-rawdata-online' },
         ]},
         { isCategory: true, label: 'Utility On Rawdata', children: [
-          { label: 'Update Daytype In Rawdata', path: '/utilities/rawdata/update-daytype' },
+          { label: 'Update Daytype In Rawdata',  path: '/utilities/rawdata/update-daytype' },
           { label: 'Update Workshift In Rawdata', path: '/utilities/rawdata/update-workshift' },
-          { label: 'Delete Incomplete Logs', path: '/utilities/rawdata/delete-incomplete-logs' },
-          { label: 'Delete Rawdata', path: '/utilities/rawdata/delete-rawdata' },
+          { label: 'Delete Incomplete Logs',      path: '/utilities/rawdata/delete-incomplete-logs' },
+          { label: 'Delete Rawdata',              path: '/utilities/rawdata/delete-rawdata' },
         ]},
         { isCategory: true, label: 'Utility On Processed Data', children: [
-          { label: 'Unpost Transaction', path: '/utilities/processed/unpost-transaction' },
-          { label: 'Additional Hours Per Week', path: '/utilities/processed/additional-hours-per-week' },
-          { label: 'Apply Ot Allowance', path: '/utilities/processed/apply-ot-allowances' },
-          { label: 'Apply Break1 And Break3 Overbreak', path: '/utilities/processed/apply-break-overbreak' },
-          { label: 'Update Allowance Per Bracket', path: '/utilities/processed/update-allowance-per-bracket' },
-          { label: 'Update SSS Notification', path: '/utilities/processed/update-sss-notification' },
-          { label: 'Update No. Of Hours Per Week', path: '/utilities/processed/update-hours-per-week' },
-          { label: 'Update Tardiness Penalty', path: '/utilities/processed/update-tardiness-penalty' },
-          { label: 'Deduct Tardiness To Overtime Of The Day', path: '/utilities/processed/deduct-tardiness-to-overtime' },
-          { label: 'Delete Ot During Restday If Absent Or Incomplete In Previous Day', path: '/utilities/processed/delete-ot-restday-absent' },
-          { label: 'Process Overtime Per Cut-Off', path: '/utilities/processed/process-overtime-cutoff' },
-          { label: 'Update Assumed Days', path: '/utilities/processed/update-assumed-days' },
-          { label: 'Process Overtime 24 Hours Rule', path: '/utilities/processed/process-overtime-24hours' },
-          { label: 'Deduct Absences In Excess Of Total Hours With Pay If With Filed Leave', path: '/utilities/processed/deduct-absences-excess' },
-          { label: 'Post Processed Timekeeping Transactions', path: '/utilities/processed/post-processed-timekeeping' },
-          { label: 'Utility To Update The Time Flag Based On Set Policy Of Breaks', path: '/utilities/processed/update-time-flag-breaks' },
-          { label: 'Unpaid Lunch Deduction', path: '/utilities/processed/unpaid-lunch-deduction' },
-          { label: 'Update Flexi Break', path: '/utilities/processed/update-flexi-break' },
-          { label: 'Update GL Code Utility', path: '/utilities/processed/update-gl-code-utility' },
+          { label: 'Unpost Transaction',                                                             path: '/utilities/processed/unpost-transaction' },
+          { label: 'Additional Hours Per Week',                                                      path: '/utilities/processed/additional-hours-per-week' },
+          { label: 'Apply Ot Allowance',                                                             path: '/utilities/processed/apply-ot-allowances' },
+          { label: 'Apply Break1 And Break3 Overbreak',                                              path: '/utilities/processed/apply-break-overbreak' },
+          { label: 'Update Allowance Per Bracket',                                                   path: '/utilities/processed/update-allowance-per-bracket' },
+          { label: 'Update SSS Notification',                                                        path: '/utilities/processed/update-sss-notification' },
+          { label: 'Update No. Of Hours Per Week',                                                   path: '/utilities/processed/update-hours-per-week' },
+          { label: 'Update Tardiness Penalty',                                                       path: '/utilities/processed/update-tardiness-penalty' },
+          { label: 'Deduct Tardiness To Overtime Of The Day',                                        path: '/utilities/processed/deduct-tardiness-to-overtime' },
+          { label: 'Delete Ot During Restday If Absent Or Incomplete In Previous Day',               path: '/utilities/processed/delete-ot-restday-absent' },
+          { label: 'Process Overtime Per Cut-Off',                                                   path: '/utilities/processed/process-overtime-cutoff' },
+          { label: 'Update Assumed Days',                                                            path: '/utilities/processed/update-assumed-days' },
+          { label: 'Process Overtime 24 Hours Rule',                                                 path: '/utilities/processed/process-overtime-24hours' },
+          { label: 'Deduct Absences In Excess Of Total Hours With Pay If With Filed Leave',          path: '/utilities/processed/deduct-absences-excess' },
+          { label: 'Post Processed Timekeeping Transactions',                                        path: '/utilities/processed/post-processed-timekeeping' },
+          { label: 'Utility To Update The Time Flag Based On Set Policy Of Breaks',                 path: '/utilities/processed/update-time-flag-breaks' },
+          { label: 'Unpaid Lunch Deduction',                                                         path: '/utilities/processed/unpaid-lunch-deduction' },
+          { label: 'Update Flexi Break',                                                             path: '/utilities/processed/update-flexi-break' },
+          { label: 'Update GL Code Utility',                                                         path: '/utilities/processed/update-gl-code-utility' },
         ]},
         { isCategory: true, label: 'Utility On Reports', children: [
           { label: 'Timekeep Email Distribution', path: '/utilities/reports/timekeep-email-distribution' },
         ]},
         { isCategory: true, label: 'Utility On 2 Shifts In A Day', children: [
-          { label: 'Include Unworked Holiday Pay in the Regular Days/Hours', path: '/utilities/2-shifts/include-unworked-holiday-pay' },
-          { label: 'ND Basic Round Down', path: '/utilities/2-shifts/nd-basic-round-down' },
-          { label: 'Saturday Unworked Considered as Paid Regular Hours', path: '/utilities/2-shifts/saturday-unworked-paid-regular-hours' },
-          { label: 'Sunday Work Is Considered OT if Worked on Saturday', path: '/utilities/2-shifts/sunday-work-ot-if-worked-saturday' },
-          { label: 'Unpost 2 Shifts In A Day Transaction', path: '/utilities/2-shifts/unpost-transaction' },
-          { label: 'Delete Incomplete Logs 2 Shifts In A Day', path: '/utilities/2-shifts/delete-incomplete-logs' },
-          { label: 'Delete Records In Raw Data 2 Shifts In A Day', path: '/utilities/2-shifts/delete-records-raw-data' },
+          { label: 'Include Unworked Holiday Pay in the Regular Days/Hours',        path: '/utilities/2-shifts/include-unworked-holiday-pay' },
+          { label: 'ND Basic Round Down',                                            path: '/utilities/2-shifts/nd-basic-round-down' },
+          { label: 'Saturday Unworked Considered as Paid Regular Hours',             path: '/utilities/2-shifts/saturday-unworked-paid-regular-hours' },
+          { label: 'Sunday Work Is Considered OT if Worked on Saturday',             path: '/utilities/2-shifts/sunday-work-ot-if-worked-saturday' },
+          { label: 'Unpost 2 Shifts In A Day Transaction',                           path: '/utilities/2-shifts/unpost-transaction' },
+          { label: 'Delete Incomplete Logs 2 Shifts In A Day',                       path: '/utilities/2-shifts/delete-incomplete-logs' },
+          { label: 'Delete Records In Raw Data 2 Shifts In A Day',                   path: '/utilities/2-shifts/delete-records-raw-data' },
         ]},
       ],
     },
@@ -346,35 +390,35 @@ export function Navigation({ onLogout }: NavigationProps) {
       id: 'import', label: 'Import', icon: Upload, path: '/import',
       submenu: [
         { label: '1 shift in a Day', isCategory: true, children: [
-          { label: 'Import Workshift Variable', path: '/import/workshift-variable' },
-          { label: 'Import Leave Application', path: '/import/leave-application' },
-          { label: 'Import Overtime Application', path: '/import/overtime-application' },
-          { label: 'Import Device Code', path: '/import/device-code' },
-          { label: 'Import Employee Masterfile', path: '/import/employee-masterfile' },
-          { label: 'Import Logs From Device V2', path: '/import/logs-from-device-v2' },
-          { label: 'Update Raw Data', path: '/import/update-rawdata' },
-          { label: 'Import Adjustment', path: '/import/adjustment' },
+          { label: 'Import Workshift Variable',      path: '/import/workshift-variable' },
+          { label: 'Import Leave Application',       path: '/import/leave-application' },
+          { label: 'Import Overtime Application',    path: '/import/overtime-application' },
+          { label: 'Import Device Code',             path: '/import/device-code' },
+          { label: 'Import Employee Masterfile',     path: '/import/employee-masterfile' },
+          { label: 'Import Logs From Device V2',     path: '/import/logs-from-device-v2' },
+          { label: 'Update Raw Data',                path: '/import/update-rawdata' },
+          { label: 'Import Adjustment',              path: '/import/adjustment' },
         ]},
         { label: '2 Shift in a Day', isCategory: true, children: [
-          { label: 'Import Overtime Application', path: '/import/2-shifts/overtime-application' },
-          { label: 'Import Workshift Variable', path: '/import/2-shifts/workshift-variable' },
-          { label: 'Import Logs From Device V2', path: '/import/2-shifts/logs-from-device-v2' },
+          { label: 'Import Overtime Application',    path: '/import/2-shifts/overtime-application' },
+          { label: 'Import Workshift Variable',      path: '/import/2-shifts/workshift-variable' },
+          { label: 'Import Logs From Device V2',     path: '/import/2-shifts/logs-from-device-v2' },
         ]},
       ],
     },
     {
       id: 'export', label: 'Export', icon: Download, path: '/export',
       submenu: [
-        { label: 'Payroll Data', path: '/export/payroll-data' },
-        { label: 'Export NAV', path: '/export/nav' },
-        { label: 'Payroll DTR Allowance', path: '/export/payroll-dtr-allowance' },
+        { label: 'Payroll Data',            path: '/export/payroll-data' },
+        { label: 'Export NAV',              path: '/export/nav' },
+        { label: 'Payroll DTR Allowance',   path: '/export/payroll-dtr-allowance' },
       ],
     },
     {
       id: 'security', label: 'Security', icon: Shield, path: '/security',
       submenu: [
-        { label: 'Security Manager', path: '/security/security-manager' },
-        { label: 'Audit Trail', path: '/security/audit-trail' },
+        { label: 'Security Manager',    path: '/security/security-manager' },
+        { label: 'Audit Trail',         path: '/security/audit-trail' },
         { label: 'Email Configuration', path: '/security/email-configuration' },
         { label: 'Create New Database', path: '/security/create-new-database' },
       ],
@@ -434,7 +478,7 @@ export function Navigation({ onLogout }: NavigationProps) {
     setMobileExpandedSubmenus(next);
   };
 
-  const isMenuItemActive = (item: MenuItem): boolean =>
+  const isMenuItemActive  = (item: MenuItem): boolean =>
     location.pathname === item.path || location.pathname.startsWith(item.path + '/');
 
   const isSubItemActive = (path?: string): boolean =>
@@ -626,7 +670,7 @@ export function Navigation({ onLogout }: NavigationProps) {
   };
 
   const renderMobileSubmenuItem = (subItem: SubMenuItem, index: number, parentKey = 'mobile-submenu', depth = 0): React.ReactNode => {
-    const itemKey = `${parentKey}-${index}`;
+    const itemKey    = `${parentKey}-${index}`;
     const paddingLeft = `${(depth + 1) * 1}rem`;
     if (subItem.separator) return <div key={itemKey} className="my-1 border-t border-gray-300" />;
     if ((subItem.isCategory || subItem.hasSubmenu || subItem.children) && subItem.children) {
@@ -743,7 +787,41 @@ export function Navigation({ onLogout }: NavigationProps) {
               <User className="w-4 h-4 text-slate-200" />
               <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>
               <span className="text-green-300 text-xs">🔑</span>
-            </button>
+
+              {showVersionTooltip && (
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fadeIn min-w-[180px]">
+                  {loadingInfo ? (
+                    <div className="text-sm text-green-200">Loading...</div>
+                  ) : systemInfo ? (
+                    <button
+                      type="button"
+                      onClick={handleCopyBuildInfo}
+                      onMouseDown={e => e.preventDefault()}
+                      title="Click to copy build info"
+                      className="w-full text-left focus:outline-none group"
+                    >
+                      <div className="text-sm font-semibold tracking-wide group-hover:text-green-100 transition-colors">
+                        {systemInfo.appVersion} {systemInfo.buildDate}
+                      </div>
+                      <div className="text-xs text-green-200 mt-0.5">
+                        SQL {systemInfo.sqlVersion}
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="text-sm text-green-200">Unable to load</div>
+                  )}
+                  <div className="mt-2 pt-2 border-t border-green-500 text-xs text-green-200 text-center">
+                    Click to change password
+                  </div>
+                  <div className={`mt-2 text-center text-xs transition-all duration-300 ${
+                    navToast ? 'text-green-300 opacity-100' : 'opacity-0 h-0 mt-0 overflow-hidden'
+                  }`}>
+                    ✓ Build info copied
+                  </div>
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45" />
+                </div>
+              )}
+            </div>
 
             <button
               onClick={handleLogout}

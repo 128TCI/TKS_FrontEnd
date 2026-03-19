@@ -1,24 +1,34 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Trash2, Check, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 import { LeaveCodeSearchModal } from '../Modals/LeaveCodeSearchModal';
-import { Search, X } from 'lucide-react';
-import { toISO } from '../../services/utilityService';
+// toISO removed — date parsing handled by toLocalISOString below
 
-interface GroupItem { id: number; code: string; description: string; }
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface GroupItem    { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
-interface LeaveCode { leaveID: number; leaveCode: string; leaveDesc: string; }
+interface LeaveCode    { leaveID: number; leaveCode: string; leaveDesc: string; }
 
-type TabName = 'TK Group' | 'Branch' | 'Department' | 'Division' | 'Group Schedule' | 'Pay House' | 'Section' | 'Unit';
+type TabName =
+  | 'TK Group' | 'Branch'   | 'Department'    | 'Division'
+  | 'Group Schedule'         | 'Pay House'     | 'Section' | 'Unit';
+
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
-  { name: 'TK Group', icon: Users }, { name: 'Branch', icon: Building2 },
-  { name: 'Department', icon: Briefcase }, { name: 'Division', icon: Network },
-  { name: 'Group Schedule', icon: CalendarClock }, { name: 'Pay House', icon: Wallet },
-  { name: 'Section', icon: Grid }, { name: 'Unit', icon: Box },
+  { name: 'TK Group',       icon: Users        },
+  { name: 'Branch',         icon: Building2    },
+  { name: 'Department',     icon: Briefcase    },
+  { name: 'Division',       icon: Network      },
+  { name: 'Group Schedule', icon: CalendarClock },
+  { name: 'Pay House',      icon: Wallet       },
+  { name: 'Section',        icon: Grid         },
+  { name: 'Unit',           icon: Box          },
 ];
 
 const EMPTY_SELECTION: Record<TabName, number[]> = {
@@ -26,272 +36,537 @@ const EMPTY_SELECTION: Record<TabName, number[]> = {
   'Group Schedule': [], 'Pay House': [], 'Section': [], 'Unit': [],
 };
 
-const TRANSACTION_TYPES = ['Rest Day', 'Overtime', 'Leave', 'Workshift', 'All'];
+/**
+ * Transaction types shown in the dropdown.
+ * "All" is intentionally excluded — the SP has no branch for it.
+ *
+ * The `value` is what we send to the BE (human-readable label).
+ * The service layer maps these to the exact strings the SP expects:
+ *   "Rest Day"  → "RestDay"
+ *   "Overtime"  → "OvertimeApplication"
+ *   "Workshift" → "WorkShift"
+ *   "Leave"     → "LeaveApplication"
+ */
+const TRANSACTION_TYPES: { label: string; value: string }[] = [
+  { label: 'Rest Day',  value: 'Rest Day'  },
+  { label: 'Overtime',  value: 'Overtime'  },
+  { label: 'Leave',     value: 'Leave'     },
+  { label: 'Workshift', value: 'Workshift' },
+];
+
+const ITEMS_PER_PAGE = 10;
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+// ── Date parser ──────────────────────────────────────────────────────────────
+// Accepts "MM/DD/YYYY" (calendar picker output) or any string parseable by Date().
+// Always returns a local-time ISO string "YYYY-MM-DDTHH:MM:SS" so ASP.NET's
+// DateTime? binder receives an unambiguous value regardless of browser locale.
+const toLocalISOString = (raw: string): string | null => {
+  if (!raw) return null;
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+  }
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T00:00:00`;
+};
 
 export function DeleteEmployeeTransactionsPage() {
-  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
-  const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
-  const [dateFrom,           setDateFrom]           = useState('');
-  const [dateTo,             setDateTo]             = useState('');
-  const [transactionType,    setTransactionType]    = useState('Rest Day');
+  // — tab / filter state
+  const [activeTab,    setActiveTab]    = useState<TabName>('TK Group');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+
+  // — form fields
+  const [dateFrom,         setDateFrom]         = useState('');
+  const [dateTo,           setDateTo]           = useState('');
+  const [transactionType,  setTransactionType]  = useState<string>('Rest Day');
+  const [leaveCode,        setLeaveCode]        = useState('');
+
+  // — search inputs
   const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  const [isUpdating,         setIsUpdating]         = useState(false);
-  const [leaveCode,          setLeaveCode]          = useState('');
-  const [leaveCodeItems,     setLeaveCodeItems]     = useState<LeaveCode[]>([]);
-  const [loadingLeaveCodes,  setLoadingLeaveCodes]  = useState(false);
-  const [leaveCodeError,     setLeaveCodeError]     = useState('');
+
+  // — UI state
+  const [isDeleting,         setIsDeleting]         = useState(false);
   const [showLeaveCodeModal, setShowLeaveCodeModal] = useState(false);
-  const itemsPerPage = 10;
 
+  // — leave codes (for modal)
+  const [leaveCodeItems,    setLeaveCodeItems]    = useState<LeaveCode[]>([]);
+  const [loadingLeaveCodes, setLoadingLeaveCodes] = useState(false);
+  const [leaveCodeError,    setLeaveCodeError]    = useState('');
+
+  // — group data per tab
+  const [tkGroupItems,       setTKGroupItems]       = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [divisionItems,      setDivisionItems]      = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
+  const [unitItems,          setUnitItems]          = useState<GroupItem[]>([]);
+
+  // — employee data
+  const [employeeItems,    setEmployeeItems]    = useState<EmployeeItem[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+
+  // — selections
   const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
-  const selectedGroups = selectedGroupsMap[activeTab] ?? [];
-  const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) =>
-    setSelectedGroupsMap(prev => ({ ...prev, [activeTab]: typeof updater === 'function' ? updater(prev[activeTab]) : updater }));
-
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
-  const [currentGroupPage,  setCurrentGroupPage]  = useState(1);
-  const [currentEmpPage,    setCurrentEmpPage]    = useState(1);
 
-  const [tkGroupItems,        setTKSGroupItems]      = useState<GroupItem[]>([]);
-  const [branchItems,         setBranchItems]        = useState<GroupItem[]>([]);
-  const [departmentItems,     setDepartmentItems]    = useState<GroupItem[]>([]);
-  const [divisionItems,       setDivisionItems]      = useState<GroupItem[]>([]);
-  const [groupScheduleItems,  setGroupScheduleItems] = useState<GroupItem[]>([]);
-  const [payHouseItems,       setPayHouseItems]      = useState<GroupItem[]>([]);
-  const [sectionItems,        setSectionItems]       = useState<GroupItem[]>([]);
-  const [unitItems,           setUnitItems]          = useState<GroupItem[]>([]);
-  const [employeeItems,       setEmployeeItems]      = useState<EmployeeItem[]>([]);
-  const [loadingEmployees,    setLoadingEmployees]   = useState(false);
+  // — pagination
+  const [currentGroupPage, setCurrentGroupPage] = useState(1);
+  const [currentEmpPage,   setCurrentEmpPage]   = useState(1);
 
-  useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
+  // ── Derived: per-tab groups & selection ───────────────────────────────────
+
+  const selectedGroups    = selectedGroupsMap[activeTab] ?? [];
+  const setSelectedGroups = (updater: number[] | ((prev: number[]) => number[])) =>
+    setSelectedGroupsMap(prev => ({
+      ...prev,
+      [activeTab]: typeof updater === 'function' ? updater(prev[activeTab]) : updater,
+    }));
+
+  const getCurrentData = useCallback((): GroupItem[] => {
+    switch (activeTab) {
+      case 'Branch':         return branchItems;
+      case 'Department':     return departmentItems;
+      case 'Division':       return divisionItems;
+      case 'Group Schedule': return groupScheduleItems;
+      case 'Pay House':      return payHouseItems;
+      case 'Section':        return sectionItems;
+      case 'Unit':           return unitItems;
+      default:               return tkGroupItems;
+    }
+  }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems,
+      groupScheduleItems, payHouseItems, sectionItems, unitItems]);
+
+  // ── Load all group lists once ──────────────────────────────────────────────
 
   useEffect(() => {
     const load = async () => {
       try {
         const [tks, bra, dep, div, grp, pay, sec, unit] = await Promise.all([
-          apiClient.get('/Fs/Process/TimeKeepGroupSetUp'), apiClient.get('/Fs/Employment/BranchSetUp'),
-          apiClient.get('/Fs/Employment/DepartmentSetUp'), apiClient.get('/Fs/Employment/DivisionSetUp'),
-          apiClient.get('/Fs/Employment/GroupSetUp'),      apiClient.get('/Fs/Employment/PayHouseSetUp'),
-          apiClient.get('/Fs/Employment/SectionSetUp'),    apiClient.get('/Fs/Employment/UnitSetUp'),
+          apiClient.get('/Fs/Process/TimeKeepGroupSetUp'),
+          apiClient.get('/Fs/Employment/BranchSetUp'),
+          apiClient.get('/Fs/Employment/DepartmentSetUp'),
+          apiClient.get('/Fs/Employment/DivisionSetUp'),
+          apiClient.get('/Fs/Employment/GroupSetUp'),
+          apiClient.get('/Fs/Employment/PayHouseSetUp'),
+          apiClient.get('/Fs/Employment/SectionSetUp'),
+          apiClient.get('/Fs/Employment/UnitSetUp'),
         ]);
         const map = (data: any[], idKey: string, codeKey: string, descKey: string): GroupItem[] =>
-          (Array.isArray(data) ? data : []).map(i => ({ id: i[idKey] ?? i.ID ?? i.id ?? 0, code: i[codeKey] ?? i.code ?? '', description: i[descKey] ?? i.description ?? '' }));
-        setTKSGroupItems(map(tks.data,'ID','groupCode','groupDescription'));
-        setBranchItems(map(bra.data,'braID','braCode','braDesc'));
-        setDepartmentItems(map(dep.data,'depID','depCode','depDesc'));
-        setDivisionItems(map(div.data,'divID','divCode','divDesc'));
-        setGroupScheduleItems(map(grp.data,'grpSchID','grpCode','grpDesc'));
-        setPayHouseItems(map(pay.data,'lineID','lineCode','lineDesc'));
-        setSectionItems(map(sec.data,'secID','secCode','secDesc'));
-        setUnitItems(map(unit.data,'unitID','unitCode','unitDesc'));
-      } catch (err) { console.error('Failed to load group lists:', err); }
+          (Array.isArray(data) ? data : []).map(i => ({
+            id:          i[idKey]   ?? i.ID   ?? i.id   ?? 0,
+            code:        i[codeKey] ?? i.code ?? '',
+            description: i[descKey] ?? i.description ?? '',
+          }));
+        setTKGroupItems      (map(tks.data,  'ID',       'groupCode', 'groupDescription'));
+        setBranchItems       (map(bra.data,  'braID',    'braCode',   'braDesc'));
+        setDepartmentItems   (map(dep.data,  'depID',    'depCode',   'depDesc'));
+        setDivisionItems     (map(div.data,  'divID',    'divCode',   'divDesc'));
+        setGroupScheduleItems(map(grp.data,  'grpSchID', 'grpCode',   'grpDesc'));
+        setPayHouseItems     (map(pay.data,  'lineID',   'lineCode',  'lineDesc'));
+        setSectionItems      (map(sec.data,  'secID',    'secCode',   'secDesc'));
+        setUnitItems         (map(unit.data, 'unitID',   'unitCode',  'unitDesc'));
+      } catch (err) {
+        console.error('Failed to load group lists:', err);
+      }
     };
     load();
   }, []);
 
-  const getCurrentData = useCallback((): GroupItem[] => {
-    switch (activeTab) {
-      case 'Branch': return branchItems; case 'Department': return departmentItems;
-      case 'Division': return divisionItems; case 'Group Schedule': return groupScheduleItems;
-      case 'Pay House': return payHouseItems; case 'Section': return sectionItems;
-      case 'Unit': return unitItems; default: return tkGroupItems;
-    }
-  }, [activeTab, tkGroupItems, branchItems, departmentItems, divisionItems, groupScheduleItems, payHouseItems, sectionItems, unitItems]);
-
-  const buildSpParams = useCallback((tab: TabName, selectedIds: number[], allItems: GroupItem[], status: 'active' | 'inactive' | 'all') => {
-    const codes = allItems.filter(i => selectedIds.includes(i.id)).map(i => i.code).join(',');
-    return {
-      Transaction: status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
-      GroupCodes: tab === 'TK Group' ? codes : '', Branches: tab === 'Branch' ? codes : '',
-      Divisions: tab === 'Division' ? codes : '', Departments: tab === 'Department' ? codes : '',
-      Sections: tab === 'Section' ? codes : '', Units: tab === 'Unit' ? codes : '',
-      Lines: '', Areas: '', Locations: '', GroupSchedules: tab === 'Group Schedule' ? codes : '',
-    };
-  }, []);
-
-  const fetchFilteredEmployees = useCallback(async (tab: TabName, selectedIds: number[], allItems: GroupItem[], status: 'active' | 'inactive' | 'all') => {
-    setLoadingEmployees(true); setCurrentEmpPage(1);
-    try {
-      if (selectedIds.length === 0) {
-        const res = await apiClient.get('/Maintenance/EmployeeMasterFile');
-        setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((item: any): EmployeeItem => ({
-          id: item.empID ?? item.ID ?? item.id ?? 0, code: item.empCode ?? item.code ?? '',
-          name: `${item.lName ?? ''}, ${item.fName ?? ''} ${item.mName ?? ''}`.trim(),
-        })));
-      } else {
-        const res = await apiClient.post('/Utilities/GetFilteredEmployees', buildSpParams(tab, selectedIds, allItems, status));
-        setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((item: any): EmployeeItem => ({
-          id: item.empID ?? item.ID ?? item.id ?? 0, code: item.empCode ?? item.EmpCode ?? item.code ?? '',
-          name: `${item.lName ?? item.LName ?? ''}, ${item.fName ?? item.FName ?? ''} ${item.mName ?? item.MName ?? ''}`.trim(),
-        })));
-      }
-    } catch { setEmployeeItems([]); } finally { setLoadingEmployees(false); }
-  }, [buildSpParams]);
+  // ── Load leave codes ───────────────────────────────────────────────────────
 
   useEffect(() => {
-    fetchFilteredEmployees(activeTab, selectedGroups, getCurrentData(), statusFilter);
-    setSelectedEmployees([]);
-  }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
-
-  // Fetch leave codes — same API as UpdateEmployeeLeaveApplicationPage
-  useEffect(() => {
-    const loadLeaveCodes = async () => {
+    const load = async () => {
       setLoadingLeaveCodes(true);
       setLeaveCodeError('');
       try {
-        const response = await apiClient.get('/Fs/Process/LeaveTypeSetUp');
-        const list = Array.isArray(response.data) ? response.data : [];
-        setLeaveCodeItems(list.map((item: any): LeaveCode => ({
-          leaveID:   item.leaveID   ?? item.ID  ?? 0,
-          leaveCode: item.leaveCode ?? item.code ?? '',
-          leaveDesc: item.leaveDesc ?? item.description ?? '',
-        })));
+        const res = await apiClient.get('/Fs/Process/LeaveTypeSetUp');
+        setLeaveCodeItems(
+          (Array.isArray(res.data) ? res.data : []).map((item: any): LeaveCode => ({
+            leaveID:   item.leaveID   ?? item.ID   ?? 0,
+            leaveCode: item.leaveCode ?? item.code ?? '',
+            leaveDesc: item.leaveDesc ?? item.description ?? '',
+          }))
+        );
       } catch (err: any) {
         setLeaveCodeError(err?.response?.data?.message ?? 'Failed to load leave codes.');
       } finally {
         setLoadingLeaveCodes(false);
       }
     };
-    loadLeaveCodes();
+    load();
   }, []);
 
-  const getSelectionTitle = () => {
-    switch (activeTab) {
-      case 'TK Group': return 'TK Group Selection';
-      case 'Branch': return 'Branch Selection';
-      case 'Department': return 'Department Selection';
-      case 'Division': return 'Division Selection';
-      case 'Group Schedule': return 'Group Schedule Selection';
-      case 'Pay House': return 'Pay House Selection';
-      case 'Section': return 'Section Selection';
-      case 'Unit': return 'Unit Selection';
-      default: return 'Selection';
+  // ── Build SP filter params ─────────────────────────────────────────────────
+
+  const buildSpParams = useCallback((
+    tab: TabName,
+    selectedIds: number[],
+    allItems: GroupItem[],
+    status: 'active' | 'inactive' | 'all'
+  ) => {
+    const codes = allItems
+      .filter(i => selectedIds.includes(i.id))
+      .map(i => i.code)
+      .join(',');
+    return {
+      Transaction:    status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
+      GroupCodes:     tab === 'TK Group'        ? codes : '',
+      Branches:       tab === 'Branch'          ? codes : '',
+      Divisions:      tab === 'Division'        ? codes : '',
+      Departments:    tab === 'Department'      ? codes : '',
+      Sections:       tab === 'Section'         ? codes : '',
+      Units:          tab === 'Unit'            ? codes : '',
+      Lines:          '',
+      Areas:          '',
+      Locations:      '',
+      GroupSchedules: tab === 'Group Schedule'  ? codes : '',
+    };
+  }, []);
+
+  // ── Fetch filtered employees ───────────────────────────────────────────────
+
+  const fetchFilteredEmployees = useCallback(async (
+    tab: TabName,
+    selectedIds: number[],
+    allItems: GroupItem[],
+    status: 'active' | 'inactive' | 'all'
+  ) => {
+    setLoadingEmployees(true);
+    setCurrentEmpPage(1);
+    try {
+      if (selectedIds.length === 0) {
+        const res = await apiClient.get('/Maintenance/EmployeeMasterFile');
+        setEmployeeItems(
+          (Array.isArray(res.data) ? res.data : []).map((item: any): EmployeeItem => ({
+            id:   item.empID ?? item.ID ?? item.id ?? 0,
+            code: item.empCode ?? item.code ?? '',
+            name: `${item.lName ?? ''}, ${item.fName ?? ''} ${item.mName ?? ''}`.trim(),
+          }))
+        );
+      } else {
+        const res = await apiClient.post(
+          '/Utilities/GetFilteredEmployees',
+          buildSpParams(tab, selectedIds, allItems, status)
+        );
+        setEmployeeItems(
+          (Array.isArray(res.data) ? res.data : []).map((item: any): EmployeeItem => ({
+            id:   item.empID  ?? item.ID  ?? item.id  ?? 0,
+            code: item.empCode ?? item.EmpCode ?? item.code ?? '',
+            name: `${item.lName ?? item.LName ?? ''}, ${item.fName ?? item.FName ?? ''} ${item.mName ?? item.MName ?? ''}`.trim(),
+          }))
+        );
+      }
+    } catch {
+      setEmployeeItems([]);
+    } finally {
+      setLoadingEmployees(false);
     }
-  }; 
+  }, [buildSpParams]);
 
-  const currentItems    = getCurrentData();
-  const filteredGroups  = currentItems.filter(i => i.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) || i.description.toLowerCase().includes(groupSearchTerm.toLowerCase()));
-  const totalGroupPages = Math.ceil(filteredGroups.length / itemsPerPage);
-  const startGroupIndex = (currentGroupPage - 1) * itemsPerPage;
-  const paginatedGroups = filteredGroups.slice(startGroupIndex, startGroupIndex + itemsPerPage);
+  // Re-fetch employees whenever tab / group selection / status changes
+  useEffect(() => {
+    fetchFilteredEmployees(activeTab, selectedGroups, getCurrentData(), statusFilter);
+    setSelectedEmployees([]);
+  }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
 
-  const filteredEmployees  = employeeItems.filter(e => e.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()));
-  const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
-  const startEmpIndex      = (currentEmpPage - 1) * itemsPerPage;
-  const paginatedEmployees = filteredEmployees.slice(startEmpIndex, startEmpIndex + itemsPerPage);
+  // Reset group page on tab change
+  useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
 
-  const getPageNumbers = (current: number, total: number) => {
+  // Clear leave code when switching away from Leave type
+  useEffect(() => {
+    if (transactionType !== 'Leave') setLeaveCode('');
+  }, [transactionType]);
+
+  // ── Pagination helpers ─────────────────────────────────────────────────────
+
+  const getPageNumbers = (current: number, total: number): (number | string)[] => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: (number | string)[] = [];
-    if (current <= 4) { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(total); }
-    else if (current >= total - 3) { pages.push(1); pages.push('...'); for (let i = total - 4; i <= total; i++) pages.push(i); }
-    else { pages.push(1); pages.push('...'); for (let i = current - 1; i <= current + 1; i++) pages.push(i); pages.push('...'); pages.push(total); }
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...'); pages.push(total);
+    } else if (current >= total - 3) {
+      pages.push(1); pages.push('...');
+      for (let i = total - 4; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1); pages.push('...');
+      for (let i = current - 1; i <= current + 1; i++) pages.push(i);
+      pages.push('...'); pages.push(total);
+    }
     return pages;
   };
 
-  const handleGroupToggle        = (id: number) => setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  const handleEmployeeToggle     = (id: number) => setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  const handleSelectAllGroups    = () => setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
-  const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
+  const renderPagination = (
+    current: number, total: number,
+    setPage: (p: number) => void,
+    startIdx: number, totalCount: number
+  ) => (
+    <div className="flex items-center justify-between mt-3">
+      <span className="text-xs text-gray-500">
+        Showing {totalCount === 0 ? 0 : startIdx + 1} to{' '}
+        {Math.min(startIdx + ITEMS_PER_PAGE, totalCount)} of {totalCount} entries
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setPage(Math.max(1, current - 1))}
+          disabled={current === 1}
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+        >Previous</button>
+        {getPageNumbers(current, total).map((page, idx) =>
+          page === '...'
+            ? <span key={`e-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+            : <button
+                key={page}
+                onClick={() => setPage(page as number)}
+                className={`px-2 py-1 rounded text-xs ${
+                  current === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'
+                }`}
+              >{page}</button>
+        )}
+        <button
+          onClick={() => setPage(Math.min(total, current + 1))}
+          disabled={current === total || total === 0}
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+        >Next</button>
+      </div>
+    </div>
+  );
 
-  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); setLeaveCode(''); };
+  // ── Selection handlers ─────────────────────────────────────────────────────
 
-  const handleLeaveCodeSelect = (code: string) => {
-    setLeaveCode(code);
-    setShowLeaveCodeModal(false);
+  const handleGroupToggle        = (id: number) =>
+    setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleEmployeeToggle     = (id: number) =>
+    setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleSelectAllGroups    = () =>
+    setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
+  const handleSelectAllEmployees = () =>
+    setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+
+  const resetForm = () => {
+    setSelectedGroupsMap({ ...EMPTY_SELECTION });
+    setSelectedEmployees([]);
+    setDateFrom('');
+    setDateTo('');
+    setLeaveCode('');
+    setTransactionType('Rest Day');
   };
 
+  // ── Delete handler ─────────────────────────────────────────────────────────
+  //
+  // Payload mirrors DeleteEmployeeTransactionRequestDto:
+  //   mode            → always "Delete" (service validates internally)
+  //   transactionType → FE human-readable label; service maps to SP value
+  //   dateFrom        → ISO datetime string
+  //   dateTo          → ISO datetime string
+  //   leaveCode       → only sent when transactionType === "Leave"
+  //   empCodes        → array of employee code strings
+
   const handleDelete = async () => {
-    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
-    if (!dateFrom || !dateTo)      { await showErrorModal('Please select Date From and Date To.'); return; }
+    if (!selectedEmployees.length) {
+      await showErrorModal('Please select employee/s to delete.');
+      return;
+    }
+    if (!dateFrom || !dateTo) {
+      await showErrorModal('Please select Date From and Date To.');
+      return;
+    }
 
     const confirmed = await ApiService.showDeleteConfirmDialog();
     if (!confirmed) return;
 
     try {
-      setIsUpdating(true);
+      setIsDeleting(true);
+
+      const parsedDateFrom = toLocalISOString(dateFrom);
+      const parsedDateTo   = toLocalISOString(dateTo);
+
+      if (!parsedDateFrom || !parsedDateTo) {
+        await showErrorModal('Invalid date format. Please re-select Date From and Date To.');
+        return;
+      }
+
       const payload = {
-        mode:      'Delete',
-        transType: transactionType,
-        dateFrom:  toISO(dateFrom),
-        dateTo:    toISO(dateTo),
-        leavecode: transactionType === 'Leave' ? leaveCode : '',
-        empCode:   selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        mode:            'Delete',
+        transactionType: transactionType,
+        dateFrom:        parsedDateFrom,
+        dateTo:          parsedDateTo,
+        leaveCode:       transactionType === 'Leave' ? leaveCode : '',
+        empCodes:        selectedEmployees.map(
+                           id => employeeItems.find(e => e.id === id)?.code ?? String(id)
+                         ),
       };
+
       const res = await apiClient.post('/Utilities/DeleteEmployeeTransactions', payload);
-      if (ApiService.isApiSuccess(res)) { await showSuccessModal('Employee transactions deleted successfully.'); resetForm(); }
-    } catch { await showErrorModal('Failed to delete employee transaction'); }
-    finally { setIsUpdating(false); }
+
+      if (ApiService.isApiSuccess(res)) {
+        const isPartial: boolean = res.data?.partial === true;
+
+        if (isPartial) {
+          // Some employees were deleted, some were skipped because their
+          // period was already processed. Show as a warning so the user
+          // knows to review the skipped codes listed in the message.
+          await showSuccessModal(res.data?.message ?? 'Partial deletion completed.');
+        } else {
+          await showSuccessModal(res.data?.message ?? 'Employee transactions deleted successfully.');
+        }
+
+        resetForm();
+      } else {
+        // BE returned 2xx but success=false (all employees blocked)
+        await showErrorModal(res.data?.message ?? 'Failed to delete employee transactions.');
+      }
+    } catch (err: any) {
+      // Axios throws for 4xx/5xx — read the actual BE message from the response body.
+      const beMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.Message;
+
+      await showErrorModal(beMessage ?? 'Failed to delete employee transactions.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const renderPagination = (current: number, total: number, setPage: (p: number) => void, startIdx: number, totalCount: number) => (
-    <div className="flex items-center justify-between mt-3">
-      <span className="text-xs text-gray-500">Showing {totalCount === 0 ? 0 : startIdx + 1} to {Math.min(startIdx + itemsPerPage, totalCount)} of {totalCount} entries</span>
-      <div className="flex items-center gap-1">
-        <button onClick={() => setPage(Math.max(1, current - 1))} disabled={current === 1} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-        {getPageNumbers(current, total).map((page, idx) =>
-          page === '...' ? <span key={`e-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-          : <button key={page} onClick={() => setPage(page as number)} className={`px-2 py-1 rounded text-xs ${current === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>{page}</button>
-        )}
-        <button onClick={() => setPage(Math.min(total, current + 1))} disabled={current === total || total === 0} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-      </div>
-    </div>
+  // ── Filtered / paginated data ──────────────────────────────────────────────
+
+  const currentItems    = getCurrentData();
+  const filteredGroups  = currentItems.filter(i =>
+    i.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
+    i.description.toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
+  const totalGroupPages = Math.ceil(filteredGroups.length / ITEMS_PER_PAGE);
+  const startGroupIndex = (currentGroupPage - 1) * ITEMS_PER_PAGE;
+  const paginatedGroups = filteredGroups.slice(startGroupIndex, startGroupIndex + ITEMS_PER_PAGE);
+
+  const filteredEmployees  = employeeItems.filter(e =>
+    e.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    e.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+  const totalEmployeePages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
+  const startEmpIndex      = (currentEmpPage - 1) * ITEMS_PER_PAGE;
+  const paginatedEmployees = filteredEmployees.slice(startEmpIndex, startEmpIndex + ITEMS_PER_PAGE);
+
+  const getSelectionTitle = () => `${activeTab} Selection`;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
+
+          {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Delete Employee Transactions</h1>
           </div>
+
           <div className="bg-white rounded-b-lg shadow-lg p-6">
 
+            {/* Info banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center"><Trash2 className="w-5 h-5 text-white" /></div>
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-white" />
+                </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-700 mb-3">Delete specific employee transactions by type within a given date range. Select a transaction type and confirm before proceeding.</p>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Delete specific employee transactions by type within a given date range.
+                    Select a transaction type and confirm before proceeding.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    {['Select transaction type to delete','Specify date range','Filter by employee status','Confirm deletion before processing'].map(t => (
-                      <div key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /><span className="text-gray-600">{t}</span></div>
+                    {[
+                      'Select transaction type to delete',
+                      'Specify date range',
+                      'Filter by employee status',
+                      'Confirm deletion before processing',
+                    ].map(t => (
+                      <div key={t} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">{t}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Tabs */}
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
               {TABS.map(tab => (
-                <button key={tab.name} onClick={() => setActiveTab(tab.name)}
-                  className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg transition-colors ${activeTab === tab.name ? 'font-medium bg-blue-600 text-white -mb-px' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                <button
+                  key={tab.name}
+                  onClick={() => setActiveTab(tab.name)}
+                  className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg transition-colors ${
+                    activeTab === tab.name
+                      ? 'font-medium bg-blue-600 text-white -mb-px'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
                   <tab.icon className="w-4 h-4" />{tab.name}
                 </button>
               ))}
             </div>
 
+            {/* Main grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* ── Group selection panel ── */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
-                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                 
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">
+                    {selectedGroups.length} selected
+                  </span>
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
-                  <input type="text" value={groupSearchTerm} onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                  <input
+                    type="text"
+                    value={groupSearchTerm}
+                    onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full">
-                    <thead className="bg-gray-100 border-b border-gray-200"><tr>
-                      <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={handleSelectAllGroups} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></th>
-                      <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
-                      <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
-                    </tr></thead>
+                    <thead className="bg-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0}
+                            onChange={handleSelectAllGroups}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
+                      </tr>
+                    </thead>
                     <tbody className="divide-y divide-gray-100">
                       {paginatedGroups.map(item => (
                         <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2"><input type="checkbox" checked={selectedGroups.includes(item.id)} onChange={() => handleGroupToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedGroups.includes(item.id)}
+                              onChange={() => handleGroupToggle(item.id)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                          </td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
                         </tr>
@@ -302,70 +577,114 @@ export function DeleteEmployeeTransactionsPage() {
                 {renderPagination(currentGroupPage, totalGroupPages, setCurrentGroupPage, startGroupIndex, filteredGroups.length)}
               </div>
 
+              {/* ── Right column ── */}
               <div className="space-y-6">
+
+                {/* Employee selection panel */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-gray-900">Employees</h3>
-                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
-                  </div>                    
+                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">
+                      {selectedEmployees.length} selected
+                    </span>
+                  </div>
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
-                    <input type="text" value={employeeSearchTerm} onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    <input
+                      type="text"
+                      value={employeeSearchTerm}
+                      onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
                   </div>
                   <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full">
-                      <thead className="bg-gray-100 border-b border-gray-200"><tr>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0} onChange={handleSelectAllEmployees} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></th>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
-                      </tr></thead>
+                      <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs text-gray-600">
+                            <input
+                              type="checkbox"
+                              checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
+                              onChange={handleSelectAllEmployees}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
+                          <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
+                        </tr>
+                      </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {loadingEmployees ? (<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td></tr>)
-                        : paginatedEmployees.length === 0 ? (<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td></tr>)
-                        : paginatedEmployees.map(item => (
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2"><input type="checkbox" checked={selectedEmployees.includes(item.id)} onChange={() => handleEmployeeToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></td>
-                            <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
-                          </tr>
-                        ))}
+                        {loadingEmployees
+                          ? <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td></tr>
+                          : paginatedEmployees.length === 0
+                            ? <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td></tr>
+                            : paginatedEmployees.map(item => (
+                                <tr key={item.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedEmployees.includes(item.id)}
+                                      onChange={() => handleEmployeeToggle(item.id)}
+                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
+                                  <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
+                                </tr>
+                              ))
+                        }
                       </tbody>
                     </table>
                   </div>
                   {renderPagination(currentEmpPage, totalEmployeePages, setCurrentEmpPage, startEmpIndex, filteredEmployees.length)}
+
+                  {/* Status filter */}
                   <div className="mt-4 flex items-center gap-6">
-                    {(['active','inactive','all'] as const).map(s => (
+                    {(['active', 'inactive', 'all'] as const).map(s => (
                       <label key={s} className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="statusFilter" value={s} checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                        <span className="text-sm text-gray-700">{s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}</span>
+                        <input
+                          type="radio"
+                          name="statusFilter"
+                          value={s}
+                          checked={statusFilter === s}
+                          onChange={() => setStatusFilter(s)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}
+                        </span>
                       </label>
                     ))}
                   </div>
                 </div>
 
+                {/* Transaction options panel */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
-                  {/* Transaction type */}
+
+                  {/* Transaction Type */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-700 w-32">Transaction Type:</label>
                     <select
                       value={transactionType}
-                      onChange={e => { setTransactionType(e.target.value); setLeaveCode(''); }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                      {TRANSACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      onChange={e => setTransactionType(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      {TRANSACTION_TYPES.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
                     </select>
                   </div>
 
-                  {/* Leave Code — only shown when Transaction Type is "Leave" */}
+                  {/* Leave Code — only when Leave is selected */}
                   {transactionType === 'Leave' && (
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700 w-32">Leave Code:</label>
                       <input
                         type="text"
                         value={leaveCode}
-                        onChange={e => setLeaveCode(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        placeholder="Select leave code..."
                         readOnly
+                        placeholder="Select leave code…"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
                       <button
                         onClick={() => setShowLeaveCodeModal(true)}
@@ -383,20 +702,40 @@ export function DeleteEmployeeTransactionsPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* Date From */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-700 w-20">Date From:</label>
-                    <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                    <input
+                      type="text"
+                      value={dateFrom}
+                      onChange={e => setDateFrom(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
+                    />
                     <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                   </div>
+
+                  {/* Date To */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-700 w-20">Date To:</label>
-                    <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                    <input
+                      type="text"
+                      value={dateTo}
+                      onChange={e => setDateTo(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"
+                    />
                     <CalendarPopover date={dateTo} onChange={setDateTo} />
                   </div>
+
+                  {/* Delete button */}
                   <div className="flex justify-end pt-4 border-t border-gray-200">
-                    <button onClick={handleDelete} disabled={isUpdating}
-                      className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                      <Trash2 className="w-4 h-4" />{isUpdating ? 'Deleting…' : 'Delete'}
+                    <button
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {isDeleting ? 'Deleting…' : 'Delete'}
                     </button>
                   </div>
                 </div>
@@ -405,12 +744,14 @@ export function DeleteEmployeeTransactionsPage() {
           </div>
         </div>
       </div>
+
       <Footer />
 
+      {/* Leave Code Search Modal */}
       <LeaveCodeSearchModal
         isOpen={showLeaveCodeModal}
         onClose={() => setShowLeaveCodeModal(false)}
-        onSelect={handleLeaveCodeSelect}
+        onSelect={(code: string) => { setLeaveCode(code); setShowLeaveCodeModal(false); }}
         leaveCodeItems={leaveCodeItems}
         loading={loadingLeaveCodes}
         error={leaveCodeError}

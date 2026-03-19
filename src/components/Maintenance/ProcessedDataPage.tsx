@@ -251,8 +251,8 @@ const fetchEmployees = async () => {
         setNoOfHoursError('');
     };
 
-    // ──  NO OF HRS PER DAY ───────────────────────────────────────────────────
-    interface NoOfHoursRecord {
+   // ──  NO OF HRS PER DAY ───────────────────────────────────────────────────
+interface NoOfHoursRecord {
     id: number;
     empCode: string;
     workshiftCode: string;
@@ -262,96 +262,96 @@ const fetchEmployees = async () => {
     groupCode?: string;
     glCode?: string;
 }
-    const [noOfHoursData,    setNoOfHoursData]    = useState<NoOfHoursRecord[]>([]);
-    const [noOfHoursLoading, setNoOfHoursLoading] = useState(false);
-    const [noOfHoursError,   setNoOfHoursError]   = useState<string>('');
-    const [showNoOfHoursModal, setShowNoOfHoursModal] = useState(false);
+const [noOfHoursData,    setNoOfHoursData]    = useState<NoOfHoursRecord[]>([]);
+const [noOfHoursLoading, setNoOfHoursLoading] = useState(false);
+const [noOfHoursError,   setNoOfHoursError]   = useState<string>('');
+const [showNoOfHoursModal, setShowNoOfHoursModal] = useState(false);
 
-    // Modal form fields
-    const [noOfHoursEmpCode,      setNoOfHoursEmpCode]      = useState('');
-    const [noOfHoursWorkshiftCode, setNoOfHoursWorkshiftCode] = useState('');
-    const [noOfHoursDateIn,       setNoOfHoursDateIn]       = useState('');
-    const [noOfHoursDateOut,      setNoOfHoursDateOut]      = useState('');
-    const [noOfHoursNoOfHours,    setNoOfHoursNoOfHours]    = useState('');
-    const [noOfHoursGroupCode,     setNoOfHoursGroupCode]     = useState('');
+// Modal form fields
+const [noOfHoursEmpCode,       setNoOfHoursEmpCode]       = useState('');
+const [noOfHoursWorkshiftCode, setNoOfHoursWorkshiftCode] = useState('');
+const [noOfHoursDateIn,        setNoOfHoursDateIn]        = useState('');
+const [noOfHoursDateOut,       setNoOfHoursDateOut]       = useState('');
+const [noOfHoursNoOfHours,     setNoOfHoursNoOfHours]     = useState('');
+const [noOfHoursGroupCode,     setNoOfHoursGroupCode]     = useState('');
 
-    // ── Fetch ─────────────────────────────────────────────────────────────────
-    const fetchNoOfHours = useCallback(async () => {
-        if (!employeeCode) return;
-        setNoOfHoursLoading(true);
-        setNoOfHoursError('');
+// ── Fetch ─────────────────────────────────────────────────────────────────
+const fetchNoOfHours = useCallback(async () => {
+    if (!employeeCode) return;
+    setNoOfHoursLoading(true);
+    setNoOfHoursError('');
 
-        const parsedFrom = parseDate(dateFrom);
-        const parsedTo   = parseDate(dateTo);
+    const parsedFrom = parseDate(dateFrom);
+    const parsedTo   = parseDate(dateTo);
 
-        if (!parsedFrom || !parsedTo) {
-            setNoOfHoursError('Invalid date range. Please check Date From and Date To.');
-            setNoOfHoursLoading(false);
-            return;
+    if (!parsedFrom || !parsedTo) {
+        setNoOfHoursError('Invalid date range. Please check Date From and Date To.');
+        setNoOfHoursLoading(false);
+        return;
+    }
+
+    try {
+        const response = await apiClient.get(
+            '/Maintenance/ProcessedData/PDNumberHoursPerDay',
+            { params: {
+                empCode:  employeeCode,
+                dateFrom: parsedFrom,
+                dateTo:   parsedTo,
+                start:    (noOfHoursPage - 1) * PAGE_SIZE,
+                length:   PAGE_SIZE,
+            }}
+        );
+        if (response.status === 200 && response.data) {
+            const rows  = response.data.data ?? response.data;
+            const total = response.data.totalCount ?? 0;
+            setNoOfHoursTotalCount(total);
+            const records: NoOfHoursRecord[] = rows.map((r: any) => ({
+                id:            r.id            ?? 0,
+                empCode:       r.empCode       ?? '',
+                workshiftCode: r.workShiftCode ?? '',
+                dateIn:        formatDateTime(r.dateIn),
+                dateOut:       formatDateTime(r.dateOut),
+                noOfHours:     r.noOfHoursHHMM ?? r.noOfHours ?? '',
+                groupCode:     r.groupCode     ?? '',
+                glCode:        r.glCode        ?? '',
+            }));
+            setNoOfHoursData(records);
         }
+    } catch (error: any) {
+        setNoOfHoursError(error.response?.data?.message || error.message || 'Failed to load No Of Hours data');
+    } finally {
+        setNoOfHoursLoading(false);
+    }
+}, [employeeCode, dateFrom, dateTo, noOfHoursPage]);
 
-        try {
-            const response = await apiClient.get(
-                '/Maintenance/ProcessedData/PDNumberHoursPerDay',
-                { params: {
-                    empCode:   employeeCode,
-                    dateFrom:  parsedFrom,
-                    dateTo:    parsedTo,
-                    start:     (noOfHoursPage - 1) * PAGE_SIZE, 
-                    length:    PAGE_SIZE,
-                }}
-            );
-            if (response.status === 200 && response.data) {
-                const rows = response.data.data ?? response.data;
-                const total = response.data.totalCount ?? 0;             // ← capture total
-                setNoOfHoursTotalCount(total);
-                const records: NoOfHoursRecord[] = rows.map((r: any) => ({
-                    id:            r.id            ?? 0,
-                    empCode:       r.empCode       ?? '',
-                    workshiftCode: r.workShiftCode ?? '',
-                    dateIn:        formatDateTime(r.dateIn),
-                    dateOut:       formatDateTime(r.dateOut),
-                    noOfHours:     r.noOfHoursHHMM ?? r.noOfHours ?? '',
-                    groupCode:     r.groupCode     ?? '',
-                    glCode:        r.glCode        ?? '',
-                }));
-                setNoOfHoursData(records);
-            }
-        } catch (error: any) {
-            setNoOfHoursError(error.response?.data?.message || error.message || 'Failed to load No Of Hours data');
-        } finally {
-            setNoOfHoursLoading(false);
-        }
-    }, [employeeCode, dateFrom, dateTo, noOfHoursPage]); 
+// ── Create ────────────────────────────────────────────────────────────────
+const handleOpenCreateNoOfHours = () => {
+    setIsEditMode(false);
+    setEditingIndex(null);
+    setNoOfHoursEmpCode(employeeCode);
+    setNoOfHoursWorkshiftCode('');
+    setNoOfHoursDateIn('');
+    setNoOfHoursDateOut('');
+    setNoOfHoursNoOfHours('');
+    setNoOfHoursGroupCode(employeeGroupCode);
+    setShowNoOfHoursModal(true);
+};
 
-    // ── Create ────────────────────────────────────────────────────────────────
-    const handleOpenCreateNoOfHours = () => {
-        setIsEditMode(false);
-        setEditingIndex(null);
-        setNoOfHoursEmpCode(employeeCode);
-        setNoOfHoursWorkshiftCode('');
-        setNoOfHoursDateIn('');
-        setNoOfHoursDateOut('');
-        setNoOfHoursNoOfHours('');
-        setNoOfHoursGroupCode(employeeGroupCode);
-        setShowNoOfHoursModal(true);
-    };
+// ── Edit ──────────────────────────────────────────────────────────────────
+const handleEditNoOfHours = (index: number) => {
+    const record = noOfHoursData[index];
+    setIsEditMode(true);
+    setEditingIndex(index);
+    setNoOfHoursEmpCode(record.empCode);
+    setNoOfHoursWorkshiftCode(record.workshiftCode);
+    setNoOfHoursDateIn(record.dateIn);
+    setNoOfHoursDateOut(record.dateOut);
+    setNoOfHoursNoOfHours(record.noOfHours);
+    setNoOfHoursGroupCode(record.groupCode ?? '');
+    setShowNoOfHoursModal(true);
+};
 
-    // ── Edit ──────────────────────────────────────────────────────────────────
-    const handleEditNoOfHours = (index: number) => {
-        const record = noOfHoursData[index];
-        setIsEditMode(true);
-        setEditingIndex(index);
-        setNoOfHoursEmpCode(record.empCode);
-        setNoOfHoursWorkshiftCode(record.workshiftCode);
-        setNoOfHoursDateIn(record.dateIn);
-        setNoOfHoursDateOut(record.dateOut);
-        setNoOfHoursNoOfHours(record.noOfHours);
-        setNoOfHoursGroupCode(record.groupCode ?? '');        
-        setShowNoOfHoursModal(true);
-    };
-
-    // ── Submit (create / update) ──────────────────────────────────────────────
+// ── Submit (create / update) ──────────────────────────────────────────────
 const handleNoOfHoursSubmit = async () => {
 
     const parsedDateIn  = parseToISO(noOfHoursDateIn);
@@ -359,9 +359,9 @@ const handleNoOfHoursSubmit = async () => {
 
     if (!parsedDateIn || !parsedDateOut) {
         await Swal.fire({
-            icon: 'error',
+            icon:  'error',
             title: 'Invalid Date',
-            text: 'Invalid Date In or Date Out. Please use MM/DD/YYYY HH:MM AM format.'
+            text:  'Invalid Date In or Date Out. Please use MM/DD/YYYY HH:MM AM format.'
         });
         return;
     }
@@ -396,18 +396,29 @@ const handleNoOfHoursSubmit = async () => {
 
     const parsedNoOfHours = noOfHoursNoOfHours ? parseFloat(noOfHoursNoOfHours) : null;
 
-    const payload = {
-        empCode:       noOfHoursEmpCode,
-        workshiftCode: noOfHoursWorkshiftCode || null,
+    // ✅ Fix 1 & 2: separate payloads for create vs update
+    const createPayload = {
+        empCode:       noOfHoursEmpCode,          // only needed for POST
+        workShiftCode: noOfHoursWorkshiftCode || null, // ✅ was: workshiftCode
         dateIn:        parsedDateIn,
         dateOut:       parsedDateOut,
         noOfHours:     parsedNoOfHours,
         noOfHoursHHMM: parsedNoOfHours,
         groupCode:     noOfHoursGroupCode || null,
-        glCode:        null,
+        glCode:        null,                      // intentional — not yet attainable
     };
 
-    const recordLabel = `${formatDateTime(payload.dateIn)} → ${formatDateTime(payload.dateOut)}`;
+    const updatePayload = {
+        // empCode intentionally excluded — BE fetches it from DB
+        workShiftCode: noOfHoursWorkshiftCode || null, // ✅ was: workshiftCode
+        dateIn:        parsedDateIn,
+        dateOut:       parsedDateOut,
+        noOfHours:     parsedNoOfHours,
+        noOfHoursHHMM: parsedNoOfHours,
+        groupCode:     noOfHoursGroupCode || null,
+    };
+
+    const recordLabel = `${formatDateTime(parsedDateIn)} → ${formatDateTime(parsedDateOut)}`;
 
     try {
         if (isEditMode && editingIndex !== null) {
@@ -423,56 +434,56 @@ const handleNoOfHoursSubmit = async () => {
             }
 
             const confirm = await Swal.fire({
-                icon: 'question',
-                title: 'Confirm Update',
-                text: `Are you sure you want to update the record for ${recordLabel}?`,
-                showCancelButton: true,
+                icon:               'question',
+                title:              'Confirm Update',
+                text:               `Are you sure you want to update the record for ${recordLabel}?`,
+                showCancelButton:   true,
                 confirmButtonColor: '#2563eb',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'Cancel'
+                cancelButtonColor:  '#6b7280',
+                confirmButtonText:  'Yes',
+                cancelButtonText:   'Cancel'
             });
             if (!confirm.isConfirmed) return;
 
             const id = noOfHoursData[editingIndex].id;
-            await apiClient.put(`/Maintenance/ProcessedData/PDNumberHoursPerDay/${id}`, payload);
+            await apiClient.put(`/Maintenance/ProcessedData/PDNumberHoursPerDay/${id}`, updatePayload); // ✅ updatePayload
             await auditTrail.log({
                 accessType: 'Edit',
-                trans: `Updated record for ${recordLabel}`,
-                messages: `${formName} update record: ${recordLabel}`,
-                formName: formName,
+                trans:      `Updated record for ${recordLabel}`,
+                messages:   `${formName} update record: ${recordLabel}`,
+                formName:   formName,
             });
             await Swal.fire({
-                icon: 'success',
-                title: 'Updated successfully',
-                text: `Record for ${recordLabel} updated.`,
-                timer: 1500,
+                icon:              'success',
+                title:             'Updated successfully',
+                text:              `Record for ${recordLabel} updated.`,
+                timer:             1500,
                 showConfirmButton: false
             });
 
         } else {
 
-            await apiClient.post('/Maintenance/ProcessedData/PDNumberHoursPerDay', payload);
+            await apiClient.post('/Maintenance/ProcessedData/PDNumberHoursPerDay', createPayload); // ✅ createPayload
             await auditTrail.log({
                 accessType: 'Add',
-                trans: `Created new record for ${recordLabel}`,
-                messages: `${formName} new record: ${recordLabel}`,
-                formName: formName,
+                trans:      `Created new record for ${recordLabel}`,
+                messages:   `${formName} new record: ${recordLabel}`,
+                formName:   formName,
             });
             await Swal.fire({
-                icon: 'success',
-                title: 'Created successfully',
-                text: `Record for ${recordLabel} created.`,
-                timer: 1500,
+                icon:              'success',
+                title:             'Created successfully',
+                text:              `Record for ${recordLabel} created.`,
+                timer:             1500,
                 showConfirmButton: false
             });
         }
         await fetchNoOfHours();
     } catch (err: any) {
         await Swal.fire({
-            icon: 'error',
+            icon:  'error',
             title: 'Error',
-            text: err.response?.data?.message || err.message || 'Failed to save record'
+            text:  err.response?.data?.message || err.message || 'Failed to save record'
         });
     } finally {
         setShowNoOfHoursModal(false);
@@ -481,8 +492,8 @@ const handleNoOfHoursSubmit = async () => {
     }
 };
 
-    // ── Delete ────────────────────────────────────────────────────────────────
-  const handleDeleteNoOfHours = async (index: number) => {
+// ── Delete ────────────────────────────────────────────────────────────────
+const handleDeleteNoOfHours = async (index: number) => {
 
     // Null check
     if (!noOfHoursData[index]) {
@@ -494,18 +505,18 @@ const handleNoOfHoursSubmit = async () => {
         return;
     }
 
-    const record = noOfHoursData[index];
+    const record      = noOfHoursData[index];
     const recordLabel = `${record.dateIn} → ${record.dateOut}`;
 
     const confirm = await Swal.fire({
-        icon: 'warning',
-        title: 'Confirm Delete',
-        text: `Are you sure you want to delete the record for ${recordLabel}?`,
-        showCancelButton: true,
+        icon:               'warning',
+        title:              'Confirm Delete',
+        text:               `Are you sure you want to delete the record for ${recordLabel}?`,
+        showCancelButton:   true,
         confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel'
+        cancelButtonColor:  '#6b7280',
+        confirmButtonText:  'Delete',
+        cancelButtonText:   'Cancel'
     });
     if (!confirm.isConfirmed) return;
 
@@ -513,23 +524,23 @@ const handleNoOfHoursSubmit = async () => {
         await apiClient.delete(`/Maintenance/ProcessedData/PDNumberHoursPerDay/${record.id}`);
         await auditTrail.log({
             accessType: 'Delete',
-            trans: `Deleted record for ${recordLabel}`,
-            messages: `${formName} deleted: ${recordLabel}`,
-            formName: formName,
+            trans:      `Deleted record for ${recordLabel}`,
+            messages:   `${formName} deleted: ${recordLabel}`,
+            formName:   formName,
         });
         await fetchNoOfHours();
         await Swal.fire({
-            icon: 'success',
-            title: 'Deleted successfully',
-            text: `Record for ${recordLabel} deleted.`,
-            timer: 1500,
+            icon:              'success',
+            title:             'Deleted successfully',
+            text:              `Record for ${recordLabel} deleted.`,
+            timer:             1500,
             showConfirmButton: false
         });
     } catch (err: any) {
         await Swal.fire({
-            icon: 'error',
+            icon:  'error',
             title: 'Error',
-            text: err.response?.data?.message || err.message || 'Failed to delete record'
+            text:  err.response?.data?.message || err.message || 'Failed to delete record'
         });
     }
 };
@@ -822,7 +833,6 @@ const handleDeleteTardiness = async (index: number) => {
 };
 
     // ──  UNDERTIME ───────────────────────────────────────────────────────────
-    // ── Types ─────────────────────────────────────────────────────────────────
     interface UndertimeRecord {
         id:                              number;
         empCode:                         string;

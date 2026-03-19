@@ -10,6 +10,7 @@ export interface RefCodeItem {
   restDay:    string;
   special:    string;
   legal:      string;
+  paidLeave?: boolean; // BE: tbl_AddOTWeek.PaidLeave (bit) — drives leave deduction in ComputeOTadd
 }
 
 interface RefCodeSearchModalProps {
@@ -44,7 +45,7 @@ export function RefCodeSearchModal({
 
   const filteredItems = items.filter(item =>
     String(item.refCode).includes(searchTerm) ||
-    item.day.toLowerCase().includes(searchTerm.toLowerCase())    ||
+    item.day.toLowerCase().includes(searchTerm.toLowerCase())        ||
     item.regularDay.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.restDay.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -56,7 +57,7 @@ export function RefCodeSearchModal({
   const getPageNumbers = (): (number | string)[] => {
     if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
     const pages: (number | string)[] = [1];
-    if (currentPage > 3)            pages.push('...');
+    if (currentPage > 3)              pages.push('...');
     const start = Math.max(2, currentPage - 1);
     const end   = Math.min(totalPages - 1, currentPage + 1);
     for (let i = start; i <= end; i++) pages.push(i);
@@ -91,10 +92,13 @@ export function RefCodeSearchModal({
             {/* Search input */}
             <div className="flex items-center gap-2 mb-3">
               <label className="text-gray-700 text-sm">Search:</label>
-              <input type="text" value={searchTerm}
+              <input
+                type="text"
+                value={searchTerm}
                 onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="Search by ref code, day name, OT code..." />
+                placeholder="Search by ref code, day name, OT code..."
+              />
             </div>
 
             {/* Error */}
@@ -124,9 +128,18 @@ export function RefCodeSearchModal({
                   </thead>
                   <tbody>
                     {paginatedItems.length > 0 ? paginatedItems.map(item => (
-                      <tr key={item.refCode}
+                      <tr
+                        key={item.refCode}
                         className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                        onClick={() => { onSelect(item.refCode, String(item.refCode)); onClose(); }}>
+                        onClick={() => {
+                          // Label: "1 — Monday" so user sees both the code and the day name
+                          const label = item.day
+                            ? `${item.refCode} — ${item.day}`
+                            : String(item.refCode);
+                          onSelect(item.refCode, label);
+                          onClose();
+                        }}
+                      >
                         <td className="px-3 py-1.5 text-gray-900">{item.refCode}</td>
                         <td className="px-3 py-1.5 text-gray-700">{item.day}</td>
                         <td className="px-3 py-1.5 text-gray-700">{item.regularDay}</td>
@@ -136,7 +149,9 @@ export function RefCodeSearchModal({
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={6} className="px-3 py-4 text-center text-gray-500 text-sm">No ref codes found.</td>
+                        <td colSpan={6} className="px-3 py-4 text-center text-gray-500 text-sm">
+                          No ref codes found.
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -147,23 +162,38 @@ export function RefCodeSearchModal({
             {/* Pagination */}
             <div className="flex items-center justify-between mt-3">
               <span className="text-gray-600 text-xs">
-                Showing {filteredItems.length === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredItems.length)} of {filteredItems.length} entries
+                Showing {filteredItems.length === 0 ? 0 : startIndex + 1} to{' '}
+                {Math.min(startIndex + itemsPerPage, filteredItems.length)} of{' '}
+                {filteredItems.length} entries
               </span>
               <div className="flex gap-1">
-                <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}
-                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Previous
                 </button>
                 {getPageNumbers().map((page, idx) =>
                   page === '...'
                     ? <span key={`e-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-                    : <button key={page} onClick={() => setCurrentPage(page as number)}
-                        className={`px-2 py-1 rounded text-xs ${currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                    : <button
+                        key={page}
+                        onClick={() => setCurrentPage(page as number)}
+                        className={`px-2 py-1 rounded text-xs ${
+                          currentPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
                         {page}
                       </button>
                 )}
-                <button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0}
-                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Next
                 </button>
               </div>
