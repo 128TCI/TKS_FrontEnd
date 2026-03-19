@@ -79,8 +79,8 @@ export function ProcessPage() {
   // ── Date state ────────────────────────────────────────────────────────────
   const today = new Date();
   const todayStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
-  const [dateFrom,    setDateFrom]    = useState('3/1/2020');
-  const [dateTo,      setDateTo]      = useState('03/15/2020');
+  const [dateFrom,    setDateFrom]    = useState(todayStr);
+  const [dateTo,      setDateTo]      = useState(todayStr);
   const [dateApplied, setDateApplied] = useState(todayStr);
   const [lateFiling,  setLateFiling]  = useState(false);
   const [showDateFromCal,    setShowDateFromCal]    = useState(false);
@@ -474,6 +474,7 @@ export function ProcessPage() {
     });
 
     try {
+      console.log(payload)
       // 30-minute explicit timeout — prevents axios default cutting off long populates
       const response = await apiClient.post('/Populate/Populate', payload, {
         timeout: 30 * 60 * 1000,

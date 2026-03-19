@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Building2, User, Lock, Eye, EyeOff } from 'lucide-react';
 import apiClient from '../services/apiClient';
 import auditTrail from '../services/auditTrail';
-import { ApiService, showErrorModal, showSuccessModal } from '../services/apiService';
+import { showErrorModal, showSuccessModal } from '../services/apiService';
 import CryptoJS from 'crypto-js';
 import { decryptData } from '../services/encryptionService';
 import { Footer } from './Footer/Footer';
@@ -49,135 +49,178 @@ function encryptData(plainText: string): string {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 interface LoginPageProps {
-  onLogin: () => void;
+  onLogin:          () => void;
   onForgotPassword: () => void;
 }
 
 export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [company,  setCompany]  = useState('');
-  const [companies, setCompanies] = useState<string[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [windowsAuth, setWindowsAuth] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-const [companyDisplayName, setCompanyDisplayName] = useState('');
-  // ─── Fetch companies from API on mount ──────────────────────────────────────
-useEffect(() => {
-  const fetchCompanies = async () => {
-    try {
-      const infoResponse = await apiClient.get('/Fs/System/CompanyInformation');
-  const infoList: Array<{ companyCode?: string; companyName?: string }> =
-  Array.isArray(infoResponse.data) ? infoResponse.data : [];
+  const [username,           setUsername]           = useState('');
+  const [password,           setPassword]           = useState('');
+  const [company,            setCompany]            = useState('');
+  const [companies,          setCompanies]          = useState<string[]>([]);
+  const [loadingCompanies,   setLoadingCompanies]   = useState(true);
+  const [windowsAuth,        setWindowsAuth]        = useState(false);
+  const [loading,            setLoading]            = useState(false);
+  const [error,              setError]              = useState('');
+  const [showPassword,       setShowPassword]       = useState(false);
+  const [companyDisplayName, setCompanyDisplayName] = useState('');
 
-const names = infoList
-  .filter((info) => info.companyName)
-  .map((info) => info.companyName as string);
+  // ── Fetch companies on mount ───────────────────────────────────────────────
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const infoResponse = await apiClient.get('/Fs/System/CompanyInformation');
+        const infoList: Array<{ companyCode?: string; companyName?: string }> =
+          Array.isArray(infoResponse.data) ? infoResponse.data : [];
 
-setCompanies(names);
-setCompanyDisplayName(names[0] ?? ''); // ← add this
-if (names.length > 0) {
-  setCompany(names[0]);
-}
-    } catch (err) {
-      console.error('Failed to fetch companies:', err);
-      await showErrorModal("Failed to load company list. Please try again later.");
-      const fallback = ['DEMO COMPANY INC'];
-      setCompanies(fallback);
-      setCompany(fallback[0]);
-    } finally {
-      setLoadingCompanies(false);
-    }
-  };
+        const names = infoList
+          .filter(info => info.companyName)
+          .map(info => info.companyName as string);
 
-  fetchCompanies();
-}, []);
+        setCompanies(names);
+        setCompanyDisplayName(names[0] ?? '');
+        if (names.length > 0) setCompany(names[0]);
 
-  // ── Fetch build version on mount ────────────────────────────────────────
-  // useEffect(() => {
-  //   apiClient.get('/api/SystemInfo/version')
-  //     .then(res => setBuildDate(res.data?.buildDate ?? ''))
-  //     .catch(() => {});
-  // }, []);
+      } catch (err) {
+        console.error('Failed to fetch companies:', err);
+        await showErrorModal('Failed to load company list. Please try again later.');
+        const fallback = ['DEMO COMPANY INC'];
+        setCompanies(fallback);
+        setCompany(fallback[0]);
+        setCompanyDisplayName(fallback[0]);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
 
-  // // ── Copy build info to clipboard ─────────────────────────────────────────
-  // const handleCopyBuildInfo = async () => {
-  //   if (!buildDate) return;
-  //   try {
-  //     await navigator.clipboard.writeText(buildDate);
-  //   } catch {
-  //     const ta = document.createElement('textarea');
-  //     ta.value = buildDate;
-  //     ta.style.position = 'fixed'; ta.style.opacity = '0';
-  //     document.body.appendChild(ta);
-  //     ta.select();
-  //     document.execCommand('copy');
-  //     document.body.removeChild(ta);
-  //   }
-  //   setToast(true);
-  //   setTimeout(() => setToast(false), 2500);
-  // };
+    fetchCompanies();
+  }, []);
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
 
+  try {
+    // ── Reset any stuck IsLoggedIn session before attempting login ────────
+    // Handles cases where browser was closed without proper logout
     try {
-      const response = await apiClient.post('UserLogin/login', {
-        username:    encryptData(username),
-        password:    encryptData(password),
-        company:     encryptData(company),
-        windowsAuth,
+      await apiClient.post('UserLogin/force-logout', {
+        UserName: username,
       });
+    } catch {
+      // Ignore — user may not exist or already logged out
+    }
 
+    const response = await apiClient.post('UserLogin/login', {
+      UserName:    encryptData(username),
+      Password:    encryptData(password),
+      Company:     encryptData(company),
+      WindowsAuth: windowsAuth,
+    });
+
+    if (response.status === 200) {
+
+      // ── Policy 4: Password change required ────────────────────────────
+      if (response.data.requiresPasswordChange) {
+
+        localStorage.setItem('pendingPasswordChange', 'true');
+        localStorage.setItem('pendingToken',          response.data.token ?? '');
+        localStorage.setItem('pendingPayload',        JSON.stringify(response.data));
+        localStorage.setItem('pendingUserData',       JSON.stringify(response.data.user ?? {}));
+        localStorage.setItem('pendingUsername',       username);
+
+        const currentPath = window.location.pathname;
+        const loginIdx    = currentPath.lastIndexOf('/login');
+        const base        = loginIdx !== -1 ? currentPath.substring(0, loginIdx) : '';
+
+        await showErrorModal(
+          response.data.message ?? 'You are required to change your password before proceeding.'
+        );
+
+        window.location.href = `${base}/change-password-login`;
+        return;
+      }
+
+      // ── Store auth token ───────────────────────────────────────────────
+      if (response.data.token) {
+        localStorage.setItem('authToken',      response.data.token);
+        localStorage.setItem('loginTimestamp', new Date().getTime().toString());
+      }
+
+      // ── Store user payload ─────────────────────────────────────────────
+      if (response.data)      localStorage.setItem('loginPayload', JSON.stringify(response.data));
+      if (response.data.user) localStorage.setItem('userData',     JSON.stringify(response.data.user));
+
+      // ── Set IsLoggedIn = true only on full successful login ────────────
+      try {
+        await apiClient.post('UserLogin/set-logged-in', {
+          UserName: username,
+        });
+      } catch (loginErr) {
+        console.error('Failed to set logged in status:', loginErr);
+      }
+
+      // ── Decrypt username for audit trail ───────────────────────────────
       const decryptedUsername = decryptData(response.data.user?.username) || username;
 
-      if (response.status === 200) {
-        if (response.data.token) {
-          localStorage.setItem('authToken',      response.data.token);
-          localStorage.setItem('loginTimestamp', new Date().getTime().toString());
-        }
-        if (response.data)      localStorage.setItem('loginPayload', JSON.stringify(response.data));
-        if (response.data.user) localStorage.setItem('userData',     JSON.stringify(response.data.user));
-
-        try {
-          await auditTrail.log({
-            trans:      `Employee ${decryptedUsername} logged in.`,
-            messages:   `Employee ${decryptedUsername} logged in.`,
-            formName:   'LogIn',
-            accessType: 'LogIn',
-          });
-        } catch (err) {
-          console.error('Audit trail login failed:', err);
-        }
-
-        await showSuccessModal('Login Successful');
-        onLogin();
+      // ── Audit trail ────────────────────────────────────────────────────
+      try {
+        await auditTrail.log({
+          trans:      `Employee ${decryptedUsername} logged in.`,
+          messages:   `Employee ${decryptedUsername} logged in.`,
+          formName:   'LogIn',
+          accessType: 'LogIn',
+        });
+      } catch (auditErr) {
+        console.error('Audit trail login failed:', auditErr);
       }
-    } catch (err: any) {
-      await handleLoginError(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
- // ── Login error handler ───────────────────────────────────────────────────
+      await showSuccessModal('Login Successful');
+      onLogin();
+    }
+
+  } catch (err: any) {
+    await handleLoginError(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // ── Login error handler ───────────────────────────────────────────────────
   const handleLoginError = async (err: any) => {
     const status  = err.response?.status;
-    const message = err.response?.data?.message || err.message || 'Login failed. Please try again.';
+    const message = err.response?.data?.message
+                 || err.message
+                 || 'Login failed. Please try again.';
 
     let modalMessage: string;
-    if      (status === 401)                                   modalMessage = 'Invalid username or password.';
-    else if (status === 403)                                   modalMessage = 'Account is suspended. Please contact administrator.';
-    else if (status === 409)                                   modalMessage = 'User is already logged in on another session.'; // ✅ Added
-    else if (status === 400)                                   modalMessage = 'Invalid input data.';
-    else if (status >= 500)                                    modalMessage = 'Server error. Please try again later.';
-    else if (err.message === 'Network Error' || !err.response) modalMessage = 'Unable to connect to the server.';
-    else                                                       modalMessage = message;
+
+    if (status === 401) {
+      modalMessage = 'Invalid username or password.';
+
+    } else if (status === 403) {
+      // Policy 2a Expired / Policy 2b Suspended / Policy 5 Locked
+      // Use exact server message since each 403 has a different reason
+      modalMessage = message;
+
+    } else if (status === 409) {
+      // Policy 2c — Already logged in on another session
+      modalMessage = 'User is already logged in on another session.';
+
+    } else if (status === 400) {
+      modalMessage = 'Invalid input data.';
+
+    } else if (status >= 500) {
+      modalMessage = 'Server error. Please try again later.';
+
+    } else if (err.message === 'Network Error' || !err.response) {
+      modalMessage = 'Unable to connect to the server.';
+
+    } else {
+      modalMessage = message;
+    }
 
     setError(modalMessage);
     await showErrorModal(modalMessage);
@@ -186,31 +229,34 @@ if (names.length > 0) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+
       {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 -left-20 w-96 h-96 bg-green-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
-        <div className="absolute top-40 -right-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-20 -left-20 w-96 h-96 bg-green-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" />
+        <div className="absolute top-40 -right-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000" />
       </div>
 
-    {/* Dark Slate Bar with Company Name */}
-<div className="w-full bg-green-600 text-white py-3">
-  <div className="max-w-7xl mx-auto">
-    <p className="text-white tracking-wide">
-      {companyDisplayName || 'DEMO ACCOUNT'}
-    </p>
-  </div>
-</div>
+      {/* Green top bar */}
+      <div className="w-full bg-green-600 text-white py-3">
+        <div className="max-w-7xl mx-auto px-6">
+          <p className="text-white tracking-wide">
+            {companyDisplayName || 'DEMO ACCOUNT'}
+          </p>
+        </div>
+      </div>
 
       {/* Main content */}
       <div className="flex-1 flex items-center justify-center p-6 relative z-10">
         <div className="w-full max-w-md relative">
-
           <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8 pt-16">
+
             <div className="flex flex-col items-center mb-8">
               <h2 className="text-gray-900 text-center">Login</h2>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
+
+              {/* Inline error */}
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-red-700 text-sm">{error}</p>
@@ -268,7 +314,10 @@ if (names.length > 0) {
                   </div>
                   <select
                     value={company}
-                    onChange={e => setCompany(e.target.value)}
+                    onChange={e => {
+                      setCompany(e.target.value);
+                      setCompanyDisplayName(e.target.value);
+                    }}
                     disabled={loadingCompanies}
                     className="w-full pl-10 pr-10 py-3 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none cursor-pointer text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
@@ -324,15 +373,14 @@ if (names.length > 0) {
                   Forgot Password?
                 </button>
               </div>
+
             </form>
           </div>
-
-       
         </div>
       </div>
 
       {/* Footer */}
-     <Footer />
+      <Footer />
 
       {/* CSS Animations */}
       <style>{`
