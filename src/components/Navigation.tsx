@@ -778,7 +778,7 @@ export function Navigation({ onLogout }: NavigationProps) {
             </div>
           )}
 
-          {/* User menu — tooltip removed, navigate to change password on click */}
+          {/* User menu */}
           <div className="flex items-center space-x-3">
             <button
               onClick={() => goTo('/security/change-password')}
@@ -821,7 +821,7 @@ export function Navigation({ onLogout }: NavigationProps) {
                   <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45" />
                 </div>
               )}
-            </div>
+            </button>  {/* ← FIXED: was </div> */}
 
             <button
               onClick={handleLogout}
