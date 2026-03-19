@@ -11,7 +11,7 @@ import axios, {
   type AxiosResponse,
 } from 'axios';
 import { decryptData } from './encryptionService';
-
+ 
 //Local
 const BASE_URL = 'https://localhost:7264/api';
 //Demo
