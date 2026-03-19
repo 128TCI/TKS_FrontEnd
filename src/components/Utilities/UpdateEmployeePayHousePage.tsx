@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Search, X, Save, Building2, Users, Briefcase, Network, CalendarClock, Wallet, Grid, Box, RefreshCw } from 'lucide-react';
+import { Check, Search, X, Save, Building2, Users, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { PayHouseSearchModal } from './../Modals/PayhouseSearchModal';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
@@ -27,8 +27,12 @@ export function UpdateEmployeePayHousePage() {
   const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
   const [groupSearchTerm,    setGroupSearchTerm]    = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+
+  // payHouse = code sent to BE as lineCode
+  // house    = description shown in the read-only input for display only
   const [payHouse,           setPayHouse]           = useState('');
   const [house,              setHouse]              = useState('');
+
   const [showPayHouseModal,  setShowPayHouseModal]  = useState(false);
   const [isUpdating,         setIsUpdating]         = useState(false);
   const itemsPerPage = 10;
@@ -42,18 +46,18 @@ export function UpdateEmployeePayHousePage() {
   const [currentGroupPage,  setCurrentGroupPage]  = useState(1);
   const [currentEmpPage,    setCurrentEmpPage]    = useState(1);
 
-  const [tkGroupItems,        setTKSGroupItems]      = useState<GroupItem[]>([]);
-  const [branchItems,         setBranchItems]        = useState<GroupItem[]>([]);
-  const [departmentItems,     setDepartmentItems]    = useState<GroupItem[]>([]);
-  const [divisionItems,       setDivisionItems]      = useState<GroupItem[]>([]);
-  const [groupScheduleItems,  setGroupScheduleItems] = useState<GroupItem[]>([]);
-  const [payHouseItems,       setPayHouseItems]      = useState<GroupItem[]>([]);
-  const [payHouseError,       setPayHouseError]      = useState('');
-  const [sectionItems,        setSectionItems]       = useState<GroupItem[]>([]);
-  const [unitItems,           setUnitItems]          = useState<GroupItem[]>([]);
-  const [employeeItems,       setEmployeeItems]      = useState<EmployeeItem[]>([]);
-  const [loadingEmployees,    setLoadingEmployees]   = useState(false);
-  const [loadingPayHouses,    setLoadingPayHouses]   = useState(false);
+  const [tkGroupItems,       setTKSGroupItems]      = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [divisionItems,      setDivisionItems]      = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [payHouseError,      setPayHouseError]      = useState('');
+  const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
+  const [unitItems,          setUnitItems]          = useState<GroupItem[]>([]);
+  const [employeeItems,      setEmployeeItems]      = useState<EmployeeItem[]>([]);
+  const [loadingEmployees,   setLoadingEmployees]   = useState(false);
+  const [loadingPayHouses,   setLoadingPayHouses]   = useState(false);
 
   useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
 
@@ -154,18 +158,18 @@ export function UpdateEmployeePayHousePage() {
 
   const getSelectionTitle = () => {
     switch (activeTab) {
-      case 'TK Group': return 'TK Group Selection';
-      case 'Branch': return 'Branch Selection';
-      case 'Department': return 'Department Selection';
-      case 'Division': return 'Division Selection';
+      case 'TK Group':       return 'TK Group Selection';
+      case 'Branch':         return 'Branch Selection';
+      case 'Department':     return 'Department Selection';
+      case 'Division':       return 'Division Selection';
       case 'Group Schedule': return 'Group Schedule Selection';
-      case 'Pay House': return 'Pay House Selection';
-      case 'Section': return 'Section Selection';
-      case 'Unit': return 'Unit Selection';
-      default: return 'Selection';
+      case 'Pay House':      return 'Pay House Selection';
+      case 'Section':        return 'Section Selection';
+      case 'Unit':           return 'Unit Selection';
+      default:               return 'Selection';
     }
-  };  
-    
+  };
+
   // ── Derived lists ─────────────────────────────────────────────────────────
   const currentItems    = getCurrentData();
   const filteredGroups  = currentItems.filter(i =>
@@ -208,8 +212,8 @@ export function UpdateEmployeePayHousePage() {
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
   const handlePayHouseSelect = (code: string, description: string) => {
-    setPayHouse(code);
-    setHouse(description);
+    setPayHouse(code);          // code → sent to BE as lineCode
+    setHouse(description);      // description → display only
     setShowPayHouseModal(false);
   };
 
@@ -221,22 +225,37 @@ export function UpdateEmployeePayHousePage() {
   };
 
   const handleUpdate = async () => {
-    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
-    if (!house)                    { await showErrorModal('Pay House code should not be empty.'); return; }
+    // ── Validate against payHouse (the code), not house (the description) ──
+    if (!selectedEmployees.length) {
+      await showErrorModal('Please select employee/s to update.');
+      return;
+    }
+    if (!payHouse) {
+      await showErrorModal('Pay House code should not be empty.');
+      return;
+    }
 
     try {
       setIsUpdating(true);
       const payload = {
         empCode:  selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        lineCode: payHouse,
+        lineCode: payHouse,   // always the code, never the description
       };
       const res = await apiClient.post('/Utilities/UpdateEmployeesLine', payload);
       if (ApiService.isApiSuccess(res)) {
-        await showSuccessModal('Successfully updated Employees Pay House.');
+        await showSuccessModal(res.data?.messages ?? 'Successfully updated Employees Pay House.');
         resetForm();
+      } else {
+        // Show the BE error message if update was rejected
+        await showErrorModal(
+          res.data?.errors?.[0] ?? res.data?.messages ?? 'Failed to update Employees Pay House.'
+        );
       }
-    } catch { await showErrorModal('Failed to update records'); }
-    finally { setIsUpdating(false); }
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.messages ?? 'Failed to update records.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const renderPagination = (
@@ -314,7 +333,7 @@ export function UpdateEmployeePayHousePage() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm}
@@ -361,7 +380,7 @@ export function UpdateEmployeePayHousePage() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-gray-900">Employees</h3>
                     <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
-                  </div>                    
+                  </div>
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input type="text" value={employeeSearchTerm}
@@ -423,7 +442,12 @@ export function UpdateEmployeePayHousePage() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 flex-wrap">
                       <label className="text-sm text-gray-700">Pay House Code</label>
+                      {/*
+                        Shows the description for readability but payHouse (code)
+                        is what gets validated and sent to the BE as lineCode.
+                      */}
                       <input type="text" readOnly value={house}
+                        placeholder="Select via search…"
                         className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-40 bg-gray-50" />
                       <button onClick={() => setShowPayHouseModal(true)}
                         className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
@@ -433,6 +457,10 @@ export function UpdateEmployeePayHousePage() {
                         className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                         <X className="w-4 h-4" />
                       </button>
+                      {/* Show the actual code being sent so it's visible to the user */}
+                      {payHouse && (
+                        <span className="text-xs text-gray-500 italic">Code: {payHouse}</span>
+                      )}
                     </div>
 
                     <div className="flex justify-end pt-4 border-t border-gray-200">

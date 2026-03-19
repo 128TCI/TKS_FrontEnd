@@ -918,7 +918,7 @@ export function EmployeeMasterFilePage() {
       gender: employee.sex,
       email: employee.email,
       birthDate: toDateOnly(employee.birthDate),
-      age: employee.age.toString(),
+      age: employee.age?.toString() || '',      
       birthPlace: employee.birthPlace,
     });
 

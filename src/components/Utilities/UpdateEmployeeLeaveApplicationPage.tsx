@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Search, X, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box, RefreshCw } from 'lucide-react';
+import { Check, Search, X, Save, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { LeaveCodeSearchModal } from './../Modals/LeaveCodeSearchModal';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
-import { toISO } from '../../services/utilityService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,6 +49,45 @@ const EMPTY_SELECTION: Record<TabName, number[]> = {
 
 const ITEMS_PER_PAGE = 10;
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const parseHoursInput = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // hh:mm → decimal conversion
+  const hhmmMatch = trimmed.match(/^(\d{1,3}):(\d{2})$/);
+  if (hhmmMatch) {
+    const hours   = parseInt(hhmmMatch[1], 10);
+    const minutes = parseInt(hhmmMatch[2], 10);
+    if (minutes >= 60) return null;
+    const decimal = hours + minutes / 60;
+    if (decimal <= 0) return null;
+    return decimal.toFixed(2);        // e.g. "8.50"
+  }
+
+  // Plain decimal / integer
+  const num = parseFloat(trimmed);
+  if (isNaN(num) || num <= 0) return null;
+  return num.toFixed(2);             // normalise to 2 dp
+};
+const toLocalISOString = (raw: string): string | null => {
+  if (!raw) return null;
+
+  // Handle MM/DD/YYYY format from CalendarPopover
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+  }
+
+  // Fallback: parse and extract local date parts (avoids UTC shift)
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T00:00:00`;
+};
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function UpdateEmployeeLeaveApplicationPage() {
@@ -94,7 +132,7 @@ export function UpdateEmployeeLeaveApplicationPage() {
   const [dateFrom,        setDateFrom]        = useState('');
   const [dateTo,          setDateTo]          = useState('');
   const [period,          setPeriod]          = useState('');
-  const [numberOfHours,   setNumberOfHours]   = useState('');
+  const [numberOfHours,   setNumberOfHours]   = useState('');    // raw input string
   const [withPay,         setWithPay]         = useState(false);
   const [sssNotification, setSssNotification] = useState(false);
 
@@ -204,9 +242,7 @@ export function UpdateEmployeeLeaveApplicationPage() {
     };
   }, []);
 
-  // ── Fetch employees:
-  //    no groups selected → GET /Maintenance/EmployeeMasterFile
-  //    groups selected    → POST /Utilities/GetFilteredEmployees
+  // ── Fetch employees ───────────────────────────────────────────────────────
   const fetchFilteredEmployees = useCallback(async (
     tab: TabName, selectedIds: number[], allItems: GroupItem[],
     status: 'active' | 'inactive' | 'all'
@@ -323,25 +359,61 @@ export function UpdateEmployeeLeaveApplicationPage() {
   };
 
   const handleUpdate = async () => {
-    if (!selectedEmployees.length)                   { await showErrorModal('Please select employee/s to update.'); return; }
-    if (!leaveCode)                                  { await showErrorModal('Leave code should not be empty.'); return; }
-    if (!numberOfHours || Number(numberOfHours) < 1) { await showErrorModal('Number of hours must be greater than 0.'); return; }
-    if (!dateFrom || !dateTo)                        { await showErrorModal('Please select Date From and Date To.'); return; }
+    // ── FE validation (mirrors BE validation) ─────────────────────────────
+    if (!selectedEmployees.length) {
+      await showErrorModal('Please select employee/s to update.');
+      return;
+    }
+    if (!leaveCode) {
+      await showErrorModal('Leave code should not be empty.');
+      return;
+    }
+
+    // Validate & normalise numberOfHours — accepts "8", "8.5", "08:30"
+    const parsedHours = parseHoursInput(numberOfHours);
+    if (!parsedHours) {
+      await showErrorModal(
+        'Number of hours must be a positive decimal (e.g. 8, 8.5) or hh:mm format (e.g. 08:30).'
+      );
+      return;
+    }
+
+    if (!dateFrom || !dateTo) {
+      await showErrorModal('Please select Date From and Date To.');
+      return;
+    }
+
+    const isoFrom = toLocalISOString(dateFrom);
+    const isoTo   = toLocalISOString(dateTo);
+
+    if (!isoFrom || !isoTo) {
+      await showErrorModal('Invalid date format. Please re-select Date From and Date To.');
+      return;
+    }
+
+    if (isoTo < isoFrom) {
+      await showErrorModal('Date To must not be earlier than Date From.');
+      return;
+    }
 
     try {
       setIsUpdating(true);
+
       const payload = {
+        // Map selected employee IDs → their string codes
         empCode:         selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        dateFrom:        toISO(dateFrom),
-        dateTo:          toISO(dateTo),
-        numberOfHours:   parseFloat(numberOfHours),
+        dateFrom:        isoFrom,
+        dateTo:          isoTo,
+        // Send as decimal string — matches BE DTO decimal, SP DECIMAL(18,2)
+        numberOfHours:   parseFloat(parsedHours),   // JSON number, deserialised to decimal by BE
         leaveCode,
         period,
         withPay,
         sssNotification,
-
       };
+
       const res = await apiClient.post('/Utilities/UpdateEmployeeLeaveApplication', payload);
+
       if (ApiService.isApiSuccess(res)) {
         await showSuccessModal(res.data?.message ?? 'Successfully updated Employees Leave Application.');
         resetForm();
@@ -557,10 +629,21 @@ export function UpdateEmployeeLeaveApplicationPage() {
                   {/* Number of Hours + Period */}
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700 whitespace-nowrap">Number Of Hours [hh:mm]</label>
-                      <input type="text" value={numberOfHours}
+                      {/*
+                        Label updated: accepts decimal (8, 8.5) OR hh:mm (08:30).
+                        parseHoursInput() converts hh:mm → decimal before sending.
+                      */}
+                      <label className="text-sm text-gray-700 whitespace-nowrap">
+                        Number Of Hours
+                        <span className="ml-1 text-xs text-gray-400">(e.g. 8, 8.5, 08:30)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={numberOfHours}
                         onChange={e => setNumberOfHours(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-20" />
+                        placeholder="e.g. 8.5"
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-24"
+                      />
                     </div>
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700">Period</label>
@@ -579,6 +662,7 @@ export function UpdateEmployeeLeaveApplicationPage() {
                     <label className="text-sm text-gray-700">Leave Code</label>
                     <input type="text" value={leaveCode}
                       onChange={e => setLeaveCode(e.target.value)}
+                      readOnly style={{cursor:'not-allowed'}} placeholder='Select a Leave Code'
                       className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-40" />
                     <button type="button"
                       className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -606,14 +690,16 @@ export function UpdateEmployeeLeaveApplicationPage() {
                   <div className="flex items-center gap-6 flex-wrap">
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700">Date From</label>
-                      <input readOnly type="text" value={dateFrom}
-                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <input type="text" value={dateFrom} 
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" 
+                        readOnly style={{cursor: 'not-allowed'}} placeholder='MM/DD/YYYY'/>
                       <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                     </div>
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700">Date To</label>
-                      <input readOnly type="text" value={dateTo}
-                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <input type="text" value={dateTo}
+                        className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" 
+                        readOnly style={{cursor: 'not-allowed'}} placeholder='MM/DD/YYYY'/>
                       <CalendarPopover date={dateTo} onChange={setDateTo} />
                     </div>
                   </div>

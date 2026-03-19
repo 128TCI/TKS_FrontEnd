@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Mail, Briefcase, Settings, FlaskConical, Check } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { EmailConfigurationModal } from '../Modals/EmailConfigurationModal';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 
-interface GroupItem  { id: number; code: string; description: string; }
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface GroupItem    { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
+
+// ─── Pagination helper ────────────────────────────────────────────────────────
 
 function getPageNumbers(currentPage: number, totalPages: number): (number | string)[] {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -21,134 +25,289 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | stri
   return pages;
 }
 
-function PaginationBar({ currentPage, totalPages, setPage, startIdx, endIdx, total }: {
+function PaginationBar({
+  currentPage, totalPages, setPage, startIdx, endIdx, total,
+}: {
   currentPage: number; totalPages: number; setPage: (p: number) => void;
   startIdx: number; endIdx: number; total: number;
 }) {
   return (
     <div className="flex items-center justify-between mt-3">
-      <span className="text-gray-500 text-xs">Showing {total === 0 ? 0 : startIdx + 1} to {endIdx} of {total} entries</span>
+      <span className="text-gray-500 text-xs">
+        Showing {total === 0 ? 0 : startIdx + 1} to {Math.min(endIdx, total)} of {total} entries
+      </span>
       <div className="flex gap-1 flex-wrap">
         <button type="button" onClick={() => setPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
-          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+          Previous
+        </button>
         {getPageNumbers(currentPage, totalPages).map((page, idx) =>
           page === '...'
             ? <span key={`e${idx}`} className="px-1 text-gray-400 text-xs self-center">…</span>
             : <button key={`p${page}`} type="button" onClick={() => setPage(page as number)}
-                className={`px-2 py-1 rounded text-xs ${currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>{page}</button>
+                className={`px-2 py-1 rounded text-xs ${currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>
+                {page}
+              </button>
         )}
-        <button type="button" onClick={() => setPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages || totalPages === 0}
-          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+        <button type="button" onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages || totalPages === 0}
+          className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+          Next
+        </button>
       </div>
     </div>
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export function TimekeepEmailDistributionPage() {
+
+  // ── Department state ──────────────────────────────────────────────────────
   const [departmentItems,     setDepartmentItems]     = useState<GroupItem[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<number[]>([]);
   const [departmentSearch,    setDepartmentSearch]    = useState('');
   const [currentDeptPage,     setCurrentDeptPage]     = useState(1);
 
+  // ── Employee state ────────────────────────────────────────────────────────
   const [employeeItems,     setEmployeeItems]     = useState<EmployeeItem[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [employeeSearch,    setEmployeeSearch]    = useState('');
   const [currentEmpPage,    setCurrentEmpPage]    = useState(1);
   const [statusFilter,      setStatusFilter]      = useState<'active' | 'inactive' | 'all'>('active');
+  const [loadingEmployees,  setLoadingEmployees]  = useState(false);
 
-  const [dateFrom,   setDateFrom]   = useState('');
-  const [dateTo,     setDateTo]     = useState('');
-  const [reportType, setReportType] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
-
+  // ── Form state ────────────────────────────────────────────────────────────
+  const [dateFrom,        setDateFrom]        = useState('');
+  const [dateTo,          setDateTo]          = useState('');
+  const [reportType,      setReportType]      = useState('');
+  const [isUpdating,      setIsUpdating]      = useState(false);
+  const [isTesting,       setIsTesting]       = useState(false);
   const [showEmailConfig, setShowEmailConfig] = useState(false);
+
   const itemsPerPage = 10;
 
+  // ── Load departments on mount ─────────────────────────────────────────────
   useEffect(() => {
     apiClient.get('/Fs/Employment/DepartmentSetUp').then(res => {
-      setDepartmentItems((Array.isArray(res.data)?res.data:[]).map((item: any) => ({
-        id: item.depID??item.ID??item.id??0, code: item.depCode??item.code??'', description: item.depDesc??item.description??'',
+      setDepartmentItems((Array.isArray(res.data) ? res.data : []).map((item: any): GroupItem => ({
+        id:          item.depID       ?? item.ID          ?? item.id          ?? 0,
+        code:        item.depCode     ?? item.code        ?? '',
+        description: item.depDesc     ?? item.description ?? '',
       })));
     }).catch(console.error);
+  }, []);
+
+  // ── fetchFilteredEmployees ────────────────────────────────────────────────
+  const fetchFilteredEmployees = useCallback(async (
+    selectedIds: number[], allItems: GroupItem[],
+    status: 'active' | 'inactive' | 'all'
+  ) => {
+    setLoadingEmployees(true);
+    setCurrentEmpPage(1);
+    try {
+      if (selectedIds.length === 0) {
+        const response = await apiClient.get('/Maintenance/EmployeeMasterFile');
+        const list = Array.isArray(response.data) ? response.data : [];
+        setEmployeeItems(list.map((item: any): EmployeeItem => ({
+          id:   item.empID   ?? item.ID   ?? item.id  ?? 0,
+          code: item.empCode ?? item.code ?? '',
+          name: `${item.lName ?? ''}, ${item.fName ?? ''} ${item.mName ?? ''}`.trim(),
+        })));
+      } else {
+        const selectedCodes = allItems
+          .filter(i => selectedIds.includes(i.id))
+          .map(i => i.code)
+          .join(',');
+        const params = {
+          Transaction:    status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
+          GroupCodes:     '',
+          Branches:       '',
+          Divisions:      '',
+          Departments:    selectedCodes,
+          Sections:       '',
+          Units:          '',
+          Lines:          '',
+          Areas:          '',
+          Locations:      '',
+          GroupSchedules: '',
+        };
+        const response = await apiClient.post('/Utilities/GetFilteredEmployees', params);
+        const list = Array.isArray(response.data) ? response.data : [];
+        setEmployeeItems(list.map((item: any): EmployeeItem => ({
+          id:   item.empID   ?? item.ID        ?? item.id   ?? 0,
+          code: item.empCode ?? item.EmpCode   ?? item.code ?? '',
+          name: `${item.lName ?? item.LName ?? ''}, ${item.fName ?? item.FName ?? ''} ${item.mName ?? item.MName ?? ''}`.trim(),
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to fetch employees:', err);
+      setEmployeeItems([]);
+    } finally {
+      setLoadingEmployees(false);
+    }
   }, []);
 
   useEffect(() => {
-    apiClient.get('/Maintenance/EmployeeMasterFile').then(res => {
-      setEmployeeItems((Array.isArray(res.data)?res.data:[]).map((item: any) => ({
-        id: item.empID??item.ID??item.id??0, code: item.empCode??item.code??'',
-        name: `${item.lName??''}, ${item.fName??''} ${item.mName??''}`.trim(),
-      })));
-    }).catch(console.error);
-  }, []);
+    fetchFilteredEmployees(selectedDepartments, departmentItems, statusFilter);
+    setSelectedEmployees([]);
+  }, [selectedDepartments, statusFilter]); // eslint-disable-line
 
+  // ── Derived lists ─────────────────────────────────────────────────────────
   const filteredDepts = departmentItems.filter(d =>
     d.code.toLowerCase().includes(departmentSearch.toLowerCase()) ||
-    d.description.toLowerCase().includes(departmentSearch.toLowerCase()));
+    d.description.toLowerCase().includes(departmentSearch.toLowerCase())
+  );
+  const totalDeptPages = Math.ceil(filteredDepts.length / itemsPerPage);
+  const startDeptIdx   = (currentDeptPage - 1) * itemsPerPage;
+  const endDeptIdx     = startDeptIdx + itemsPerPage;
+  const paginatedDepts = filteredDepts.slice(startDeptIdx, endDeptIdx);
+
   const filteredEmps = employeeItems.filter(e =>
     e.code.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-    e.name.toLowerCase().includes(employeeSearch.toLowerCase()));
+    e.name.toLowerCase().includes(employeeSearch.toLowerCase())
+  );
+  const totalEmpPages = Math.ceil(filteredEmps.length / itemsPerPage);
+  const startEmpIdx   = (currentEmpPage - 1) * itemsPerPage;
+  const endEmpIdx     = startEmpIdx + itemsPerPage;
+  const paginatedEmps = filteredEmps.slice(startEmpIdx, endEmpIdx);
 
-  const totalDeptPages = Math.ceil(filteredDepts.length / itemsPerPage);
-  const totalEmpPages  = Math.ceil(filteredEmps.length  / itemsPerPage);
-  const startDeptIdx   = (currentDeptPage - 1) * itemsPerPage;
-  const endDeptIdx     = Math.min(startDeptIdx + itemsPerPage, filteredDepts.length);
-  const startEmpIdx    = (currentEmpPage  - 1) * itemsPerPage;
-  const endEmpIdx      = Math.min(startEmpIdx  + itemsPerPage, filteredEmps.length);
-  const paginatedDepts = filteredDepts.slice(startDeptIdx, endDeptIdx);
-  const paginatedEmps  = filteredEmps.slice(startEmpIdx,  endEmpIdx);
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleDeptToggle     = (id: number) => setSelectedDepartments(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleEmpToggle      = (id: number) => setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleSelectAllDepts = () => setSelectedDepartments(selectedDepartments.length === filteredDepts.length ? [] : filteredDepts.map(d => d.id));
+  const handleSelectAllEmps  = () => setSelectedEmployees(selectedEmployees.length === filteredEmps.length ? [] : filteredEmps.map(e => e.id));
 
-  const handleDeptToggle     = (id: number) => setSelectedDepartments(prev => prev.includes(id)?prev.filter(i=>i!==id):[...prev,id]);
-  const handleEmpToggle      = (id: number) => setSelectedEmployees(prev => prev.includes(id)?prev.filter(i=>i!==id):[...prev,id]);
-  const handleSelectAllDepts = () => setSelectedDepartments(selectedDepartments.length===filteredDepts.length?[]:filteredDepts.map(d=>d.id));
-  const handleSelectAllEmps  = () => setSelectedEmployees(selectedEmployees.length===filteredEmps.length?[]:filteredEmps.map(e=>e.id));
-
-  const resetForm = () => { setSelectedDepartments([]); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); };
-
-  const handleTestEmail = async () => {
-    try {
-      setIsUpdating(true);
-      await apiClient.post('/EmailConfiguration/SendTestEmail', {});
-      await showSuccessModal('Test email was sent successfully.');
-    } catch { await showErrorModal('Failed to send test email.'); }
-    finally { setIsUpdating(false); }
+  const resetForm = () => {
+    setSelectedDepartments([]);
+    setSelectedEmployees([]);
+    setDateFrom('');
+    setDateTo('');
   };
 
+  // ── Test Email — fetch config first, then send test like EmailConfigurationPage ──
+  const handleTestEmail = async () => {
+    setIsTesting(true);
+    try {
+      // ── 1. Load email config to get emailSender ─────────────────────────
+      const configRes = await apiClient.get(`/Security/EmailConfiguration/${getLoggedInUsername()}`);
+      const isConfigSuccess = ApiService.isApiSuccess(configRes);
+      if (!isConfigSuccess) {
+        await showErrorModal('Failed to load email configuration. Please try again later.');
+        return;
+      }
+
+      const emailSender: string = configRes.data?.emailSender ?? configRes.data?.EmailSender ?? '';
+      if (!emailSender) {
+        await showErrorModal('Email Configuration is empty. Please configure it first.');
+        return;
+      }
+
+      // ── 2. Send test email — same payload as EmailConfigurationPage ──────
+      const payload = {
+        toEmail: emailSender,
+        subject: 'Test Email Configuration',
+        body:    'This is a test email to verify your email configuration is working correctly.',
+      };
+
+      const _response = await apiClient.post('/Security/EmailConfiguration/Test', payload);
+      const isSuccess = ApiService.isApiSuccess(_response);
+
+      if (isSuccess) {
+        await showSuccessModal(`Test email sent successfully to ${emailSender}!`);
+      } else {
+        await showErrorModal(`Failed to send test email to ${emailSender}.`);
+      }
+    } catch (error: any) {
+      await showErrorModal(error?.response?.data?.message ?? 'Failed to send test email.');
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  // ── Send Report — fetch email config first, then send distribution ────────
   const handleSendReport = async () => {
     if (!selectedDepartments.length && !selectedEmployees.length) {
       await showErrorModal('Please select department(s) or employee(s).');
       return;
     }
-    if (!dateFrom || !dateTo) { await showErrorModal('Please select Date From and Date To.'); return; }
+    if (!dateFrom || !dateTo) {
+      await showErrorModal('Please select Date From and Date To.');
+      return;
+    }
+    if (!reportType) {
+      await showErrorModal('Please select a report type.');
+      return;
+    }
+
     try {
       setIsUpdating(true);
-      const empCodes = selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id));
+
+      // ── 1. Load email config to validate sender exists ──────────────────
+      const configRes = await apiClient.get(`/Security/EmailConfiguration/${getLoggedInUsername()}`);
+      console.log('Email config response:', configRes.data);
+      const isConfigSuccess = ApiService.isApiSuccess(configRes);
+      if (!isConfigSuccess) {
+        await showErrorModal('Failed to load email configuration. Please try again later.');
+        return;
+      }
+
+      const emailSender: string = configRes.data?.emailSender ?? configRes.data?.EmailSender ?? '';
+      if (!emailSender) {
+        await showErrorModal('Email Configuration is empty. Please configure it first.');
+        return;
+      }
+
+      // ── 2. Send distribution ────────────────────────────────────────────
+      const empCodes  = selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id));
       const deptCodes = selectedDepartments.map(id => departmentItems.find(d => d.id === id)?.code ?? String(id));
+
       const payload = {
-        empCodes, deptCodes, reportType,
-        dateFrom: new Date(dateFrom).toISOString(),
-        dateTo:   new Date(dateTo).toISOString(),
+        username:   getLoggedInUsername(),
+        empCodes,
+        deptCodes,
+        reportType,
+        dateFrom:   new Date(dateFrom).toISOString(),
+        dateTo:     new Date(dateTo).toISOString(),
       };
-      const res = await apiClient.post('/Utilities/TimekeepEmailDistribution', payload);
-      if (ApiService.isApiSuccess(res)) { await showSuccessModal('Emails sent successfully.'); resetForm(); }
-    } catch { await showErrorModal('Failed to send emails.'); }
-    finally { setIsUpdating(false); }
+
+      const res = await apiClient.post('/EmailConfiguration/SendDistribution', payload);
+
+      if (ApiService.isApiSuccess(res)) {
+        await showSuccessModal(res.data?.message ?? `Report sent successfully to ${emailSender}.`);
+        resetForm();
+      } else {
+        await showErrorModal(res.data?.message ?? 'Failed to send report.');
+      }
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.message ?? 'Failed to send report.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
+
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">Timekeep Email Distribution</h1>
           </div>
+
           <div className="bg-white rounded-b-lg shadow-lg p-6">
+
+            {/* Info banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                   <Mail className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-700 mb-3">Send timekeeping reports via email to selected departments or employees. Configure report type, date range, and email settings before sending.</p>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Send timekeeping reports via email to selected departments or employees. Configure report type, date range, and email settings before sending.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     {[
                       'Select departments and employees',
@@ -166,75 +325,128 @@ export function TimekeepEmailDistributionPage() {
               </div>
             </div>
 
+            {/* Department tab — single fixed tab */}
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200">
-              <button type="button" className="px-4 py-2 text-sm font-medium bg-blue-600 text-white -mb-px rounded-t-lg flex items-center gap-2">
-                <Briefcase className="w-4 h-4"/>Department
+              <button type="button"
+                className="px-4 py-2 text-sm font-medium bg-blue-600 text-white -mb-px rounded-t-lg flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />Department
               </button>
             </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Department table */}
+
+              {/* Left — Department list */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-gray-900">Department Selection</h3>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">
+                    {selectedDepartments.length} selected
+                  </span>
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
-                  <input type="text" value={departmentSearch} onChange={e=>{setDepartmentSearch(e.target.value);setCurrentDeptPage(1);}} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
+                  <input type="text" value={departmentSearch}
+                    onChange={e => { setDepartmentSearch(e.target.value); setCurrentDeptPage(1); }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full">
-                    <thead className="bg-gray-100 border-b border-gray-200"><tr>
-                      <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
-                        <input type="checkbox" checked={filteredDepts.length>0&&selectedDepartments.length===filteredDepts.length} onChange={handleSelectAllDepts} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
-                      <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
-                    </tr></thead>
+                    <thead className="bg-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
+                          <input type="checkbox"
+                            checked={filteredDepts.length > 0 && selectedDepartments.length === filteredDepts.length}
+                            onChange={handleSelectAllDepts}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
+                      </tr>
+                    </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {paginatedDepts.length>0?paginatedDepts.map(d=>(
+                      {paginatedDepts.length > 0 ? paginatedDepts.map(d => (
                         <tr key={d.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2"><input type="checkbox" checked={selectedDepartments.includes(d.id)} onChange={()=>handleDeptToggle(d.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/></td>
+                          <td className="px-4 py-2">
+                            <input type="checkbox" checked={selectedDepartments.includes(d.id)}
+                              onChange={() => handleDeptToggle(d.id)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                          </td>
                           <td className="px-4 py-2 text-sm text-gray-900">{d.code}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">{d.description}</td>
                         </tr>
-                      )):<tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">No departments found.</td></tr>}
+                      )) : (
+                        <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">No departments found.</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
-                <PaginationBar currentPage={currentDeptPage} totalPages={totalDeptPages} setPage={setCurrentDeptPage} startIdx={startDeptIdx} endIdx={endDeptIdx} total={filteredDepts.length}/>
+                <PaginationBar currentPage={currentDeptPage} totalPages={totalDeptPages} setPage={setCurrentDeptPage}
+                  startIdx={startDeptIdx} endIdx={endDeptIdx} total={filteredDepts.length} />
               </div>
 
-              {/* Right panel */}
+              {/* Right — Employee list + report options */}
               <div className="space-y-6">
-                {/* Employee table */}
+
+                {/* Employee list */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-gray-900">Employees</h3>
+                    <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">
+                      {selectedEmployees.length} selected
+                    </span>
+                  </div>
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
-                    <input type="text" value={employeeSearch} onChange={e=>{setEmployeeSearch(e.target.value);setCurrentEmpPage(1);}} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
+                    <input type="text" value={employeeSearch}
+                      onChange={e => { setEmployeeSearch(e.target.value); setCurrentEmpPage(1); }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                   </div>
                   <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full">
-                      <thead className="bg-gray-100 border-b border-gray-200"><tr>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
-                          <input type="checkbox" checked={filteredEmps.length>0&&selectedEmployees.length===filteredEmps.length} onChange={handleSelectAllEmps} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
-                      </tr></thead>
+                      <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs text-gray-600 w-10">
+                            <input type="checkbox"
+                              checked={filteredEmps.length > 0 && selectedEmployees.length === filteredEmps.length}
+                              onChange={handleSelectAllEmps}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
+                          <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
+                        </tr>
+                      </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {paginatedEmps.length>0?paginatedEmps.map(e=>(
+                        {loadingEmployees ? (
+                          <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td></tr>
+                        ) : paginatedEmps.length > 0 ? paginatedEmps.map(e => (
                           <tr key={e.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2"><input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={()=>handleEmpToggle(e.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/></td>
+                            <td className="px-4 py-2">
+                              <input type="checkbox" checked={selectedEmployees.includes(e.id)}
+                                onChange={() => handleEmpToggle(e.id)}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                            </td>
                             <td className="px-4 py-2 text-sm text-gray-900">{e.code}</td>
                             <td className="px-4 py-2 text-sm text-gray-600">{e.name}</td>
                           </tr>
-                        )):<tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">No employees found.</td></tr>}
+                        )) : (
+                          <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">No employees found.</td></tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
-                  <PaginationBar currentPage={currentEmpPage} totalPages={totalEmpPages} setPage={setCurrentEmpPage} startIdx={startEmpIdx} endIdx={endEmpIdx} total={filteredEmps.length}/>
+                  <PaginationBar currentPage={currentEmpPage} totalPages={totalEmpPages} setPage={setCurrentEmpPage}
+                    startIdx={startEmpIdx} endIdx={endEmpIdx} total={filteredEmps.length} />
+
+                  {/* Status filter */}
                   <div className="mt-4 flex items-center gap-6">
-                    {(['active','inactive','all'] as const).map(s=>(
+                    {(['active', 'inactive', 'all'] as const).map(s => (
                       <label key={s} className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="statusFilter" value={s} checked={statusFilter===s} onChange={()=>setStatusFilter(s)} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"/>
-                        <span className="text-sm text-gray-700">{s==='inactive'?'In Active':s.charAt(0).toUpperCase()+s.slice(1)}</span>
+                        <input type="radio" name="statusFilterEmail" value={s}
+                          checked={statusFilter === s} onChange={() => setStatusFilter(s)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                        <span className="text-sm text-gray-700">
+                          {s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -246,48 +458,58 @@ export function TimekeepEmailDistributionPage() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <label className="text-sm text-gray-700 w-28 flex-shrink-0">Report Type:</label>
-                      <select value={reportType} onChange={e=>setReportType(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                      <select value={reportType} onChange={e => setReportType(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
                         <option value="">-- Select --</option>
                         <option value="DTR">Daily Time Record</option>
-                        <option value="ASR">Attendance Summary Report</option>
-                        <option value="EmplRawInOut">Employee Raw In and Out</option>
+                        <option value="AttSumRep">Attendance Summary Report</option>
+                        <option value="EmpRawInOut">Employee Raw In and Out</option>
                       </select>
                     </div>
                     <h2 className="text-gray-700">Date Range</h2>
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center gap-2">
                         <label className="text-sm text-gray-700 whitespace-nowrap">From:</label>
-                        <input placeholder="MM/DD/YY" type="text" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"/>
-                        <CalendarPopover date={dateFrom} onChange={setDateFrom}/>
+                        <input placeholder="MM/DD/YY" type="text" value={dateFrom}
+                          onChange={e => setDateFrom(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                        <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                       </div>
                       <div className="flex items-center gap-2">
                         <label className="text-sm text-gray-700 whitespace-nowrap">To:</label>
-                        <input placeholder="MM/DD/YY" type="text" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"/>
-                        <CalendarPopover date={dateTo} onChange={setDateTo}/>
+                        <input placeholder="MM/DD/YY" type="text" value={dateTo}
+                          onChange={e => setDateTo(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                        <CalendarPopover date={dateTo} onChange={setDateTo} />
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <button type="button" onClick={()=>setShowEmailConfig(true)} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
-                        <Settings className="w-3.5 h-3.5 text-gray-500"/>Email Configuration
+                      <button type="button" onClick={() => setShowEmailConfig(true)}
+                        className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+                        <Settings className="w-3.5 h-3.5 text-gray-500" />Email Configuration
                       </button>
-                      <button type="button" onClick={handleTestEmail} disabled={isUpdating} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <FlaskConical className="w-3.5 h-3.5 text-gray-500"/>Test Email Configuration
+                      <button type="button" onClick={handleTestEmail} disabled={isTesting}
+                        className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <FlaskConical className="w-3.5 h-3.5 text-gray-500" />
+                        {isTesting ? 'Sending…' : 'Test Email Configuration'}
                       </button>
                     </div>
                   </div>
                   <div className="flex justify-end pt-4 border-t border-gray-200 mt-4">
-                    <button type="button" onClick={handleSendReport} disabled={isUpdating} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                      <Mail className="w-4 h-4"/>{isUpdating ? 'Sending…' : 'Send Report'}
+                    <button type="button" onClick={handleSendReport} disabled={isUpdating}
+                      className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Mail className="w-4 h-4" />{isUpdating ? 'Sending…' : 'Send Report'}
                     </button>
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
         </div>
       </div>
-      <Footer/>
-      <EmailConfigurationModal isOpen={showEmailConfig} onClose={()=>setShowEmailConfig(false)}/>
+      <Footer />
+      <EmailConfigurationModal isOpen={showEmailConfig} onClose={() => setShowEmailConfig(false)} />
     </div>
   );
 }

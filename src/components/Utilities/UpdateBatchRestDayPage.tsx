@@ -1,25 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Search, X, Calendar as CalendarIcon, Save, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, RefreshCw } from 'lucide-react';
+import { Check, Search, X, Save, Users, Building2, Briefcase, CalendarClock, Wallet, Grid } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
+import { RestDaySearchModal } from '../Modals/RestDaySearchModal';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
-interface RestDayRecord { id: number; from: string; to: string; restDay1: string; restDay2: string; restDay3: string; }
+interface RestDayRecord {
+  id: number;
+  from: string;
+  to: string;
+  restDay1: string;
+  restDay2: string;
+  restDay3: string;
+}
 
-// Note: UpdateBatchRestDayPage uses 6 tabs (no Division, Unit)
 type TabName = 'TK Group' | 'Branch' | 'Department' | 'Group Schedule' | 'Pay House' | 'Section';
 
 const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
-  { name: 'TK Group', icon: Users }, { name: 'Branch', icon: Building2 },
-  { name: 'Department', icon: Briefcase }, { name: 'Group Schedule', icon: CalendarClock },
-  { name: 'Pay House', icon: Wallet }, { name: 'Section', icon: Grid },
+  { name: 'TK Group',       icon: Users         },
+  { name: 'Branch',         icon: Building2     },
+  { name: 'Department',     icon: Briefcase     },
+  { name: 'Group Schedule', icon: CalendarClock },
+  { name: 'Pay House',      icon: Wallet        },
+  { name: 'Section',        icon: Grid          },
 ];
 
 const EMPTY_SELECTION: Record<TabName, number[]> = {
-  'TK Group': [], 'Branch': [], 'Department': [], 'Group Schedule': [], 'Pay House': [], 'Section': [],
+  'TK Group': [], 'Branch': [], 'Department': [],
+  'Group Schedule': [], 'Pay House': [], 'Section': [],
 };
 
 const DAY_OPTIONS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -34,12 +45,12 @@ export function UpdateBatchRestDayPage() {
   const [isUpdating,         setIsUpdating]         = useState(false);
   const itemsPerPage = 10;
 
-  // Fixed mode
+  // ── Fixed mode ────────────────────────────────────────────────────────────
   const [restDay1Fixed, setRestDay1Fixed] = useState('');
   const [restDay2Fixed, setRestDay2Fixed] = useState('');
   const [restDay3Fixed, setRestDay3Fixed] = useState('');
 
-  // Variable mode
+  // ── Variable mode ─────────────────────────────────────────────────────────
   const [dateFrom,         setDateFrom]         = useState('');
   const [dateTo,           setDateTo]           = useState('');
   const [restDay1Variable, setRestDay1Variable] = useState('');
@@ -47,10 +58,11 @@ export function UpdateBatchRestDayPage() {
   const [restDay3Variable, setRestDay3Variable] = useState('');
   const [restDayRecords,   setRestDayRecords]   = useState<RestDayRecord[]>([]);
 
-  // RestDay Setup mode
-  const [refNo,        setRefNo]        = useState('');
-  const [dateFromSetup, setDateFromSetup] = useState('');
-  const [dateToSetup,   setDateToSetup]   = useState('');
+  // ── RestDay Setup mode ────────────────────────────────────────────────────
+  const [refNo,            setRefNo]            = useState('');
+  const [dateFromSetup,    setDateFromSetup]    = useState('');
+  const [dateToSetup,      setDateToSetup]      = useState('');
+  const [showRestDayModal, setShowRestDayModal] = useState(false);
 
   const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<TabName, number[]>>(EMPTY_SELECTION);
   const selectedGroups = selectedGroupsMap[activeTab] ?? [];
@@ -61,17 +73,34 @@ export function UpdateBatchRestDayPage() {
   const [currentGroupPage,  setCurrentGroupPage]  = useState(1);
   const [currentEmpPage,    setCurrentEmpPage]    = useState(1);
 
-  const [tkGroupItems,        setTKSGroupItems]      = useState<GroupItem[]>([]);
-  const [branchItems,         setBranchItems]        = useState<GroupItem[]>([]);
-  const [departmentItems,     setDepartmentItems]    = useState<GroupItem[]>([]);
-  const [groupScheduleItems,  setGroupScheduleItems] = useState<GroupItem[]>([]);
-  const [payHouseItems,       setPayHouseItems]      = useState<GroupItem[]>([]);
-  const [sectionItems,        setSectionItems]       = useState<GroupItem[]>([]);
-  const [employeeItems,       setEmployeeItems]      = useState<EmployeeItem[]>([]);
-  const [loadingEmployees,    setLoadingEmployees]   = useState(false);
+  const [tkGroupItems,       setTKSGroupItems]      = useState<GroupItem[]>([]);
+  const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
+  const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
+  const [groupScheduleItems, setGroupScheduleItems] = useState<GroupItem[]>([]);
+  const [payHouseItems,      setPayHouseItems]      = useState<GroupItem[]>([]);
+  const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
+  const [employeeItems,      setEmployeeItems]      = useState<EmployeeItem[]>([]);
+  const [loadingEmployees,   setLoadingEmployees]   = useState(false);
+
+  // ── toLocalISOString (inline) ─────────────────────────────────────────────
+  const toLocalISOString = (raw: string): string | null => {
+    if (!raw) return null;
+    const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+      const [, month, day, year] = slashMatch;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+    }
+    const date = new Date(raw);
+    if (isNaN(date.getTime())) return null;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}T00:00:00`;
+  };
 
   useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
 
+  // ── Load group lists ──────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
@@ -82,12 +111,12 @@ export function UpdateBatchRestDayPage() {
         ]);
         const map = (data: any[], idKey: string, codeKey: string, descKey: string): GroupItem[] =>
           (Array.isArray(data) ? data : []).map(i => ({ id: i[idKey] ?? i.ID ?? i.id ?? 0, code: i[codeKey] ?? i.code ?? '', description: i[descKey] ?? i.description ?? '' }));
-        setTKSGroupItems(map(tks.data,'ID','groupCode','groupDescription'));
-        setBranchItems(map(bra.data,'braID','braCode','braDesc'));
-        setDepartmentItems(map(dep.data,'depID','depCode','depDesc'));
-        setGroupScheduleItems(map(grp.data,'grpSchID','grpCode','grpDesc'));
-        setPayHouseItems(map(pay.data,'lineID','lineCode','lineDesc'));
-        setSectionItems(map(sec.data,'secID','secCode','secDesc'));
+        setTKSGroupItems(map(tks.data, 'ID', 'groupCode', 'groupDescription'));
+        setBranchItems(map(bra.data, 'braID', 'braCode', 'braDesc'));
+        setDepartmentItems(map(dep.data, 'depID', 'depCode', 'depDesc'));
+        setGroupScheduleItems(map(grp.data, 'grpSchID', 'grpCode', 'grpDesc'));
+        setPayHouseItems(map(pay.data, 'lineID', 'lineCode', 'lineDesc'));
+        setSectionItems(map(sec.data, 'secID', 'secCode', 'secDesc'));
       } catch (err) { console.error('Failed to load group lists:', err); }
     };
     load();
@@ -95,19 +124,28 @@ export function UpdateBatchRestDayPage() {
 
   const getCurrentData = useCallback((): GroupItem[] => {
     switch (activeTab) {
-      case 'Branch': return branchItems; case 'Department': return departmentItems;
-      case 'Group Schedule': return groupScheduleItems; case 'Pay House': return payHouseItems;
-      case 'Section': return sectionItems; default: return tkGroupItems;
+      case 'Branch':         return branchItems;
+      case 'Department':     return departmentItems;
+      case 'Group Schedule': return groupScheduleItems;
+      case 'Pay House':      return payHouseItems;
+      case 'Section':        return sectionItems;
+      default:               return tkGroupItems;
     }
   }, [activeTab, tkGroupItems, branchItems, departmentItems, groupScheduleItems, payHouseItems, sectionItems]);
 
   const buildSpParams = useCallback((tab: TabName, selectedIds: number[], allItems: GroupItem[], status: 'active' | 'inactive' | 'all') => {
     const codes = allItems.filter(i => selectedIds.includes(i.id)).map(i => i.code).join(',');
     return {
-      Transaction: status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
-      GroupCodes: tab === 'TK Group' ? codes : '', Branches: tab === 'Branch' ? codes : '',
-      Divisions: '', Departments: tab === 'Department' ? codes : '',
-      Sections: tab === 'Section' ? codes : '', Units: '', Lines: '', Areas: '', Locations: '',
+      Transaction:    status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
+      GroupCodes:     tab === 'TK Group'       ? codes : '',
+      Branches:       tab === 'Branch'         ? codes : '',
+      Divisions:      '',
+      Departments:    tab === 'Department'     ? codes : '',
+      Sections:       tab === 'Section'        ? codes : '',
+      Units:          '',
+      Lines:          tab === 'Pay House'      ? codes : '',
+      Areas:          '',
+      Locations:      '',
       GroupSchedules: tab === 'Group Schedule' ? codes : '',
     };
   }, []);
@@ -137,16 +175,13 @@ export function UpdateBatchRestDayPage() {
   }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
 
   const getSelectionTitle = () => {
-    switch (activeTab) {
-      case 'TK Group': return 'TK Group Selection';
-      case 'Branch': return 'Branch Selection';
-      case 'Department': return 'Department Selection';
-      case 'Group Schedule': return 'Group Schedule Selection';
-      case 'Pay House': return 'Pay House Selection';
-      case 'Section': return 'Section Selection';
-      default: return 'Selection';
-    }
-  };  
+    const titles: Record<TabName, string> = {
+      'TK Group': 'TK Group Selection', 'Branch': 'Branch Selection',
+      'Department': 'Department Selection', 'Group Schedule': 'Group Schedule Selection',
+      'Pay House': 'Pay House Selection', 'Section': 'Section Selection',
+    };
+    return titles[activeTab] ?? 'Selection';
+  };
 
   const currentItems    = getCurrentData();
   const filteredGroups  = currentItems.filter(i => i.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) || i.description.toLowerCase().includes(groupSearchTerm.toLowerCase()));
@@ -176,37 +211,76 @@ export function UpdateBatchRestDayPage() {
   const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
   const handleAddRecord = () => {
-    if (dateFrom && dateTo) {
-      setRestDayRecords(prev => [...prev, { id: Date.now(), from: dateFrom, to: dateTo, restDay1: restDay1Variable, restDay2: restDay2Variable, restDay3: restDay3Variable }]);
-      setDateFrom(''); setDateTo('');
+    if (!dateFrom || !dateTo) {
+      showErrorModal('Please select Date From and Date To before adding.');
+      return;
     }
+    setRestDayRecords(prev => [
+      ...prev,
+      { id: Date.now(), from: dateFrom, to: dateTo, restDay1: restDay1Variable, restDay2: restDay2Variable, restDay3: restDay3Variable },
+    ]);
+    setDateFrom(''); setDateTo('');
+    setRestDay1Variable(''); setRestDay2Variable(''); setRestDay3Variable('');
   };
 
-  const resetForm = () => { setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]); };
+  const handleDeleteRecord = (id: number) =>
+    setRestDayRecords(prev => prev.filter(r => r.id !== id));
+
+  const resetForm = () => {
+    setSelectedGroupsMap({ ...EMPTY_SELECTION });
+    setSelectedEmployees([]);
+    setRestDay1Fixed(''); setRestDay2Fixed(''); setRestDay3Fixed('');
+    setDateFrom(''); setDateTo('');
+    setRestDay1Variable(''); setRestDay2Variable(''); setRestDay3Variable('');
+    setRestDayRecords([]);
+    setRefNo(''); setDateFromSetup(''); setDateToSetup('');
+    setDeleteExisting(false);
+  };
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
+
     if (restDayMode === 'fixed') {
-      if (restDay1Fixed === restDay2Fixed || restDay1Fixed === restDay3Fixed || restDay2Fixed === restDay3Fixed) {
-        await showErrorModal('Restdays must not be equal.'); return;
+      const days = [restDay1Fixed, restDay2Fixed, restDay3Fixed].filter(Boolean);
+      if (days.length !== new Set(days.map(d => d.toLowerCase())).size) {
+        await showErrorModal('Rest days must not be equal.'); return;
       }
     } else if (restDayMode === 'variable') {
-      if (!dateFrom || !dateTo) { await showErrorModal('Please select Date From and Date To.'); return; }
-      if (!refNo) { await showErrorModal('Variable restday must add atleast 1 item.'); return; }
+      if (!restDayRecords.length) { await showErrorModal('Variable rest day must add at least 1 item.'); return; }
     } else if (restDayMode === 'restday-setup') {
       if (!refNo) { await showErrorModal('Reference number must not be empty.'); return; }
+      if (!dateFromSetup || !dateToSetup) { await showErrorModal('Please select Date From and Date To.'); return; }
     }
+
     try {
       setIsUpdating(true);
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
-        restDayMode, deleteExisting, restDay1Fixed, restDay2Fixed, restDay3Fixed,
-        restDayRecords, refNo, dateFromSetup, dateToSetup,
+        empCodes:    selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        restDayMode,
+        deleteExisting,
+        restDay1Fixed, restDay2Fixed, restDay3Fixed,
+        restDayRecords: restDayRecords.map(r => ({
+          from:     toLocalISOString(r.from)  ?? r.from,
+          to:       toLocalISOString(r.to)    ?? r.to,
+          restDay1: r.restDay1, restDay2: r.restDay2, restDay3: r.restDay3,
+        })),
+        refNo,
+        dateFromSetup: dateFromSetup ? toLocalISOString(dateFromSetup) : null,
+        dateToSetup:   dateToSetup   ? toLocalISOString(dateToSetup)   : null,
       };
+
       const res = await apiClient.post('/Utilities/UpdateBatchRestDay', payload);
-      if (ApiService.isApiSuccess(res)) { await showSuccessModal('Successfully updated Batch Rest Day.'); resetForm(); }
-    } catch { await showErrorModal('Failed to update records'); }
-    finally { setIsUpdating(false); }
+      if (ApiService.isApiSuccess(res)) {
+        await showSuccessModal(res.data?.messages ?? 'Successfully updated Batch Rest Day.');
+        resetForm();
+      } else {
+        await showErrorModal(res.data?.errors?.[0] ?? res.data?.messages ?? 'Failed to update Batch Rest Day.');
+      }
+    } catch (err: any) {
+      await showErrorModal(err?.response?.data?.messages ?? 'Failed to update records.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const renderPagination = (current: number, total: number, setPage: (p: number) => void, startIdx: number, endIdx: number, totalCount: number) => (
@@ -245,7 +319,7 @@ export function UpdateBatchRestDayPage() {
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-3">Update employee rest day assignments in batch. Choose between fixed, variable, or by rest day setup configuration.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    {['Bulk update rest days for multiple employees','Configure fixed or variable rest day schedules','Filter by employee status','Select groups and employees'].map(t => (
+                    {['Bulk update rest days for multiple employees', 'Configure fixed or variable rest day schedules', 'Filter by employee status', 'Select groups and employees'].map(t => (
                       <div key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /><span className="text-gray-600">{t}</span></div>
                     ))}
                   </div>
@@ -263,12 +337,13 @@ export function UpdateBatchRestDayPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
               {/* Left — Group list */}
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                  
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
                   <input type="text" value={groupSearchTerm} onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
@@ -296,11 +371,13 @@ export function UpdateBatchRestDayPage() {
 
               {/* Right */}
               <div className="space-y-6">
+
+                {/* Employee list */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-gray-900">Employees</h3>
                     <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
-                  </div>                    
+                  </div>
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
                     <input type="text" value={employeeSearchTerm} onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
@@ -327,7 +404,7 @@ export function UpdateBatchRestDayPage() {
                   </div>
                   {renderPagination(currentEmpPage, totalEmployeePages, setCurrentEmpPage, startEmpIndex, endEmpIndex, filteredEmployees.length)}
                   <div className="mt-4 flex items-center gap-6">
-                    {(['active','inactive','all'] as const).map(s => (
+                    {(['active', 'inactive', 'all'] as const).map(s => (
                       <label key={s} className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="statusFilter" value={s} checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                         <span className="text-sm text-gray-700">{s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}</span>
@@ -340,11 +417,11 @@ export function UpdateBatchRestDayPage() {
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="space-y-6">
 
-                    {/* Fixed */}
+                    {/* ── Fixed ─────────────────────────────────────────────── */}
                     <div className="border-b border-gray-200 pb-4">
                       <label className="flex items-center gap-2 cursor-pointer mb-4">
                         <input type="radio" name="restDayMode" checked={restDayMode === 'fixed'} onChange={() => setRestDayMode('fixed')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                        <span className="text-sm text-gray-700">Fixed</span>
+                        <span className="text-sm font-medium text-gray-700">Fixed</span>
                       </label>
                       {restDayMode === 'fixed' && (
                         <div className="ml-6 space-y-3">
@@ -357,21 +434,20 @@ export function UpdateBatchRestDayPage() {
                       )}
                     </div>
 
-                    {/* Variable */}
+                    {/* ── Variable ──────────────────────────────────────────── */}
                     <div className="border-b border-gray-200 pb-4">
                       <label className="flex items-center gap-2 cursor-pointer mb-4">
                         <input type="radio" name="restDayMode" checked={restDayMode === 'variable'} onChange={() => setRestDayMode('variable')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                        <span className="text-sm text-gray-700">Variable</span>
+                        <span className="text-sm font-medium text-gray-700">Variable</span>
                       </label>
                       {restDayMode === 'variable' && (
                         <div className="ml-6 space-y-3">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <button onClick={handleAddRecord} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Add</button>
                             <label className="text-sm text-gray-700">Date From</label>
-                            <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded text-sm w-28" />
+                            <input readOnly type="text" value={dateFrom} className="px-3 py-2 border border-gray-300 rounded text-sm w-28" />
                             <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                             <label className="text-sm text-gray-700">Date To</label>
-                            <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded text-sm w-28" />
+                            <input readOnly type="text" value={dateTo} className="px-3 py-2 border border-gray-300 rounded text-sm w-28" />
                             <CalendarPopover date={dateTo} onChange={setDateTo} />
                           </div>
                           <div className="grid grid-cols-3 gap-2">
@@ -379,11 +455,16 @@ export function UpdateBatchRestDayPage() {
                             <div className="flex items-center gap-1"><label className="text-sm text-gray-700 whitespace-nowrap">Rest Day 2</label><DaySelect value={restDay2Variable} onChange={setRestDay2Variable} /></div>
                             <div className="flex items-center gap-1"><label className="text-sm text-gray-700 whitespace-nowrap">Rest Day 3</label><DaySelect value={restDay3Variable} onChange={setRestDay3Variable} /></div>
                           </div>
+                          <button onClick={handleAddRecord} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">
+                            Add Record
+                          </button>
                           {restDayRecords.length > 0 && (
                             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                               <table className="w-full">
                                 <thead className="bg-gray-100 border-b border-gray-200"><tr>
-                                  {['From','To','Rest Day1','Rest Day2','Rest Day3'].map(h => <th key={h} className="px-3 py-2 text-left text-xs text-gray-600">{h}</th>)}
+                                  {['From', 'To', 'Rest Day 1', 'Rest Day 2', 'Rest Day 3', ''].map(h => (
+                                    <th key={h} className="px-3 py-2 text-left text-xs text-gray-600">{h}</th>
+                                  ))}
                                 </tr></thead>
                                 <tbody className="divide-y divide-gray-100">
                                   {restDayRecords.map(r => (
@@ -393,6 +474,11 @@ export function UpdateBatchRestDayPage() {
                                       <td className="px-3 py-2 text-sm text-gray-600">{r.restDay1}</td>
                                       <td className="px-3 py-2 text-sm text-gray-600">{r.restDay2}</td>
                                       <td className="px-3 py-2 text-sm text-gray-600">{r.restDay3}</td>
+                                      <td className="px-3 py-2">
+                                        <button onClick={() => handleDeleteRecord(r.id)} className="p-1 text-red-500 hover:text-red-700">
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -403,28 +489,49 @@ export function UpdateBatchRestDayPage() {
                       )}
                     </div>
 
-                    {/* By RestDay Set Up */}
+                    {/* ── By RestDay Set Up ─────────────────────────────────── */}
                     <div className="pb-4">
                       <label className="flex items-center gap-2 cursor-pointer mb-4">
                         <input type="radio" name="restDayMode" checked={restDayMode === 'restday-setup'} onChange={() => setRestDayMode('restday-setup')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                        <span className="text-sm text-gray-700">By RestDay Set Up</span>
+                        <span className="text-sm font-medium text-gray-700">By RestDay Set Up</span>
                       </label>
                       {restDayMode === 'restday-setup' && (
                         <div className="ml-6 space-y-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <label className="text-sm text-gray-700">Ref No.</label>
-                            <input type="text" value={refNo} onChange={e => setRefNo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded text-sm w-32" />
-                            <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Search</button>
-                            <button onClick={() => setRefNo('')} className="p-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"><X className="w-4 h-4" /></button>
+                            {/* Read-only — value set by modal selection only */}
+                            <input
+                              type="text"
+                              readOnly
+                              value={refNo}
+                              placeholder="Select via search…"
+                              className="px-3 py-2 border border-gray-300 rounded text-sm w-36 bg-gray-50 cursor-default"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowRestDayModal(true)}
+                              className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRefNo('')}
+                              className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
                           <div className="flex items-center gap-4 flex-wrap">
                             <div className="flex items-center gap-2">
                               <label className="text-sm text-gray-700">Date From</label>
-                              <input type="text" value={dateFromSetup} onChange={e => setDateFromSetup(e.target.value)} className="px-3 py-2 border border-gray-300 rounded text-sm w-32" />
+                              <input readOnly type="text" value={dateFromSetup} className="px-3 py-2 border border-gray-300 rounded text-sm w-32" />
+                              <CalendarPopover date={dateFromSetup} onChange={setDateFromSetup} />
                             </div>
                             <div className="flex items-center gap-2">
                               <label className="text-sm text-gray-700">Date To</label>
-                              <input type="text" value={dateToSetup} onChange={e => setDateToSetup(e.target.value)} className="px-3 py-2 border border-gray-300 rounded text-sm w-32" />
+                              <input readOnly type="text" value={dateToSetup} className="px-3 py-2 border border-gray-300 rounded text-sm w-32" />
+                              <CalendarPopover date={dateToSetup} onChange={setDateToSetup} />
                             </div>
                           </div>
                         </div>
@@ -449,6 +556,15 @@ export function UpdateBatchRestDayPage() {
         </div>
       </div>
       <Footer />
+
+      <RestDaySearchModal
+        isOpen={showRestDayModal}
+        onClose={() => setShowRestDayModal(false)}
+        onSelect={(referenceNo) => {
+          setRefNo(referenceNo);
+          setShowRestDayModal(false);
+        }}
+      />
     </div>
   );
 }

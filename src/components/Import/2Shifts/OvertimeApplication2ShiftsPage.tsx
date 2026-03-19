@@ -38,6 +38,7 @@ interface ImportOvertimeApplication2ShiftsFormDto {
   dateFrom?: string | null;
   dateTo?: string | null;
   isDeleteExistingRecord: boolean;
+  selectedGroupCodes: String[];
   imports: ImportOvertimeApplication2ShiftsDto[];
 }
 
@@ -220,6 +221,9 @@ export function OvertimeApplication2ShiftsPage() {
     }
 
     setIsProcessing(true);
+    setInvalidRows([]);   
+    setErrors([]);        
+    setImportDataResult([]); 
 
     try {
       const formData = new FormData();
@@ -252,6 +256,7 @@ export function OvertimeApplication2ShiftsPage() {
           text: "File imported successfully",
         });
       }
+      console.log(res.data.resultData)
     } catch (error: any) {
       Swal.fire({
         icon: "error",
@@ -283,6 +288,7 @@ export function OvertimeApplication2ShiftsPage() {
         dateFrom: new Date(dateFrom).toISOString(),
         dateTo: new Date(dateTo).toISOString(),
         isDeleteExistingRecord: deleteExisting,
+        selectedGroupCodes: selectedCodes,
         imports: importDataResult.filter((x) => !x.message),
       };
 
@@ -676,7 +682,7 @@ export function OvertimeApplication2ShiftsPage() {
                         >
                           <td className="px-4 py-2 text-sm">{item.empCode}</td>
                           <td className="px-4 py-2 text-sm">
-                            {decryptData(item.empName ?? "")}
+                            {item.empName}
                           </td>
                           <td className="px-4 py-2 text-sm">
                             {item.dateFrom
@@ -692,19 +698,19 @@ export function OvertimeApplication2ShiftsPage() {
                             {item.numOTHoursApproved}
                           </td>
                           <td className="px-4 py-2 text-sm">
-                            {item.tksGroup || "-"}
+                            {item.tksGroup || ""}
                           </td>
                           <td className="px-4 py-2 text-sm">
-                            {item.reason || "-"}
+                            {item.reason || ""}
                           </td>
                           <td className="px-4 py-2 text-sm">
-                            {item.remarks || "-"}
+                            {item.remarks || ""}
                           </td>
                           <td className="px-4 py-2 text-sm">
                             {item.appliedBeforeShiftDate
                               ? new Date(
                                   item.appliedBeforeShiftDate,
-                                ).toLocaleDateString()
+                                ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                               : "-"}
                           </td>
                           <td className="px-4 py-2 text-sm">
@@ -714,7 +720,7 @@ export function OvertimeApplication2ShiftsPage() {
                             {item.earlyOTStartTime
                               ? new Date(
                                   item.earlyOTStartTime,
-                                ).toLocaleDateString()
+                                ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                               : "-"}
                           </td>
                           <td className="px-4 py-2 text-sm">
