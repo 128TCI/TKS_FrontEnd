@@ -13,9 +13,9 @@ import axios, {
 import { decryptData } from './encryptionService';
 
 //Local
-// const BASE_URL = 'https://localhost:7264/api';
+ const BASE_URL = 'https://localhost:7264/api';
 //Demo
-const BASE_URL = 'https://demo.128techconsultinginc.com/DEMO_128TIMEKEEP_NEO/api'
+//const BASE_URL = 'https://demo.128techconsultinginc.com/DEMO_128TIMEKEEP_NEO/api'
 //Sir Marc
 // const BASE_URL = 'http://128pc-42.128dom/DEMO_128TIMEKEEP_NEO/api';
 //Mam Robby

@@ -1,111 +1,200 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Loader2 } from 'lucide-react';
+import apiClient from '../../services/apiClient';
 
-interface EmpClassItems {
-    id: number;
-    code: string;
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface EmpClassItem {
+    id:          number | string;
+    code:        string;
     description: string;
 }
 
 interface EmpClassSearchModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSelect: (empCode: string, name: string) => void;
-    employeeClassItems: EmpClassItems[];
-    loading: boolean;
-    error: string;
+    isOpen:   boolean;
+    onClose:  () => void;
+    onSelect: (empCode: string, description: string) => void;
 }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const ITEMS_PER_PAGE = 20;
+
+// ── Pagination ─────────────────────────────────────────────────────────────────
+
+function Pagination({
+    currentPage,
+    totalCount,
+    pageSize,
+    onPageChange,
+}: {
+    currentPage:  number;
+    totalCount:   number;
+    pageSize:     number;
+    onPageChange: (page: number) => void;
+}) {
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex   = Math.min(startIndex + pageSize, totalCount);
+
+    const getPageNumbers = () => {
+        const pages: (number | string)[] = [];
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else if (currentPage <= 4) {
+            for (let i = 1; i <= 5; i++) pages.push(i);
+            pages.push('...');
+            pages.push(totalPages);
+        } else if (currentPage >= totalPages - 3) {
+            pages.push(1);
+            pages.push('...');
+            for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            pages.push('...');
+            for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+            pages.push('...');
+            pages.push(totalPages);
+        }
+        return pages;
+    };
+
+    return (
+        <div className="flex items-center justify-between mt-3 px-2 pb-2">
+            <div className="text-gray-600 text-xs">
+                Showing {totalCount === 0 ? 0 : startIndex + 1} to {endIndex} of {totalCount}
+            </div>
+            <div className="flex gap-1">
+                <button
+                    onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Previous
+                </button>
+                {getPageNumbers().map((page, idx) =>
+                    page === '...' ? (
+                        <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+                    ) : (
+                        <button
+                            key={page}
+                            onClick={() => onPageChange(page as number)}
+                            className={`px-2 py-1 rounded text-xs ${
+                                currentPage === page
+                                    ? 'bg-blue-600 text-white'
+                                    : 'border border-gray-300 hover:bg-gray-100'
+                            }`}
+                        >
+                            {page}
+                        </button>
+                    )
+                )}
+                <button
+                    onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export function EmpClassSearchModal({
     isOpen,
     onClose,
     onSelect,
-    employeeClassItems,
-    loading,
-    error
 }: EmpClassSearchModalProps) {
-    const [searchTerm, setSearchTerm] = useState('');
+    const [items,       setItems]       = useState<EmpClassItem[]>([]);
+    const [isLoading,   setIsLoading]   = useState(false);
+    const [error,       setError]       = useState('');
+
+    const [searchTerm,  setSearchTerm]  = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 20;
 
-    // Handle ESC key to close modal
-    useEffect(() => {
-        const handleEscKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && isOpen) {
-                onClose();
+    // ── Fetch ──────────────────────────────────────────────────────────────────
+
+    const fetchClassifications = useCallback(async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp');
+            if (response.status === 200 && response.data) {
+                const mapped: EmpClassItem[] = response.data.map((classification: any) => ({
+                    id:          classification.classId   || '',
+                    code:        classification.classCode || '',
+                    description: classification.classDesc || '',
+                }));
+                setItems(mapped);
             }
-        };
-
-        if (isOpen) {
-            document.addEventListener('keydown', handleEscKey);
+        } catch (err: any) {
+            const errorMsg = err.response?.data?.message || err.message || 'Failed to load classifications.';
+            setError(errorMsg);
+            console.error('Error fetching classifications:', err);
+        } finally {
+            setIsLoading(false);
         }
+    }, []);
 
-        return () => {
-            document.removeEventListener('keydown', handleEscKey);
-        };
-    }, [isOpen, onClose]);
-
-    // Reset search when modal opens/closes
+    // Fetch when modal opens; clear state when it closes
     useEffect(() => {
         if (isOpen) {
             setSearchTerm('');
             setCurrentPage(1);
+            fetchClassifications();
+        } else {
+            setItems([]);
+            setError('');
         }
-    }, [isOpen]);
+    }, [isOpen, fetchClassifications]);
 
-    const filteredItems = employeeClassItems.filter(item =>
+    // ── ESC key ────────────────────────────────────────────────────────────────
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [isOpen, onClose]);
+
+    if (!isOpen) return null;
+
+    // ── Filtering & Pagination ─────────────────────────────────────────────────
+
+    const filteredItems  = items.filter((item) =>
         item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Pagination logic
-    const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedItems = filteredItems.slice(startIndex, endIndex);
+    const startIndex     = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    // Get visible page numbers
-    const getPageNumbers = () => {
-        const pages = [];
-        const maxVisible = 5;
-        if (totalPages <= maxVisible) {
-            return Array.from({ length: totalPages }, (_, i) => i + 1);
-        }
-        pages.push(1);
-        if (currentPage > 3) pages.push('...');
-        const start = Math.max(2, currentPage - 1);
-        const end = Math.min(totalPages - 1, currentPage + 1);
-        for (let i = start; i <= end; i++) pages.push(i);
-        if (currentPage < totalPages - 2) pages.push('...');
-        pages.push(totalPages);
-        return pages;
-    };
-
-    if (!isOpen) return null;
+    // ── Render ─────────────────────────────────────────────────────────────────
 
     return (
         <>
-            {/* Modal Backdrop */}
+            {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/30 z-30"
                 onClick={onClose}
-            ></div>
+            />
 
-            {/* Modal Dialog */}
+            {/* Dialog */}
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+
                     {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                         <h2 className="text-gray-800 text-sm">Search</h2>
-                        <button
-                            onClick={onClose}
-                            className="text-gray-600 hover:text-gray-800"
-                        >
+                        <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
 
-                    {/* Modal Content */}
+                    {/* Modal Body */}
                     <div className="p-3">
                         <h3 className="text-blue-600 mb-2 text-sm">Employee Classification Code</h3>
 
@@ -120,29 +209,30 @@ export function EmpClassSearchModal({
                                     setCurrentPage(1);
                                 }}
                                 className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                placeholder="Search by code, name, or group..."
+                                placeholder="Search by code or description..."
                             />
                         </div>
 
-                        {/* Error Message */}
+                        {/* Error */}
                         {error && (
                             <div className="p-2 bg-red-50 border border-red-200 rounded mb-3">
                                 <p className="text-red-700 text-xs">{error}</p>
                             </div>
                         )}
 
-                        {/* Loading State */}
-                        {loading ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="text-gray-600 text-sm">Loading Leave Codes...</div>
+                        {/* Table */}
+                        {isLoading ? (
+                            <div className="flex items-center justify-center py-8 text-gray-500 text-sm">
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Loading classifications...
                             </div>
                         ) : (
                             <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                                 <table className="w-full border-collapse text-sm">
                                     <thead className="sticky top-0 bg-white">
                                         <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                            <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Code</th>
-                                            <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Description</th>
+                                            <th className="px-3 py-1.5 text-left text-gray-700">Code</th>
+                                            <th className="px-3 py-1.5 text-left text-gray-700 border-l border-gray-300">Description</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -152,18 +242,18 @@ export function EmpClassSearchModal({
                                                     key={item.id}
                                                     className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
                                                     onClick={() => {
-                                                        onSelect(item.id.toString(), item.code);
+                                                        onSelect(item.code, item.description);
                                                         onClose();
                                                     }}
                                                 >
                                                     <td className="px-3 py-1.5">{item.code}</td>
-                                                    <td className="px-3 py-1.5">{item.description}</td>
+                                                    <td className="px-3 py-1.5 border-l border-gray-200">{item.description}</td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
                                                 <td colSpan={2} className="px-3 py-4 text-center text-gray-500 text-sm">
-                                                    No items found
+                                                    No records found.
                                                 </td>
                                             </tr>
                                         )}
@@ -173,44 +263,12 @@ export function EmpClassSearchModal({
                         )}
 
                         {/* Pagination */}
-                        <div className="flex items-center justify-between mt-3">
-                            <div className="text-gray-600 text-xs">
-                                Showing {filteredItems.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredItems.length)} of {filteredItems.length} entries
-                            </div>
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Previous
-                                </button>
-                                {getPageNumbers().map((page, idx) => (
-                                    page === '...' ? (
-                                        <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-                                    ) : (
-                                        <button
-                                            key={page}
-                                            onClick={() => setCurrentPage(page as number)}
-                                            className={`px-2 py-1 rounded text-xs ${
-                                                currentPage === page
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'border border-gray-300 hover:bg-gray-100'
-                                            }`}
-                                        >
-                                            {page}
-                                        </button>
-                                    )
-                                ))}
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages || totalPages === 0}
-                                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Next
-                                </button>
-                            </div>
-                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalCount={filteredItems.length}
+                            pageSize={ITEMS_PER_PAGE}
+                            onPageChange={setCurrentPage}
+                        />
                     </div>
                 </div>
             </div>

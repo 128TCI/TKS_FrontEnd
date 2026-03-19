@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, Check, Save, Search, X, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box } from 'lucide-react';
+import { AlertCircle, Check, Save, Search, X, Users, Building2, Briefcase, Network, CalendarClock, Wallet, Grid, Box, Info } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
-import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import { ApiService, showErrorModal } from '../../services/apiService';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 import { toISO } from '../../services/utilityService';
 import { RefCodeSearchModal, type RefCodeItem } from './../Modals/RefCodeSearchModal';
 
@@ -41,6 +42,126 @@ const INFO_ITEMS = [
 
 const ITEMS_PER_PAGE = 10;
 
+// ── API endpoints ─────────────────────────────────────────────────────────────
+// Controller: [Route("api/Utilities/[action]")]
+//   GET  api/Utilities/GetRefCode/AdditionalHoursPerWeek
+//   POST api/Utilities/AdditionalHoursPerWeek
+
+const API_GET_REF_CODES = '/Utilities/GetRefCode/AdditionalHoursPerWeek';
+const API_POST_UPDATE   = '/Utilities/AdditionalHoursPerWeek';
+
+// ── Update conditions ─────────────────────────────────────────────────────────
+// Plain language — no DB table names. Shown on the page and in the result modal.
+
+const UPDATE_CONDITIONS = [
+  'Employee must be set up and configured in the timekeeping system',
+  'Employee\'s active/inactive status must match the selected filter',
+  'Employee must have processed daily hours within the selected date range',
+  'Hours worked per day must meet the minimum threshold set in the Ref Code',
+  'The date range must include at least one weekday defined in the Ref Code',
+  'Total weekly hours must meet the minimum threshold set in the Ref Code',
+  'Employee must have a valid work shift schedule assigned',
+];
+
+// ── Result modal ──────────────────────────────────────────────────────────────
+// Uses SweetAlert2 directly.
+// Skipped employees are in a collapsible <details> — closed by default.
+
+const showResultModal = async (
+  updatedEmpCodes: string[],
+  skippedEmpCodes: string[],
+  message: string
+) => {
+  const hasUpdated = updatedEmpCodes.length > 0;
+  const hasSkipped = skippedEmpCodes.length > 0;
+
+  // ── Updated section ────────────────────────────────────────────────────
+  const updatedSection = `
+    <div style="margin-bottom:12px;">
+      <div style="
+        display:flex;align-items:center;gap:8px;
+        background:#f0fdf4;border:1px solid #bbf7d0;
+        border-radius:8px;padding:9px 13px;">
+        <span style="
+          width:22px;height:22px;border-radius:50%;
+          background:#22c55e;color:#fff;
+          display:inline-flex;align-items:center;justify-content:center;
+          font-size:12px;font-weight:700;flex-shrink:0;">✓</span>
+        <span style="font-weight:600;color:#15803d;font-size:13px;">
+          Updated — ${updatedEmpCodes.length} employee${updatedEmpCodes.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      ${hasUpdated ? `
+        <div style="
+          margin-top:6px;
+          background:#f9fafb;border:1px solid #e5e7eb;
+          border-radius:6px;padding:8px 12px;
+          font-family:monospace;font-size:12px;color:#374151;
+          line-height:1.9;text-align:left;word-break:break-all;">
+          ${updatedEmpCodes.join(' &nbsp;·&nbsp; ')}
+        </div>` : ''}
+    </div>`;
+
+  // ── Skipped section — collapsible, closed by default ──────────────────
+  const skippedSection = hasSkipped ? `
+    <div style="margin-bottom:12px;">
+      <details style="
+        background:#fff7ed;border:1px solid #fed7aa;
+        border-radius:8px;overflow:hidden;">
+        <summary style="
+          display:flex;align-items:center;gap:8px;
+          padding:9px 13px;cursor:pointer;
+          list-style:none;user-select:none;
+          outline:none;">
+          <span style="
+            width:22px;height:22px;border-radius:50%;
+            background:#f97316;color:#fff;
+            display:inline-flex;align-items:center;justify-content:center;
+            font-size:12px;font-weight:700;flex-shrink:0;">!</span>
+          <span style="font-weight:600;color:#c2410c;font-size:13px;flex:1;text-align:left;">
+            Skipped — ${skippedEmpCodes.length} employee${skippedEmpCodes.length !== 1 ? 's' : ''}
+          </span>
+          <span style="font-size:11px;color:#9a3412;text-decoration:underline;
+            text-underline-offset:2px;white-space:nowrap;">
+            See skipped employees ▾
+          </span>
+        </summary>
+        <div style="
+          border-top:1px solid #fed7aa;
+          padding:8px 12px 10px;
+          background:#fffbf7;">
+          <div style="
+            background:#fff;border:1px solid #e5e7eb;
+            border-radius:6px;padding:8px 12px;
+            font-family:monospace;font-size:12px;color:#374151;
+            line-height:1.9;text-align:left;word-break:break-all;">
+            ${skippedEmpCodes.join(' &nbsp;·&nbsp; ')}
+          </div>
+        </div>
+      </details>
+    </div>` : '';
+
+  await Swal.fire({
+    title: !hasUpdated && hasSkipped
+      ? '<span style="color:#dc2626;font-size:17px;">No Employees Updated</span>'
+      : hasSkipped
+        ? '<span style="color:#d97706;font-size:17px;">Partial Update</span>'
+        : '<span style="color:#16a34a;font-size:17px;">Update Successful</span>',
+    html: `
+      <div style="text-align:left;">
+        <p style="font-size:13px;color:#6b7280;margin:0 0 14px 0;text-align:center;">
+          ${message}
+        </p>
+        ${updatedSection}
+        ${skippedSection}
+      </div>`,
+    icon: !hasUpdated && hasSkipped ? 'error' : hasSkipped ? 'warning' : 'success',
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#2563eb',
+    width: 460,
+  });
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const mapGroupItems = (data: any[], idKey: string, codeKey: string, descKey: string): GroupItem[] =>
@@ -53,8 +174,8 @@ const mapGroupItems = (data: any[], idKey: string, codeKey: string, descKey: str
 const getPageNumbers = (current: number, total: number): (number | string)[] => {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: (number | string)[] = [];
-  if (current <= 4)                { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(total); }
-  else if (current >= total - 3)   { pages.push(1); pages.push('...'); for (let i = total - 4; i <= total; i++) pages.push(i); }
+  if (current <= 4)              { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(total); }
+  else if (current >= total - 3) { pages.push(1); pages.push('...'); for (let i = total - 4; i <= total; i++) pages.push(i); }
   else { pages.push(1); pages.push('...'); for (let i = current - 1; i <= current + 1; i++) pages.push(i); pages.push('...'); pages.push(total); }
   return pages;
 };
@@ -111,15 +232,14 @@ export function AdditionalHoursPerWeekPage() {
   const [loadingEmployees,   setLoadingEmployees]   = useState(false);
 
   // ── Ref Code state ──────────────────────────────────────────────────────────
-  const [refCode,            setRefCode]            = useState<number>(0);
-  const [refCodeLabel,       setRefCodeLabel]       = useState('');
-  const [refCodeItems,       setRefCodeItems]       = useState<RefCodeItem[]>([]);
-  const [refCodeLoading,     setRefCodeLoading]     = useState(false);
-  const [refCodeError,       setRefCodeError]       = useState('');
-  const [showRefCodeModal,   setShowRefCodeModal]   = useState(false);
+  const [refCode,          setRefCode]          = useState<number>(0);
+  const [refCodeLabel,     setRefCodeLabel]     = useState('');
+  const [refCodeItems,     setRefCodeItems]     = useState<RefCodeItem[]>([]);
+  const [refCodeLoading,   setRefCodeLoading]   = useState(false);
+  const [refCodeError,     setRefCodeError]     = useState('');
+  const [showRefCodeModal, setShowRefCodeModal] = useState(false);
 
   // ── Group data per tab ──────────────────────────────────────────────────────
-
   const [tkGroupItems,       setTKGroupItems]       = useState<GroupItem[]>([]);
   const [branchItems,        setBranchItems]        = useState<GroupItem[]>([]);
   const [departmentItems,    setDepartmentItems]    = useState<GroupItem[]>([]);
@@ -186,20 +306,23 @@ export function AdditionalHoursPerWeekPage() {
   useEffect(() => {
     const loadRefCodes = async () => {
       setRefCodeLoading(true);
+      setRefCodeError('');
       try {
-        const res = await apiClient.get('/Utilities/GetRefCode/AdditionalHoursPerWeek');
-        console.log('Loaded Ref Codes:', res.data);
-        setRefCodeItems((Array.isArray(res.data) ? res.data : []).map((item: any): RefCodeItem => ({
-          refCode:    item.refCode    ?? item.RefCode    ?? 0,
-          day:        item.day        ?? item.Day    ?? '',
-          regularDay: item.regularDay ?? item.RegularDay ?? '',
-          restDay:    item.restDay    ?? item.RestDay    ?? '',
-          special:    item.special    ?? item.Special    ?? '',
-          legal:      item.legal      ?? item.Legal      ?? '',
-        })));
+        const res = await apiClient.get(API_GET_REF_CODES);
+        setRefCodeItems(
+          (Array.isArray(res.data) ? res.data : []).map((item: any): RefCodeItem => ({
+            refCode:    item.refCode    ?? item.RefCode    ?? 0,
+            day:        item.day        ?? item.Day        ?? '',
+            regularDay: item.regularDay ?? item.RegularDay ?? '',
+            restDay:    item.restDay    ?? item.RestDay    ?? '',
+            special:    item.special    ?? item.Special    ?? '',
+            legal:      item.legal      ?? item.Legal      ?? '',
+            paidLeave:  item.paidLeave  ?? item.PaidLeave  ?? false,
+          }))
+        );
       } catch (err) {
         setRefCodeError('Failed to load Ref Codes.');
-        console.error(err);
+        console.error('Failed to load ref codes:', err);
       } finally {
         setRefCodeLoading(false);
       }
@@ -233,7 +356,7 @@ export function AdditionalHoursPerWeekPage() {
     };
   }, []);
 
-  // ── Fetch employees when group selection / status / tab changes ────────────
+  // ── Fetch employees ────────────────────────────────────────────────────────
 
   const fetchFilteredEmployees = useCallback(async (
     tab: TabName, selectedIds: number[], allItems: GroupItem[],
@@ -254,7 +377,7 @@ export function AdditionalHoursPerWeekPage() {
         const params = buildSpParams(tab, selectedIds, allItems, status);
         const res    = await apiClient.post('/Utilities/GetFilteredEmployees', params);
         list = (Array.isArray(res.data) ? res.data : []).map((item: any): EmployeeItem => ({
-          id:   item.empID   ?? item.ID     ?? item.id   ?? 0,
+          id:   item.empID   ?? item.ID      ?? item.id   ?? 0,
           code: item.empCode ?? item.EmpCode ?? item.code ?? '',
           name: `${item.lName ?? item.LName ?? ''}, ${item.fName ?? item.FName ?? ''} ${item.mName ?? item.MName ?? ''}`.trim(),
         }));
@@ -304,36 +427,54 @@ export function AdditionalHoursPerWeekPage() {
   const handleSelectAllEmployees = () =>
     setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
 
+  // ── Reset form ──────────────────────────────────────────────────────────────
+
+  const resetForm = () => {
+    setSelectedGroupsMap({ ...EMPTY_SELECTION });
+    setSelectedEmployees([]);
+    setDateFrom('');
+    setDateTo('');
+    setRefCode(0);
+    setRefCodeLabel('');
+    setGroupSearchTerm('');
+    setEmployeeSearchTerm('');
+    setCurrentGroupPage(1);
+    setCurrentEmpPage(1);
+  };
+
   // ── Update ──────────────────────────────────────────────────────────────────
 
   const handleUpdate = async () => {
     if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
-    if (!dateFrom || !dateTo)      { await showErrorModal('Please select Date From and Date To.'); return; }
+    if (!dateFrom)                  { await showErrorModal('Please select Date From.'); return; }
+    if (!dateTo)                    { await showErrorModal('Please select Date To.'); return; }
+    if (!refCode || refCode === 0)  { await showErrorModal('Reference code cannot be empty.'); return; }
 
     try {
       setIsUpdating(true);
 
-      // Map status for backend: legacy expects "Active" | "InActive" | "All"
       const statusMap = { active: 'Active', inactive: 'InActive', all: 'All' } as const;
 
       const payload = {
-        empCodes: selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id)),
+        empCodes: selectedEmployees
+          .map(id => employeeItems.find(e => e.id === id)?.code ?? '')
+          .filter(code => code !== ''),
         dateFrom: toISO(dateFrom),
         dateTo:   toISO(dateTo),
         status:   statusMap[statusFilter],
-        refCode:  refCode,
+        refCode,
+        userName: getLoggedInUsername(),
       };
 
-      const res = await apiClient.post('/Utilities/AdditionalHoursPerWeek_byDate', payload);
+      const res = await apiClient.post(API_POST_UPDATE, payload);
 
       if (ApiService.isApiSuccess(res)) {
-        await showSuccessModal(res.data?.message ?? 'Additional Hours Per Week successfully updated.');
-        setSelectedGroupsMap({ ...EMPTY_SELECTION });
-        setSelectedEmployees([]);
-        setDateFrom('');
-        setDateTo('');
-        setRefCode(0);
-        setRefCodeLabel('');
+        const updatedEmpCodes: string[] = res.data?.updatedEmpCodes ?? [];
+        const skippedEmpCodes: string[] = res.data?.skippedEmpCodes ?? [];
+        const message: string           = res.data?.message ?? 'Additional Hours Per Week successfully updated.';
+
+        await showResultModal(updatedEmpCodes, skippedEmpCodes, message);
+        resetForm();
       } else {
         await showErrorModal(res.data?.message ?? 'Update failed.');
       }
@@ -440,7 +581,7 @@ export function AdditionalHoursPerWeekPage() {
                   startIdx={startGroupIndex} totalCount={filteredGroups.length} />
               </div>
 
-              {/* Right — Employees + date range */}
+              {/* Right — Employees + controls */}
               <div className="space-y-6">
 
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
@@ -501,16 +642,16 @@ export function AdditionalHoursPerWeekPage() {
                   </div>
                 </div>
 
-                {/* Date range + Update button */}
+                {/* Ref Code + Date range + Requirements note + Update button */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="space-y-4">
 
-                    {/* Ref Code — above Date From, matching legacy layout */}
+                    {/* Ref Code */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700 w-24">Ref Code:</label>
-                      <input type="text" readOnly value={refCodeLabel}
+                      <input type="text" readOnly style={{cursor:'not-allowed'}} value={refCodeLabel}
                         className="px-3 py-2 border border-gray-300 rounded bg-gray-100 text-sm w-32 cursor-default"
-                        placeholder="—" />
+                        placeholder="Select via search..." />
                       <button onClick={() => setShowRefCodeModal(true)}
                         className="px-2 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                         title="Search Ref Code">
@@ -522,27 +663,62 @@ export function AdditionalHoursPerWeekPage() {
                         title="Clear Ref Code">
                         <X className="w-4 h-4" />
                       </button>
+                      {refCodeLoading && <span className="text-xs text-gray-400 ml-1">Loading…</span>}
+                      {refCodeError && !refCodeLoading && (
+                        <span className="text-xs text-red-500 ml-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {refCodeError}
+                        </span>
+                      )}
                     </div>
 
+                    {/* Date From */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700 w-24">Date From:</label>
                       <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                        readOnly style={{cursor:'not-allowed'}} placeholder='MM/DD/YYYY'
                         className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
                       <CalendarPopover date={dateFrom} onChange={setDateFrom} />
                     </div>
+
+                    {/* Date To */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-gray-700 w-24">Date To:</label>
                       <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                        readOnly style={{cursor:'not-allowed'}} placeholder='MM/DD/YYYY'
                         className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
                       <CalendarPopover date={dateTo} onChange={setDateTo} />
                     </div>
-                    <div className="flex justify-end pt-4 border-t border-gray-200">
+
+                    {/* ── Requirements note ────────────────────────────────── */}
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Info className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                        <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+                          Requirements for an employee to be updated
+                        </span>
+                      </div>
+                      <ul className="space-y-1">
+                        {UPDATE_CONDITIONS.map((condition, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-xs text-blue-800">
+                            <span className="mt-0.5 w-4 h-4 flex-shrink-0 rounded-full bg-blue-200 text-blue-700
+                              flex items-center justify-center font-semibold text-[10px]">
+                              {idx + 1}
+                            </span>
+                            <span>{condition}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Update button */}
+                    <div className="flex justify-end pt-2 border-t border-gray-200">
                       <button onClick={handleUpdate} disabled={isUpdating}
                         className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         <Save className="w-4 h-4" />
                         {isUpdating ? 'Updating…' : 'Update'}
                       </button>
                     </div>
+
                   </div>
                 </div>
 
@@ -557,7 +733,11 @@ export function AdditionalHoursPerWeekPage() {
       <RefCodeSearchModal
         isOpen={showRefCodeModal}
         onClose={() => setShowRefCodeModal(false)}
-        onSelect={(code, label) => { setRefCode(code); setRefCodeLabel(label); }}
+        onSelect={(code, label) => {
+          setRefCode(code);
+          setRefCodeLabel(label);
+          setShowRefCodeModal(false);
+        }}
         items={refCodeItems}
         loading={refCodeLoading}
         error={refCodeError}

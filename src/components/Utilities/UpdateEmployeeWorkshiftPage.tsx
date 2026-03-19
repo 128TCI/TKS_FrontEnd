@@ -1,13 +1,36 @@
 import { useState, useEffect } from 'react';
-import { Save, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, Check, Clock } from 'lucide-react';
+import { Save, Users, Building2, Briefcase, CalendarClock, Wallet, Grid, Check, Clock, Search } from 'lucide-react';
 import { CalendarPopover } from '../Modals/CalendarPopover';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
 import apiClient from '../../services/apiClient';
+import { DailyScheduleSearchModal } from '../Modals/DailyScheduleSearchModal';
+import { WorkshiftCodeSearchModal } from '../Modals/WorkshiftSetupModals/WorkshiftCodeSearchModal';
 
 interface GroupItem { id: number; code: string; description: string; }
 interface EmployeeItem { id: number; code: string; name: string; }
-
+interface DailySchedule {
+  dailyScheduleID: number;
+  referenceNo: string;
+  monday: string;
+  tuesday: string;
+  wednesday: string;
+  thursday: string;
+  friday: string;
+  saturday: string;
+  sunday: string;
+}
+interface UpdateEmployeeWorkshiftDto {
+  empCode:                 string[];
+  scheduleType:            string;
+  dailySchedule:           string | null;
+  workshift:               string | null;
+  withDateRange:           boolean;
+  fixWithDateRange:        boolean;
+  dateFrom:                string | null;
+  dateTo:                  string | null;
+  deleteExistingWorkshift: boolean;
+}
 type TabName = 'TK Group' | 'Branch' | 'Department' | 'Group Schedule' | 'Pay House' | 'Section';
 const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
   { name: 'TK Group', icon: Users }, { name: 'Branch', icon: Building2 },
@@ -17,7 +40,26 @@ const TABS: { name: TabName; icon: React.ComponentType<any> }[] = [
 const EMPTY_SELECTION: Record<TabName, number[]> = {
   'TK Group': [], 'Branch': [], 'Department': [], 'Group Schedule': [], 'Pay House': [], 'Section': [],
 };
-export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
+const toLocalISOString = (raw: string): string | null => {
+  if (!raw) return null;
+
+  // Handle MM/DD/YYYY format from CalendarPopover
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+  }
+
+  // Fallback: parse and extract local date parts (avoids UTC shift)
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T00:00:00`;
+};
+export function UpdateEmployeeWorkshiftPage() {
+  const [activeTab,          setActiveTab]          = useState<TabName>('TK Group');
   const [statusFilter,       setStatusFilter]       = useState<'active' | 'inactive' | 'all'>('active');
   const [dateFrom,           setDateFrom]           = useState('');
   const [dateTo,             setDateTo]             = useState('');
@@ -25,7 +67,7 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [isUpdating,         setIsUpdating]         = useState(false);
   const itemsPerPage = 10;
-  const [workshiftType,  setWorkshiftType]  = useState<'fixed'|'variable'>('fixed');
+  const [workshiftType,  setWorkshiftType]  = useState<'fixed' | 'variable'>('fixed');
   const [withDateRange,  setWithDateRange]  = useState(false);
   const [dailySchedule,  setDailySchedule]  = useState('');
   const [workshift,      setWorkshift]      = useState('');
@@ -45,8 +87,18 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
   const [sectionItems,       setSectionItems]       = useState<GroupItem[]>([]);
   const [employeeItems,      setEmployeeItems]      = useState<EmployeeItem[]>([]);
   const [loadingEmployees,   setLoadingEmployees]   = useState(false);
+
+  // Daily Schedule Modal
+  const [dailyScheduleModalOpen,    setDailyScheduleModalOpen]    = useState(false);
+  const [dailySchedules,            setDailySchedules]            = useState<DailySchedule[]>([]);
+  const [dailyScheduleLoading,      setDailyScheduleLoading]      = useState(false);
+
+  // Workshift Modal
+  const [workshiftModalOpen,        setWorkshiftModalOpen]        = useState(false);
+  const [workshiftSearchTerm,       setWorkshiftSearchTerm]       = useState('');
+
   useEffect(() => { setCurrentGroupPage(1); }, [activeTab]);
-  
+
   const getSelectionTitle = () => {
     switch (activeTab) {
       case 'TK Group': return 'TK Group Selection';
@@ -57,7 +109,7 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
       case 'Section': return 'Section Selection';
       default: return 'Selection';
     }
-  };  
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -68,17 +120,55 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
           apiClient.get('/Fs/Employment/PayHouseSetUp'),   apiClient.get('/Fs/Employment/SectionSetUp'),
         ]);
         const mp = (d: any[], ik: string, ck: string, dk: string): GroupItem[] =>
-          (Array.isArray(d) ? d : []).map(i => ({ id: i[ik]??i.ID??i.id??0, code: i[ck]??i.code??'', description: i[dk]??i.description??'' }));
-        setTKSGroupItems(mp(tks.data,'ID','groupCode','groupDescription'));
-        setBranchItems(mp(bra.data,'braID','braCode','braDesc'));
-        setDepartmentItems(mp(dep.data,'depID','depCode','depDesc'));
-        setGroupScheduleItems(mp(grp.data,'grpSchID','grpCode','grpDesc'));
-        setPayHouseItems(mp(pay.data,'lineID','lineCode','lineDesc'));
-        setSectionItems(mp(sec.data,'secID','secCode','secDesc'));
+          (Array.isArray(d) ? d : []).map(i => ({ id: i[ik] ?? i.ID ?? i.id ?? 0, code: i[ck] ?? i.code ?? '', description: i[dk] ?? i.description ?? '' }));
+        setTKSGroupItems(mp(tks.data, 'ID', 'groupCode', 'groupDescription'));
+        setBranchItems(mp(bra.data, 'braID', 'braCode', 'braDesc'));
+        setDepartmentItems(mp(dep.data, 'depID', 'depCode', 'depDesc'));
+        setGroupScheduleItems(mp(grp.data, 'grpSchID', 'grpCode', 'grpDesc'));
+        setPayHouseItems(mp(pay.data, 'lineID', 'lineCode', 'lineDesc'));
+        setSectionItems(mp(sec.data, 'secID', 'secCode', 'secDesc'));
       } catch (err) { console.error(err); }
     };
     load();
   }, []);
+
+  const fetchDailySchedules = async () => {
+    setDailyScheduleLoading(true);
+    try {
+      const response = await apiClient.get('/Fs/Process/DailyScheduleSetUp');
+      if (response.status === 200 && response.data) {
+        console.log(response.data);
+        const schedules = response.data.data;
+        const mappedData = schedules.map((schedule: any) => ({
+          dailyScheduleID: schedule.dailyScheduleID || 0,
+          referenceNo:     schedule.referenceNo     || '',
+          monday:          schedule.monday          || '',
+          tuesday:         schedule.tuesday         || '',
+          wednesday:       schedule.wednesday       || '',
+          thursday:        schedule.thursday        || '',
+          friday:          schedule.friday          || '',
+          saturday:        schedule.saturday        || '',
+          sunday:          schedule.sunday          || '',
+        }));
+        setDailySchedules(mappedData);
+      }
+    } catch (error: any) {
+      console.error('Error fetching daily schedules:', error);
+    } finally {
+      setDailyScheduleLoading(false);
+    }
+  };
+
+  const handleOpenDailyScheduleModal = () => {
+    fetchDailySchedules();
+    setDailyScheduleModalOpen(true);
+  };
+
+  const handleOpenWorkshiftModal = () => {
+    setWorkshiftSearchTerm('');
+    setWorkshiftModalOpen(true);
+  };
+
   const getCurrentData = (): GroupItem[] => {
     switch (activeTab) {
       case 'Branch': return branchItems; case 'Department': return departmentItems;
@@ -86,30 +176,32 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
       case 'Section': return sectionItems; default: return tkGroupItems;
     }
   };
+
   const buildSpParams = (tab: TabName, ids: number[], items: GroupItem[], status: string) => {
     const codes = items.filter(i => ids.includes(i.id)).map(i => i.code).join(',');
     return {
-      Transaction: status==='active'?'Active':status==='inactive'?'InActive':'All',
-      GroupCodes: tab==='TK Group'?codes:'', Branches: tab==='Branch'?codes:'',
-      Divisions:'', Departments: tab==='Department'?codes:'',
-      Sections: tab==='Section'?codes:'', Units:'', Lines:'', Areas:'', Locations:'',
-      GroupSchedules: tab==='Group Schedule'?codes:'',
+      Transaction: status === 'active' ? 'Active' : status === 'inactive' ? 'InActive' : 'All',
+      GroupCodes: tab === 'TK Group' ? codes : '', Branches: tab === 'Branch' ? codes : '',
+      Divisions: '', Departments: tab === 'Department' ? codes : '',
+      Sections: tab === 'Section' ? codes : '', Units: '', Lines: '', Areas: '', Locations: '',
+      GroupSchedules: tab === 'Group Schedule' ? codes : '',
     };
   };
+
   const fetchFilteredEmployees = async (tab: TabName, ids: number[], items: GroupItem[], status: string) => {
     setLoadingEmployees(true); setCurrentEmpPage(1);
     try {
       if (ids.length === 0) {
         const res = await apiClient.get('/Maintenance/EmployeeMasterFile');
-        setEmployeeItems((Array.isArray(res.data)?res.data:[]).map((e:any):EmployeeItem=>({
-          id:e.empID??e.ID??e.id??0, code:e.empCode??e.code??'',
-          name:`${e.lName??''}, ${e.fName??''} ${e.mName??''}`.trim(),
+        setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((e: any): EmployeeItem => ({
+          id: e.empID ?? e.ID ?? e.id ?? 0, code: e.empCode ?? e.code ?? '',
+          name: `${e.lName ?? ''}, ${e.fName ?? ''} ${e.mName ?? ''}`.trim(),
         })));
       } else {
-        const res = await apiClient.post('/Utilities/GetFilteredEmployees', buildSpParams(tab,ids,items,status));
-        setEmployeeItems((Array.isArray(res.data)?res.data:[]).map((e:any):EmployeeItem=>({
-          id:e.empID??e.ID??e.id??0, code:e.empCode??e.EmpCode??e.code??'',
-          name:`${e.lName??e.LName??''}, ${e.fName??e.FName??''} ${e.mName??e.MName??''}`.trim(),
+        const res = await apiClient.post('/Utilities/GetFilteredEmployees', buildSpParams(tab, ids, items, status));
+        setEmployeeItems((Array.isArray(res.data) ? res.data : []).map((e: any): EmployeeItem => ({
+          id: e.empID ?? e.ID ?? e.id ?? 0, code: e.empCode ?? e.EmpCode ?? e.code ?? '',
+          name: `${e.lName ?? e.LName ?? ''}, ${e.fName ?? e.FName ?? ''} ${e.mName ?? e.MName ?? ''}`.trim(),
         })));
       }
     } catch { setEmployeeItems([]); } finally { setLoadingEmployees(false); }
@@ -119,6 +211,7 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
     fetchFilteredEmployees(activeTab, selectedGroups, getCurrentData(), statusFilter);
     setSelectedEmployees([]);
   }, [activeTab, selectedGroups, statusFilter]); // eslint-disable-line
+
   const currentItems    = getCurrentData();
   const filteredGroups  = currentItems.filter(i =>
     i.code.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
@@ -133,55 +226,91 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
   const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
   const startEmpIndex      = (currentEmpPage - 1) * itemsPerPage;
   const paginatedEmployees = filteredEmployees.slice(startEmpIndex, startEmpIndex + itemsPerPage);
+
   const getPageNumbers = (current: number, total: number) => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: (number | string)[] = [];
-    if (current <= 4)           { for (let i=1;i<=5;i++) pages.push(i); pages.push('...'); pages.push(total); }
-    else if (current>=total-3)  { pages.push(1); pages.push('...'); for (let i=total-4;i<=total;i++) pages.push(i); }
-    else { pages.push(1); pages.push('...'); for (let i=current-1;i<=current+1;i++) pages.push(i); pages.push('...'); pages.push(total); }
+    if (current <= 4)          { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(total); }
+    else if (current >= total - 3) { pages.push(1); pages.push('...'); for (let i = total - 4; i <= total; i++) pages.push(i); }
+    else { pages.push(1); pages.push('...'); for (let i = current - 1; i <= current + 1; i++) pages.push(i); pages.push('...'); pages.push(total); }
     return pages;
   };
-  const handleGroupToggle        = (id: number) => setSelectedGroups(prev => prev.includes(id)?prev.filter(i=>i!==id):[...prev,id]);
-  const handleEmployeeToggle     = (id: number) => setSelectedEmployees(prev => prev.includes(id)?prev.filter(i=>i!==id):[...prev,id]);
-  const handleSelectAllGroups    = () => setSelectedGroups(selectedGroups.length===filteredGroups.length?[]:filteredGroups.map(g=>g.id));
-  const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length===filteredEmployees.length?[]:filteredEmployees.map(e=>e.id));
 
-  const resetForm = () => { setSelectedGroupsMap({...EMPTY_SELECTION}); setSelectedEmployees([]); setDateFrom(''); setDateTo(''); setWorkshiftType('fixed'); setWithDateRange(false); setDailySchedule(''); setWorkshift(''); setDeleteExisting(false); };
-  const handleUpdate = async () => {
-    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
-    if (workshiftType==='fixed'    && !dailySchedule) { await showErrorModal('Daily Time Schedule should not be empty.'); return; }
-    if (workshiftType==='variable' && !workshift)     { await showErrorModal('Workshift should not be empty.'); return; }
-    if (workshiftType==='variable' && (!dateFrom||!dateTo)) { await showErrorModal('Please select Date From and Date To.'); return; }
-    try {
-      setIsUpdating(true);
-      const payload = {
-        empCode:                 selectedEmployees.map(id=>employeeItems.find(e=>e.id===id)?.code??String(id)),
-        dailySchedule,
-        workshift:               workshiftType,
-        withDateRange,
-        dateFrom:                new Date(dateFrom).toISOString(),
-        dateTo:                  new Date(dateTo).toISOString(),
-        deleteExistingWorkshift: deleteExisting,
-      };
-      const res = await apiClient.post('/Utilities/UpdateStatus_byCDate', payload);
-      if (ApiService.isApiSuccess(res)) { await showSuccessModal('Successfully updated Employee Workshift.'); resetForm(); }
-    } catch { await showErrorModal('Failed to update records'); }
-    finally { setIsUpdating(false); }
+  const handleGroupToggle        = (id: number) => setSelectedGroups(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleEmployeeToggle     = (id: number) => setSelectedEmployees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleSelectAllGroups    = () => setSelectedGroups(selectedGroups.length === filteredGroups.length ? [] : filteredGroups.map(g => g.id));
+  const handleSelectAllEmployees = () => setSelectedEmployees(selectedEmployees.length === filteredEmployees.length ? [] : filteredEmployees.map(e => e.id));
+
+  const resetForm = () => {
+    setSelectedGroupsMap({ ...EMPTY_SELECTION }); setSelectedEmployees([]);
+    setDateFrom(''); setDateTo(''); setWorkshiftType('fixed'); setWithDateRange(false);
+    setDailySchedule(''); setWorkshift(''); setDeleteExisting(false);
   };
 
-  const renderPagination = (current: number, total: number, setPage: (p:number)=>void, startIdx: number, totalCount: number) => (
+  const handleUpdate = async () => {
+    if (!selectedEmployees.length) { await showErrorModal('Please select employee/s to update.'); return; }
+    if (workshiftType === 'fixed'    && !dailySchedule) { await showErrorModal('Daily Time Schedule should not be empty.'); return; }
+    if (workshiftType === 'variable' && !workshift)     { await showErrorModal('Workshift should not be empty.'); return; }
+    if (workshiftType === 'variable' && (!dateFrom || !dateTo)) { await showErrorModal('Please select Date From and Date To.'); return; }
+
+    try {
+      setIsUpdating(true);
+
+      const empCodes = selectedEmployees.map(id => employeeItems.find(e => e.id === id)?.code ?? String(id));
+
+      const payload: UpdateEmployeeWorkshiftDto = {
+        empCode:                 empCodes,
+        scheduleType:            workshiftType === 'fixed' ? 'Fixed' : 'Variable',
+        dailySchedule:           workshiftType === 'fixed'    ? dailySchedule : null,
+        workshift:               workshiftType === 'variable' ? workshift     : null,
+        withDateRange,
+        fixWithDateRange:        workshiftType === 'fixed' && withDateRange,  // ← new
+        dateFrom:                toLocalISOString(dateFrom),
+        dateTo:                  toLocalISOString(dateTo),
+        deleteExistingWorkshift: deleteExisting,
+      };
+
+      if (workshiftType === 'fixed') {
+        if (withDateRange) {
+          // Fixed WITH date range — single SP handles delete + insert
+          await apiClient.post('/Utilities/UpdateEmployeeWorkshiftFixWithDateRange', payload);
+        } else {
+          // Fixed WITHOUT date range — delete then add
+          if (deleteExisting)
+            await apiClient.post('/Utilities/UpdateEmployeeWorkshiftFixed_DeleteEmpTKConfigWorkShift', payload);
+          await apiClient.post('/Utilities/UpdateEmployeeWorkshiftFixed_AddEmpTKConfigWorkShift', payload);
+        }
+      } else {
+        // Variable — delete existing if checked, then add
+        if (deleteExisting)
+          await apiClient.post('/Utilities/UpdateEmployeeWorkshiftVariable_DeleteEmpTKConfigWorkShift', payload);
+        await apiClient.post('/Utilities/UpdateEmployeeWorkshiftVariable_AddEmpTKConfigWorkShift', payload);
+      }
+
+      await showSuccessModal('Successfully updated Employee Workshift.');
+      resetForm();
+
+    } catch {
+      await showErrorModal('Failed to update records.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const renderPagination = (current: number, total: number, setPage: (p: number) => void, startIdx: number, totalCount: number) => (
     <div className="flex items-center justify-between mt-3">
-      <span className="text-xs text-gray-500">Showing {totalCount===0?0:startIdx+1} to {Math.min(startIdx+itemsPerPage,totalCount)} of {totalCount} entries</span>
+      <span className="text-xs text-gray-500">Showing {totalCount === 0 ? 0 : startIdx + 1} to {Math.min(startIdx + itemsPerPage, totalCount)} of {totalCount} entries</span>
       <div className="flex items-center gap-1">
-        <button onClick={()=>setPage(Math.max(1,current-1))} disabled={current===1} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-        {getPageNumbers(current,total).map((page,idx)=>
-          page==='...'?<span key={`e-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
-          :<button key={page} onClick={()=>setPage(page as number)} className={`px-2 py-1 rounded text-xs ${current===page?'bg-blue-600 text-white':'border border-gray-300 hover:bg-gray-100'}`}>{page}</button>
+        <button onClick={() => setPage(Math.max(1, current - 1))} disabled={current === 1} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+        {getPageNumbers(current, total).map((page, idx) =>
+          page === '...' ? <span key={`e-${idx}`} className="px-1 text-gray-500 text-xs">...</span>
+            : <button key={page} onClick={() => setPage(page as number)} className={`px-2 py-1 rounded text-xs ${current === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}>{page}</button>
         )}
-        <button onClick={()=>setPage(Math.min(total,current+1))} disabled={current===total||total===0} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+        <button onClick={() => setPage(Math.min(total, current + 1))} disabled={current === total || total === 0} className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
       </div>
     </div>
   );
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 p-6">
@@ -216,37 +345,40 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
               </div>
             </div>
           </div>
-            {/* Tabs */}
+
+          {/* Tabs */}
           <div className="bg-white rounded-b-lg shadow-lg p-6">
             <div className="mb-6 flex items-center gap-1 border-b border-gray-200 flex-wrap">
               {TABS.map(tab => (
-                <button key={tab.name} onClick={()=>setActiveTab(tab.name)}
-                  className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg transition-colors ${activeTab===tab.name?'font-medium bg-blue-600 text-white -mb-px':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                  <tab.icon className="w-4 h-4"/>{tab.name}
+                <button key={tab.name} onClick={() => setActiveTab(tab.name)}
+                  className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg transition-colors ${activeTab === tab.name ? 'font-medium bg-blue-600 text-white -mb-px' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  <tab.icon className="w-4 h-4" />{tab.name}
                 </button>
               ))}
             </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">      
+              {/* Group Selection Panel */}
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-900">{getSelectionTitle()}</h3>
                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedGroups.length} selected</span>
-                </div>                                   
+                </div>
                 <div className="mb-4 flex items-center gap-3">
                   <label className="text-sm text-gray-700">Search:</label>
-                  <input type="text" value={groupSearchTerm} onChange={e=>{setGroupSearchTerm(e.target.value);setCurrentGroupPage(1);}} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
+                  <input type="text" value={groupSearchTerm} onChange={e => { setGroupSearchTerm(e.target.value); setCurrentGroupPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-gray-100 border-b border-gray-200"><tr>
-                      <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedGroups.length===filteredGroups.length&&filteredGroups.length>0} onChange={handleSelectAllGroups} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/></th>
+                      <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={handleSelectAllGroups} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></th>
                       <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
                       <th className="px-4 py-2 text-left text-xs text-gray-600">Description</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-100">
-                      {paginatedGroups.map(item=>(
+                      {paginatedGroups.map(item => (
                         <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2"><input type="checkbox" checked={selectedGroups.includes(item.id)} onChange={()=>handleGroupToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/></td>
+                          <td className="px-4 py-2"><input type="checkbox" checked={selectedGroups.includes(item.id)} onChange={() => handleGroupToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">{item.description}</td>
                         </tr>
@@ -254,91 +386,139 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
                     </tbody>
                   </table>
                 </div>
-                {renderPagination(currentGroupPage,totalGroupPages,setCurrentGroupPage,startGroupIndex,filteredGroups.length)}
+                {renderPagination(currentGroupPage, totalGroupPages, setCurrentGroupPage, startGroupIndex, filteredGroups.length)}
               </div>
+
+              {/* Right Panel */}
               <div className="space-y-6">
+                {/* Employee Panel */}
                 <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-gray-900">Employees</h3>
                     <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm">{selectedEmployees.length} selected</span>
-                  </div>                  
+                  </div>
                   <div className="mb-4 flex items-center gap-3">
                     <label className="text-sm text-gray-700">Search:</label>
-                    <input type="text" value={employeeSearchTerm} onChange={e=>{setEmployeeSearchTerm(e.target.value);setCurrentEmpPage(1);}} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
+                    <input type="text" value={employeeSearchTerm} onChange={e => { setEmployeeSearchTerm(e.target.value); setCurrentEmpPage(1); }} className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                   </div>
                   <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-gray-100 border-b border-gray-200"><tr>
-                        <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedEmployees.length===filteredEmployees.length&&filteredEmployees.length>0} onChange={handleSelectAllEmployees} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/></th>
+                        <th className="px-4 py-2 text-left text-xs text-gray-600"><input type="checkbox" checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0} onChange={handleSelectAllEmployees} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></th>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">Code</th>
                         <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
                       </tr></thead>
                       <tbody className="divide-y divide-gray-100">
-                        {loadingEmployees?(<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td></tr>)
-                        :paginatedEmployees.length===0?(<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td></tr>)
-                        :paginatedEmployees.map(item=>(
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2"><input type="checkbox" checked={selectedEmployees.includes(item.id)} onChange={()=>handleEmployeeToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/></td>
-                            <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
-                          </tr>
-                        ))}
+                        {loadingEmployees ? (<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Loading employees…</td></tr>)
+                          : paginatedEmployees.length === 0 ? (<tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">No employees found.</td></tr>)
+                            : paginatedEmployees.map(item => (
+                              <tr key={item.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-2"><input type="checkbox" checked={selectedEmployees.includes(item.id)} onChange={() => handleEmployeeToggle(item.id)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" /></td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{item.code}</td>
+                                <td className="px-4 py-2 text-sm text-gray-600">{item.name}</td>
+                              </tr>
+                            ))}
                       </tbody>
                     </table>
                   </div>
-                  {renderPagination(currentEmpPage,totalEmployeePages,setCurrentEmpPage,startEmpIndex,filteredEmployees.length)}
+                  {renderPagination(currentEmpPage, totalEmployeePages, setCurrentEmpPage, startEmpIndex, filteredEmployees.length)}
                   <div className="mt-4 flex items-center gap-6">
-                    {(['active','inactive','all'] as const).map(s=>(
+                    {(['active', 'inactive', 'all'] as const).map(s => (
                       <label key={s} className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="statusFilter" value={s} checked={statusFilter===s} onChange={()=>setStatusFilter(s)} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"/>
-                        <span className="text-sm text-gray-700">{s==='inactive'?'In Active':s.charAt(0).toUpperCase()+s.slice(1)}</span>
+                        <input type="radio" name="statusFilter" value={s} checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                        <span className="text-sm text-gray-700">{s === 'inactive' ? 'In Active' : s.charAt(0).toUpperCase() + s.slice(1)}</span>
                       </label>
                     ))}
                   </div>
-                </div>                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
-                  <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="workshiftType" value="fixed" checked={workshiftType==='fixed'} onChange={()=>setWorkshiftType('fixed')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"/>
+                </div>
+
+                {/* Workshift Settings Panel */}
+                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 space-y-4">
+                  {/* Fixed Row */}
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
+                      <input type="radio" name="workshiftType" value="fixed" checked={workshiftType === 'fixed'} onChange={() => { setWorkshiftType('fixed'); setWorkshift(''); }} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                       <span className="text-sm text-gray-700">Fixed</span>
                     </label>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700">Daily Schedule:</label>
-                      <input type="text" value={dailySchedule} onChange={e=>setDailySchedule(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-40"/>
+                    <div className="flex items-center gap-2 flex-1">
+                      <label className="text-sm text-gray-700 whitespace-nowrap">Daily Schedule:</label>
+                      <div className="flex flex-1 gap-1">
+                        <input
+                          type="text"
+                          value={dailySchedule}
+                          onChange={e => setDailySchedule(e.target.value)}
+                          disabled={workshiftType !== 'fixed'}
+                          placeholder='Select a Daily Schedule Setup'
+                          className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleOpenDailyScheduleModal}
+                          disabled={workshiftType !== 'fixed'}
+                          className="px-2 py-2 border border-gray-300 rounded bg-white hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Search Daily Schedule"
+                        >
+                          <Search className="w-4 h-4 text-gray-500" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="workshiftType" value="variable" checked={workshiftType==='variable'} onChange={()=>setWorkshiftType('variable')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"/>
+
+                  {/* Variable Row */}
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
+                      <input type="radio" name="workshiftType" value="variable" checked={workshiftType === 'variable'} onChange={() => { setWorkshiftType('variable'); setDailySchedule(''); }} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                       <span className="text-sm text-gray-700">Variable</span>
                     </label>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700">Workshift:</label>
-                      <input type="text" value={workshift} onChange={e=>setWorkshift(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-40"/>
+                    <div className="flex items-center gap-2 flex-1">
+                      <label className="text-sm text-gray-700 whitespace-nowrap">Workshift:</label>
+                      <div className="flex flex-1 gap-1">
+                        <input
+                          type="text"
+                          value={workshift}
+                          onChange={e => setWorkshift(e.target.value)}
+                          disabled={workshiftType !== 'variable'}
+                          placeholder='Select a Workshift Code'
+                          className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleOpenWorkshiftModal}
+                          disabled={workshiftType !== 'variable'}
+                          className="px-2 py-2 border border-gray-300 rounded bg-white hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Search Workshift"
+                        >
+                          <Search className="w-4 h-4 text-gray-500" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={withDateRange} onChange={e=>setWithDateRange(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
+                    <input type="checkbox" checked={withDateRange} onChange={e => setWithDateRange(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                     <span className="text-sm text-gray-700">With Date Range</span>
                   </label>
+
                   <div className="flex items-center gap-6 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-24">Date From:</label>
-                    <input type="text" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"/>
-                    <CalendarPopover date={dateFrom} onChange={setDateFrom}/>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-700 w-24">Date From:</label>
+                      <input type="text" value={dateFrom} readOnly style={{cursor: 'not-allowed'}} placeholder='MM/DD/YYYY' onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <CalendarPopover date={dateFrom} onChange={setDateFrom} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-700 w-24">Date To:</label>
+                      <input type="text" value={dateTo} readOnly style={{cursor: 'not-allowed'}} placeholder='MM/DD/YYYY' onChange={e => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32" />
+                      <CalendarPopover date={dateTo} onChange={setDateTo} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700 w-24">Date To:</label>
-                    <input type="text" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-32"/>
-                    <CalendarPopover date={dateTo} onChange={setDateTo}/>
-                  </div>
-                  </div>
+
                   <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={deleteExisting} onChange={e=>setDeleteExisting(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
+                      <input type="checkbox" checked={deleteExisting} onChange={e => setDeleteExisting(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                       <span className="text-sm text-gray-700">Delete Existing Workshift</span>
                     </label>
                     <button onClick={handleUpdate} disabled={isUpdating} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
-                      <Save className="w-4 h-4"/>{isUpdating?'Updating…':'Update'}
+                      <Save className="w-4 h-4" />{isUpdating ? 'Updating…' : 'Update'}
                     </button>
                   </div>
                 </div>
@@ -347,7 +527,26 @@ export function UpdateEmployeeWorkshiftPage() {  const [activeTab,          setA
           </div>
         </div>
       </div>
+
       <Footer />
+
+      {/* Daily Schedule Search Modal */}
+      <DailyScheduleSearchModal
+        isOpen={dailyScheduleModalOpen}
+        onClose={() => setDailyScheduleModalOpen(false)}
+        onSelect={(referenceNo) => setDailySchedule(referenceNo)}
+        dailySchedules={dailySchedules}
+        loading={dailyScheduleLoading}
+      />
+
+      {/* Workshift Search Modal */}
+      <WorkshiftCodeSearchModal
+        show={workshiftModalOpen}
+        onClose={() => setWorkshiftModalOpen(false)}
+        onSelect={(code) => setWorkshift(code)}
+        searchTerm={workshiftSearchTerm}
+        setSearchTerm={setWorkshiftSearchTerm}
+      />
     </div>
   );
 }
