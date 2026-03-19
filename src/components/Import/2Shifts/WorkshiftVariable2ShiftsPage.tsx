@@ -171,7 +171,7 @@ export function WorkshiftVariable2ShiftsPage() {
     console.log(dateFrom, dateTo)
 
       try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import2Shifts/ImportWorkshiftVariable2Shifts`, formData, {
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/ImportWorkshiftVariable2Shifts`, formData, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
@@ -222,7 +222,7 @@ export function WorkshiftVariable2ShiftsPage() {
     }
     console.log(param, dateFrom, dateTo);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Utilities/Import2Shifts/UpdateWorkshiftVariable2Shifts`, param)
+        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/UpdateWorkshiftVariable2Shifts`, param)
         setImportDataResult(data.data.resultData);
         if(data.data.errors.length > 0){
             setImportDataResult([]);
