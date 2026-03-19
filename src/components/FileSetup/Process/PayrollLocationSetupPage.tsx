@@ -689,6 +689,7 @@ export function PayrollLocationSetupPage() {
                                                     value={formData.locCode}
                                                     onChange={(e) => setFormData({ ...formData, locCode: e.target.value })}
                                                     maxLength={10}
+                                                    disabled={isEditMode}
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 />
                                             </div>

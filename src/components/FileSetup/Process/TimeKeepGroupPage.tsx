@@ -3308,7 +3308,7 @@ export function TimeKeepGroupPage() {
                           type="text"
                           value={tksGroupCode}
                           onChange={(e) => setTksGroupCode(e.target.value)}
-                          readOnly={!isEditMode}
+                          readOnly={!isCreateNew}
                           className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${!isEditMode ? "bg-gray-50" : ""}`}
                         />
                       </div>

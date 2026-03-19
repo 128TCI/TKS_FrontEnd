@@ -20,6 +20,7 @@ export function GroupScheduleSetupPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingItem, setEditingItem] = useState<GroupSchedule | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false)
 
   const [formData, setFormData] = useState({
     groupScheduleCode: '',
@@ -329,6 +330,7 @@ export function GroupScheduleSetupPage() {
   const handleCloseModal = () => {
     setShowCreateModal(false);
     setEditingItem(null);
+    setIsEditMode(false);
   };
 
   // Handle ESC key press
@@ -445,7 +447,10 @@ export function GroupScheduleSetupPage() {
                           <div className="flex items-center justify-center gap-2">
                             {hasPermission('Edit') && (
                               <button
-                                onClick={() => handleEdit(item)}
+                                onClick={() => {
+                                  handleEdit(item);
+                                  setIsEditMode(true)
+                                }}
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 title="Edit"
                               >
@@ -549,6 +554,7 @@ export function GroupScheduleSetupPage() {
                     type="text"
                     value={formData.groupScheduleCode}
                     onChange={(e) => setFormData({ ...formData, groupScheduleCode: e.target.value })}
+                    readOnly={isEditMode}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     required
                   />

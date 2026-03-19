@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Footer } from '../Footer/Footer';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInPassword } from '../../services/apiClient';
 import { securityService } from '../../services/securityService';
 import type { User, UserGroup, Form, FormAccessType, FormAccess, TKSGroup, TKSGroupAccess } from '../Types/security';
 import { ACCESS_TYPE_LABELS, ACCESS_TYPE_ORDER } from '../Types/security';
@@ -566,24 +566,28 @@ const handleEditUser = (user: User) => {
   };
 
   const handleSaveChangePassword = async () => {
-    if (!passwordForm.oldPassword.trim()) { showErrorModal('Please enter your old password.'); return; }
+    if (!passwordForm.oldPassword.trim()) { showErrorModal('The current password is incorrect.'); return; }
     if (!passwordForm.newPassword.trim()) { showErrorModal('Please enter a new password.'); return; }
     if (passwordForm.newPassword !== passwordForm.confirmNewPassword) { showErrorModal('New passwords do not match.'); return; }
     if (passwordForm.newPassword === passwordForm.oldPassword) { await showErrorModal('New password must be different from the current one.'); return; }
     try {
-      const res = await securityService.changePassword(selectedUser!.username, {
-        oldPassword: passwordForm.oldPassword,
-        newPassword: passwordForm.newPassword,
-      });
-      if (res.success) { 
-        await auditTrail.log({
-          accessType: 'Edit',
-          trans: `Changed Password for account '${selectedUser!.username}'`,
-          messages: `Security Manager - Users update record: ${selectedUser!.username}`,
-          formName: 'Security Manager - Users',
+        const userRes = await apiClient.get(`/User/by-username/${selectedUser!.username}`);
+        const currentPassword = userRes.data.password;
+        if (passwordForm.oldPassword !== currentPassword) { showErrorModal('The Old password is incorrect.'); return; }
+
+        const res = await securityService.changePassword(selectedUser!.username, {
+          oldPassword: passwordForm.oldPassword,
+          newPassword: passwordForm.newPassword,
         });
-        showSuccessModal(res.message); setShowChangePasswordModal(false); }
-      else showErrorModal(res.message);
+        if (res.success) {
+          await auditTrail.log({
+            accessType: 'Edit',
+            trans: `Changed Password for account '${selectedUser!.username}'`,
+            messages: `Security Manager - Users update record: ${selectedUser!.username}`,
+            formName: 'Security Manager - Users',
+          });
+          showSuccessModal(res.message); setShowChangePasswordModal(false); }
+        else showErrorModal(res.message);
     } catch {
       showErrorModal('Failed to change password.');
     }
@@ -1257,7 +1261,7 @@ const handleEditUser = (user: User) => {
                                               setEditingRowId(null); setEditedRowData(null);
                                             }}
                                             disabled={savingAccess}
-                                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-1"
                                           >
                                             <Save className="w-3 h-3" /> Save
                                           </button>
@@ -1271,7 +1275,7 @@ const handleEditUser = (user: User) => {
                                       ) : (
                                         <button
                                           onClick={() => { setEditingRowId(access.id); setEditedRowData({ ...access }); }}
-                                          className="px-3 py-1 text-xs text-green-600 hover:text-green-700 border border-green-600 rounded hover:bg-green-50"
+                                          className="px-3 py-1 text-xs text-blue-600 hover:text-blue-700 border border-blue-600 rounded hover:bg-blue-50"
                                         >Edit</button>
                                       )}
                                     </td>

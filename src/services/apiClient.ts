@@ -13,9 +13,9 @@ import axios, {
 import { decryptData } from './encryptionService';
 
 //Local
- const BASE_URL = 'https://localhost:7264/api';
+const BASE_URL = 'https://localhost:7264/api';
 //Demo
-//const BASE_URL = 'https://demo.128techconsultinginc.com/DEMO_128TIMEKEEP_NEO/api'
+// const BASE_URL = 'https://demo.128techconsultinginc.com/DEMO_128TIMEKEEP_NEO/api'
 //Sir Marc
 // const BASE_URL = 'http://128pc-42.128dom/DEMO_128TIMEKEEP_NEO/api';
 //Mam Robby
@@ -151,5 +151,24 @@ export function getLoggedInUsername(): string {
     return 'Guest';
   }
 }
+
+// ── Password helper — reads from userData in localStorage ─────────────────────
+export function getLoggedInPassword(): string {
+    try {
+        const raw = localStorage.getItem('userData') || '';
+        if (!raw) return 'Guest';
+        // Handles both plain string and JSON object
+        if (raw.startsWith('{')) {
+            const parsed = JSON.parse(raw);
+            console.log('Parsed userData for password retrieval:', parsed?.password);
+            return decryptData(parsed?.password ?? 'Guest');
+        }
+        return raw;
+    } catch (error) {
+        console.error('Error decrypting password:', error);
+        return 'Guest';
+    }
+}
+
 
 export default apiClient;

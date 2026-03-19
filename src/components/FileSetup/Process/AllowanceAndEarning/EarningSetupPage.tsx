@@ -691,6 +691,7 @@ export function EarningSetupPage() {
                       value={formData.code}
                       onChange={(e) => handleCodeChange(e.target.value)}
                       maxLength={10}
+                      readOnly={true}
                       className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
                         codeError
                           ? 'border-red-500 focus:ring-red-500'

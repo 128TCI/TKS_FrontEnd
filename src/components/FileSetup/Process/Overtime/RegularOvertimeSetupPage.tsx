@@ -45,6 +45,7 @@ export function RegularOvertimeSetupPage() {
   const [editingItem, setEditingItem] = useState<RegularOvertimeRecord | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<RegularOvertimeRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -140,6 +141,7 @@ export function RegularOvertimeSetupPage() {
 
   const handleEdit = (item: RegularOvertimeRecord) => {
     setEditingItem(item);
+    setIsEditMode(true);
     setFormData({
       code: item.code,
       desc: item.desc,
@@ -317,6 +319,7 @@ export function RegularOvertimeSetupPage() {
     setShowSearchModal(false);
     setShowDetailsModal(false);
     setEditingItem(null);
+    setIsEditMode(false);
     setSelectedRecord(null);
   };
 
@@ -546,6 +549,7 @@ export function RegularOvertimeSetupPage() {
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     maxLength={10}
+                    disabled={isEditMode}
                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="Max 10 characters"
                   />

@@ -778,13 +778,11 @@ export function Navigation({ onLogout }: NavigationProps) {
             </div>
           )}
 
-          {/* User menu */}
+          {/* User menu — tooltip removed, navigate to change password on click */}
           <div className="flex items-center space-x-3">
-            <div
-              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-700 hover:bg-green-800 rounded-lg relative cursor-pointer transition-colors duration-150"
-              onMouseEnter={() => { fetchSystemInfo(); setShowVersionTooltip(true); }}
-              onMouseLeave={() => setShowVersionTooltip(false)}
+            <button
               onClick={() => goTo('/security/change-password')}
+              className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-700 hover:bg-green-800 rounded-lg transition-colors duration-150"
             >
               <User className="w-4 h-4 text-slate-200" />
               <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>

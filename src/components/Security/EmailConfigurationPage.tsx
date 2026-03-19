@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Mail, Check, Send, Edit } from 'lucide-react';
 import { ApiService, showSuccessModal, showErrorModal } from '../../services/apiService';
-import apiClient from '../../services/apiClient';
+import apiClient, { getLoggedInUsername } from '../../services/apiClient';
 import { Footer } from '../Footer/Footer';
 
 interface EmailConfiguration {
@@ -52,7 +52,7 @@ export function EmailConfigurationPage() {
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
   const fetchEmailConfig = async () => {
-    const _response = await apiClient.get('/Security/EmailConfiguration/128TCI');
+    const _response = await apiClient.get(`/Security/EmailConfiguration/${getLoggedInUsername()}`);
     console.log('API response:', _response.data);
 
     const isSuccess = ApiService.isApiSuccess(_response);
