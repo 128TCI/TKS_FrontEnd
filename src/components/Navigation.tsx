@@ -734,7 +734,7 @@ export function Navigation({ onLogout }: NavigationProps) {
             </div>
           )}
 
-          {/* User menu — tooltip removed, navigate to change password on click */}
+          {/* User menu */}
           <div className="flex items-center space-x-3">
             <button
               onClick={() => goTo('/security/change-password')}
@@ -743,7 +743,41 @@ export function Navigation({ onLogout }: NavigationProps) {
               <User className="w-4 h-4 text-slate-200" />
               <span className="text-slate-200 text-sm">{getLoggedInUsername()}</span>
               <span className="text-green-300 text-xs">🔑</span>
-            </button>
+
+              {showVersionTooltip && (
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fadeIn min-w-[180px]">
+                  {loadingInfo ? (
+                    <div className="text-sm text-green-200">Loading...</div>
+                  ) : systemInfo ? (
+                    <button
+                      type="button"
+                      onClick={handleCopyBuildInfo}
+                      onMouseDown={e => e.preventDefault()}
+                      title="Click to copy build info"
+                      className="w-full text-left focus:outline-none group"
+                    >
+                      <div className="text-sm font-semibold tracking-wide group-hover:text-green-100 transition-colors">
+                        {systemInfo.appVersion} {systemInfo.buildDate}
+                      </div>
+                      <div className="text-xs text-green-200 mt-0.5">
+                        SQL {systemInfo.sqlVersion}
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="text-sm text-green-200">Unable to load</div>
+                  )}
+                  <div className="mt-2 pt-2 border-t border-green-500 text-xs text-green-200 text-center">
+                    Click to change password
+                  </div>
+                  <div className={`mt-2 text-center text-xs transition-all duration-300 ${
+                    navToast ? 'text-green-300 opacity-100' : 'opacity-0 h-0 mt-0 overflow-hidden'
+                  }`}>
+                    ✓ Build info copied
+                  </div>
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45" />
+                </div>
+              )}
+            </button>  {/* ← FIXED: was </div> */}
 
             <button
               onClick={handleLogout}
