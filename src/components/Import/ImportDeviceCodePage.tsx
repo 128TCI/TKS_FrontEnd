@@ -172,11 +172,22 @@ export function ImportDeviceCodePage() {
         console.log(data.data.errors)
         setImportDataResult([]);
         Swal.close();
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: data.data.resultData?.[0]?.message ?? data.data.errors,
-        });
+        const errors = data.data.resultData || [];
+
+        const allMessages = errors
+          .filter(x => x.message?.trim())
+          .map(x => `${x.message}`)
+          .join('<br>');
+
+        if (allMessages) {
+          await Swal.fire({
+            icon: 'error',
+            title: 'Error Found',
+            html: `<div style="text-align:center; max-height:300px; overflow:auto;">
+                                     ${allMessages}
+                                   </div>`,
+          });
+        }
         setErrors(data.data.errors);
       }
       else {
