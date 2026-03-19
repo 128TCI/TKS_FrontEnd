@@ -344,7 +344,7 @@ export function Unpost2ShiftsTransactionPage() {
         },
       };
       // Uses the 2-shifts specific endpoint
-      const res = await apiClient.post('/Utilities/UnpostTransaction2Shifts', payload);
+      const res = await apiClient.post('/Utilities/Unpost2Shifts', payload);
       if (res.data?.success) {
         await showSuccessModal(res.data.message ?? 'Successfully Unpost 2 Shifts Transactions.');
         resetForm();
