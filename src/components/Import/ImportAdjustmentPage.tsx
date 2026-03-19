@@ -25,16 +25,16 @@ interface ImportAdjustmentDto {
   columnNumber: number
 }
 interface ImportAdjustmentFormDto {
-    dateFrom: "",
-    dateTo: "",
-    isDeleteExistingRecord: false,
-    imports: ImportAdjustmentDto[]
+  dateFrom: "",
+  dateTo: "",
+  isDeleteExistingRecord: false,
+  imports: ImportAdjustmentDto[]
 }
 type ResponseResultDto<T> = {
-    isSuccess: boolean,
-    resultData: T,
-    errors: string[],
-    messages: string
+  isSuccess: boolean,
+  resultData: T,
+  errors: string[],
+  messages: string
 }
 
 export function ImportAdjustmentPage() {
@@ -45,7 +45,7 @@ export function ImportAdjustmentPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
+  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string; }>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -67,8 +67,8 @@ export function ImportAdjustmentPage() {
 
   const fetchData = async () => {
     setLoading(true);
-      error;
-      try {
+    error;
+    try {
       const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
@@ -78,21 +78,21 @@ export function ImportAdjustmentPage() {
         }));
         setTKSGroupList(mappedData);
       }
-      } catch (error: any) {
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-          setError(errorMsg);
-          console.error('Error fetching TKSGroup:', error);
-        } finally {
-          loading;
-        }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+      setError(errorMsg);
+      console.error('Error fetching TKSGroup:', error);
+    } finally {
+      loading;
+    }
   };
 
   const handleCodeToggle = (id: string) => {
-    setSelectedCodes(prev => 
+    setSelectedCodes(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
-  
+
   const handleSelectAll = () => {
     if (selectedCodes.length === tksGroupList.length) {
       setSelectedCodes([]);
@@ -100,13 +100,30 @@ export function ImportAdjustmentPage() {
       setSelectedCodes(tksGroupList.map(w => w.groupCode));
     }
   };
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (!file) return;
-    
-    setXlsxFile(file);  
-    setFileName(file!.name);    
+
+    const allowedTypes = [
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xls and .xlsx files are allowed.",
+        //confirmButtonColor: "#14b8a6"
+      });
+
+      e.target.value = ""; // reset input
+      return;
+    }
+
+    setXlsxFile(file);
+    setFileName(file!.name);
   };
 
   const fileLinkCreate = (blob: Blob, filename: string): void => {
@@ -120,20 +137,20 @@ export function ImportAdjustmentPage() {
     window.URL.revokeObjectURL(url);
   };
   const downloadTemplate = async () => {
-     setIsProcessing(true);
-     try {
-          const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportAdjustment_Template.xlsx`, {
-               responseType: 'blob'
-          });
-          const mimeType = response.headers['content-type'];
-          const blob = new Blob([response.data], { type: mimeType });
-          fileLinkCreate(blob, `ImportAdjustment_Template.xlsx`);
-     } finally {
-          isProcessing;
-     }
+    setIsProcessing(true);
+    try {
+      const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportAdjustment_Template.xlsx`, {
+        responseType: 'blob'
+      });
+      const mimeType = response.headers['content-type'];
+      const blob = new Blob([response.data], { type: mimeType });
+      fileLinkCreate(blob, `ImportAdjustment_Template.xlsx`);
+    } finally {
+      isProcessing;
+    }
   }
-const onClickImport = async ( ) => {
-    if(!xlsxFile) {
+  const onClickImport = async () => {
+    if (!xlsxFile) {
       setError("Please select a file to import.");
       Swal.fire({
         icon: 'error',
@@ -142,7 +159,7 @@ const onClickImport = async ( ) => {
       });
       return;
     }
-    if(selectedCodes.length === 0){
+    if (selectedCodes.length === 0) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -150,7 +167,7 @@ const onClickImport = async ( ) => {
       });
       return;
     }
-    if(!dateFrom || !dateTo){
+    if (!dateFrom || !dateTo) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -164,37 +181,47 @@ const onClickImport = async ( ) => {
     formData.append("dateTo", dateTo);
     //formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
-
+    Swal.fire({
+      icon: 'info',
+      title: 'Importing Data',
+      text: 'Importing data please wait.',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
     try {
       const data = await apiClient.post<ResponseResultDto<ImportAdjustmentDto[]>>(`/Import/ImportAdjustment`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        })
-        setImportDataResult(data.data.resultData);
-        if (data.data.errors.length > 0){
-          console.log(data.data.errors)
-          setImportDataResult([]);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.data.resultData?.[0]?.message ?? data.data.errors,
-          });            
-          setErrors(data.data.errors);
+        headers: {
+          "Content-Type": "multipart/form-data"
         }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Import done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
-      } finally {
-          setIsProcessing(false);
-          setFileLoaded(true);
-        }
+      })
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        console.log(data.data.errors)
+        setImportDataResult([]);
+        Swal.close();
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Import done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      setIsProcessing(false);
+      setFileLoaded(true);
+    }
   }
   function addOneDay(dateStr: string) {
     if (!dateStr) return null;
@@ -212,28 +239,28 @@ const onClickImport = async ( ) => {
     console.log(param, dateFrom, dateTo);
     console.log(xlsxFile);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportAdjustmentDto[]>>(`/Import/UpdateImportAdjustment`, param)
-        setImportDataResult(data.data.resultData);
-        if(data.data.errors.length > 0){
-            setImportDataResult([]);
-            Swal.fire({
-              icon: 'error',
-              title: 'Error',
-              text: data.data.resultData?.[0]?.message ?? data.data.errors,
-            });             
-            setErrors(data.data.errors);
-        }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Update done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
+      const data = await apiClient.post<ResponseResultDto<ImportAdjustmentDto[]>>(`/Import/UpdateImportAdjustment`, param)
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        setImportDataResult([]);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Update done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   }
   const totalPages = Math.ceil(importDataResult.length / itemsPerPage);
@@ -375,7 +402,7 @@ const onClickImport = async ( ) => {
                   {/* Download Template */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start gap-2">
-                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate}/>
+                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate} />
                       <a href="#" className="text-sm text-blue-600 hover:text-blue-700" onClick={downloadTemplate}>
                         Download Template
                       </a>
@@ -385,15 +412,15 @@ const onClickImport = async ( ) => {
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
                     <button className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      onClick={onClickImport}                    
+                      onClick={onClickImport}
                     >
-                      <Upload className="w-4 h-4" onClick={onClickImport}/>
+                      <Upload className="w-4 h-4" onClick={onClickImport} />
                       Import Data
                     </button>
                     <button className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <Save className="w-4 h-4" onClick={onClickInsertUpdate}/>
+                      <Save className="w-4 h-4" onClick={onClickInsertUpdate} />
                       Update Data
                     </button>
                   </div>
@@ -426,29 +453,29 @@ const onClickImport = async ( ) => {
                   </thead>
                   <tbody>
                     {Array.isArray(currentData) && currentData.map((item, index) => (
-                    <tr key={index}>                   
-                      <td className="px-4 py-2">{item.empCode}</td>
-                      <td className="px-4 py-2">{item.empName}</td>
-                      <td className="px-4 py-2">{item.transactionDate ? new Date(item.transactionDate).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.transactionType}</td>
-                      <td className="px-4 py-2">{item.leaveType}</td>
-                      <td className="px-4 py-2">{item.overtimeCode}</td>
-                      <td className="px-4 py-2">{item.noOfHours}</td>
-                      <td className="px-4 py-2">{item.adjustType}</td>
-                      <td className="px-4 py-2">{item.remarks}</td>
-                      <td className="px-4 py-2">{item.isLateFiling}</td>
-                      <td className="px-4 py-2">{item.isLateFilingActualDate ? new Date(item.isLateFilingActualDate).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.status}</td>
-                    </tr>
+                      <tr key={index}>
+                        <td className="px-4 py-2">{item.empCode}</td>
+                        <td className="px-4 py-2">{item.empName}</td>
+                        <td className="px-4 py-2">{item.transactionDate ? new Date(item.transactionDate).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.transactionType}</td>
+                        <td className="px-4 py-2">{item.leaveType}</td>
+                        <td className="px-4 py-2">{item.overtimeCode}</td>
+                        <td className="px-4 py-2">{item.noOfHours}</td>
+                        <td className="px-4 py-2">{item.adjustType}</td>
+                        <td className="px-4 py-2">{item.remarks}</td>
+                        <td className="px-4 py-2">{item.isLateFiling}</td>
+                        <td className="px-4 py-2">{item.isLateFilingActualDate ? new Date(item.isLateFilingActualDate).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.status}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center text-xs text-gray-500 justify-between">
-                {!fileLoaded &&(<span>
+                {!fileLoaded && (<span>
                   Showing {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
-                {fileLoaded &&(<span>
+                {fileLoaded && (<span>
                   Showing {startIndex + 1} to {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
                 <div className="flex items-center gap-1">
@@ -464,11 +491,10 @@ const onClickImport = async ( ) => {
                       <button
                         key={index}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-2 py-1 rounded text-xs ${
-                          currentPage === page
-                            ? 'bg-blue-500 text-white'
-                            : 'border border-gray-300 hover:bg-gray-100'
-                        }`}
+                        className={`px-2 py-1 rounded text-xs ${currentPage === page
+                          ? 'bg-blue-500 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100'
+                          }`}
                       >
                         {page}
                       </button>

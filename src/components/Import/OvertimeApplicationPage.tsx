@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Upload, Download, Check, FileText, CheckCircle, Info, Save } from "lucide-react";
+import { Upload, Download, Check, Info, Save } from "lucide-react";
 import { DatePickerWithButton } from "../DateSetup/DatePickerWithButton";
 import { Footer } from "../Footer/Footer";
 import { TKSGroupTable } from "../TKSGroupTable";
@@ -29,12 +29,6 @@ interface ImportOvertimeApplicationDto {
   isLateFiling: boolean;
   isLateFilingProcessed: boolean;
   appliedBeforeShiftDate: Date | string | null;
-}
-interface ImportOvertimeApplicationFormDto {
-  dateFrom: "";
-  dateTo: "";
-  isDeleteExistingRecord: false;
-  imports: ImportOvertimeApplicationDto[];
 }
 
 type ResponseResultDto<T> = {
@@ -69,12 +63,6 @@ export function OvertimeApplicationPage() {
   const [importDataResult, setImportDataResult] = useState<
     ImportOvertimeApplicationDto[]
   >([]);
-  const [form, setForm] = useState<ImportOvertimeApplicationFormDto>({
-    dateFrom: "",
-    dateTo: "",
-    isDeleteExistingRecord: false,
-    imports: [] as ImportOvertimeApplicationDto[],
-  });
 
   useEffect(() => {
     fetchData();
@@ -109,7 +97,7 @@ export function OvertimeApplicationPage() {
   };
 
   const handleCodeToggle = (id: string) => {
-    setSelectedCodes(prev => 
+    setSelectedCodes(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -135,7 +123,7 @@ export function OvertimeApplicationPage() {
       "application/vnd.ms-excel", // .xls
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
     ];
-    
+
     if (!allowedTypes.includes(file.type)) {
       Swal.fire({
         icon: "error",
@@ -143,7 +131,7 @@ export function OvertimeApplicationPage() {
         text: "Only .xls and .xlsx files are allowed.",
         //confirmButtonColor: "#14b8a6"
       });
-    
+
       e.target.value = ""; // reset input
       return;
     }
@@ -168,9 +156,6 @@ export function OvertimeApplicationPage() {
       setSheetNames(workbook.SheetNames);
       setSelectedSheet(defaultSheet);
       setSheetData(sheetData);
-
-      console.log("Sheets:", workbook.SheetNames);
-      console.log(sheetData);
     };
 
     reader.readAsArrayBuffer(file);
@@ -188,11 +173,8 @@ export function OvertimeApplicationPage() {
     });
 
     setSheetData(data);
-    //console.log(data);
-    //setForm(data);
   };
   useEffect(() => {
-    console.log("sheetData updated:", sheetData);
   }, [sheetData]);
 
   const createXlsxFileFromSheetData = (
@@ -276,50 +258,95 @@ export function OvertimeApplicationPage() {
     const formData = new FormData();
     formData.append("dateFrom", dateFrom);
     formData.append("dateTo", dateTo);
+    formData.append("GroupCodes", JSON.stringify(selectedCodes));
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName);
-
+    Swal.fire({
+      icon: 'info',
+      title: 'Importing Data',
+      text: 'Importing data please wait.',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
     try {
       const data = await apiClient.post<ResponseResultDto<ImportOvertimeApplicationDto[]>>(`/Import/ImportOvertimeApplication`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        })
-        setImportDataResult(data.data.resultData);
-        if (data.data.errors.length > 0){
-          console.log(data.data.errors)
-          setImportDataResult([]);
-          Swal.fire({
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      })
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        console.log(data.data.errors)
+        setImportDataResult([]);
+        Swal.close();
+        // Swal.fire({
+        //   icon: 'error',
+        //   title: 'Error',
+        //   text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        // });
+        const errors = data.data.resultData || [];
+
+        const allMessages = errors
+          .filter(x => x.message?.trim())
+          .map(x => `${x.message}`)
+          .join('<br>');
+
+        if (allMessages) {
+          await Swal.fire({
             icon: 'error',
-            title: 'Error',
-            text: data.data.resultData?.[0]?.message ?? data.data.errors,
-          });            
-          setErrors(data.data.errors);
+            title: 'Error Found',
+            html: `<div style="text-align:center; max-height:300px; overflow:auto;">
+                             ${allMessages}
+                           </div>`,
+          });
         }
-      } finally {
-          setIsProcessing(false);
-          setFileLoaded(true);
-        }
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Import done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      setIsProcessing(false);
+      setFileLoaded(true);
+    }
   }
+  // function addOneDay(dateStr: string) {
+  //   if (!dateStr) return null;
+  //   const date = new Date(dateStr);
+  //   date.setDate(date.getDate() + 1); // Add 1 day
+  //   return date.toISOString();
+  // }
   function addOneDay(dateStr: string) {
     if (!dateStr) return null;
-    const date = new Date(dateStr);
-    date.setDate(date.getDate() + 1); // Add 1 day
-    return date.toISOString();
+
+    const [m, d, y] = dateStr.split("/");
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+
+    date.setDate(date.getDate() + 1);
+
+    return date.toISOString().split("T")[0]; // "2026-03-18"
   }
   const onClickInsertUpdate = async () => {
     const param = {
       dateFrom: addOneDay(dateFrom),
       dateTo: addOneDay(dateTo),
+      groupCodes: selectedCodes,
       isDeleteExistingRecord: deleteExisting,
       imports: importDataResult.filter((x) => !x.message), // only valid records
     };
-    console.log(param, dateFrom, dateTo);
-    console.log(xlsxFile);
     try {
       const data = await apiClient.post<
         ResponseResultDto<ImportOvertimeApplicationDto[]>
-      >(`/Utilities/Import/UpdateImportOvertimeApplication`, param);
+      >(`/Import/UpdateImportOvertimeApplication`, param);
       setImportDataResult(data.data.resultData);
       if (data.data.errors.length > 0) {
         setImportDataResult([]);
@@ -329,6 +356,15 @@ export function OvertimeApplicationPage() {
           text: data.data.resultData?.[0]?.message ?? data.data.errors,
         });
         setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Update done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
       }
     } finally {
       setIsProcessing(false);
@@ -509,7 +545,7 @@ export function OvertimeApplicationPage() {
                   </div>
 
                   {/* Date Range */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* <div className="grid grid-cols-2 gap-4">
                     <DatePickerWithButton
                       date={dateFrom}
                       onChange={setDateFrom}
@@ -520,8 +556,30 @@ export function OvertimeApplicationPage() {
                       onChange={setDateTo}
                       label="Date To"
                     />
+                  </div> */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <DatePickerWithButton
+                      label="Date From"
+                      date={dateFrom}
+                      onChange={(d) => {
+                        setDateFrom(d)
+                        if (new Date(dateTo) < new Date(d) || dateTo == "") {
+                          setDateTo(d)
+                        }
+                      }}
+                    />
+                    <DatePickerWithButton
+                      label="Date To"
+                      date={dateTo}
+                      onChange={(d) => {
+                        setDateTo(d)
+                        if (new Date(dateFrom) > new Date(d) || dateFrom == "") {
+                          setDateFrom(d)
+                        }
+                      }}
+                      minDate={dateFrom}
+                    />
                   </div>
-
                   {/* Delete Existing Warning */}
                   <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
                     <label className="flex items-start gap-3 cursor-pointer">
@@ -543,24 +601,6 @@ export function OvertimeApplicationPage() {
                       </div>
                     </label>
                   </div>
-
-                  {/* List Not Equal Info */}
-                  {/* <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        id="list-not-equal"
-                        checked={false}
-                        onChange={() => {}}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
-                      />
-                      <div>
-                        <div className="text-sm text-gray-900">List Not Equal</div>
-                        <div className="text-xs text-gray-600 mt-1">Show only records with discrepancies or mismatches</div>
-                      </div>
-                    </label>
-                  </div> */}
-
                   {/* Need a template */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start gap-2">
@@ -679,20 +719,20 @@ export function OvertimeApplicationPage() {
                           <td className="px-4 py-2">{item.reason || "-"}</td>
                           <td className="px-4 py-2">{item.remarks || "-"}</td>
                           <td className="px-4 py-2">
-                            {item.appliedBeforeShiftDate
+                            {item.earlyOTStartTime
                               ? new Date(
-                                  item.appliedBeforeShiftDate,
-                                ).toLocaleTimeString()
+                                item.earlyOTStartTime,
+                              ).toLocaleTimeString()
                               : "-"}
                           </td>
                           <td className="px-4 py-2">
                             {item.approvedOTBreaksHrs ?? "-"}
                           </td>
                           <td className="px-4 py-2">
-                            {item.earlyOTStartTime
+                            {item.startOTPM
                               ? new Date(
-                                  item.earlyOTStartTime,
-                                ).toLocaleTimeString()
+                                item.startOTPM,
+                              ).toLocaleTimeString()
                               : "-"}
                           </td>
                           <td className="px-4 py-2">
@@ -701,8 +741,8 @@ export function OvertimeApplicationPage() {
                           <td className="px-4 py-2">
                             {item.appliedBeforeShiftDate
                               ? new Date(
-                                  item.appliedBeforeShiftDate,
-                                ).toLocaleDateString()
+                                item.appliedBeforeShiftDate,
+                              ).toLocaleDateString()
                               : "-"}
                           </td>
                         </tr>
@@ -737,11 +777,10 @@ export function OvertimeApplicationPage() {
                       <button
                         key={index}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-2 py-1 rounded text-xs ${
-                          currentPage === page
-                            ? "bg-blue-500 text-white"
-                            : "border border-gray-300 hover:bg-gray-100"
-                        }`}
+                        className={`px-2 py-1 rounded text-xs ${currentPage === page
+                          ? "bg-blue-500 text-white"
+                          : "border border-gray-300 hover:bg-gray-100"
+                          }`}
                       >
                         {page}
                       </button>

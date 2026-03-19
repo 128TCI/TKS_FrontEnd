@@ -1,35 +1,29 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronDown, Upload, Calendar, Search, Download, FileText, Check, CheckCircle, Info, Save } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Upload, Download, Check, Info, Save } from 'lucide-react';
 import { DatePickerWithButton } from '../../DateSetup/DatePickerWithButton';
 import { Footer } from '../../Footer/Footer';
-import { TKSGroupTable} from '../../TKSGroupTable';
+import { TKSGroupTable } from '../../TKSGroupTable';
 import apiClient from '../../../services/apiClient';
 import Swal from 'sweetalert2';
-import * as XLSX from "xlsx";
 
 interface ImportWorkshiftRestdayDto {
-    message: string;
-    rowNumber: number
-    columnNumber: number
-    empCode: string
-    employeeName: string;
-    dateFrom: Date | string | null
-    dateTo: Date | string | null
-    workshiftCode: string
-    restDay: string;
-    tkGroup: string
+  message: string;
+  rowNumber: number
+  columnNumber: number
+  empCode: string
+  employeeName: string;
+  dateFrom: Date | string | null
+  dateTo: Date | string | null
+  workshiftCode: string
+  restDay: string;
+  tkGroup: string
 }
-interface ImportWorkshiftRestdayFormDto {
-    dateFrom: "",
-    dateTo: "",
-    isDeleteExistingRecord: false,
-    imports: ImportWorkshiftRestdayDto[]
-}
+
 type ResponseResultDto<T> = {
-    isSuccess: boolean,
-    resultData: T,
-    errors: string[],
-    messages: string
+  isSuccess: boolean,
+  resultData: T,
+  errors: string[],
+  messages: string
 }
 
 export function WorkshiftVariable2ShiftsPage() {
@@ -40,7 +34,7 @@ export function WorkshiftVariable2ShiftsPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [deleteExisting, setDeleteExisting] = useState(false);
   const [importType, setImportType] = useState('workshift-variable');
-  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
+  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string; }>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -49,15 +43,15 @@ export function WorkshiftVariable2ShiftsPage() {
   const itemsPerPage = 10;
   const [error, setError] = useState<string | null>(null);
   const [importDataResult, setImportDataResult] = useState<ImportWorkshiftRestdayDto[]>([]);
-  
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
-      error;
-      try {
+    error;
+    try {
       const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
@@ -67,17 +61,17 @@ export function WorkshiftVariable2ShiftsPage() {
         }));
         setTKSGroupList(mappedData);
       }
-      } catch (error: any) {
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-          setError(errorMsg);
-          console.error('Error fetching TKSGroup:', error);
-        } finally {
-          loading;
-        }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+      setError(errorMsg);
+      console.error('Error fetching TKSGroup:', error);
+    } finally {
+      loading;
+    }
   };
-  
+
   const handleCodeToggle = (id: string) => {
-    setSelectedCodes(prev => 
+    setSelectedCodes(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -95,7 +89,24 @@ export function WorkshiftVariable2ShiftsPage() {
 
     if (!file) return;
 
-    setXlsxFile(file);  
+    const allowedTypes = [
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xls and .xlsx files are allowed.",
+        //confirmButtonColor: "#14b8a6"
+      });
+
+      e.target.value = ""; // reset input
+      return;
+    }
+
+    setXlsxFile(file);
     setFileName(file!.name);
   };
 
@@ -112,29 +123,30 @@ export function WorkshiftVariable2ShiftsPage() {
   };
 
   const downloadTemplate = async () => {
-     setIsProcessing(true);
-     try {
-          const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportWorkShift_Template_Variable.xlsx`, {
-               responseType: 'blob'
-          });
-          const mimeType = response.headers['content-type'];
-          const blob = new Blob([response.data], { type: mimeType });
-          fileLinkCreate(blob, `ImportWorkShift_Template_Variable.xlsx`);
-     } finally {
-          isProcessing;
-     }
-  }
-  const onClickImport = async ( ) => {
-    if(!xlsxFile) {
-        setError("Please select a file to import.");
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Please select a file to import.',
-        });
-        return;
+    setIsProcessing(true);
+    try {
+      const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportWorkShift_Template_Variable.xlsx`, {
+        responseType: 'blob'
+      });
+      const mimeType = response.headers['content-type'];
+      const blob = new Blob([response.data], { type: mimeType });
+      fileLinkCreate(blob, `ImportWorkShift_Template_Variable.xlsx`);
+    } finally {
+      isProcessing;
     }
-    if(selectedCodes.length === 0){
+  }
+
+  const onClickImport = async () => {
+    if (!xlsxFile) {
+      setError("Please select a file to import.");
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Please select a file to import.',
+      });
+      return;
+    }
+    if (selectedCodes.length === 0) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -142,7 +154,7 @@ export function WorkshiftVariable2ShiftsPage() {
       });
       return;
     }
-    if(!dateFrom || !dateTo){
+    if (!dateFrom || !dateTo) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -150,67 +162,74 @@ export function WorkshiftVariable2ShiftsPage() {
       });
       return;
     }
-    //setForm(dateFrom, dateTo, selectedCodes, );
-    //setError("");
-    //setIsProcessing(true);
-    // setForm(prev => ({
-    //   ...prev,
-    //   groupCode: selectedCodes.map(code => ({
-    //   groupCode: code,
-    //   })),
-    // }));
 
     const formData = new FormData();
     formData.append("dateFrom", dateFrom);
     formData.append("dateTo", dateTo);
-    //formData.append("groupCode", JSON.stringify(form.groupCode));
-    //formData.append("isDeleteExistingRecord", form.isDeleteExistingRecord.toString());
+    formData.append("GroupCodes", JSON.stringify(selectedCodes));
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("file", xlsxFile, fileName)
 
-    console.log(dateFrom, dateTo)
+    Swal.fire({
+      icon: 'info',
+      title: 'Importing Data',
+      text: 'Importing data please wait.',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+    try {
+      const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/ImportWorkshiftVariable2Shifts`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      })
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        console.log(data.data.errors)
+        setImportDataResult([]);
+        Swal.close();
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Import done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
 
-      try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/ImportWorkshiftVariable2Shifts`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        })
-        //importDataResult.value = data.resultData || [];
-        setImportDataResult(data.data.resultData);
-        if (data.data.errors.length > 0){
-            //errors.value = data.errors;
-            console.log(data.data.errors)
-            setImportDataResult([]);
-            Swal.fire({
-              icon: 'error',
-              title: 'Error',
-              text: data.data.resultData?.[0]?.message ?? data.data.errors,
-            });
-            
-            setErrors(data.data.errors);
-        }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Import done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
-        
-      } finally {
-          setIsProcessing(false);
-          setFileLoaded(true);
-        }
+    } finally {
+      setIsProcessing(false);
+      setFileLoaded(true);
+    }
+
   }
 
+  // function addOneDay(dateStr: string) {
+  //   if (!dateStr) return null;
+  //   const date = new Date(dateStr);
+  //   date.setDate(date.getDate() + 1); // Add 1 day
+  //   return date.toISOString();
+  // }
   function addOneDay(dateStr: string) {
     if (!dateStr) return null;
-    const date = new Date(dateStr);
-    date.setDate(date.getDate() + 1); // Add 1 day
-    return date.toISOString();
+
+    const [m, d, y] = dateStr.split("/");
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+
+    date.setDate(date.getDate() + 1);
+
+    return date.toISOString().split("T")[0]; // "2026-03-18"
   }
 
   const onClickInsertUpdate = async () => {
@@ -220,31 +239,30 @@ export function WorkshiftVariable2ShiftsPage() {
       isDeleteExistingRecord: deleteExisting,
       imports: importDataResult.filter(x => !x.message) // only valid records
     }
-    console.log(param, dateFrom, dateTo);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/UpdateWorkshiftVariable2Shifts`, param)
-        setImportDataResult(data.data.resultData);
-        if(data.data.errors.length > 0){
-            setImportDataResult([]);
-            await Swal.fire({
-              icon: 'error',
-              title: 'Error',
-              text: data.data.messages,
-            });
-            
-            setErrors(data.data.errors);
-        }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Update done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
+      const data = await apiClient.post<ResponseResultDto<ImportWorkshiftRestdayDto[]>>(`/Import/UpdateWorkshiftVariable2Shifts`, param)
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        setImportDataResult([]);
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.data.messages,
+        });
+
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Update done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   }
 
@@ -287,7 +305,7 @@ export function WorkshiftVariable2ShiftsPage() {
         <div className="max-w-7xl mx-auto relative">
           {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
-            <h1 className="text-white">Import Workshift Variable</h1>
+            <h1 className="text-white">Import Workshift Variable 2 Shifts In A Day</h1>
           </div>
 
           {/* Content Container */}
@@ -302,7 +320,7 @@ export function WorkshiftVariable2ShiftsPage() {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700 mb-2">
-                    Batch import workshift schedules and rest day assignments for employees. Upload Excel files to configure work schedules across multiple employee groups efficiently.
+                    Batch import workshift schedules for employees. Upload Excel files to configure work schedules across multiple employee groups efficiently.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     <div className="flex items-start gap-2">
@@ -311,7 +329,7 @@ export function WorkshiftVariable2ShiftsPage() {
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Configure rest days for employee groups</span>
+                      <span className="text-gray-600">Configure workshift for employee groups</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
@@ -400,17 +418,6 @@ export function WorkshiftVariable2ShiftsPage() {
                         />
                         <span className="text-sm text-gray-700">Workshift Variable</span>
                       </label>
-                      {/* <label className="flex items-center gap-3 p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                        <input
-                          type="radio"
-                          name="importType"
-                          value="workshift-restday"
-                          checked={importType === 'workshift-restday'}
-                          onChange={(e) => setImportType(e.target.value)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">Workshift with Restday</span>
-                      </label> */}
                     </div>
                   </div>
 
@@ -424,15 +431,9 @@ export function WorkshiftVariable2ShiftsPage() {
                       <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
                         onClick={downloadTemplate}
                       >
-                        <Download className="w-3 h-3" onClick={downloadTemplate}/>
+                        <Download className="w-3 h-3" onClick={downloadTemplate} />
                         Download Template (Workshift Variable)
                       </a>
-                      {/* <a href="#" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
-                        onClick={downloadRDTemplate}
-                      >
-                        <Download className="w-3 h-3" onClick={downloadRDTemplate}/>
-                        Download Template (Workshift w/ Rest Day)
-                      </a> */}
                     </div>
                   </div>
 
@@ -448,7 +449,7 @@ export function WorkshiftVariable2ShiftsPage() {
                       />
                       <div>
                         <div className="text-sm text-gray-900">Delete Existing Workshift Variable</div>
-                        <div className="text-xs text-gray-600 mt-1">Remove all existing workshift variable before importing new data</div>
+                        <div className="text-xs text-gray-600 mt-1">Remove all existing workshift records before importing new data</div>
                       </div>
                     </label>
                   </div>
@@ -456,15 +457,15 @@ export function WorkshiftVariable2ShiftsPage() {
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
                     <button className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      onClick={onClickImport}                    
+                      onClick={onClickImport}
                     >
-                      <Upload className="w-4 h-4" onClick={onClickImport}/>
+                      <Upload className="w-4 h-4" onClick={onClickImport} />
                       Import Data
                     </button>
                     <button className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                      onClick={onClickInsertUpdate} 
+                      onClick={onClickInsertUpdate}
                     >
-                      <Save className="w-4 h-4" onClick={onClickInsertUpdate}/>
+                      <Save className="w-4 h-4" onClick={onClickInsertUpdate} />
                       Update Data
                     </button>
                   </div>
@@ -496,23 +497,23 @@ export function WorkshiftVariable2ShiftsPage() {
                   </thead>
                   <tbody>
                     {Array.isArray(currentData) && currentData.map((item, index) => (
-                    <tr key={index}>                   
-                      <td className="px-4 py-2">{item.empCode}</td>
-                      <td className="px-4 py-2">{item.employeeName}</td>
-                      <td className="px-4 py-2">{item.dateFrom ? new Date(item.dateFrom).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.dateTo ? new Date(item.dateTo).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.workshiftCode}</td>
-                      <td className="px-4 py-2">{item.tkGroup}</td>
-                    </tr>
+                      <tr key={index}>
+                        <td className="px-4 py-2">{item.empCode}</td>
+                        <td className="px-4 py-2">{item.employeeName}</td>
+                        <td className="px-4 py-2">{item.dateFrom ? new Date(item.dateFrom).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.dateTo ? new Date(item.dateTo).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.workshiftCode}</td>
+                        <td className="px-4 py-2">{item.tkGroup}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center text-xs text-gray-500 justify-between">
-                {!fileLoaded &&(<span>
+                {!fileLoaded && (<span>
                   Showing {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
-                {fileLoaded &&(<span>
+                {fileLoaded && (<span>
                   Showing {startIndex + 1} to {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
                 <div className="flex items-center gap-1">
@@ -528,11 +529,10 @@ export function WorkshiftVariable2ShiftsPage() {
                       <button
                         key={index}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-2 py-1 rounded text-xs ${
-                          currentPage === page
-                            ? 'bg-blue-500 text-white'
-                            : 'border border-gray-300 hover:bg-gray-100'
-                        }`}
+                        className={`px-2 py-1 rounded text-xs ${currentPage === page
+                          ? 'bg-blue-500 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100'
+                          }`}
                       >
                         {page}
                       </button>
@@ -550,7 +550,7 @@ export function WorkshiftVariable2ShiftsPage() {
                     Next
                   </button>
                 </div>
-              </div> 
+              </div>
             </div>
           </div>
         </div>

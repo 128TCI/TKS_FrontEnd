@@ -32,6 +32,61 @@ interface ImportLogsFromDeviceDto {
   terminalID: string
 }
 
+interface ValidateLogsRequestDto {
+  userName:                string;
+  noOfMinsBeforeTheShift:  number;
+  noOfMinsBeforeMidnightShift: number;
+  devicePolicy:            string;
+  dateFrom:                string;
+  dateTo:                  string;
+}
+
+interface ValidateMainLogsResultDto {
+  id:               string | null;
+  empCode:          string | null;
+  name:             string | null;
+  dateIn:           string | null;
+  dateOut:          string | null;
+  timeIn:           string | null;
+  timeOut:          string | null;
+  sequence:         string | null;
+  workShiftCode:    string | null;
+  dayType:          string | null;
+  otApproved:       boolean | null;
+  rawID:            string | null;
+  copy:             number | null;
+  free:             string | null;
+  break1Out:        string | null;
+  break1In:         string | null;
+  break2Out:        string | null;
+  break2In:         string | null;
+  break3Out:        string | null;
+  break3In:         string | null;
+  terminalID:       string | null;
+  lName:            string | null;
+  fName:            string | null;
+  mName:            string | null;
+  suffix:           string | null;
+  actualDateIn:     string | null;
+  deviceNameIn:     string | null;
+  deviceNameOut:    string | null;
+  groupCode:        string | null;
+  useTKSystemConfig:    boolean | null;
+  devicePolicy:         string | null;
+  numOfMinBeforeTheShift:             number | null;
+  numOfMinToIgnoreMultipleOutInBreak: number | null;
+  numOfMinBeforeMidnightShift:        number | null;
+  noOfMinToConsiderBrk2In:            number | null;
+  identifier:       string | null;
+  shift12AM_Flag:   string | null;
+}
+
+interface ValidateResponse {
+  isSuccessful: boolean;
+  message?:     string;
+  data?:        ValidateMainLogsResultDto[];
+}
+
 type ResponseResultDto<T> = {
     isSuccess: boolean,
     resultData: T,
@@ -61,6 +116,8 @@ export function UpdateRawDataPage() {
   const [selectedDevice, setSelectedDevice] = useState('');
   const [device, setDevice] = useState<Array<{ deviceName: string;}>>([]);
   const [importDataResult, setImportDataResult] = useState<ImportLogsFromDeviceDto[]>([]);
+  const [validatedLogs, setValidatedLogs]   = useState<ValidateMainLogsResultDto[]>([]);
+  const [isValidating, setIsValidating]   = useState(false);
   const [getEmployee, setGetEmployee] = useState<Array<{ 
     empID: number; 
     empCode: string; 
@@ -69,33 +126,45 @@ export function UpdateRawDataPage() {
     mName: string;
     suffix: string;
   }>>([]);
-  const [getRawData, setGetRawData] = useState<Array<{ 
-    id: number
-    empCode: string
-    lName: string
-    fName: string
-    mName: string
-    suffix: string
-    rawDateIn: string
-    workShiftCode: string
-    workShiftDesc: string
-    dayType: string
-    rawTimeIn: string
-    rawBreak1In: string
-    rawBreak1Out: string
-    rawBreak2In: string
-    rawBreak2Out: string
-    rawBreak3In: string
-    rawBreak3Out: string
-    rawTimeOut: string
-    rawDateOut: string
-    rawOTApproved: boolean
-    rawRemarks: string
-    entryFlag: string
-    terminalID: string
-    dayTypeDOLE: string
-    aprOTTime: string
-  }>>([]);
+  const [getRawData, setGetRawData] = useState<Array<{
+  id: number
+  empCode: string | null
+  timeIn: string | null
+  dateIn: string | null
+  flag: string | null
+  seq: number | null
+  deviceName: string | null
+  terminalID: string | null
+  logDateIn: string | null
+  logTimeIn: string | null
+  dateOut: string | null
+  timeOut: string | null
+  break1In: string | null
+  break1Out: string | null
+  break2In: string | null
+  break2Out: string | null
+  break3In: string | null
+  break3Out: string | null
+  workShiftPrev: string | null
+  workShiftCurrent: string | null
+  workShiftNext: string | null
+  name: string | null
+  copy: number | null
+  dateResigned: string | null
+  lName: string | null
+  fName: string | null
+  mName: string | null
+  suffix: string | null
+  groupCode: string | null
+  useTKSystemConfig: boolean | null
+  devicePolicy: string | null
+  numOfMinBeforeTheShift: number | null
+  numOfMinToIgnoreMultipleOutInBreak: number | null
+  numOfMinBeforeMidnightShift: number | null
+  noOfMinToConsiderBrk2In: number | null
+  identifier: string | null
+  rawID: string | null
+}>>([]);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,13 +184,6 @@ export function UpdateRawDataPage() {
     emp.mName?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
     emp.suffix?.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
-
-  const handleEmployeeSelect = (empCodeValue: string, empNameValue: string) => {
-    //setEmpCode(empCodeValue);
-    setEmpName(empNameValue);
-    setShowSearchModal(false);
-    setSearchModalTerm('');
-  };
 
   useEffect(() => {
     fetchData();
@@ -147,108 +209,109 @@ export function UpdateRawDataPage() {
         }
   };
 
-  // useEffect(() => {
-  //   fetchRawData();
-  // }, []);
-
-  // const fetchRawData = async () => {
-  //   setEmpCode(selectedEmpCodes);
-  //   setLoading(true);
-  //     error;
-  //     try {
-  //     const response = await apiClient.get(`/Import/LogsFromDevice/GetRawData?rawDateInFrom=${dateFrom}&rawDateInTo=${dateTo}&empCode=${selectedEmpCodes}`);
-  //     if (response.data) {
-  //       const mappedData = response.data.map((rawData: any) => ({
-  //         id: rawData.id || rawData.Id || '',
-  //         empCode: rawData.empCode || rawData.EmpCode || '',
-  //         lName: rawData.lName || rawData.LName || '',
-  //         fName: rawData.fName || rawData.FName || '',
-  //         mName: rawData.mName || rawData.MName || '',
-  //         suffix: rawData.suffix || rawData.Suffix || '',
-  //         rawDateIn: rawData.rawDateIn || rawData.RawDateIn || '',
-  //         workShiftCode: rawData.workShiftCode || rawData.WorkShiftCode || '',
-  //         workShiftDesc: rawData.workShiftDesc || rawData.WorkShiftDesc || '',
-  //         dayType: rawData.dayType || rawData.DayType || '',
-  //         rawTimeIn: rawData.rawTimeIn || rawData.RawTimeIn || '',
-  //         rawBreak1In: rawData.rawBreak1In || rawData.RawBreak1In || '',
-  //         rawBreak1Out: rawData.rawBreak1Out || rawData.RawBreak1Out || '',
-  //         rawBreak2In: rawData.rawBreak2In || rawData.RawBreak2In || '',
-  //         rawBreak2Out: rawData.rawBreak2Out || rawData.RawBreak2Out || '',
-  //         rawBreak3In: rawData.rawBreak3In || rawData.RawBreak3In || '',
-  //         rawBreak3Out: rawData.rawBreak3Out || rawData.RawBreak3Out || '',
-  //         rawTimeOut: rawData.rawTimeOut || rawData.RawTimeOut || '',
-  //         rawDateOut: rawData.rawDateOut || rawData.RawDateOut || '',
-  //         rawOTApproved: rawData.rawOTApproved || rawData.RawOTApproved || '',
-  //         rawRemarks: rawData.rawRemarks || rawData.RawRemarks || '',
-  //         entryFlag: rawData.entryFlag || rawData.EntryFlag || '',
-  //         terminalID: rawData.terminalID || rawData.TerminalID || '',
-  //         dayTypeDOLE: rawData.dayTypeDOLE || rawData.DayTypeDOLE || '',
-  //         aprOTTime: rawData.aprOTTime || rawData.AprOTTime || ''
-  //       }));
-  //       setGetRawData(mappedData);
-  //       console.log(empCode)
-  //       console.log(dateFrom, dateTo)
-  //       console.log(getRawData);
-  //     }
-  //     } catch (error: any) {
-  //         const errorMsg = error.response?.data?.message || error.message || 'Failed to Load Data';
-  //         setError(errorMsg);
-  //         console.error('Error fetching data', error);
-  //       } finally {
-  //         loading;
-  //       }
-  // };
+  function addOneDay(dateStr: string) {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + 1); // Add 1 day
+    return date.toISOString();
+  }
   const fetchRawData = async () => {
     setEmpCode(selectedEmpCodes);
     setLoading(true);
       error;
       try {
       const response = await apiClient.post("/Import/GetDTRLogs", {
-        dateFrom: dateFrom,
-        dateTo: dateTo,
-        userName: getLoggedInUsername(),
-        doNotIncludeResignedEmp: doNotIncludeResigned,
-        empCodes: selectedEmpCodes
+        DateFrom: addOneDay(dateFrom),
+        DateTo: addOneDay(dateTo),
+        UserName: getLoggedInUsername(),
+        DoNotIncludeResignedEmp: doNotIncludeResigned,
+        EmpCodes: Array.isArray(selectedEmpCodes)
+          ? selectedEmpCodes
+          : [selectedEmpCodes]
       });
       if (response.data) {
         const mappedData = response.data.map((rawData: any) => ({
-          id: rawData.id || rawData.Id || rawData.ID,
-          empCode: rawData.empCode || rawData.EmpCode || '',
-          lName: rawData.lName || rawData.LName || '',
-          fName: rawData.fName || rawData.FName || '',
-          mName: rawData.mName || rawData.MName || '',
-          suffix: rawData.suffix || rawData.Suffix || '',
-          rawDateIn: rawData.rawDateIn || rawData.RawDateIn || '',
-          workShiftCode: rawData.workShiftCode || rawData.WorkShiftCode || '',
-          workShiftDesc: rawData.workShiftDesc || rawData.WorkShiftDesc || '',
-          dayType: rawData.dayType || rawData.DayType || '',
-          rawTimeIn: rawData.rawTimeIn || rawData.RawTimeIn || '',
-          rawBreak1In: rawData.rawBreak1In || rawData.RawBreak1In || '',
-          rawBreak1Out: rawData.rawBreak1Out || rawData.RawBreak1Out || '',
-          rawBreak2In: rawData.rawBreak2In || rawData.RawBreak2In || '',
-          rawBreak2Out: rawData.rawBreak2Out || rawData.RawBreak2Out || '',
-          rawBreak3In: rawData.rawBreak3In || rawData.RawBreak3In || '',
-          rawBreak3Out: rawData.rawBreak3Out || rawData.RawBreak3Out || '',
-          rawTimeOut: rawData.rawTimeOut || rawData.RawTimeOut || '',
-          rawDateOut: rawData.rawDateOut || rawData.RawDateOut || '',
-          rawOTApproved: rawData.rawOTApproved || rawData.RawOTApproved || '',
-          rawRemarks: rawData.rawRemarks || rawData.RawRemarks || '',
-          entryFlag: rawData.entryFlag || rawData.EntryFlag || '',
-          terminalID: rawData.terminalID || rawData.TerminalID || '',
-          dayTypeDOLE: rawData.dayTypeDOLE || rawData.DayTypeDOLE || '',
-          aprOTTime: rawData.aprOTTime || rawData.AprOTTime || ''
+          id: rawData.id || rawData.Id || rawData.ID || 0,
+          empCode: rawData.empCode || rawData.EmpCode || null,
+
+          timeIn: rawData.timeIn || rawData.TimeIn || null,
+          dateIn: rawData.dateIn || rawData.DateIn || null,
+          flag: rawData.flag || rawData.Flag || null,
+          seq: rawData.seq || rawData.Seq || null,
+
+          deviceName: rawData.deviceName || rawData.DeviceName || null,
+          terminalID: rawData.terminalID || rawData.TerminalID || null,
+
+          logDateIn: rawData.logDateIn || rawData.LogDateIn || null,
+          logTimeIn: rawData.logTimeIn || rawData.LogTimeIn || null,
+
+          dateOut: rawData.dateOut || rawData.DateOut || null,
+          timeOut: rawData.timeOut || rawData.TimeOut || null,
+
+          break1In: rawData.break1In || rawData.Break1In || null,
+          break1Out: rawData.break1Out || rawData.Break1Out || null,
+
+          break2In: rawData.break2In || rawData.Break2In || null,
+          break2Out: rawData.break2Out || rawData.Break2Out || null,
+
+          break3In: rawData.break3In || rawData.Break3In || null,
+          break3Out: rawData.break3Out || rawData.Break3Out || null,
+
+          workShiftPrev: rawData.workShiftPrev || rawData.WorkShiftPrev || null,
+          workShiftCurrent: rawData.workShiftCurrent || rawData.WorkShiftCurrent || null,
+          workShiftNext: rawData.workShiftNext || rawData.WorkShiftNext || null,
+
+          name: rawData.name || rawData.Name || null,
+
+          copy: rawData.copy || rawData.Copy || null,
+          dateResigned: rawData.dateResigned || rawData.DateResigned || null,
+
+          lName: rawData.lName || rawData.LName || null,
+          fName: rawData.fName || rawData.FName || null,
+          mName: rawData.mName || rawData.MName || null,
+          suffix: rawData.suffix || rawData.Suffix || null,
+
+          groupCode: rawData.groupCode || rawData.GroupCode || null,
+
+          useTKSystemConfig: rawData.useTKSystemConfig || rawData.UseTKSystemConfig || null,
+          devicePolicy: rawData.devicePolicy || rawData.DevicePolicy || null,
+
+          numOfMinBeforeTheShift:
+            rawData.numOfMinBeforeTheShift || rawData.NumOfMinBeforeTheShift || null,
+
+          numOfMinToIgnoreMultipleOutInBreak:
+            rawData.numOfMinToIgnoreMultipleOutInBreak ||
+            rawData.NumOfMinToIgnoreMultipleOutInBreak ||
+            null,
+
+          numOfMinBeforeMidnightShift:
+            rawData.numOfMinBeforeMidnightShift ||
+            rawData.NumOfMinBeforeMidnightShift ||
+            null,
+
+          noOfMinToConsiderBrk2In:
+            rawData.noOfMinToConsiderBrk2In ||
+            rawData.NoOfMinToConsiderBrk2In ||
+            null,
+
+          identifier: rawData.identifier || rawData.Identifier || null,
+          rawID: rawData.rawID || rawData.RawID || null
         }));
         setGetRawData(mappedData);
-        console.log(empCode)
-        console.log(dateFrom, dateTo)
-        console.log(getRawData);
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
       }
       } catch (error: any) {
           const errorMsg = error.response?.data?.message || error.message || 'Failed to Load Data';
           setError(errorMsg);
           console.error('Error fetching data', error);
         } finally {
-          loading;
+          setLoading(false);
         }
   };
 
@@ -314,30 +377,6 @@ export function UpdateRawDataPage() {
     return pages;
   };
 
-  // const fetchEmployee = async () => {
-  //   setLoading(true);
-  //     error;
-  //     try {
-  //     const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/GetActive?active=${filterStatus}`);
-  //     if (response.data) {
-  //       const mappedData = response.data.map((getEmployee: any) => ({
-  //         empID: getEmployee.empID || getEmployee.EmpID || '',
-  //         empCode: getEmployee.empCode || getEmployee.EmpCode || '',
-  //         lName: getEmployee.lName || getEmployee.LName || '',
-  //         fName: getEmployee.fName || getEmployee.fName || '',
-  //         mName: getEmployee.mName || getEmployee.mName || '',
-  //         suffix: getEmployee.suffix || getEmployee.suffix || ''
-  //       }));
-  //       setGetEmployee(mappedData);
-  //     }
-  //     } catch (error: any) {
-  //         const errorMsg = error.response?.data?.message || error.message || 'Failed to load Employees';
-  //         setError(errorMsg);
-  //         console.error('Error fetching employees', error);
-  //       } finally {
-  //         loading;
-  //       }
-  // };
   const fetchEmployee = async () => {
     setLoading(true);
     setError(null);
@@ -457,9 +496,6 @@ export function UpdateRawDataPage() {
       setSheetNames(workbook.SheetNames);
       setSelectedSheet(defaultSheet);
       setSheetData(sheetData);
-  
-      console.log("Sheets:", workbook.SheetNames);
-      console.log(sheetData);
     };
   
       reader.readAsArrayBuffer(file);
@@ -477,11 +513,8 @@ export function UpdateRawDataPage() {
     });
   
       setSheetData(data);
-      //console.log(data);
-      //setForm(data);
   };
   useEffect(() => {
-    console.log("sheetData updated:", sheetData);
   }, [sheetData]);
   
   const createXlsxFileFromSheetData = (
@@ -558,7 +591,7 @@ const onClickImport = async ( ) => {
       //formData.append("isDeleteExistingRecord", String(deleteExisting));
       //formData.append("listNotEqual", String(listNotEqual));
       formData.append("file", xlsxFile, fileName)
-      console.log(xlsxFile);
+      
       try {
         const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/ImportLogsFromDevice`, formData, {
           headers: {
@@ -590,6 +623,161 @@ const onClickImport = async ( ) => {
             setFileLoaded(true);
           }
   }
+  const onClickValidate = async () => {
+    console.log(selectedEmpCodes);
+  if (selectedEmpCodes.length === 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'No Employee Selected',
+      text: 'Please select at least one employee before validating.',
+    });
+    return;
+  }
+  //fetchRawData();
+
+  const dto: ValidateLogsRequestDto = {
+    userName:                    getLoggedInUsername(),
+    noOfMinsBeforeTheShift:      getRawData[0]?.numOfMinBeforeTheShift      ?? 5,
+    noOfMinsBeforeMidnightShift: getRawData[0]?.numOfMinBeforeMidnightShift ?? 10,
+    devicePolicy:                getRawData[0]?.devicePolicy                ?? '',
+    dateFrom:                    dateFrom,
+    dateTo:                      dateTo,
+  };
+
+  setIsValidating(true);
+  setValidatedLogs([]);
+
+  try {
+    const response = await apiClient.post<ValidateResponse>(
+      '/Import/ValidateRawData',
+      { dto }
+    );
+
+    if (!response.data.isSuccessful || !response.data.data?.length) {
+      Swal.fire({
+        icon: 'info',
+        title: 'No Results',
+        text: response.data.message ?? 'Validation returned no results.',
+      });
+      return;
+    }
+
+    setValidatedLogs(response.data.data);
+    Swal.fire({
+      icon: 'success',
+      title: 'Validated',
+      text: `${response.data.data.length} record(s) validated successfully.`,
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  } catch (err: any) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: err.response?.data?.message ?? err.message ?? 'Validation failed.',
+    });
+  } finally {
+    setIsValidating(false);
+  }
+};
+
+const onClickUpdate = async () => {
+  if (selectedEmpCodes.length === 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "No Employee Selected",
+      text: "Please select at least one employee before updating",
+    });
+    return;
+  }
+  if(!xlsxFile) {
+    setError("Please select file.");
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Please select file.',
+    });
+    return;
+  }
+  if(!dateFrom || !dateTo){
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Please select date.',
+    });
+    return;
+  }
+
+  const param = {
+    userName: getLoggedInUsername(),
+    dateFrom: addOneDay(dateFrom),
+    dateTo: addOneDay(dateTo),
+    deleteExistingLogs: deleteExistingLogs,
+    empCodes: selectedEmpCodes,
+  };
+
+  const rawParam = {
+      dateFrom: addOneDay(dateFrom),
+      dateTo: addOneDay(dateTo),
+      isDeleteExistingRecord: deleteExistingLogs,
+      imports: importDataResult.filter(x => !x.message) // only valid records
+    }
+
+  setIsProcessing(true);
+
+  Swal.fire({
+    icon: "info",
+    title: "Updating",
+    text: "Please wait...",
+    allowOutsideClick: false,
+    showConfirmButton: false,
+    didOpen: () => Swal.showLoading(),
+  });
+
+  try {
+    // FIRST API
+    const updateResponse = await apiClient.post<{
+      isSuccessful: boolean;
+      message: string;
+    }>("/Import/Update", param);
+
+    if (!updateResponse.data.isSuccessful) {
+      throw new Error(updateResponse.data.message ?? "Update failed.");
+    }
+
+    // SECOND API
+    const rawDataResponse = await apiClient.post<
+      ResponseResultDto<ImportLogsFromDeviceDto[]>
+    >("/Import/ImportUpdateRawData", rawParam);
+
+    const data = rawDataResponse.data;
+
+    if (data.errors?.length > 0) {
+      setImportDataResult([]);
+      //setErrors(data.errors);
+      throw new Error(data.resultData?.[0]?.message ?? data.errors.join(", "));
+    }
+
+    setImportDataResult(data.resultData);
+
+    Swal.fire({
+      icon: "success",
+      title: "Done",
+      text: "Update successful.",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+
+  } catch (err: any) {
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: err.response?.data?.message ?? err.message ?? "Update failed.",
+    });
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -829,11 +1017,13 @@ const onClickImport = async ( ) => {
                       <TableOfContents className="w-4 h-4" />
                       View Logs
                     </button>
-                    <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2">
+                    <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    onClick={onClickValidate}>
                       <Check className="w-4 h-4" />
                       Validate
                     </button>
-                    <button className="px-6 py-2.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2">
+                    <button className="px-6 py-2.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
+                    onClick={onClickUpdate}>
                       <Save className="w-4 h-4"/>
                       Update
                     </button>
@@ -1011,9 +1201,9 @@ const onClickImport = async ( ) => {
                     <tr key={index}>                  
                       <td className="px-4 py-2">{item.empCode}</td>
                       <td className="px-4 py-2">{item.lName}, {item.fName} {item.mName} {item.suffix}</td>
-                      <td className="px-4 py-2">{item.rawDateIn ? new Date(item.rawDateIn).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.rawTimeIn ? new Date(item.rawTimeIn).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.entryFlag}</td>
+                      <td className="px-4 py-2">{item.dateIn ? new Date(item.dateIn).toLocaleDateString() : '-'}</td>
+                      <td className="px-4 py-2">{item.timeIn ? new Date(item.timeIn).toLocaleDateString() : '-'}</td>
+                      <td className="px-4 py-2">{item.flag}</td>
                     </tr>
                     ))}
                   </tbody>

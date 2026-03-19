@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Check, FileText, CheckCircle, Info, Save } from 'lucide-react';
+import { Upload, Download, Check, Info, Save } from 'lucide-react';
 import { DatePickerWithButton } from '../DateSetup/DatePickerWithButton';
 import { Footer } from '../Footer/Footer';
 import { TKSGroupTable } from '../TKSGroupTable';
@@ -8,35 +8,29 @@ import Swal from 'sweetalert2';
 import * as XLSX from "xlsx";
 
 interface ImportLeaveApplicationDto {
-    message: string;
-    rowNumber: number
-    columnNumber: number
-    empCode: string
-    empName: string;
-    dateFrom: Date | string | null
-    dateTo: Date | string | null
-    numApprovedHrs: number
-    leaveCode: string
-    period: string
-    tksGroup: string
-    reason: string
-    remarks: string
-    withPay: boolean
-    sssNotif: boolean
-    isLateFiling: boolean
-}
-interface ImportLeaveApplicationFormDto {
-    dateFrom: "",
-    dateTo: "",
-    isDeleteExistingRecord: false,
-    imports: ImportLeaveApplicationDto[]
+  message: string;
+  rowNumber: number
+  columnNumber: number
+  empCode: string
+  empName: string;
+  dateFrom: Date | string | null
+  dateTo: Date | string | null
+  numApprovedHrs: number
+  leaveCode: string
+  period: string
+  tksGroup: string
+  reason: string
+  remarks: string
+  withPay: boolean
+  sssNotif: boolean
+  isLateFiling: boolean
 }
 
 type ResponseResultDto<T> = {
-    isSuccess: boolean,
-    resultData: T,
-    errors: string[],
-    messages: string
+  isSuccess: boolean,
+  resultData: T,
+  errors: string[],
+  messages: string
 }
 
 export function LeaveApplicationPage() {
@@ -52,7 +46,7 @@ export function LeaveApplicationPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [listNotEqual, setListNotEqual] = useState(false);
   const [deleteExisting, setDeleteExisting] = useState(false);
-  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string;}>>([]);
+  const [tksGroupList, setTKSGroupList] = useState<Array<{ id: number; groupCode: string; groupDescription: string; }>>([]);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -61,21 +55,15 @@ export function LeaveApplicationPage() {
   const itemsPerPage = 10;
   const [error, setError] = useState<string | null>(null);
   const [importDataResult, setImportDataResult] = useState<ImportLeaveApplicationDto[]>([]);
-  const [form, setForm] = useState<ImportLeaveApplicationFormDto>({
-    dateFrom: "",
-    dateTo: "",
-    isDeleteExistingRecord: false,
-    imports: [] as ImportLeaveApplicationDto[],
-  });
-  
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
-      error;
-      try {
+    error;
+    try {
       const response = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
       if (response.data) {
         const mappedData = response.data.map((tksGroupList: any) => ({
@@ -85,17 +73,17 @@ export function LeaveApplicationPage() {
         }));
         setTKSGroupList(mappedData);
       }
-      } catch (error: any) {
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
-          setError(errorMsg);
-          console.error('Error fetching TKSGroup:', error);
-        } finally {
-          loading;
-        }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load TKS Group';
+      setError(errorMsg);
+      console.error('Error fetching TKSGroup:', error);
+    } finally {
+      loading;
+    }
   };
 
   const handleCodeToggle = (id: string) => {
-    setSelectedCodes(prev => 
+    setSelectedCodes(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -108,13 +96,30 @@ export function LeaveApplicationPage() {
     }
   };
   const getDefaultSheetName = (sheetNames: string[]) => {
-  return sheetNames.includes("LeaveApplication")
-    ? "LeaveApplication"
-    : sheetNames[0];
+    return sheetNames.includes("LeaveApplication")
+      ? "LeaveApplication"
+      : sheetNames[0];
   };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (!file) return;
+
+    const allowedTypes = [
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Only .xls and .xlsx files are allowed.",
+        //confirmButtonColor: "#14b8a6"
+      });
+
+      e.target.value = ""; // reset input
+      return;
+    }
 
     setXlsxFile(file);
     setFileName(file.name);
@@ -124,7 +129,7 @@ export function LeaveApplicationPage() {
       const data = event.target?.result;
       if (!data) return;
 
-      const workbook = XLSX.read(data, { type: "array", cellDates: true});
+      const workbook = XLSX.read(data, { type: "array", cellDates: true });
 
       const sheetNames = workbook.SheetNames;
       const defaultSheet = getDefaultSheetName(sheetNames);
@@ -158,38 +163,35 @@ export function LeaveApplicationPage() {
     });
 
     setSheetData(data);
-    //console.log(data);
-    //setForm(data);
   };
   useEffect(() => {
-    console.log("sheetData updated:", sheetData);
   }, [sheetData]);
 
   const createXlsxFileFromSheetData = (
-  sheetData: any[],
-  sheetName: string
-): File => {
-  const worksheet = XLSX.utils.json_to_sheet(sheetData);
+    sheetData: any[],
+    sheetName: string
+  ): File => {
+    const worksheet = XLSX.utils.json_to_sheet(sheetData);
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-  const buffer = XLSX.write(workbook, {
-    bookType: "xlsx",
-    type: "array",
-  });
+    const buffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
 
-  return new File([buffer], `${sheetName}.xlsx`, {
-    type:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-};
-useEffect(() => {
-  if (!sheetData.length || !selectedSheet) return;
+    return new File([buffer], `${sheetName}.xlsx`, {
+      type:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+  };
+  useEffect(() => {
+    if (!sheetData.length || !selectedSheet) return;
 
-  const file = createXlsxFileFromSheetData(sheetData, selectedSheet);
-  setXlsxFile(file);
-}, [sheetData, selectedSheet]);
+    const file = createXlsxFileFromSheetData(sheetData, selectedSheet);
+    setXlsxFile(file);
+  }, [sheetData, selectedSheet]);
 
   const fileLinkCreate = (blob: Blob, filename: string): void => {
     const url = window.URL.createObjectURL(blob);
@@ -202,20 +204,20 @@ useEffect(() => {
     window.URL.revokeObjectURL(url);
   };
   const downloadTemplate = async () => {
-     setIsProcessing(true);
-     try {
-          const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportLeaveApp_Template.xlsx`, {
-               responseType: 'blob'
-          });
-          const mimeType = response.headers['content-type'];
-          const blob = new Blob([response.data], { type: mimeType });
-          fileLinkCreate(blob, `ImportLeaveApp_Template.xlsx`);
-     } finally {
-          isProcessing;
-     }
+    setIsProcessing(true);
+    try {
+      const response = await apiClient.get(`downloads/DownloadTemplate?filename=ImportLeaveApp_Template.xlsx`, {
+        responseType: 'blob'
+      });
+      const mimeType = response.headers['content-type'];
+      const blob = new Blob([response.data], { type: mimeType });
+      fileLinkCreate(blob, `ImportLeaveApp_Template.xlsx`);
+    } finally {
+      isProcessing;
+    }
   }
-const onClickImport = async ( ) => {
-    if(!xlsxFile) {
+  const onClickImport = async () => {
+    if (!xlsxFile) {
       setError("Please select a file to import.");
       Swal.fire({
         icon: 'error',
@@ -224,7 +226,7 @@ const onClickImport = async ( ) => {
       });
       return;
     }
-    if(selectedCodes.length === 0){
+    if (selectedCodes.length === 0) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -232,7 +234,7 @@ const onClickImport = async ( ) => {
       });
       return;
     }
-    if(!dateFrom || !dateTo){
+    if (!dateFrom || !dateTo) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -246,76 +248,108 @@ const onClickImport = async ( ) => {
     formData.append("dateTo", dateTo);
     formData.append("isDeleteExistingRecord", String(deleteExisting));
     formData.append("listNotEqual", String(listNotEqual));
+    formData.append("GroupCodes", JSON.stringify(selectedCodes));
     formData.append("file", xlsxFile, fileName)
+    Swal.fire({
+      icon: 'info',
+      title: 'Importing Data',
+      text: 'Importing data please wait.',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
     try {
       const data = await apiClient.post<ResponseResultDto<ImportLeaveApplicationDto[]>>(`/Import/ImportLeaveApplication`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        })
-        setImportDataResult(data.data.resultData);
-        if (data.data.errors.length > 0){
-          console.log(data.data.errors)
-          setImportDataResult([]);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.data.resultData?.[0]?.message ?? data.data.errors,
-          });            
-          setErrors(data.data.errors);
+        headers: {
+          "Content-Type": "multipart/form-data"
         }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Import done.',
-            timer: 2000,
-            showConfirmButton: false,
+      })
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        console.log(data.data.errors)
+        setImportDataResult([]);
+        Swal.close();
+        const errors = data.data.resultData || [];
+
+        const allMessages = errors
+          .filter(x => x.message?.trim())
+          .map(x => `${x.message}`)
+          .join('<br>');
+
+        if (allMessages) {
+          await Swal.fire({
+            icon: 'error',
+            title: 'Error Found',
+            html: `<div style="text-align:center; max-height:300px; overflow:auto;">
+                   ${allMessages}
+                 </div>`,
           });
         }
-      } finally {
-          setIsProcessing(false);
-          setFileLoaded(true);
-        }
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Import done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      setIsProcessing(false);
+      setFileLoaded(true);
+    }
   }
+  // function addOneDay(dateStr: string) {
+  //   if (!dateStr) return null;
+  //   const date = new Date(dateStr);
+  //   date.setDate(date.getDate() + 1); // Add 1 day
+  //   return date.toISOString();
+  // }
   function addOneDay(dateStr: string) {
     if (!dateStr) return null;
-    const date = new Date(dateStr);
-    date.setDate(date.getDate() + 1); // Add 1 day
-    return date.toISOString();
+
+    const [m, d, y] = dateStr.split("/");
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+
+    date.setDate(date.getDate() + 1);
+
+    return date.toISOString().split("T")[0]; // "2026-03-18"
   }
   const onClickInsertUpdate = async () => {
     const param = {
       dateFrom: addOneDay(dateFrom),
       dateTo: addOneDay(dateTo),
+      groupCodes: selectedCodes,
       isDeleteExistingRecord: deleteExisting,
       imports: importDataResult.filter(x => !x.message) // only valid records
     }
-    console.log(param, dateFrom, dateTo);
-    console.log(xlsxFile);
     try {
-        const data = await apiClient.post<ResponseResultDto<ImportLeaveApplicationDto[]>>(`/Utilities/Import/UpdateImportLeaveApplication`, param)
-        setImportDataResult(data.data.resultData);
-        if(data.data.errors.length > 0){
-            setImportDataResult([]);
-            Swal.fire({
-              icon: 'error',
-              title: 'Error',
-              text: data.data.resultData?.[0]?.message ?? data.data.errors,
-            });             
-            setErrors(data.data.errors);
-        }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Update done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
+      const data = await apiClient.post<ResponseResultDto<ImportLeaveApplicationDto[]>>(`/Import/UpdateImportLeaveApplication`, param)
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        setImportDataResult([]);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Update done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   }
   const totalPages = Math.ceil(importDataResult.length / itemsPerPage);
@@ -446,7 +480,7 @@ const onClickImport = async ( ) => {
                       value={selectedSheet}
                       onChange={handleSheetChange}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    > 
+                    >
                       {sheetNames.map((name) => (
                         <option key={name} value={name}>
                           {name}
@@ -456,7 +490,7 @@ const onClickImport = async ( ) => {
                   </div>
 
                   {/* Date Range */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* <div className="grid grid-cols-2 gap-4">
                     <DatePickerWithButton
                       date={dateFrom}
                       onChange={setDateFrom}
@@ -466,6 +500,29 @@ const onClickImport = async ( ) => {
                       date={dateTo}
                       onChange={setDateTo}
                       label="Date To"
+                    />
+                  </div> */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <DatePickerWithButton
+                      label="Date From"
+                      date={dateFrom}
+                      onChange={(d) => {
+                        setDateFrom(d)
+                        if (new Date(dateTo) < new Date(d) || dateTo == "") {
+                          setDateTo(d)
+                        }
+                      }}
+                    />
+                    <DatePickerWithButton
+                      label="Date To"
+                      date={dateTo}
+                      onChange={(d) => {
+                        setDateTo(d)
+                        if (new Date(dateFrom) > new Date(d) || dateFrom == "") {
+                          setDateFrom(d)
+                        }
+                      }}
+                      minDate={dateFrom}
                     />
                   </div>
 
@@ -506,7 +563,7 @@ const onClickImport = async ( ) => {
                   {/* Download Templates */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start gap-2">
-                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate}/>
+                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate} />
                       <a href="#" className="text-sm text-blue-600 hover:text-blue-700" onClick={downloadTemplate}>
                         Download Template
                       </a>
@@ -516,15 +573,15 @@ const onClickImport = async ( ) => {
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
                     <button className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      onClick={onClickImport}                    
+                      onClick={onClickImport}
                     >
-                      <Upload className="w-4 h-4" onClick={onClickImport}/>
+                      <Upload className="w-4 h-4" onClick={onClickImport} />
                       Import Data
                     </button>
                     <button className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                       onClick={onClickInsertUpdate}
                     >
-                      <Save className="w-4 h-4" onClick={onClickInsertUpdate}/>
+                      <Save className="w-4 h-4" onClick={onClickInsertUpdate} />
                       Update Data
                     </button>
                   </div>
@@ -558,25 +615,25 @@ const onClickImport = async ( ) => {
                   </thead>
                   <tbody>
                     {Array.isArray(currentData) && currentData.map((item, index) => (
-                    <tr key={index}>                   
-                      <td className="px-4 py-2">{item.empCode}</td>
-                      <td className="px-4 py-2">{item.empName}</td>
-                      <td className="px-4 py-2">{item.dateFrom ? new Date(item.dateFrom).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.dateTo ? new Date(item.dateTo).toLocaleDateString() : '-'}</td>
-                      <td className="px-4 py-2">{item.numApprovedHrs}</td>
-                      <td className="px-4 py-2">{item.leaveCode}</td>
-                      <td className="px-4 py-2">{item.period}</td>
-                      <td className="px-4 py-2">{item.tksGroup}</td>
-                    </tr>
+                      <tr key={index}>
+                        <td className="px-4 py-2">{item.empCode}</td>
+                        <td className="px-4 py-2">{item.empName}</td>
+                        <td className="px-4 py-2">{item.dateFrom ? new Date(item.dateFrom).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.dateTo ? new Date(item.dateTo).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2">{item.numApprovedHrs}</td>
+                        <td className="px-4 py-2">{item.leaveCode}</td>
+                        <td className="px-4 py-2">{item.period}</td>
+                        <td className="px-4 py-2">{item.tksGroup}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center text-xs text-gray-500 justify-between">
-                {!fileLoaded &&(<span>
+                {!fileLoaded && (<span>
                   Showing {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
-                {fileLoaded &&(<span>
+                {fileLoaded && (<span>
                   Showing {startIndex + 1} to {Math.min(endIndex, importDataResult.length)} of {importDataResult.length} entries
                 </span>)}
                 <div className="flex items-center gap-1">
@@ -592,11 +649,10 @@ const onClickImport = async ( ) => {
                       <button
                         key={index}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-2 py-1 rounded text-xs ${
-                          currentPage === page
-                            ? 'bg-blue-500 text-white'
-                            : 'border border-gray-300 hover:bg-gray-100'
-                        }`}
+                        className={`px-2 py-1 rounded text-xs ${currentPage === page
+                          ? 'bg-blue-500 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100'
+                          }`}
                       >
                         {page}
                       </button>

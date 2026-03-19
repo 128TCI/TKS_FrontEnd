@@ -14,8 +14,8 @@ interface ImportLogsFromDeviceDto {
   rowNumber: number
   columnNumber: number
   empCode: string
-    //empName: string;
-  rawDateIn: Date | string 
+  //empName: string;
+  rawDateIn: Date | string
   workShiftCode: string
   dayType: string
   rawTimeIn: Date | string
@@ -33,10 +33,10 @@ interface ImportLogsFromDeviceDto {
 }
 
 type ResponseResultDto<T> = {
-    isSuccess: boolean,
-    resultData: T,
-    errors: string[],
-    messages: string
+  isSuccess: boolean,
+  resultData: T,
+  errors: string[],
+  messages: string
 }
 
 
@@ -60,7 +60,7 @@ export function ImportLogsFromDeviceV2Page() {
   const [loading, setLoading] = useState(false);
   const [deleteExistingLogs, setDeleteExistingLogs] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState('B3-TFT-U_DATFILE');
-  const [device, setDevice] = useState<Array<{ deviceName: string;}>>([]);
+  const [device, setDevice] = useState<Array<{ deviceName: string; }>>([]);
   const [fileName, setFileName] = useState('');
   const [fileLoaded, setFileLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,42 +71,42 @@ export function ImportLogsFromDeviceV2Page() {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchModalTerm, setSearchModalTerm] = useState('');
   const [importDataResult, setImportDataResult] = useState<ImportLogsFromDeviceDto[]>([]);
-  const [getEmployee, setGetEmployee] = useState<Array<{ 
-      empID: number; 
-      empCode: string; 
-      lName: string;
-      fName: string;
-      mName: string;
-      suffix: string;
-    }>>([]);
+  const [getEmployee, setGetEmployee] = useState<Array<{
+    empID: number;
+    empCode: string;
+    lName: string;
+    fName: string;
+    mName: string;
+    suffix: string;
+  }>>([]);
 
   const fetchEmployee = async () => {
-        //setLoading(true);
-        //error;
-          try {
-          const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/GetActive?active=${filterStatus}`);
-          if (response.data) {
-            const mappedData = response.data.map((getEmployee: any) => ({
-              empID: getEmployee.empID || getEmployee.EmpID || '',
-              empCode: getEmployee.empCode || getEmployee.EmpCode || '',
-              lName: getEmployee.lName || getEmployee.LName || '',
-              fName: getEmployee.fName || getEmployee.fName || '',
-              mName: getEmployee.mName || getEmployee.mName || '',
-              suffix: getEmployee.suffix || getEmployee.suffix || ''
-            }));
-            setGetEmployee(mappedData);
-          }
-          } catch (error: any) {
-              const errorMsg = error.response?.data?.message || error.message || 'Failed to load Employees';
-              //setError(errorMsg);
-              console.error('Error fetching employees', error);
-            } finally {
-              //loading;
-            }
-      };
-    useEffect(() => {
-        fetchEmployee();
-      }, [filterStatus]);
+    //setLoading(true);
+    //error;
+    try {
+      const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/GetActive?active=${filterStatus}`);
+      if (response.data) {
+        const mappedData = response.data.map((getEmployee: any) => ({
+          empID: getEmployee.empID || getEmployee.EmpID || '',
+          empCode: getEmployee.empCode || getEmployee.EmpCode || '',
+          lName: getEmployee.lName || getEmployee.LName || '',
+          fName: getEmployee.fName || getEmployee.fName || '',
+          mName: getEmployee.mName || getEmployee.mName || '',
+          suffix: getEmployee.suffix || getEmployee.suffix || ''
+        }));
+        setGetEmployee(mappedData);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load Employees';
+      //setError(errorMsg);
+      console.error('Error fetching employees', error);
+    } finally {
+      //loading;
+    }
+  };
+  useEffect(() => {
+    fetchEmployee();
+  }, [filterStatus]);
 
   const filteredEmployees = getEmployee.filter(emp =>
     emp.empCode?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
@@ -125,14 +125,14 @@ export function ImportLogsFromDeviceV2Page() {
   };
 
   console.log(empID);
-   useEffect(() => {
+  useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
-      error;
-      try {
+    error;
+    try {
       const response = await apiClient.get('/Fs/Process/Device/DeviceTypeSetUp');
       if (response.data) {
         const mappedData = response.data.map((device: any) => ({
@@ -140,13 +140,13 @@ export function ImportLogsFromDeviceV2Page() {
         }));
         setDevice(mappedData);
       }
-      } catch (error: any) {
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to Devices';
-          setError(errorMsg);
-          console.error('Error fetching Devices', error);
-        } finally {
-          loading;
-        }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to Devices';
+      setError(errorMsg);
+      console.error('Error fetching Devices', error);
+    } finally {
+      loading;
+    }
   };
 
   useEffect(() => {
@@ -154,7 +154,7 @@ export function ImportLogsFromDeviceV2Page() {
       if (event.key === 'Escape') {
         if (showSearchModal) {
           setShowSearchModal(false);
-        } 
+        }
       }
     };
 
@@ -178,106 +178,106 @@ export function ImportLogsFromDeviceV2Page() {
     return sheetNames.includes("EXCELDTR")
       ? "EXCELDTR"
       : sheetNames[0];
-    };
+  };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0] ?? null;
-      if (!file) return;
-    
-      setXlsxFile(file);
-      setFileName(file.name);
-    
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const data = event.target?.result;
-        if (!data) return;
-    
-        const workbook = XLSX.read(data, { type: "array", cellDates: true});
-    
-        const sheetNames = workbook.SheetNames;
-        const defaultSheet = getDefaultSheetName(sheetNames);
-    
-        const worksheet = workbook.Sheets[defaultSheet];
-        const sheetData = XLSX.utils.sheet_to_json(worksheet, {
-          defval: "",
-        });
-    
-        setWorkbook(workbook);
-        setSheetNames(workbook.SheetNames);
-        setSelectedSheet(defaultSheet);
-        setSheetData(sheetData);
-    
-        console.log("Sheets:", workbook.SheetNames);
-        console.log(sheetData);
-      };
-    
-        reader.readAsArrayBuffer(file);
-    };
-    const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const sheetName = e.target.value;
-      setSelectedSheet(sheetName);
-    
-      if (!workbook) return;
-    
-      const worksheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(worksheet, {
-        defval: "", // prevent undefined cells
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
+
+    setXlsxFile(file);
+    setFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const data = event.target?.result;
+      if (!data) return;
+
+      const workbook = XLSX.read(data, { type: "array", cellDates: true });
+
+      const sheetNames = workbook.SheetNames;
+      const defaultSheet = getDefaultSheetName(sheetNames);
+
+      const worksheet = workbook.Sheets[defaultSheet];
+      const sheetData = XLSX.utils.sheet_to_json(worksheet, {
+        defval: "",
       });
-    
-        setSheetData(data);
-        //console.log(data);
-        //setForm(data);
+
+      setWorkbook(workbook);
+      setSheetNames(workbook.SheetNames);
+      setSelectedSheet(defaultSheet);
+      setSheetData(sheetData);
+
+      console.log("Sheets:", workbook.SheetNames);
+      console.log(sheetData);
     };
+
+    reader.readAsArrayBuffer(file);
+  };
+  const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sheetName = e.target.value;
+    setSelectedSheet(sheetName);
+
+    if (!workbook) return;
+
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet, {
+      defval: "", // prevent undefined cells
+    });
+
+    setSheetData(data);
+    //console.log(data);
+    //setForm(data);
+  };
   const createXlsxFileFromSheetData = (
     sheetData: any[],
     sheetName: string
   ): File => {
     const worksheet = XLSX.utils.json_to_sheet(sheetData);
-  
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  
+
     const buffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
     });
-  
-  return new File([buffer], `${sheetName}.xlsx`, {
-    type:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+
+    return new File([buffer], `${sheetName}.xlsx`, {
+      type:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
   };
   useEffect(() => {
     if (!sheetData.length || !selectedSheet) return;
-  
+
     const file = createXlsxFileFromSheetData(sheetData, selectedSheet);
     setXlsxFile(file);
   }, [sheetData, selectedSheet]);
-  
-    const fileLinkCreate = (blob: Blob, filename: string): void => {
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    };
-    const downloadTemplate = async () => {
-     //setIsProcessing(true);
-     try {
-          const response = await apiClient.get(`downloads/DownloadTemplate?filename=DTR_Excel_Format.xls`, {
-               responseType: 'blob'
-          });
-          const mimeType = response.headers['content-type'];
-          const blob = new Blob([response.data], { type: mimeType });
-          fileLinkCreate(blob, `DTR_Excel_Format.xls`);
-     } finally {
-          //isProcessing;
-     }
+
+  const fileLinkCreate = (blob: Blob, filename: string): void => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+  const downloadTemplate = async () => {
+    //setIsProcessing(true);
+    try {
+      const response = await apiClient.get(`downloads/DownloadTemplate?filename=DTR_Excel_Format.xls`, {
+        responseType: 'blob'
+      });
+      const mimeType = response.headers['content-type'];
+      const blob = new Blob([response.data], { type: mimeType });
+      fileLinkCreate(blob, `DTR_Excel_Format.xls`);
+    } finally {
+      //isProcessing;
+    }
   }
-  const onClickImport = async ( ) => {
-    if(!xlsxFile) {
+  const onClickImport = async () => {
+    if (!xlsxFile) {
       setError("Please select a file to import.");
       Swal.fire({
         icon: 'error',
@@ -286,7 +286,7 @@ export function ImportLogsFromDeviceV2Page() {
       });
       return;
     }
-    if(!dateFrom || !dateTo){
+    if (!dateFrom || !dateTo) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -304,61 +304,106 @@ export function ImportLogsFromDeviceV2Page() {
     console.log(xlsxFile);
     try {
       const data = await apiClient.post<ResponseResultDto<ImportLogsFromDeviceDto[]>>(`/Import/LogsFromDevice/ImportLogsFromDevice`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        })
-        setImportDataResult(data.data.resultData);
-        if (data.data.errors.length > 0){
-          console.log(data.data.errors)
-          setImportDataResult([]);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.data.resultData?.[0]?.message ?? data.data.errors,
-          });            
-          //setErrors(data.data.errors);
+        headers: {
+          "Content-Type": "multipart/form-data"
         }
-        else{
-          Swal.fire({
-            icon: 'success',
-            title: 'Done',
-            text: 'Import done.',
-            timer: 2000,
-            showConfirmButton: false,
-          });
-        }
-      } finally {
-          //setIsProcessing(false);
-          setFileLoaded(true);
-        }
+      })
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        console.log(data.data.errors)
+        setImportDataResult([]);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        //setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Import done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      //setIsProcessing(false);
+      setFileLoaded(true);
+    }
   }
+  function addOneDay(dateStr: string) {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + 1); // Add 1 day
+    return date.toISOString();
+  }
+  const onClickInsertUpdate = async () => {
+    const param = {
+      dateFrom: addOneDay(dateFrom),
+      dateTo: addOneDay(dateTo),
+      devices: selectedDevice,
+      enableDeviceCode: enableDeviceCode,
+      isDeleteExistingRecord: deleteExistingLogs,
+      doNotIncludeResignedEmployees: doNotIncludeResigned,
+      imports: importDataResult.filter((x) => !x.message), // only valid records
+    };
+    console.log(param, dateFrom, dateTo);
+    console.log(xlsxFile);
+    try {
+      const data = await apiClient.post<
+        ResponseResultDto<ImportLogsFromDeviceDto[]>
+      >(`/Import/UpdateImportLogsFromDevice`, param);
+      setImportDataResult(data.data.resultData);
+      if (data.data.errors.length > 0) {
+        setImportDataResult([]);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: data.data.resultData?.[0]?.message ?? data.data.errors,
+        });
+        //setErrors(data.data.errors);
+      }
+      else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Done',
+          text: 'Update done.',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      //setIsProcessing(false);
+    }
+  };
 
   // Employee Pagination logic
-    const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
-    const startEmployeeIndex = (currentEmpPage - 1) * itemsPerPage;
-    const endEmployeeIndex = startEmployeeIndex + itemsPerPage;
+  const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const startEmployeeIndex = (currentEmpPage - 1) * itemsPerPage;
+  const endEmployeeIndex = startEmployeeIndex + itemsPerPage;
 
-    const paginatedEmployees = filteredEmployees.slice(
-        (currentEmpPage - 1) * itemsPerPage,
-        currentEmpPage * itemsPerPage
-    );
-    // Get visible page numbers
-    const getEmployeePageNumbers = () => {
-        const pages = [];
-        const maxVisible = 5;
-        if (totalEmployeePages <= maxVisible) {
-            return Array.from({ length: totalEmployeePages }, (_, i) => i + 1);
-        }
-        pages.push(1);
-        if (currentEmpPage > 3) pages.push('...');
-        const start = Math.max(2, currentEmpPage - 1);
-        const end = Math.min(totalEmployeePages - 1, currentEmpPage + 1);
-        for (let i = start; i <= end; i++) pages.push(i);
-        if (currentEmpPage < totalEmployeePages - 2) pages.push('...');
-        pages.push(totalEmployeePages);
-        return pages;
-    };
+  const paginatedEmployees = filteredEmployees.slice(
+    (currentEmpPage - 1) * itemsPerPage,
+    currentEmpPage * itemsPerPage
+  );
+  // Get visible page numbers
+  const getEmployeePageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (totalEmployeePages <= maxVisible) {
+      return Array.from({ length: totalEmployeePages }, (_, i) => i + 1);
+    }
+    pages.push(1);
+    if (currentEmpPage > 3) pages.push('...');
+    const start = Math.max(2, currentEmpPage - 1);
+    const end = Math.min(totalEmployeePages - 1, currentEmpPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (currentEmpPage < totalEmployeePages - 2) pages.push('...');
+    pages.push(totalEmployeePages);
+    return pages;
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -469,7 +514,7 @@ export function ImportLogsFromDeviceV2Page() {
                       value={selectedSheet}
                       onChange={handleSheetChange}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    > 
+                    >
                       {sheetNames.map((name) => (
                         <option key={name} value={name}>
                           {name}
@@ -479,7 +524,7 @@ export function ImportLogsFromDeviceV2Page() {
                   </div>)}
                   {selectedDevice === "Excel Format" && (<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start gap-2">
-                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate}/>
+                      <Download className="w-4 h-4 text-blue-600 mt-0.5" onClick={downloadTemplate} />
                       <a href="#" className="text-sm text-blue-600 hover:text-blue-700" onClick={downloadTemplate}>
                         Download Template
                       </a>
@@ -514,7 +559,7 @@ export function ImportLogsFromDeviceV2Page() {
                         Choose File
                       </label>
                     </div>
-                  </div>   
+                  </div>
                   <div className="grid grid-cols-2 space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -527,28 +572,28 @@ export function ImportLogsFromDeviceV2Page() {
                     </label>
                     <div className="flex items-center gap-3">
                       {/* <label className="text-gray-700 font-bold w-24">EmpCode</label> */}
-                        <input
-                          type="text"
-                          value={empName}
-                          onChange={(e) => setEmpCode(e.target.value)}
-                          className="w-36 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          readOnly
-                        />
-                        <button 
-                          onClick={() => setShowSearchModal(true)}
-                          className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                        >
-                          <Search className="w-4 h-4" />
-                        </button>
-                        <button 
-                          //onClick={handleDelete}
-                          onClick={() => {setEmpCode(""), setEmpName("")}}
-                          className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                  </div>            
+                      <input
+                        type="text"
+                        value={empName}
+                        onChange={(e) => setEmpCode(e.target.value)}
+                        className="w-36 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        readOnly
+                      />
+                      <button
+                        onClick={() => setShowSearchModal(true)}
+                        className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                      >
+                        <Search className="w-4 h-4" />
+                      </button>
+                      <button
+                        //onClick={handleDelete}
+                        onClick={() => { setEmpCode(""), setEmpName("") }}
+                        className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
 
                   {/* File Upload
                   <div>
@@ -578,7 +623,7 @@ export function ImportLogsFromDeviceV2Page() {
                     <button className="px-6 py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
                       onClick={onClickImport}
                     >
-                      <Upload className="w-4 h-4" onClick={onClickImport}/>
+                      <Upload className="w-4 h-4" onClick={onClickImport} />
                       Import
                     </button>
                     {/* <button className="px-6 py-2.5 bg-purple-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2">
@@ -589,8 +634,9 @@ export function ImportLogsFromDeviceV2Page() {
                       <Check className="w-4 h-4" />
                       Validate
                     </button>
-                    <button className="px-6 py-2.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2">
-                      <Save className="w-4 h-4"/>
+                    <button className="px-6 py-2.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
+                      onClick={onClickInsertUpdate}>
+                      <Save className="w-4 h-4" />
                       Update
                     </button>
                   </div>
@@ -601,115 +647,114 @@ export function ImportLogsFromDeviceV2Page() {
             {/* Employee List Section */}
             {showSearchModal && (<div className="mb-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
               {/* Search Modal */}
-           
-             <>
-               {/* Modal Backdrop */}
-               <div 
-                 className="fixed inset-0 bg-black/30 z-30"
-                 onClick={() => setShowSearchModal(false)}
-               ></div>
-     
-               {/* Modal Dialog */}
-               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                 <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
-                   {/* Modal Header */}
-                   <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-                     <h2 className="text-gray-800 text-sm">Search</h2>
-                     <button 
-                       onClick={() => setShowSearchModal(false)}
-                       className="text-gray-600 hover:text-gray-800"
-                     >
-                       <X className="w-4 h-4" />
-                     </button>
-                   </div>
-     
-                   {/* Modal Content */}
-                   <div className="p-3">
-                     <h3 className="text-blue-600 mb-2 text-sm">Select Employee</h3>
-     
-                     {/* Search Input */}
-                     <div className="flex items-center gap-2 mb-3">
-                       <label className="text-gray-700 text-sm">Search:</label>
-                       <input
-                         type="text"
-                         value={employeeSearchTerm}
-                         onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                       />
-                     </div>
-     
-                     {/* Employee Table */}
-                     <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                       <table className="w-full border-collapse text-sm">
-                         <thead className="sticky top-0 bg-white">
-                           <tr className="bg-gray-100 border-b-2 border-gray-300">
-                             {/* <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode ▲</th> */}
-                             <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode</th>
-                             <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
-                           </tr>
-                         </thead>
-                         <tbody>
-                           {filteredEmployees.map((emp, index) => (
-                             <tr 
-                               key={emp.empCode}
-                               className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                               onClick={() => handleEmployeeSelect(emp.empID, emp.empCode, emp.lName + ", " + emp.fName + " " + emp.mName)}
-                             >
-                               <td className="px-3 py-1.5">{emp.empCode}</td>
-                               <td className="px-3 py-1.5">{emp.lName}, {emp.fName} {emp.mName}</td>
-                             </tr>
-                           ))}
-                         </tbody>
-                       </table>
-                     </div>
-     
-                     {/* Pagination */}
-                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
-                    </span>
-                    <div className="flex items-center gap-1">
+
+              <>
+                {/* Modal Backdrop */}
+                <div
+                  className="fixed inset-0 bg-black/30 z-30"
+                  onClick={() => setShowSearchModal(false)}
+                ></div>
+
+                {/* Modal Dialog */}
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-2xl border border-gray-300">
+                    {/* Modal Header */}
+                    <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                      <h2 className="text-gray-800 text-sm">Search</h2>
                       <button
-                        onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
-                        disabled={currentEmpPage === 1}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => setShowSearchModal(false)}
+                        className="text-gray-600 hover:text-gray-800"
                       >
-                        Previous
-                      </button>
-                      {getEmployeePageNumbers().map((page, index) => (
-                        typeof page === 'number' ? (
-                          <button
-                            key={index}
-                            onClick={() => setCurrentEmpPage(page)}
-                            className={`px-2 py-1 rounded text-xs ${
-                              currentEmpPage === page
-                                ? 'bg-blue-500 text-white'
-                                : 'border border-gray-300 hover:bg-gray-100'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ) : (
-                          <span key={index} className="px-2">
-                            {page}
-                          </span>
-                        )
-                      ))}
-                      <button
-                        onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
-                        disabled={currentEmpPage === totalEmployeePages}
-                        className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {/* Modal Content */}
+                    <div className="p-3">
+                      <h3 className="text-blue-600 mb-2 text-sm">Select Employee</h3>
+
+                      {/* Search Input */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <label className="text-gray-700 text-sm">Search:</label>
+                        <input
+                          type="text"
+                          value={employeeSearchTerm}
+                          onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+
+                      {/* Employee Table */}
+                      <div className="border border-gray-200 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        <table className="w-full border-collapse text-sm">
+                          <thead className="sticky top-0 bg-white">
+                            <tr className="bg-gray-100 border-b-2 border-gray-300">
+                              {/* <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode ▲</th> */}
+                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">EmpCode</th>
+                              <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Name</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginatedEmployees.map((emp, index) => (
+                              <tr
+                                key={emp.empCode}
+                                className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
+                                onClick={() => handleEmployeeSelect(emp.empID, emp.empCode, emp.lName + ", " + emp.fName + " " + emp.mName)}
+                              >
+                                <td className="px-3 py-1.5">{emp.empCode}</td>
+                                <td className="px-3 py-1.5">{emp.lName}, {emp.fName} {emp.mName}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination */}
+                      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                        <span>
+                          Showing {startEmployeeIndex + 1} to {Math.min(endEmployeeIndex, filteredEmployees.length)} of {filteredEmployees.length} entries
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setCurrentEmpPage(p => Math.max(1, p - 1))}
+                            disabled={currentEmpPage === 1}
+                            className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Previous
+                          </button>
+                          {getEmployeePageNumbers().map((page, index) => (
+                            typeof page === 'number' ? (
+                              <button
+                                key={index}
+                                onClick={() => setCurrentEmpPage(page)}
+                                className={`px-2 py-1 rounded text-xs ${currentEmpPage === page
+                                    ? 'bg-blue-500 text-white'
+                                    : 'border border-gray-300 hover:bg-gray-100'
+                                  }`}
+                              >
+                                {page}
+                              </button>
+                            ) : (
+                              <span key={index} className="px-2">
+                                {page}
+                              </span>
+                            )
+                          ))}
+                          <button
+                            onClick={() => setCurrentEmpPage(p => Math.min(totalEmployeePages, p + 1))}
+                            disabled={currentEmpPage === totalEmployeePages}
+                            className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                   </div>
-                 </div>
-               </div>
-             </>
-           
-          </div>)}
+                </div>
+              </>
+
+            </div>)}
 
             {/* Bottom Section - Log Preview Table */}
             <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
@@ -756,7 +801,7 @@ export function ImportLogsFromDeviceV2Page() {
           </div>
         </div>
       </div>
-     
+
 
       {/* Footer */}
       <Footer />
