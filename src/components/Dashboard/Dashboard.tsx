@@ -108,9 +108,8 @@ function formatTime(iso: string): string {
 
 export function Dashboard() {
   const username = getLoggedInUsername() ?? 'User';
-  const userId = getLoggedInUserId();  
+  const userId = getLoggedInUserId();
   const BASENAME = '/DEMO_128TIMEKEEP_NEO';
-
 
   // Employee data
   const [employees, setEmployees] = useState<Employee[]>([]);

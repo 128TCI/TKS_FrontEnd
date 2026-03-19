@@ -80,11 +80,6 @@ interface BorrowedDevice {
     description: string;
 }
 
-interface WorkShift {
-    code: string;
-    description: string;
-}
-
 interface EmployeeData {
     empCode: string;
     name: string;
@@ -95,49 +90,55 @@ interface EmployeeData {
 
 const RAW_DATA_BASE_URL = '/Maintenance/EmployeeRawData';
 const DEVICE_BASE_URL = '/Fs/Process/Device/BorrowedDeviceName';
-const WORKSHIFT_BASE_URL = '/Process/WorkshiftSetUp';
-const EMPLOYEE_MASTER_URL = '/Maintenance/EmployeeMasterFile';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toISOSafe = (dateStr: string, timeStr: string = ''): string => {
-    if (!dateStr) return new Date().toISOString();
+    if (!dateStr || !dateStr.trim()) return '';
     try {
-        let base = dateStr;
-        if (dateStr.includes('/')) {
-            const [m, d, y] = dateStr.split('/');
-            base = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        let base = dateStr.trim();
+        if (base.includes('/')) {
+            const parts = base.split('/');
+            if (parts.length === 3) {
+                const [m, d, y] = parts;
+                base = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+            }
         }
-        if (timeStr) {
+        if (timeStr && timeStr.trim()) {
             const upper = timeStr.toUpperCase().trim();
             const match = upper.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
             if (match) {
-                let hours = parseInt(match[1]);
+                let hours = parseInt(match[1], 10);
                 const mins = match[2];
                 const period = match[3];
                 if (period === 'PM' && hours !== 12) hours += 12;
                 if (period === 'AM' && hours === 12) hours = 0;
-                return `${base}T${String(hours).padStart(2, '0')}:${mins}:00.000Z`;
+                return `${base}T${String(hours).padStart(2, '0')}:${mins}:00`;
             }
         }
-        return `${base}T00:00:00.000Z`;
+        return `${base}T00:00:00`;
     } catch {
-        return new Date().toISOString();
+        return '';
     }
 };
 
 const fromISO = (iso: string): { date: string; time: string } => {
-    if (!iso) return { date: '', time: '' };
+    if (!iso || !iso.trim()) return { date: '', time: '' };
     try {
-        const d = new Date(iso);
-        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(d.getUTCDate()).padStart(2, '0');
-        const year = d.getUTCFullYear();
-        let hours = d.getUTCHours();
-        const mins = String(d.getUTCMinutes()).padStart(2, '0');
+        const cleaned = iso.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+        const d = new Date(cleaned);
+        if (isNaN(d.getTime())) return { date: '', time: '' };
+        if (d.getFullYear() < 1900 || d.getFullYear() === 1) return { date: '', time: '' };
+
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day   = String(d.getDate()).padStart(2, '0');
+        const year  = d.getFullYear();
+        let hours    = d.getHours();
+        const mins   = String(d.getMinutes()).padStart(2, '0');
         const period = hours >= 12 ? 'PM' : 'AM';
         if (hours > 12) hours -= 12;
         if (hours === 0) hours = 12;
+
         return {
             date: `${month}/${day}/${year}`,
             time: `${String(hours).padStart(2, '0')}:${mins} ${period}`,
@@ -163,10 +164,11 @@ const todayStr = () => {
     return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
+const PAGE_SIZE = 10;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function RawDataPage() {
-    // ── Filter state ──
     const [dateFrom, setDateFrom] = useState(todayStr());
     const [dateTo, setDateTo] = useState(todayStr());
     const [incompleteLogs, setIncompleteLogs] = useState(true);
@@ -174,26 +176,22 @@ export function RawDataPage() {
     const [showDateFromCalendar, setShowDateFromCalendar] = useState(false);
     const [showDateToCalendar, setShowDateToCalendar] = useState(false);
 
-    // ── Table data ──
     const [rawDataList, setRawDataList] = useState<RawDataEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [tableError, setTableError] = useState('');
 
-    // ── Sorting ──
+    const [currentPage, setCurrentPage] = useState(1);
+
     type SortKey = 'empCode' | 'workShiftCode' | 'rawDateIn' | 'rawTimeIn' | 'actualDateIn' | 'rawDateOut' | 'rawTimeOut' | 'dayType' | 'rawotApproved';
     const [sortKey, setSortKey] = useState<SortKey>('empCode');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
     const handleSort = (key: SortKey) => {
-        if (sortKey === key) {
-            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortKey(key);
-            setSortDir('asc');
-        }
+        if (sortKey === key) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+        else { setSortKey(key); setSortDir('asc'); }
+        setCurrentPage(1);
     };
 
-    // ── Hide columns ──
     const [hideColumns, setHideColumns] = useState({
         break1Out: true, break1In: true,
         break2Out: false, break2In: false,
@@ -205,13 +203,11 @@ export function RawDataPage() {
         selectAll: false,
     });
 
-    // ── Modal state ──
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [submitLoading, setSubmitLoading] = useState(false);
     const [formError, setFormError] = useState('');
 
-    // ── Form fields ──
     const [empCode, setEmpCode] = useState('');
     const [empName, setEmpName] = useState('');
     const [workshiftCode, setWorkshiftCode] = useState('');
@@ -232,7 +228,6 @@ export function RawDataPage() {
     const [remarks, setRemarks] = useState('');
     const [borrowedDeviceName, setBorrowedDeviceName] = useState('');
 
-    // ── Calendar / TimePicker visibility ──
     const [showDateInCalendar, setShowDateInCalendar] = useState(false);
     const [showTimeInPicker, setShowTimeInPicker] = useState(false);
     const [showActualDateInCalendar, setShowActualDateInCalendar] = useState(false);
@@ -246,25 +241,21 @@ export function RawDataPage() {
     const [showDateOutCalendar, setShowDateOutCalendar] = useState(false);
     const [showTimeOutPicker, setShowTimeOutPicker] = useState(false);
 
-    // ── Employee search modal ──
     const [showEmpCodeModal, setShowEmpCodeModal] = useState(false);
     const [employeeData, setEmployeeData] = useState<EmployeeData[]>([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [employeeError, setEmployeeError] = useState('');
 
-    // ── "Specific" mode – search by employee ──
     const [specificEmpCode, setSpecificEmpCode] = useState('');
     const [specificEmpName, setSpecificEmpName] = useState('');
     const [showSpecificEmpModal, setShowSpecificEmpModal] = useState(false);
 
-    // ── Workshift search modal ──
     const [showWorkshiftModal, setShowWorkshiftModal] = useState(false);
     const [workshiftSearchTerm, setWorkshiftSearchTerm] = useState('');
     const [workshifts, setWorkshifts] = useState<WorkShift[]>([]);
     const [loadingWorkshifts, setLoadingWorkshifts] = useState(false);
     const [workshiftError, setWorkshiftError] = useState('');
 
-    // ── Device search modal ──
     const [showDeviceModal, setShowDeviceModal] = useState(false);
     const [deviceSearchTerm, setDeviceSearchTerm] = useState('');
     const [devices, setDevices] = useState<BorrowedDevice[]>([]);
@@ -278,6 +269,7 @@ export function RawDataPage() {
     const fetchRawData = useCallback(async () => {
         setLoading(true);
         setTableError('');
+        setCurrentPage(1);
         try {
             const params: Record<string, string> = {
                 dateFrom: toISOSafe(dateFrom),
@@ -291,13 +283,17 @@ export function RawDataPage() {
             if (response.status === 200 && response.data) {
                 const list: RawDataEntry[] = Array.isArray(response.data) ? response.data : [];
 
-                const fromMs = new Date(toISOSafe(dateFrom)).setUTCHours(0, 0, 0, 0);
-                const toMs   = new Date(toISOSafe(dateTo)).setUTCHours(23, 59, 0, 0);
+                const fromLocal = new Date(toISOSafe(dateFrom));
+                fromLocal.setHours(0, 0, 0, 0);
+                const toLocal = new Date(toISOSafe(dateTo));
+                toLocal.setHours(23, 59, 59, 999);
 
                 const filtered = list.filter(entry => {
                     if (!entry.rawDateIn) return false;
-                    const rawDateInMs = new Date(entry.rawDateIn).getTime();
-                    if (rawDateInMs < fromMs || rawDateInMs > toMs) return false;
+                    const cleaned = entry.rawDateIn.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+                    const entryDate = new Date(cleaned);
+                    if (isNaN(entryDate.getTime())) return false;
+                    if (entryDate < fromLocal || entryDate > toLocal) return false;
 
                     const hasDateOut = !!entry.rawDateOut && entry.rawDateOut.trim() !== '';
                     const hasTimeIn  = !!entry.rawTimeIn;
@@ -312,7 +308,6 @@ export function RawDataPage() {
         } catch (error: any) {
             const msg = error.response?.data?.message || error.message || 'Failed to load raw data';
             setTableError(msg);
-            console.error('Error fetching raw data:', error);
         } finally {
             setLoading(false);
         }
@@ -327,344 +322,20 @@ export function RawDataPage() {
                 setDevices(Array.isArray(response.data) ? response.data : []);
             }
         } catch (error: any) {
-            const msg = error.response?.data?.message || error.message || 'Failed to load devices';
-            setDeviceError(msg);
-            console.error('Error fetching devices:', error);
+            setDeviceError(error.response?.data?.message || error.message || 'Failed to load devices');
         } finally {
             setLoadingDevices(false);
         }
     }, []);
 
- const fetchWorkshifts = useCallback(async () => {
-    setLoadingWorkshifts(true);
-    setWorkshiftError('');
-    try {
-        const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
-        if (response.status === 200 && response.data) {
-            const list = response.data.data || [];
-            console.log('[fetchWorkshifts] sample:', list[0]);
-            const mappedData = list.map((w: any) => ({
-                code: w.code || '',
-                description: w.description || '',
-                timeIn:    w.timeIn    || w.shiftTimeIn  || w.startTime   || w.inTime    || '',
-                timeOut:   w.timeOut   || w.shiftTimeOut || w.endTime     || w.outTime   || '',
-                break1Out: w.break1Out || w.breakOut1    || w.lunchOut    || w.break1TimeOut || '',
-                break1In:  w.break1In  || w.breakIn1     || w.lunchIn     || w.break1TimeIn  || '',
-                break2Out: w.break2Out || w.breakOut2    || w.break2TimeOut || w.lunchOut2  || w.mealOut || '',
-                break2In:  w.break2In  || w.breakIn2     || w.break2TimeIn  || w.lunchIn2   || w.mealIn  || '',
-                break3Out: w.break3Out || w.breakOut3    || w.break3TimeOut || w.dinnerOut  || '',
-                break3In:  w.break3In  || w.breakIn3     || w.break3TimeIn  || w.dinnerIn   || '',
-            }));
-            setWorkshifts(mappedData);
-        }
-    } catch (error: any) {
-        const msg = error.response?.data?.message || error.message || 'Failed to load workshifts';
-        setWorkshiftError(msg);
-    } finally {
-        setLoadingWorkshifts(false);
-    }
-}, []); // Memoized with empty dependency array
-const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError('');
-    try {
-        const { employees } = await fetchEmployeesService();
-        setEmployeeData(employees.map((emp) => ({
-            empCode: emp.empCode || '',
-            name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-            groupCode: emp.grpCode || '',
-        })));
-    } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-        setEmployeeError(errorMsg);
-        console.error('Error fetching employees:', error);
-    } finally {
-        setLoadingEmployees(false);
-    }
-};
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // CRUD
-    // ─────────────────────────────────────────────────────────────────────────
-
-const handleSubmit = async () => {
-    // ── 1. Required: Emp Code ──
-    if (!empCode.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code.' });
-        return;
-    }
-
-    // ── 2. Required: Date In ──
-    if (!dateIn.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In is required.' });
-        return;
-    }
-
-    // ── 3. Fetch ALL raw data for this empCode + dateIn for duplicate check ──
-    let allRawList: RawDataEntry[] = [];
-    try {
-        const checkResponse = await apiClient.get(RAW_DATA_BASE_URL, {
-            params: {
-                dateFrom: toISOSafe(dateIn),
-                dateTo:   toISOSafe(dateIn),
-                empCode:  empCode.trim(),
-            },
-        });
-        allRawList = Array.isArray(checkResponse.data) ? checkResponse.data : [];
-        console.log('[handleSubmit] allRawList count:', allRawList.length);
-        console.log('[handleSubmit] allRawList:', JSON.stringify(allRawList, null, 2));
-    } catch (fetchError: any) {
-        console.warn('[handleSubmit] Could not fetch all raw list for duplicate check:', fetchError.message);
-    }
-
-    // ── 4. Duplicate Date In check against fresh full list ──
-    const targetDateMs_from = new Date(toISOSafe(dateIn)).setUTCHours(0, 0, 0, 0);
-    const targetDateMs_to   = new Date(toISOSafe(dateIn)).setUTCHours(23, 59, 59, 999);
-
-    const isDuplicate = allRawList.some(entry => {
-        // For Edit: exclude the current record (mirrors i.ID != model.ID)
-        if (editingId !== null && entry.id === editingId) return false;
-
-        // Same EmpCode (mirrors EmpCode.Trim().ToUpper() == model.EmpCode.Trim().ToUpper())
-        if (entry.empCode.trim().toUpperCase() !== empCode.trim().toUpperCase()) return false;
-
-        // Same date (mirrors DbFunctions.TruncateTime comparison)
-        if (!entry.rawDateIn) return false;
-        const entryDateMs = new Date(entry.rawDateIn).getTime();
-        return entryDateMs >= targetDateMs_from && entryDateMs <= targetDateMs_to;
-    });
-
-    if (isDuplicate) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In already exist.' });
-        return;
-    }
-
-    // ── 5. DateTime In must not be greater than DateTime Out ──
-    if (dateOut.trim() && timeIn.trim() && timeOut.trim()) {
-        const dtIn  = new Date(toISOSafe(dateIn, timeIn));
-        const dtOut = new Date(toISOSafe(dateOut, timeOut));
-
-        if (!isNaN(dtIn.getTime()) && !isNaN(dtOut.getTime()) && dtIn > dtOut) {
-            await Swal.fire({
-                icon: 'error',
-                title: 'Validation Error',
-                text: "Invalid DateTime 'In' and DateTime 'Out'",
-            });
-            return;
-        }
-    }
-
-    // ── Past validations done — proceed with save ──
-    setFormError('');
-    setSubmitLoading(true);
-
-    const dtoPayload = {
-        id: editingId ?? 0,
-        empCode,
-        workShiftCode: workshiftCode,
-        dayType: 'Regular',
-        rawDateIn: toISOSafe(dateIn),
-        rawTimeIn: toISOSafe(dateIn, timeIn),
-        actualDateIn: toISOSafe(actualDateIn || dateIn),
-        actualDateIn2: toISOSafe(dateIn),
-        actualTimeIn2: toISOSafe(actualDateIn || dateIn, actualTimeIn),
-        rawBreak1Out: toISOSafe(dateIn, break1Out),
-        rawBreak1In: toISOSafe(dateIn, break1In),
-        rawBreak2Out: toISOSafe(dateIn, break2Out),
-        rawBreak2In: toISOSafe(dateIn, break2In),
-        rawBreak3Out: toISOSafe(dateIn, break3Out),
-        rawBreak3In: toISOSafe(dateIn, break3In),
-        rawDateOut: toISOSafe(dateOut || dateIn),
-        rawTimeOut: toISOSafe(dateOut || dateIn, timeOut),
-        rAWOTApproved: otApproved,
-        rawRemarks: remarks,
-        isLateFiling,
-        bDeviceName: borrowedDeviceName,
-        rawTardiness: false,
-        rawUndertime: false,
-        rawOT: false,
-        rawNightDiff: false,
-        rawOtherEarnings: false,
-        rawUnproductive: false,
-        rawDisplDateFrom: toISOSafe(dateFrom),
-        rawDisplDateTo: toISOSafe(dateTo),
-        isSuspended: false,
-        rawNoofDays: false,
-        dayType2: '',
-        entryFlag: '',
-        terminalID: '',
-        dayTypeDOLE: '',
-        aprOTTime: toISOSafe(dateIn),
-        deviceNameIn: '',
-        deviceNameOut: '',
-        isLateFilingProcessed: false,
-        post_Tardy: false,
-        post_UT: false,
-        post_OT: false,
-        post_Earn: false,
-        post_ND: false,
-        post_NoOfDays: false,
-        oTAppApprovalFlag: false,
-        sDWorkShiftCodeFlag: false,
-        flexiBreakFlag: false,
-    };
-
-    try {
-        if (editingId !== null) {
-            await apiClient.put(`${RAW_DATA_BASE_URL}/${editingId}`, {
-                ...dtoPayload,
-                id: editingId,
-            });
-        } else {
-            await apiClient.post(RAW_DATA_BASE_URL, dtoPayload);
-        }
-
-        await Swal.fire({
-            icon: 'success',
-            title: editingId !== null ? 'Updated Successfully' : 'Created Successfully',
-            text: editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
-            timer: 2000,
-            timerProgressBar: true,
-            showConfirmButton: false,
-        });
-
-        setShowCreateModal(false);
-        setEditingId(null);
-        await fetchRawData();
-
-    } catch (error: any) {
-        const backendMsg =
-            error.response?.data?.message ||
-            error.response?.data?.title ||
-            error.message ||
-            'Something went wrong. Please try again.';
-
-        await Swal.fire({
-            icon: 'error',
-            title: editingId !== null ? 'Update Failed' : 'Create Failed',
-            text: backendMsg,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Close',
-        });
-
-        setFormError(backendMsg);
-        console.error('Error saving raw data:', error);
-    } finally {
-        setSubmitLoading(false);
-    }
-};
-    const handleEdit = (entry: RawDataEntry) => {
-        setEditingId(entry.id);
-        setEmpCode(entry.empCode);
-        setWorkshiftCode(entry.workShiftCode);
-
-        const di = fromISO(entry.rawDateIn);
-        const ti = fromISO(entry.rawTimeIn);
-        const adi = fromISO(entry.actualDateIn);
-        const ati = fromISO(entry.actualTimeIn2);
-        const b1o = fromISO(entry.rawBreak1Out);
-        const b1i = fromISO(entry.rawBreak1In);
-        const b2o = fromISO(entry.rawBreak2Out);
-        const b2i = fromISO(entry.rawBreak2In);
-        const b3o = fromISO(entry.rawBreak3Out);
-        const b3i = fromISO(entry.rawBreak3In);
-        const doDate = fromISO(entry.rawDateOut);
-        const toTime = fromISO(entry.rawTimeOut);
-
-        setDateIn(di.date);
-        setTimeIn(ti.time);
-        setActualDateIn(adi.date);
-        setActualTimeIn(ati.time);
-        setBreak1Out(b1o.time);
-        setBreak1In(b1i.time);
-        setBreak2Out(b2o.time);
-        setBreak2In(b2i.time);
-        setBreak3Out(b3o.time);
-        setBreak3In(b3i.time);
-        setDateOut(doDate.date);
-        setTimeOut(toTime.time);
-        setOtApproved(entry.rawotApproved);
-        setIsLateFiling(entry.isLateFiling);
-        setRemarks(entry.rawRemarks);
-        setBorrowedDeviceName(entry.bDeviceName);
-        setFormError('');
-        setShowCreateModal(true);
-    };
-
-const handleDelete = async (id: number) => {
-    const result = await Swal.fire({
-        icon: 'warning',
-        title: 'Are you sure?',
-        text: 'This entry will be permanently deleted.',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, delete it',
-        cancelButtonText: 'Cancel',
-    });
-
-    if (!result.isConfirmed) return;
-
-    try {
-        await apiClient.delete(`${RAW_DATA_BASE_URL}/${id}`);
-        setRawDataList(prev => prev.filter(e => e.id !== id));
-
-        await Swal.fire({
-            icon: 'success',
-            title: 'Deleted',
-            text: 'The entry has been deleted.',
-            timer: 1500,
-            timerProgressBar: true,
-            showConfirmButton: false,
-        });
-    } catch (error: any) {
-        const msg = error.response?.data?.message || error.message || 'Failed to delete entry';
-        await Swal.fire({
-            icon: 'error',
-            title: 'Delete Failed',
-            text: msg,
-            confirmButtonColor: '#d33',
-        });
-        console.error('Error deleting raw data:', error);
-    }
-};
-const handleGetShift = async () => {
-    if (!empCode.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code first.' });
-        return;
-    }
-    if (!dateIn.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please enter Date In first.' });
-        return;
-    }
-    if (!workshiftCode.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select a Workshift Code first.' });
-        return;
-    }
-resetShiftTimes();
-    const isoToAmPm = (raw: string): string => {
-        if (!raw) return '';
-        try {
-            const timeMatch = raw.match(/T?(\d{1,2}):(\d{2})(?::\d{2})?/);
-            if (!timeMatch) return '';
-            let hours = parseInt(timeMatch[1]);
-            const mins = parseInt(timeMatch[2]);
-            const period = hours >= 12 ? 'PM' : 'AM';
-            if (hours > 12) hours -= 12;
-            if (hours === 0) hours = 12;
-            return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${period}`;
-        } catch {
-            return '';
-        }
-    };
-
-    let list = workshifts;
-    if (list.length === 0) {
+    const fetchWorkshifts = useCallback(async () => {
+        setLoadingWorkshifts(true);
+        setWorkshiftError('');
         try {
             const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
             if (response.status === 200 && response.data) {
-                const raw = response.data.data || [];
-                list = raw.map((w: any) => ({
+                const list = response.data.data || [];
+                setWorkshifts(list.map((w: any) => ({
                     code: w.code || '',
                     description: w.description || '',
                     timeIn:    w.timeIn    || w.shiftTimeIn  || w.startTime   || w.inTime    || '',
@@ -675,25 +346,295 @@ resetShiftTimes();
                     break2In:  w.break2In  || w.breakIn2     || w.break2TimeIn  || w.lunchIn2   || w.mealIn  || '',
                     break3Out: w.break3Out || w.breakOut3    || w.break3TimeOut || w.dinnerOut  || '',
                     break3In:  w.break3In  || w.breakIn3     || w.break3TimeIn  || w.dinnerIn   || '',
+                })));
+            }
+        } catch (error: any) {
+            setWorkshiftError(error.response?.data?.message || error.message || 'Failed to load workshifts');
+        } finally {
+            setLoadingWorkshifts(false);
+        }
+    }, []);
+
+    const fetchEmployeeData = async () => {
+        setLoadingEmployees(true);
+        setEmployeeError('');
+        try {
+            const { employees } = await fetchEmployeesService();
+            setEmployeeData(employees.map((emp) => ({
+                empCode: emp.empCode || '',
+                name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+                groupCode: emp.grpCode || '',
+            })));
+        } catch (error: any) {
+            setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+        } finally {
+            setLoadingEmployees(false);
+        }
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CRUD
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const handleSubmit = async () => {
+        if (!empCode.trim()) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code.' });
+            return;
+        }
+        if (!dateIn.trim()) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In is required.' });
+            return;
+        }
+
+        let allRawList: RawDataEntry[] = [];
+        try {
+            const checkResponse = await apiClient.get(RAW_DATA_BASE_URL, {
+                params: { dateFrom: toISOSafe(dateIn), dateTo: toISOSafe(dateIn), empCode: empCode.trim() },
+            });
+            allRawList = Array.isArray(checkResponse.data) ? checkResponse.data : [];
+        } catch (fetchError: any) {
+            console.warn('[handleSubmit] Could not fetch for duplicate check:', fetchError.message);
+        }
+
+        const targetDateStart = new Date(toISOSafe(dateIn));
+        targetDateStart.setHours(0, 0, 0, 0);
+        const targetDateEnd = new Date(toISOSafe(dateIn));
+        targetDateEnd.setHours(23, 59, 59, 999);
+
+        const isDuplicate = allRawList.some(entry => {
+            if (editingId !== null && entry.id === editingId) return false;
+            if (entry.empCode.trim().toUpperCase() !== empCode.trim().toUpperCase()) return false;
+            if (!entry.rawDateIn) return false;
+            const cleaned = entry.rawDateIn.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+            const entryDate = new Date(cleaned);
+            return entryDate >= targetDateStart && entryDate <= targetDateEnd;
+        });
+
+        if (isDuplicate) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In already exist.' });
+            return;
+        }
+
+        if (dateOut.trim() && timeIn.trim() && timeOut.trim()) {
+            const dtIn  = new Date(toISOSafe(dateIn, timeIn));
+            const dtOut = new Date(toISOSafe(dateOut, timeOut));
+            const fmt = (d: Date): string => {
+                const mo = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const yr = d.getFullYear();
+                let h = d.getHours();
+                const min = String(d.getMinutes()).padStart(2, '0');
+                const per = h >= 12 ? 'PM' : 'AM';
+                if (h > 12) h -= 12;
+                if (h === 0) h = 12;
+                return `${mo}/${day}/${yr} ${String(h).padStart(2, '0')}:${min} ${per}`;
+            };
+            if (!isNaN(dtIn.getTime()) && !isNaN(dtOut.getTime()) && dtIn > dtOut) {
+                await Swal.fire({
+                    icon: 'error', title: 'Validation Error',
+                    html: `<p style="margin-bottom:10px">DateTime <b>In</b> must not be greater than DateTime <b>Out</b>.</p>
+                        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                            <tr style="background:#fef2f2;"><td style="padding:6px 12px;text-align:right;color:#6b7280;white-space:nowrap;">DateTime In:</td><td style="padding:6px 12px;font-weight:600;color:#dc2626;">${fmt(dtIn)}</td></tr>
+                            <tr style="background:#fff5f5;"><td style="padding:6px 12px;text-align:right;color:#6b7280;white-space:nowrap;">DateTime Out:</td><td style="padding:6px 12px;font-weight:600;color:#dc2626;">${fmt(dtOut)}</td></tr>
+                        </table>
+                        <p style="margin-top:10px;font-size:12px;color:#6b7280;">If this is an overnight shift, please set Date Out to the next day.</p>`,
+                });
+                return;
+            }
+        }
+
+        setFormError('');
+        setSubmitLoading(true);
+
+        // Merge Actual Date In + Actual Time In into one ISO string
+        const resolvedActualDateIn = actualDateIn.trim() || dateIn;
+        const actualDateTimeIn     = actualTimeIn.trim()
+            ? toISOSafe(resolvedActualDateIn, actualTimeIn)
+            : null;
+
+        const dtoPayload = {
+            id: editingId ?? 0,
+            empCode,
+            workShiftCode: workshiftCode,
+            dayType: 'Regular',
+            rawDateIn:      toISOSafe(dateIn),
+            rawTimeIn:      timeIn.trim()    ? toISOSafe(dateIn, timeIn)             : null,
+            actualDateIn:   toISOSafe(resolvedActualDateIn),
+            actualDateIn2:  actualDateTimeIn,
+            actualTimeIn2:  actualDateTimeIn,
+            rawBreak1Out:   break1Out.trim() ? toISOSafe(dateIn, break1Out)          : null,
+            rawBreak1In:    break1In.trim()  ? toISOSafe(dateIn, break1In)           : null,
+            rawBreak2Out:   break2Out.trim() ? toISOSafe(dateIn, break2Out)          : null,
+            rawBreak2In:    break2In.trim()  ? toISOSafe(dateIn, break2In)           : null,
+            rawBreak3Out:   break3Out.trim() ? toISOSafe(dateIn, break3Out)          : null,
+            rawBreak3In:    break3In.trim()  ? toISOSafe(dateIn, break3In)           : null,
+            rawDateOut:     dateOut.trim()   ? toISOSafe(dateOut)                    : null,
+            rawTimeOut:     timeOut.trim()   ? toISOSafe(dateOut || dateIn, timeOut) : null,
+            rAWOTApproved:  otApproved,
+            rawRemarks:     remarks,
+            isLateFiling,
+            bDeviceName:    borrowedDeviceName,
+            rawTardiness: false, rawUndertime: false, rawOT: false,
+            rawNightDiff: false, rawOtherEarnings: false, rawUnproductive: false,
+            rawDisplDateFrom: toISOSafe(dateFrom),
+            rawDisplDateTo:   toISOSafe(dateTo),
+            isSuspended: false, rawNoofDays: false,
+            dayType2: '', entryFlag: '', terminalID: '', dayTypeDOLE: '',
+            aprOTTime: toISOSafe(dateIn),
+            deviceNameIn: '', deviceNameOut: '',
+            isLateFilingProcessed: false,
+            post_Tardy: false, post_UT: false, post_OT: false,
+            post_Earn: false, post_ND: false, post_NoOfDays: false,
+            oTAppApprovalFlag: false, sDWorkShiftCodeFlag: false, flexiBreakFlag: false,
+        };
+
+        try {
+            if (editingId !== null) {
+                await apiClient.put(`${RAW_DATA_BASE_URL}/${editingId}`, { ...dtoPayload, id: editingId });
+            } else {
+                await apiClient.post(RAW_DATA_BASE_URL, dtoPayload);
+            }
+            await Swal.fire({
+                icon: 'success',
+                title: editingId !== null ? 'Updated Successfully' : 'Created Successfully',
+                text:  editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
+                timer: 2000, timerProgressBar: true, showConfirmButton: false,
+            });
+            setShowCreateModal(false);
+            setEditingId(null);
+            await fetchRawData();
+        } catch (error: any) {
+            const backendMsg = error.response?.data?.message || error.response?.data?.title || error.message || 'Something went wrong.';
+            await Swal.fire({ icon: 'error', title: editingId !== null ? 'Update Failed' : 'Create Failed', text: backendMsg, confirmButtonColor: '#d33', confirmButtonText: 'Close' });
+            setFormError(backendMsg);
+        } finally {
+            setSubmitLoading(false);
+        }
+    };
+
+    const handleEdit = (entry: RawDataEntry) => {
+        setEditingId(entry.id);
+        setEmpCode(entry.empCode);
+        setWorkshiftCode(entry.workShiftCode);
+
+        const di     = fromISO(entry.rawDateIn);
+        const ti     = fromISO(entry.rawTimeIn);
+        const adi    = fromISO(entry.actualDateIn);
+        const ati    = fromISO(entry.actualTimeIn2);   // time from merged field
+        const b1o    = fromISO(entry.rawBreak1Out);
+        const b1i    = fromISO(entry.rawBreak1In);
+        const b2o    = fromISO(entry.rawBreak2Out);
+        const b2i    = fromISO(entry.rawBreak2In);
+        const b3o    = fromISO(entry.rawBreak3Out);
+        const b3i    = fromISO(entry.rawBreak3In);
+        const doDate = fromISO(entry.rawDateOut);
+        const toTime = fromISO(entry.rawTimeOut);
+
+        setDateIn(di.date);        setTimeIn(ti.time);
+        setActualDateIn(adi.date); setActualTimeIn(ati.time);
+        setBreak1Out(b1o.time);    setBreak1In(b1i.time);
+        setBreak2Out(b2o.time);    setBreak2In(b2i.time);
+        setBreak3Out(b3o.time);    setBreak3In(b3i.time);
+        setDateOut(doDate.date);   setTimeOut(toTime.time);
+        setOtApproved(entry.rawotApproved);
+        setIsLateFiling(entry.isLateFiling);
+        setRemarks(entry.rawRemarks);
+        setBorrowedDeviceName(entry.bDeviceName);
+        setFormError('');
+        setShowCreateModal(true);
+    };
+
+    const handleDelete = async (id: number) => {
+        const result = await Swal.fire({
+            icon: 'warning', title: 'Are you sure?', text: 'This entry will be permanently deleted.',
+            showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it', cancelButtonText: 'Cancel',
+        });
+        if (!result.isConfirmed) return;
+        try {
+            await apiClient.delete(`${RAW_DATA_BASE_URL}/${id}`);
+            setRawDataList(prev => prev.filter(e => e.id !== id));
+            await Swal.fire({ icon: 'success', title: 'Deleted', text: 'The entry has been deleted.', timer: 1500, timerProgressBar: true, showConfirmButton: false });
+        } catch (error: any) {
+            await Swal.fire({ icon: 'error', title: 'Delete Failed', text: error.response?.data?.message || error.message || 'Failed to delete entry', confirmButtonColor: '#d33' });
+        }
+    };
+
+ const handleGetShift = async () => {
+    if (!empCode.trim()) { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code first.' }); return; }
+    if (!dateIn.trim())  { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please enter Date In first.' }); return; }
+    if (!workshiftCode.trim()) { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select a Workshift Code first.' }); return; }
+
+    resetShiftTimes();
+
+    const isoToAmPm = (raw: string): string => {
+        if (!raw) return '';
+        try {
+            const timeMatch = raw.match(/T?(\d{1,2}):(\d{2})(?::\d{2})?/);
+            if (!timeMatch) return '';
+            let hours = parseInt(timeMatch[1], 10);
+            const mins = parseInt(timeMatch[2], 10);
+            const period = hours >= 12 ? 'PM' : 'AM';
+            if (hours > 12) hours -= 12;
+            if (hours === 0) hours = 12;
+            return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${period}`;
+        } catch { return ''; }
+    };
+
+    // ── NEW: convert AM/PM string → total minutes since midnight ──────────
+    const amPmToMinutes = (amPm: string): number => {
+        const match = amPm.trim().toUpperCase().match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
+        if (!match) return -1;
+        let hours = parseInt(match[1], 10);
+        const mins = parseInt(match[2], 10);
+        const period = match[3];
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        return hours * 60 + mins;
+    };
+
+    // ── NEW: add one day to a MM/DD/YYYY string ────────────────────────────
+    const addOneDay = (dateStr: string): string => {
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return dateStr;
+        const d = new Date(`${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}T00:00:00`);
+        if (isNaN(d.getTime())) return dateStr;
+        d.setDate(d.getDate() + 1);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${m}/${day}/${d.getFullYear()}`;
+    };
+
+    let list = workshifts;
+    if (list.length === 0) {
+        try {
+            const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
+            if (response.status === 200 && response.data) {
+                const raw = response.data.data || [];
+                list = raw.map((w: any) => ({
+                    code: w.code || '', description: w.description || '',
+                    timeIn: w.timeIn || w.shiftTimeIn || w.startTime || w.inTime || '',
+                    timeOut: w.timeOut || w.shiftTimeOut || w.endTime || w.outTime || '',
+                    break1Out: w.break1Out || w.breakOut1 || w.lunchOut || w.break1TimeOut || '',
+                    break1In:  w.break1In  || w.breakIn1  || w.lunchIn  || w.break1TimeIn  || '',
+                    break2Out: w.break2Out || w.breakOut2 || w.break2TimeOut || w.lunchOut2 || w.mealOut || '',
+                    break2In:  w.break2In  || w.breakIn2  || w.break2TimeIn  || w.lunchIn2  || w.mealIn  || '',
+                    break3Out: w.break3Out || w.breakOut3 || w.break3TimeOut || w.dinnerOut || '',
+                    break3In:  w.break3In  || w.breakIn3  || w.break3TimeIn  || w.dinnerIn  || '',
                 }));
                 setWorkshifts(list);
             }
-        } catch {
-            await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load workshifts. Please try again.' });
-            return;
-        }
+        } catch { await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load workshifts. Please try again.' }); return; }
     }
 
     const found = list.find(ws => ws.code === workshiftCode);
-    console.log('[handleGetShift] raw found:', JSON.stringify(found, null, 2));
+    if (!found) { await Swal.fire({ icon: 'error', title: 'Not Found', text: `Workshift "${workshiftCode}" not found.` }); return; }
 
-    if (!found) {
-        await Swal.fire({ icon: 'error', title: 'Not Found', text: `Workshift "${workshiftCode}" not found.` });
-        return;
-    }
+    const shiftTimeIn  = found.timeIn  ? isoToAmPm(found.timeIn)  : '';
+    const shiftTimeOut = found.timeOut ? isoToAmPm(found.timeOut) : '';
 
-    if (found.timeIn)    setTimeIn(isoToAmPm(found.timeIn));
-    if (found.timeOut)   setTimeOut(isoToAmPm(found.timeOut));
+    if (shiftTimeIn)    setTimeIn(shiftTimeIn);
+    if (shiftTimeOut)   setTimeOut(shiftTimeOut);
     if (found.break1Out) setBreak1Out(isoToAmPm(found.break1Out));
     if (found.break1In)  setBreak1In(isoToAmPm(found.break1In));
     if (found.break2Out) setBreak2Out(isoToAmPm(found.break2Out));
@@ -701,16 +642,22 @@ resetShiftTimes();
     if (found.break3Out) setBreak3Out(isoToAmPm(found.break3Out));
     if (found.break3In)  setBreak3In(isoToAmPm(found.break3In));
 
-    if (dateIn) setDateOut(dateIn);
+    if (dateIn) {
+        // ── FIXED: if Time Out < Time In → overnight shift → next day ────
+        const inMins  = amPmToMinutes(shiftTimeIn);
+        const outMins = amPmToMinutes(shiftTimeOut);
+        const isOvernight = inMins >= 0 && outMins >= 0 && outMins < inMins;
+
+        setDateOut(isOvernight ? addOneDay(dateIn) : dateIn);
+    }
 };
+
     const handleCreateNew = () => {
         setEditingId(null);
         setEmpCode(''); setEmpName(''); setWorkshiftCode('');
         setDateIn(''); setTimeIn(''); setActualDateIn(''); setActualTimeIn('');
-        setBreak1Out(''); setBreak1In('');
-        setBreak2Out(''); setBreak2In('');
-        setBreak3Out(''); setBreak3In('');
-        setDateOut(''); setTimeOut('');
+        setBreak1Out(''); setBreak1In(''); setBreak2Out(''); setBreak2In('');
+        setBreak3Out(''); setBreak3In(''); setDateOut(''); setTimeOut('');
         setOtApproved(false); setIsLateFiling(false);
         setRemarks(''); setBorrowedDeviceName('');
         setFormError('');
@@ -721,127 +668,78 @@ resetShiftTimes();
     // SEARCH HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    const handleEmpCodeSelect = (code: string, name: string) => {
-        setEmpCode(code);
-        setEmpName(name);
-        setShowEmpCodeModal(false);
+    const handleEmpCodeSelect = (code: string, name: string) => { setEmpCode(code); setEmpName(name); setShowEmpCodeModal(false); };
+    const handleSpecificEmpSelect = (code: string, name: string) => { setSpecificEmpCode(code); setSpecificEmpName(name); setShowSpecificEmpModal(false); };
+
+    const resetShiftTimes = () => {
+        setTimeIn(''); setTimeOut('');
+        setBreak1Out(''); setBreak1In('');
+        setBreak2Out(''); setBreak2In('');
+        setBreak3Out(''); setBreak3In('');
     };
 
-    const handleSpecificEmpSelect = (code: string, name: string) => {
-        setSpecificEmpCode(code);
-        setSpecificEmpName(name);
-        setShowSpecificEmpModal(false);
-    };
-const resetShiftTimes = () => {
-        setTimeIn('');
-        setTimeOut('');
-        setBreak1Out('');
-        setBreak1In('');
-        setBreak2Out('');
-        setBreak2In('');
-        setBreak3Out('');
-        setBreak3In('');
-    };
- const handleWorkshiftSelect = (code: string) => {
-        resetShiftTimes();
-        setWorkshiftCode(code);
-        setShowWorkshiftModal(false);
-        setWorkshiftSearchTerm('');
-    };
-
-    const handleDeviceSelect = (desc: string) => {
-        setBorrowedDeviceName(desc);
-        setShowDeviceModal(false);
-        setDeviceSearchTerm('');
-    };
+    const handleWorkshiftSelect = (code: string) => { resetShiftTimes(); setWorkshiftCode(code); setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); };
+    const handleDeviceSelect = (desc: string) => { setBorrowedDeviceName(desc); setShowDeviceModal(false); setDeviceSearchTerm(''); };
 
     const filteredWorkshifts = workshifts.filter(ws =>
         ws.code.toLowerCase().includes(workshiftSearchTerm.toLowerCase()) ||
         ws.description.toLowerCase().includes(workshiftSearchTerm.toLowerCase())
     );
-
     const filteredDevices = devices.filter(d =>
         d.code.toLowerCase().includes(deviceSearchTerm.toLowerCase()) ||
         d.description.toLowerCase().includes(deviceSearchTerm.toLowerCase())
     );
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // COLUMN TOGGLE
-    // ─────────────────────────────────────────────────────────────────────────
-
-    const handleHideColumnChange = (column: string) => {
-        setHideColumns(prev => ({ ...prev, [column]: !prev[column as keyof typeof prev] }));
-    };
-
+    const handleHideColumnChange = (column: string) => setHideColumns(prev => ({ ...prev, [column]: !prev[column as keyof typeof prev] }));
     const handleSelectAllChange = () => {
         const val = !hideColumns.selectAll;
-        setHideColumns({
-            break1Out: val, break1In: val, break2Out: val, break2In: val,
-            break3Out: val, break3In: val, terminalId: val, secondDayType: val,
-            remarks: val, entryFlag: val, isLateFiling: val, borrowedDeviceName: val,
-            approvedOvertime: val, deviceName: val, selectAll: val,
-        });
+        setHideColumns({ break1Out: val, break1In: val, break2Out: val, break2In: val, break3Out: val, break3In: val, terminalId: val, secondDayType: val, remarks: val, entryFlag: val, isLateFiling: val, borrowedDeviceName: val, approvedOvertime: val, deviceName: val, selectAll: val });
     };
 
     // ─────────────────────────────────────────────────────────────────────────
     // EFFECTS
     // ─────────────────────────────────────────────────────────────────────────
 
-    useEffect(() => {
-        fetchEmployeeData();
-    }, []);
-
+    useEffect(() => { fetchEmployeeData(); }, []);
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
-            if (showEmpCodeModal)       { setShowEmpCodeModal(false);       return; }
-            if (showSpecificEmpModal)   { setShowSpecificEmpModal(false);   return; }
-            if (showWorkshiftModal)     { setShowWorkshiftModal(false);     return; }
-            if (showDeviceModal)        { setShowDeviceModal(false);        return; }
-            if (showCreateModal)        { setShowCreateModal(false);        return; }
-            setShowDateFromCalendar(false);
-            setShowDateToCalendar(false);
-            setShowDateInCalendar(false);
-            setShowTimeInPicker(false);
-            setShowActualDateInCalendar(false);
-            setShowActualTimeInPicker(false);
-            setShowBreak1OutPicker(false);
-            setShowBreak1InPicker(false);
-            setShowBreak2OutPicker(false);
-            setShowBreak2InPicker(false);
-            setShowBreak3OutPicker(false);
-            setShowBreak3InPicker(false);
-            setShowDateOutCalendar(false);
-            setShowTimeOutPicker(false);
+            if (showEmpCodeModal)     { setShowEmpCodeModal(false);     return; }
+            if (showSpecificEmpModal) { setShowSpecificEmpModal(false); return; }
+            if (showWorkshiftModal)   { setShowWorkshiftModal(false);   return; }
+            if (showDeviceModal)      { setShowDeviceModal(false);      return; }
+            if (showCreateModal)      { setShowCreateModal(false);      return; }
+            setShowDateFromCalendar(false); setShowDateToCalendar(false);
+            setShowDateInCalendar(false); setShowTimeInPicker(false);
+            setShowActualDateInCalendar(false); setShowActualTimeInPicker(false);
+            setShowBreak1OutPicker(false); setShowBreak1InPicker(false);
+            setShowBreak2OutPicker(false); setShowBreak2InPicker(false);
+            setShowBreak3OutPicker(false); setShowBreak3InPicker(false);
+            setShowDateOutCalendar(false); setShowTimeOutPicker(false);
         };
         document.addEventListener('keydown', handleEsc);
         return () => document.removeEventListener('keydown', handleEsc);
     }, [showEmpCodeModal, showSpecificEmpModal, showWorkshiftModal, showDeviceModal, showCreateModal]);
 
-    useEffect(() => {
-        if (showWorkshiftModal && workshifts.length === 0) fetchWorkshifts();
-    }, [showWorkshiftModal, workshifts.length, fetchWorkshifts]);
-
-    useEffect(() => {
-        if (showDeviceModal) fetchDevices();
-    }, [showDeviceModal, fetchDevices]);
+    useEffect(() => { if (showWorkshiftModal && workshifts.length === 0) fetchWorkshifts(); }, [showWorkshiftModal, workshifts.length, fetchWorkshifts]);
+    useEffect(() => { if (showDeviceModal) fetchDevices(); }, [showDeviceModal, fetchDevices]);
+    useEffect(() => { setCurrentPage(1); }, [rawDataList.length]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // TIME INPUT HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    const timeChangeHandler = (setter: (v: string) => void) =>
-        (e: React.ChangeEvent<HTMLInputElement>) => setter(e.target.value);
+    const timeChangeHandler = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => setter(e.target.value);
+    const timeBlurHandler   = (val: string, setter: (v: string) => void) => () => setter(validateTimeFormat(val));
 
-    const timeBlurHandler = (val: string, setter: (v: string) => void) =>
-        () => setter(validateTimeFormat(val));
+    // ─────────────────────────────────────────────────────────────────────────
+    // SORT ICON + DERIVED LISTS
+    // ─────────────────────────────────────────────────────────────────────────
 
-    // ── SortIcon helper ──
     const SortIcon = ({ col }: { col: SortKey }) => {
         if (sortKey !== col) return (
             <span className="inline-flex flex-col ml-1 leading-none" style={{ fontSize: '8px', verticalAlign: 'middle' }}>
-                <span className="text-gray-400">▲</span>
-                <span className="text-gray-400">▼</span>
+                <span className="text-gray-400">▲</span><span className="text-gray-400">▼</span>
             </span>
         );
         return (
@@ -852,7 +750,6 @@ const resetShiftTimes = () => {
         );
     };
 
-    // ── Derived sorted + filtered list ──
     const filteredByEmp = displayMode === 'specific' && specificEmpCode
         ? rawDataList.filter(e => e.empCode === specificEmpCode)
         : rawDataList;
@@ -860,57 +757,44 @@ const resetShiftTimes = () => {
     const sortedList = [...filteredByEmp].sort((a, b) => {
         let aVal: string | number | boolean = '';
         let bVal: string | number | boolean = '';
-
-        if (sortKey === 'rawotApproved') {
-            aVal = a.rawotApproved ? 1 : 0;
-            bVal = b.rawotApproved ? 1 : 0;
-        } else if (['rawDateIn', 'rawTimeIn', 'actualDateIn', 'rawDateOut', 'rawTimeOut'].includes(sortKey)) {
-            aVal = a[sortKey] ? new Date(a[sortKey]).getTime() : 0;
-            bVal = b[sortKey] ? new Date(b[sortKey]).getTime() : 0;
-        } else {
-            aVal = (a[sortKey as keyof RawDataEntry] as string) ?? '';
-            bVal = (b[sortKey as keyof RawDataEntry] as string) ?? '';
-        }
-
+        if (sortKey === 'rawotApproved') { aVal = a.rawotApproved ? 1 : 0; bVal = b.rawotApproved ? 1 : 0; }
+        else if (['rawDateIn', 'rawTimeIn', 'actualDateIn', 'rawDateOut', 'rawTimeOut'].includes(sortKey)) {
+            aVal = a[sortKey] ? new Date(a[sortKey].replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '')).getTime() : 0;
+            bVal = b[sortKey] ? new Date(b[sortKey].replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '')).getTime() : 0;
+        } else { aVal = (a[sortKey as keyof RawDataEntry] as string) ?? ''; bVal = (b[sortKey as keyof RawDataEntry] as string) ?? ''; }
         if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
         if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
         return 0;
     });
 
+    const totalEntries = sortedList.length;
+    const totalPages   = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE));
+    const safePage     = Math.min(currentPage, totalPages);
+    const pageStart    = (safePage - 1) * PAGE_SIZE;
+    const pageEnd      = Math.min(pageStart + PAGE_SIZE, totalEntries);
+    const pagedList    = sortedList.slice(pageStart, pageEnd);
+    const goToPage     = (page: number) => setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+
+    const pageNumbers: number[] = [];
+    const rangeStart = Math.max(1, safePage - 2);
+    const rangeEnd   = Math.min(totalPages, rangeStart + 4);
+    for (let i = rangeStart; i <= rangeEnd; i++) pageNumbers.push(i);
+
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    const renderDateWithCalendar = (
-        label: string,
-        val: string,
-        setter: (v: string) => void,
-        showCalendar: boolean,
-        setShowCalendar: (v: boolean) => void
-    ) => (
+    const renderDateWithCalendar = (label: string, val: string, setter: (v: string) => void, showCalendar: boolean, setShowCalendar: (v: boolean) => void) => (
         <div className="flex items-center gap-2">
             <label className="text-gray-700 text-sm whitespace-nowrap">{label} :</label>
             <div className="relative">
-                <input
-                    type="text"
-                    value={val}
-                    onChange={e => setter(e.target.value)}
-                    placeholder="MM/DD/YYYY"
-                    className="w-36 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9"
-                />
-                <button
-                    type="button"
-                    onClick={() => setShowCalendar(!showCalendar)}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                >
+                <input type="text" value={val} onChange={e => setter(e.target.value)} placeholder="MM/DD/YYYY"
+                    className="w-36 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-9" />
+                <button type="button" onClick={() => setShowCalendar(!showCalendar)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
                     <Calendar className="w-3.5 h-3.5" />
                 </button>
-                {showCalendar && (
-                    <CalendarPopup
-                        onDateSelect={date => { setter(date); setShowCalendar(false); }}
-                        onClose={() => setShowCalendar(false)}
-                    />
-                )}
+                {showCalendar && <CalendarPopup onDateSelect={date => { setter(date); setShowCalendar(false); }} onClose={() => setShowCalendar(false)} />}
             </div>
         </div>
     );
@@ -924,12 +808,10 @@ const resetShiftTimes = () => {
             <div className="flex-1">
                 <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8">
 
-                    {/* Page Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
                         <h1 className="text-white text-xl font-semibold">Raw Data</h1>
                     </div>
 
-                    {/* Content Container */}
                     <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
 
                         {/* Info Banner */}
@@ -941,9 +823,7 @@ const resetShiftTimes = () => {
                                     </svg>
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-sm text-gray-700 mb-2">
-                                        Manage and view employee raw time data including clock in/out times, breaks, and overtime approvals.
-                                    </p>
+                                    <p className="text-sm text-gray-700 mb-2">Manage and view employee raw time data including clock in/out times, breaks, and overtime approvals.</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                         {['Employee time tracking', 'Break time management', 'Overtime approval tracking', 'Workshift assignment'].map(item => (
                                             <div key={item} className="flex items-center gap-2">
@@ -958,37 +838,19 @@ const resetShiftTimes = () => {
 
                         {/* Top Controls */}
                         <div className="flex flex-wrap items-center gap-4 mb-6">
-                            <button
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                                onClick={handleCreateNew}
-                            >
-                                <Plus className="w-4 h-4" />
-                                Create New
+                            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm" onClick={handleCreateNew}>
+                                <Plus className="w-4 h-4" /> Create New
                             </button>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={incompleteLogs}
-                                    onChange={e => setIncompleteLogs(e.target.checked)}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded"
-                                />
+                                <input type="checkbox" checked={incompleteLogs} onChange={e => setIncompleteLogs(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
                                 <span className="text-gray-700">Incomplete Logs</span>
                             </label>
                             <div className="flex items-center gap-4">
                                 {(['all', 'specific'] as const).map(mode => (
                                     <label key={mode} className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            checked={displayMode === mode}
-                                            onChange={() => {
-                                                setDisplayMode(mode);
-                                                if (mode === 'all') {
-                                                    setSpecificEmpCode('');
-                                                    setSpecificEmpName('');
-                                                }
-                                            }}
-                                            className="w-4 h-4 text-blue-600"
-                                        />
+                                        <input type="radio" checked={displayMode === mode}
+                                            onChange={() => { setDisplayMode(mode); if (mode === 'all') { setSpecificEmpCode(''); setSpecificEmpName(''); } }}
+                                            className="w-4 h-4 text-blue-600" />
                                         <span className="text-gray-700 capitalize">{mode}</span>
                                     </label>
                                 ))}
@@ -999,34 +861,14 @@ const resetShiftTimes = () => {
                         {displayMode === 'specific' && (
                             <div className="flex flex-wrap items-center gap-3 mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
                                 <span className="text-sm font-medium text-blue-700 whitespace-nowrap">Employee:</span>
-                                <input
-                                    type="text"
-                                    value={specificEmpCode}
-                                    readOnly
-                                    placeholder="Select employee..."
-                                    className="w-32 px-3 py-1.5 border border-gray-300 rounded text-sm bg-white"
-                                />
-                                <input
-                                    type="text"
-                                    value={specificEmpName}
-                                    readOnly
-                                    placeholder="Employee name"
-                                    className="flex-1 min-w-[160px] px-3 py-1.5 border border-gray-300 rounded text-sm bg-white"
-                                />
-                                <button
-                                    onClick={() => setShowSpecificEmpModal(true)}
-                                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 text-sm"
-                                >
-                                    <Search className="w-3.5 h-3.5" />
-                                    Browse
+                                <input type="text" value={specificEmpCode} readOnly placeholder="Select employee..." className="w-32 px-3 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+                                <input type="text" value={specificEmpName} readOnly placeholder="Employee name" className="flex-1 min-w-[160px] px-3 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+                                <button onClick={() => setShowSpecificEmpModal(true)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 text-sm">
+                                    <Search className="w-3.5 h-3.5" /> Browse
                                 </button>
                                 {specificEmpCode && (
-                                    <button
-                                        onClick={() => { setSpecificEmpCode(''); setSpecificEmpName(''); }}
-                                        className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-1 text-sm"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                        Clear
+                                    <button onClick={() => { setSpecificEmpCode(''); setSpecificEmpName(''); }} className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-1 text-sm">
+                                        <X className="w-3.5 h-3.5" /> Clear
                                     </button>
                                 )}
                             </div>
@@ -1036,21 +878,14 @@ const resetShiftTimes = () => {
                         <div className="flex flex-wrap items-center gap-4 mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
                             {renderDateWithCalendar('Date From', dateFrom, setDateFrom, showDateFromCalendar, setShowDateFromCalendar)}
                             {renderDateWithCalendar('Date To', dateTo, setDateTo, showDateToCalendar, setShowDateToCalendar)}
-                            <button
-                                onClick={fetchRawData}
-                                disabled={loading}
-                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-60"
-                            >
-                                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                                Search
+                            <button onClick={fetchRawData} disabled={loading} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-60">
+                                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Search
                             </button>
                         </div>
 
-                        {/* Error Banner */}
                         {tableError && (
                             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
-                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                {tableError}
+                                <AlertCircle className="w-4 h-4 flex-shrink-0" />{tableError}
                             </div>
                         )}
 
@@ -1059,38 +894,22 @@ const resetShiftTimes = () => {
                             <h3 className="text-gray-700 font-medium mb-4">Hide Column</h3>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3">
                                 {[
-                                    { key: 'break1Out', label: 'Break 1 Out' },
-                                    { key: 'break1In', label: 'Break 1 In' },
-                                    { key: 'break2Out', label: 'Break 2 Out' },
-                                    { key: 'break2In', label: 'Break 2 In' },
-                                    { key: 'break3Out', label: 'Break 3 Out' },
-                                    { key: 'break3In', label: 'Break 3 In' },
-                                    { key: 'remarks', label: 'Remarks' },
-                                    { key: 'entryFlag', label: 'Entry Flag' },
-                                    { key: 'terminalId', label: 'TerminalID' },
-                                    { key: 'secondDayType', label: '2nd Day Type' },
-                                    { key: 'approvedOvertime', label: 'Approved Overtime' },
-                                    { key: 'deviceName', label: 'Device Name' },
-                                    { key: 'isLateFiling', label: 'Is Late Filing' },
-                                    { key: 'borrowedDeviceName', label: 'BDevice Name' },
+                                    { key: 'break1Out', label: 'Break 1 Out' }, { key: 'break1In', label: 'Break 1 In' },
+                                    { key: 'break2Out', label: 'Break 2 Out' }, { key: 'break2In', label: 'Break 2 In' },
+                                    { key: 'break3Out', label: 'Break 3 Out' }, { key: 'break3In', label: 'Break 3 In' },
+                                    { key: 'remarks', label: 'Remarks' }, { key: 'entryFlag', label: 'Entry Flag' },
+                                    { key: 'terminalId', label: 'TerminalID' }, { key: 'secondDayType', label: '2nd Day Type' },
+                                    { key: 'approvedOvertime', label: 'Approved Overtime' }, { key: 'deviceName', label: 'Device Name' },
+                                    { key: 'isLateFiling', label: 'Is Late Filing' }, { key: 'borrowedDeviceName', label: 'BDevice Name' },
                                 ].map(col => (
                                     <label key={col.key} className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={hideColumns[col.key as keyof typeof hideColumns]}
-                                            onChange={() => handleHideColumnChange(col.key)}
-                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded"
-                                        />
+                                        <input type="checkbox" checked={hideColumns[col.key as keyof typeof hideColumns]}
+                                            onChange={() => handleHideColumnChange(col.key)} className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
                                         <span className="text-gray-700 text-sm">{col.label}</span>
                                     </label>
                                 ))}
                                 <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={hideColumns.selectAll}
-                                        onChange={handleSelectAllChange}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded"
-                                    />
+                                    <input type="checkbox" checked={hideColumns.selectAll} onChange={handleSelectAllChange} className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
                                     <span className="text-gray-700 text-sm font-medium">Select All</span>
                                 </label>
                             </div>
@@ -1115,11 +934,11 @@ const resetShiftTimes = () => {
                                             </th>
                                         ))}
                                         {!hideColumns.break1Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break1-Out</th>}
-                                        {!hideColumns.break1In && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break1-In</th>}
+                                        {!hideColumns.break1In  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break1-In</th>}
                                         {!hideColumns.break2Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break2-Out</th>}
-                                        {!hideColumns.break2In && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break2-In</th>}
+                                        {!hideColumns.break2In  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break2-In</th>}
                                         {!hideColumns.break3Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break3-Out</th>}
-                                        {!hideColumns.break3In && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break3-In</th>}
+                                        {!hideColumns.break3In  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break3-In</th>}
                                         {([
                                             { key: 'rawDateOut',    label: 'Date-Out' },
                                             { key: 'rawTimeOut',    label: 'Time-Out' },
@@ -1131,490 +950,273 @@ const resetShiftTimes = () => {
                                                 {label}<SortIcon col={key} />
                                             </th>
                                         ))}
-                                        {!hideColumns.remarks && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Remarks</th>}
-                                        {!hideColumns.entryFlag && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Entry Flag</th>}
-                                        {!hideColumns.terminalId && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Terminal ID</th>}
-                                        {!hideColumns.secondDayType && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">2nd Day Type</th>}
-                                        {!hideColumns.approvedOvertime && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Approved OT</th>}
-                                        {!hideColumns.deviceName && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Device In/Out</th>}
-                                        {!hideColumns.isLateFiling && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Late Filing</th>}
+                                        {!hideColumns.remarks           && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Remarks</th>}
+                                        {!hideColumns.entryFlag         && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Entry Flag</th>}
+                                        {!hideColumns.terminalId        && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Terminal ID</th>}
+                                        {!hideColumns.secondDayType     && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">2nd Day Type</th>}
+                                        {!hideColumns.approvedOvertime  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Approved OT</th>}
+                                        {!hideColumns.deviceName        && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Device In/Out</th>}
+                                        {!hideColumns.isLateFiling      && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Late Filing</th>}
                                         {!hideColumns.borrowedDeviceName && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">BDevice</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loading ? (
-                                        <tr>
-                                            <td colSpan={25} className="px-6 py-12 text-center">
-                                                <div className="flex items-center justify-center gap-2 text-gray-500">
-                                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                                    Loading data...
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : sortedList.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={25} className="px-6 py-8 text-center text-gray-500">
-                                                No data available. Use the Search button to load records.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        sortedList.map(entry => {
-                                            const di = fromISO(entry.rawDateIn);
-                                            const ti = fromISO(entry.rawTimeIn);
-                                            const adi = fromISO(entry.actualDateIn);
-                                            const ati = fromISO(entry.actualTimeIn2);
-                                            const b1o = fromISO(entry.rawBreak1Out);
-                                            const b1i = fromISO(entry.rawBreak1In);
-                                            const b2o = fromISO(entry.rawBreak2Out);
-                                            const b2i = fromISO(entry.rawBreak2In);
-                                            const b3o = fromISO(entry.rawBreak3Out);
-                                            const b3i = fromISO(entry.rawBreak3In);
-                                            const doDate = fromISO(entry.rawDateOut);
-                                            const toTime = fromISO(entry.rawTimeOut);
-                                            const apOT = fromISO(entry.aprOTTime);
-                                            return (
-                                                <tr key={entry.id} className="border-b border-gray-200 hover:bg-gray-50">
-                                                    <td className="px-4 py-2 whitespace-nowrap">
-                                                        <div className="flex gap-1">
-                                                            <button onClick={() => handleEdit(entry)} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Edit">
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                            <button onClick={() => handleDelete(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete">
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{entry.empCode}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{entry.workShiftCode}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{di.date}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{ti.time}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{adi.date} {ati.time}</td>
-                                                    {!hideColumns.break1Out && <td className="px-4 py-2 whitespace-nowrap">{b1o.time}</td>}
-                                                    {!hideColumns.break1In && <td className="px-4 py-2 whitespace-nowrap">{b1i.time}</td>}
-                                                    {!hideColumns.break2Out && <td className="px-4 py-2 whitespace-nowrap">{b2o.time}</td>}
-                                                    {!hideColumns.break2In && <td className="px-4 py-2 whitespace-nowrap">{b2i.time}</td>}
-                                                    {!hideColumns.break3Out && <td className="px-4 py-2 whitespace-nowrap">{b3o.time}</td>}
-                                                    {!hideColumns.break3In && <td className="px-4 py-2 whitespace-nowrap">{b3i.time}</td>}
-                                                    <td className="px-4 py-2 whitespace-nowrap">{doDate.date}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{toTime.time}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{entry.dayType}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap">{entry.rawotApproved ? 'Yes' : 'No'}</td>
-                                                    {!hideColumns.remarks && <td className="px-4 py-2 text-sm max-w-xs truncate">{entry.rawRemarks}</td>}
-                                                    {!hideColumns.entryFlag && <td className="px-4 py-2 whitespace-nowrap">{entry.entryFlag}</td>}
-                                                    {!hideColumns.terminalId && <td className="px-4 py-2 whitespace-nowrap">{entry.terminalID}</td>}
-                                                    {!hideColumns.secondDayType && <td className="px-4 py-2 whitespace-nowrap">{entry.dayType2}</td>}
-                                                    {!hideColumns.approvedOvertime && <td className="px-4 py-2 whitespace-nowrap">{apOT.time}</td>}
-                                                    {!hideColumns.deviceName && <td className="px-4 py-2 whitespace-nowrap text-xs">{entry.deviceNameIn}/{entry.deviceNameOut}</td>}
-                                                    {!hideColumns.isLateFiling && <td className="px-4 py-2 whitespace-nowrap">{entry.isLateFiling ? 'Yes' : 'No'}</td>}
-                                                    {!hideColumns.borrowedDeviceName && <td className="px-4 py-2 whitespace-nowrap">{entry.bDeviceName}</td>}
-                                                </tr>
-                                            );
-                                        })
-                                    )}
+                                        <tr><td colSpan={25} className="px-6 py-12 text-center">
+                                            <div className="flex items-center justify-center gap-2 text-gray-500">
+                                                <Loader2 className="w-5 h-5 animate-spin" />Loading data...
+                                            </div>
+                                        </td></tr>
+                                    ) : pagedList.length === 0 ? (
+                                        <tr><td colSpan={25} className="px-6 py-8 text-center text-gray-500">
+                                            No data available. Use the Search button to load records.
+                                        </td></tr>
+                                    ) : pagedList.map(entry => {
+                                        const di     = fromISO(entry.rawDateIn);
+                                        const ti     = fromISO(entry.rawTimeIn);
+                                        const adi    = fromISO(entry.actualDateIn);
+                                        const ati    = fromISO(entry.actualTimeIn2);
+                                        const b1o    = fromISO(entry.rawBreak1Out);
+                                        const b1i    = fromISO(entry.rawBreak1In);
+                                        const b2o    = fromISO(entry.rawBreak2Out);
+                                        const b2i    = fromISO(entry.rawBreak2In);
+                                        const b3o    = fromISO(entry.rawBreak3Out);
+                                        const b3i    = fromISO(entry.rawBreak3In);
+                                        const doDate = fromISO(entry.rawDateOut);
+                                        const toTime = fromISO(entry.rawTimeOut);
+                                        const apOT   = fromISO(entry.aprOTTime);
+                                        return (
+                                            <tr key={entry.id} className="border-b border-gray-200 hover:bg-gray-50">
+                                                <td className="px-4 py-2 whitespace-nowrap">
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => handleEdit(entry)} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Edit"><Edit className="w-4 h-4" /></button>
+                                                        <button onClick={() => handleDelete(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-2 whitespace-nowrap">{entry.empCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap">{entry.workShiftCode}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap">{di.date}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap">{ti.time}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap">{adi.date} {ati.time}</td>
+                                                {!hideColumns.break1Out && <td className="px-4 py-2 whitespace-nowrap">{b1o.time}</td>}
+                                                {!hideColumns.break1In  && <td className="px-4 py-2 whitespace-nowrap">{b1i.time}</td>}
+                                                {!hideColumns.break2Out && <td className="px-4 py-2 whitespace-nowrap">{b2o.time}</td>}
+                                                {!hideColumns.break2In  && <td className="px-4 py-2 whitespace-nowrap">{b2i.time}</td>}
+                                                {!hideColumns.break3Out && <td className="px-4 py-2 whitespace-nowrap">{b3o.time}</td>}
+                                                {!hideColumns.break3In  && <td className="px-4 py-2 whitespace-nowrap">{b3i.time}</td>}
+                                                <td className="px-4 py-2 whitespace-nowrap">{doDate.date}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap">{toTime.time}</td>
+                                                {/* Issue 3 — dayType now renders entry.dayType directly */}
+                                                <td className="px-4 py-2 whitespace-nowrap">{entry.dayType || '—'}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap">{entry.rawotApproved ? 'Yes' : 'No'}</td>
+                                                {!hideColumns.remarks           && <td className="px-4 py-2 text-sm max-w-xs truncate">{entry.rawRemarks}</td>}
+                                                {!hideColumns.entryFlag         && <td className="px-4 py-2 whitespace-nowrap">{entry.entryFlag}</td>}
+                                                {!hideColumns.terminalId        && <td className="px-4 py-2 whitespace-nowrap">{entry.terminalID}</td>}
+                                                {!hideColumns.secondDayType     && <td className="px-4 py-2 whitespace-nowrap">{entry.dayType2}</td>}
+                                                {!hideColumns.approvedOvertime  && <td className="px-4 py-2 whitespace-nowrap">{apOT.time}</td>}
+                                                {!hideColumns.deviceName        && <td className="px-4 py-2 whitespace-nowrap text-xs">{entry.deviceNameIn}/{entry.deviceNameOut}</td>}
+                                                {!hideColumns.isLateFiling      && <td className="px-4 py-2 whitespace-nowrap">{entry.isLateFiling ? 'Yes' : 'No'}</td>}
+                                                {!hideColumns.borrowedDeviceName && <td className="px-4 py-2 whitespace-nowrap">{entry.bDeviceName}</td>}
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
 
-                        {/* Pagination info */}
-                        <div className="flex items-center justify-between mt-4">
+                        {/* Pagination */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
                             <div className="text-gray-600 text-sm">
-                                {rawDataList.length > 0 ? `Showing 1 to ${rawDataList.length} of ${rawDataList.length} entries` : 'No entries'}
+                                {totalEntries === 0 ? 'No entries' : `Showing ${pageStart + 1} to ${pageEnd} of ${totalEntries} entr${totalEntries === 1 ? 'y' : 'ies'}`}
                             </div>
-                            <div className="flex gap-2">
-                                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50" disabled>Previous</button>
-                                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50" disabled>Next</button>
-                            </div>
+                            {totalEntries > 0 && (
+                                <div className="flex items-center gap-1">
+                                    <button onClick={() => goToPage(1)} disabled={safePage === 1}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" title="First page">«</button>
+                                    <button onClick={() => goToPage(safePage - 1)} disabled={safePage === 1}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
+                                    {pageNumbers.map(n => (
+                                        <button key={n} onClick={() => goToPage(n)}
+                                            className={`px-3 py-1 border rounded text-sm transition-colors ${n === safePage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-gray-300 hover:bg-gray-100'}`}>
+                                            {n}
+                                        </button>
+                                    ))}
+                                    <button onClick={() => goToPage(safePage + 1)} disabled={safePage === totalPages}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+                                    <button onClick={() => goToPage(totalPages)} disabled={safePage === totalPages}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" title="Last page">»</button>
+                                </div>
+                            )}
                         </div>
 
-                        {/* ══════════════════════════════════════════════════════════
-                            CREATE / EDIT MODAL
-                        ══════════════════════════════════════════════════════════ */}
+                        {/* ══ CREATE / EDIT MODAL ══ */}
                         {showCreateModal && (
                             <>
                                 <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowCreateModal(false)} />
                                 <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
                                     <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-                                        {/* Modal Header */}
                                         <div className="sticky top-0 bg-white px-5 py-3 border-b border-gray-200 flex items-center justify-between z-10">
-                                            <h2 className="text-gray-800 font-semibold">
-                                                {editingId !== null ? 'Edit Entry' : 'Create New Entry'}
-                                            </h2>
-                                            <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
-                                                <X className="w-5 h-5" />
-                                            </button>
+                                            <h2 className="text-gray-800 font-semibold">{editingId !== null ? 'Edit Entry' : 'Create New Entry'}</h2>
+                                            <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700"><X className="w-5 h-5" /></button>
                                         </div>
-
                                         <div className="p-5 space-y-3">
                                             <h3 className="text-blue-600 font-medium">Raw Data</h3>
-
-                                            {/* Form Error */}
                                             {formError && (
                                                 <div className="p-3 bg-red-50 border border-red-200 rounded flex items-center gap-2 text-red-700 text-sm">
-                                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                                    {formError}
+                                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />{formError}
                                                 </div>
                                             )}
 
-                                            {/* ── Emp Code ── */}
+                                            {/* Emp Code */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Emp Code :</label>
-                                                <input
-                                                    type="text" value={empCode} readOnly
-                                                    placeholder="Select employee..."
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-gray-50"
-                                                />
-                                                <button
-                                                    onClick={() => setShowEmpCodeModal(true)}
-                                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"
-                                                >
-                                                    <Search className="w-4 h-4" />
-                                                </button>
+                                                <input type="text" value={empCode} readOnly placeholder="Select employee..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-gray-50" />
+                                                <button onClick={() => setShowEmpCodeModal(true)} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"><Search className="w-4 h-4" /></button>
                                             </div>
 
-                                            {/* ── Workshift Code ── */}
+                                            {/* Workshift Code */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Workshift Code :</label>
-                                                <input
-                                                    type="text" value={workshiftCode} readOnly
-                                                    placeholder="Select workshift..."
+                                                <input type="text" value={workshiftCode} readOnly placeholder="Select workshift..."
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-gray-50 cursor-pointer"
-                                                    onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }}
-                                                />
-                                                <button
-                                                    onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }}
-                                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"
-                                                >
-                                                    <Search className="w-4 h-4" />
-                                                </button>
-                                               
-                                                {/* X / Clear button */}
-<button
-    onClick={() => { setWorkshiftCode(''); resetShiftTimes(); }}
-    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
->
-    <X className="w-4 h-4" />
-</button>
-                                               <button 
-    type="button"
-    onClick={handleGetShift}
-    className="px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex-shrink-0"
->
-    Get Shift
-</button>
+                                                    onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }} />
+                                                <button onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"><Search className="w-4 h-4" /></button>
+                                                <button onClick={() => { setWorkshiftCode(''); resetShiftTimes(); }} className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"><X className="w-4 h-4" /></button>
+                                                <button type="button" onClick={handleGetShift} className="px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex-shrink-0">Get Shift</button>
                                             </div>
 
-                                            {/* ── Date In / Time In ── */}
+                                            {/* Date In / Time In */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Date In :</label>
                                                 <div className="relative">
-                                                    <input
-                                                        type="text" value={dateIn} onChange={e => setDateIn(e.target.value)}
-                                                        placeholder="MM/DD/YYYY"
-                                                        className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9"
-                                                    />
-                                                    <button
-                                                        type="button" onClick={() => setShowDateInCalendar(!showDateInCalendar)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                                    >
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showDateInCalendar && (
-                                                        <CalendarPopup
-                                                            onDateSelect={d => { setDateIn(d); setShowDateInCalendar(false); }}
-                                                            onClose={() => setShowDateInCalendar(false)}
-                                                        />
-                                                    )}
+                                                    <input type="text" value={dateIn} onChange={e => setDateIn(e.target.value)} placeholder="MM/DD/YYYY" className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9" />
+                                                    <button type="button" onClick={() => setShowDateInCalendar(!showDateInCalendar)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showDateInCalendar && <CalendarPopup onDateSelect={d => { setDateIn(d); setShowDateInCalendar(false); }} onClose={() => setShowDateInCalendar(false)} />}
                                                 </div>
                                                 <label className="text-gray-700 text-sm whitespace-nowrap">Time In :</label>
                                                 <div className="relative flex-1">
-                                                    <input
-                                                        type="text" value={timeIn}
-                                                        onChange={timeChangeHandler(setTimeIn)}
-                                                        onBlur={timeBlurHandler(timeIn, setTimeIn)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button
-                                                        type="button" onClick={() => setShowTimeInPicker(!showTimeInPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                                    >
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showTimeInPicker && (
-                                                        <TimePicker
-                                                            initialTime={timeIn}
-                                                            onTimeSelect={time => { setTimeIn(time); setShowTimeInPicker(false); }}
-                                                            onClose={() => setShowTimeInPicker(false)}
-                                                        />
-                                                    )}
+                                                    <input type="text" value={timeIn} onChange={timeChangeHandler(setTimeIn)} onBlur={timeBlurHandler(timeIn, setTimeIn)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowTimeInPicker(!showTimeInPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showTimeInPicker && <TimePicker initialTime={timeIn} onTimeSelect={time => { setTimeIn(time); setShowTimeInPicker(false); }} onClose={() => setShowTimeInPicker(false)} />}
                                                 </div>
                                             </div>
 
-                                            {/* ── Actual Date In / Actual Time In ── */}
+                                            {/* Actual Date In / Actual Time In — FIX: Actual Time In is now uncommented and wired */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Actual Date In :</label>
                                                 <div className="relative">
-                                                    <input
-                                                        type="text" value={actualDateIn} onChange={e => setActualDateIn(e.target.value)}
-                                                        placeholder="MM/DD/YYYY"
-                                                        className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9"
-                                                    />
-                                                    <button
-                                                        type="button" onClick={() => setShowActualDateInCalendar(!showActualDateInCalendar)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                                    >
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showActualDateInCalendar && (
-                                                        <CalendarPopup
-                                                            onDateSelect={d => { setActualDateIn(d); setShowActualDateInCalendar(false); }}
-                                                            onClose={() => setShowActualDateInCalendar(false)}
-                                                        />
-                                                    )}
+                                                    <input type="text" value={actualDateIn} onChange={e => setActualDateIn(e.target.value)} placeholder="MM/DD/YYYY" className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9" />
+                                                    <button type="button" onClick={() => setShowActualDateInCalendar(!showActualDateInCalendar)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showActualDateInCalendar && <CalendarPopup onDateSelect={d => { setActualDateIn(d); setShowActualDateInCalendar(false); }} onClose={() => setShowActualDateInCalendar(false)} />}
                                                 </div>
                                                 <label className="text-gray-700 text-sm whitespace-nowrap">Actual Time In :</label>
                                                 <div className="relative flex-1">
-                                                    <input
-                                                        type="text" value={actualTimeIn}
-                                                        onChange={timeChangeHandler(setActualTimeIn)}
-                                                        onBlur={timeBlurHandler(actualTimeIn, setActualTimeIn)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button
-                                                        type="button" onClick={() => setShowActualTimeInPicker(!showActualTimeInPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                                    >
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showActualTimeInPicker && (
-                                                        <TimePicker
-                                                            initialTime={actualTimeIn}
-                                                            onTimeSelect={time => { setActualTimeIn(time); setShowActualTimeInPicker(false); }}
-                                                            onClose={() => setShowActualTimeInPicker(false)}
-                                                        />
-                                                    )}
+                                                    <input type="text" value={actualTimeIn} onChange={timeChangeHandler(setActualTimeIn)} onBlur={timeBlurHandler(actualTimeIn, setActualTimeIn)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowActualTimeInPicker(!showActualTimeInPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showActualTimeInPicker && <TimePicker initialTime={actualTimeIn} onTimeSelect={time => { setActualTimeIn(time); setShowActualTimeInPicker(false); }} onClose={() => setShowActualTimeInPicker(false)} />}
                                                 </div>
                                             </div>
 
-                                            {/* ── Break 1 ── */}
+                                            {/* Break 1 */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Break 1 Out :</label>
                                                 <div className="relative w-32">
-                                                    <input
-                                                        type="text" value={break1Out}
-                                                        onChange={timeChangeHandler(setBreak1Out)}
-                                                        onBlur={timeBlurHandler(break1Out, setBreak1Out)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button type="button" onClick={() => setShowBreak1OutPicker(!showBreak1OutPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showBreak1OutPicker && (
-                                                        <TimePicker initialTime={break1Out}
-                                                            onTimeSelect={time => { setBreak1Out(time); setShowBreak1OutPicker(false); }}
-                                                            onClose={() => setShowBreak1OutPicker(false)} />
-                                                    )}
+                                                    <input type="text" value={break1Out} onChange={timeChangeHandler(setBreak1Out)} onBlur={timeBlurHandler(break1Out, setBreak1Out)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowBreak1OutPicker(!showBreak1OutPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showBreak1OutPicker && <TimePicker initialTime={break1Out} onTimeSelect={time => { setBreak1Out(time); setShowBreak1OutPicker(false); }} onClose={() => setShowBreak1OutPicker(false)} />}
                                                 </div>
                                                 <label className="text-gray-700 text-sm whitespace-nowrap">Break 1 In :</label>
                                                 <div className="relative flex-1">
-                                                    <input
-                                                        type="text" value={break1In}
-                                                        onChange={timeChangeHandler(setBreak1In)}
-                                                        onBlur={timeBlurHandler(break1In, setBreak1In)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button type="button" onClick={() => setShowBreak1InPicker(!showBreak1InPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showBreak1InPicker && (
-                                                        <TimePicker initialTime={break1In}
-                                                            onTimeSelect={time => { setBreak1In(time); setShowBreak1InPicker(false); }}
-                                                            onClose={() => setShowBreak1InPicker(false)} />
-                                                    )}
+                                                    <input type="text" value={break1In} onChange={timeChangeHandler(setBreak1In)} onBlur={timeBlurHandler(break1In, setBreak1In)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowBreak1InPicker(!showBreak1InPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showBreak1InPicker && <TimePicker initialTime={break1In} onTimeSelect={time => { setBreak1In(time); setShowBreak1InPicker(false); }} onClose={() => setShowBreak1InPicker(false)} />}
                                                 </div>
                                             </div>
 
-                                            {/* ── Break 2 ── */}
+                                            {/* Break 2 */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Break 2 Out :</label>
                                                 <div className="relative w-32">
-                                                    <input
-                                                        type="text" value={break2Out}
-                                                        onChange={timeChangeHandler(setBreak2Out)}
-                                                        onBlur={timeBlurHandler(break2Out, setBreak2Out)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button type="button" onClick={() => setShowBreak2OutPicker(!showBreak2OutPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showBreak2OutPicker && (
-                                                        <TimePicker initialTime={break2Out}
-                                                            onTimeSelect={time => { setBreak2Out(time); setShowBreak2OutPicker(false); }}
-                                                            onClose={() => setShowBreak2OutPicker(false)} />
-                                                    )}
+                                                    <input type="text" value={break2Out} onChange={timeChangeHandler(setBreak2Out)} onBlur={timeBlurHandler(break2Out, setBreak2Out)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowBreak2OutPicker(!showBreak2OutPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showBreak2OutPicker && <TimePicker initialTime={break2Out} onTimeSelect={time => { setBreak2Out(time); setShowBreak2OutPicker(false); }} onClose={() => setShowBreak2OutPicker(false)} />}
                                                 </div>
                                                 <label className="text-gray-700 text-sm whitespace-nowrap">Break 2 In :</label>
                                                 <div className="relative flex-1">
-                                                    <input
-                                                        type="text" value={break2In}
-                                                        onChange={timeChangeHandler(setBreak2In)}
-                                                        onBlur={timeBlurHandler(break2In, setBreak2In)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button type="button" onClick={() => setShowBreak2InPicker(!showBreak2InPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showBreak2InPicker && (
-                                                        <TimePicker initialTime={break2In}
-                                                            onTimeSelect={time => { setBreak2In(time); setShowBreak2InPicker(false); }}
-                                                            onClose={() => setShowBreak2InPicker(false)} />
-                                                    )}
+                                                    <input type="text" value={break2In} onChange={timeChangeHandler(setBreak2In)} onBlur={timeBlurHandler(break2In, setBreak2In)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowBreak2InPicker(!showBreak2InPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showBreak2InPicker && <TimePicker initialTime={break2In} onTimeSelect={time => { setBreak2In(time); setShowBreak2InPicker(false); }} onClose={() => setShowBreak2InPicker(false)} />}
                                                 </div>
                                             </div>
 
-                                            {/* ── Break 3 ── */}
+                                            {/* Break 3 */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Break 3 Out :</label>
                                                 <div className="relative w-32">
-                                                    <input
-                                                        type="text" value={break3Out}
-                                                        onChange={timeChangeHandler(setBreak3Out)}
-                                                        onBlur={timeBlurHandler(break3Out, setBreak3Out)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button type="button" onClick={() => setShowBreak3OutPicker(!showBreak3OutPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showBreak3OutPicker && (
-                                                        <TimePicker initialTime={break3Out}
-                                                            onTimeSelect={time => { setBreak3Out(time); setShowBreak3OutPicker(false); }}
-                                                            onClose={() => setShowBreak3OutPicker(false)} />
-                                                    )}
+                                                    <input type="text" value={break3Out} onChange={timeChangeHandler(setBreak3Out)} onBlur={timeBlurHandler(break3Out, setBreak3Out)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowBreak3OutPicker(!showBreak3OutPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showBreak3OutPicker && <TimePicker initialTime={break3Out} onTimeSelect={time => { setBreak3Out(time); setShowBreak3OutPicker(false); }} onClose={() => setShowBreak3OutPicker(false)} />}
                                                 </div>
                                                 <label className="text-gray-700 text-sm whitespace-nowrap">Break 3 In :</label>
                                                 <div className="relative flex-1">
-                                                    <input
-                                                        type="text" value={break3In}
-                                                        onChange={timeChangeHandler(setBreak3In)}
-                                                        onBlur={timeBlurHandler(break3In, setBreak3In)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button type="button" onClick={() => setShowBreak3InPicker(!showBreak3InPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showBreak3InPicker && (
-                                                        <TimePicker initialTime={break3In}
-                                                            onTimeSelect={time => { setBreak3In(time); setShowBreak3InPicker(false); }}
-                                                            onClose={() => setShowBreak3InPicker(false)} />
-                                                    )}
+                                                    <input type="text" value={break3In} onChange={timeChangeHandler(setBreak3In)} onBlur={timeBlurHandler(break3In, setBreak3In)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowBreak3InPicker(!showBreak3InPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showBreak3InPicker && <TimePicker initialTime={break3In} onTimeSelect={time => { setBreak3In(time); setShowBreak3InPicker(false); }} onClose={() => setShowBreak3InPicker(false)} />}
                                                 </div>
                                             </div>
 
-                                            {/* ── Date Out / Time Out ── */}
+                                            {/* Date Out / Time Out */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Date Out :</label>
                                                 <div className="relative">
-                                                    <input
-                                                        type="text" value={dateOut} onChange={e => setDateOut(e.target.value)}
-                                                        placeholder="MM/DD/YYYY"
-                                                        className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9"
-                                                    />
-                                                    <button type="button" onClick={() => setShowDateOutCalendar(!showDateOutCalendar)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showDateOutCalendar && (
-                                                        <CalendarPopup
-                                                            onDateSelect={d => { setDateOut(d); setShowDateOutCalendar(false); }}
-                                                            onClose={() => setShowDateOutCalendar(false)} />
-                                                    )}
+                                                    <input type="text" value={dateOut} onChange={e => setDateOut(e.target.value)} placeholder="MM/DD/YYYY" className="w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9" />
+                                                    <button type="button" onClick={() => setShowDateOutCalendar(!showDateOutCalendar)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showDateOutCalendar && <CalendarPopup onDateSelect={d => { setDateOut(d); setShowDateOutCalendar(false); }} onClose={() => setShowDateOutCalendar(false)} />}
                                                 </div>
                                                 <label className="text-gray-700 text-sm whitespace-nowrap">Time Out :</label>
                                                 <div className="relative flex-1">
-                                                    <input
-                                                        type="text" value={timeOut}
-                                                        onChange={timeChangeHandler(setTimeOut)}
-                                                        onBlur={timeBlurHandler(timeOut, setTimeOut)}
-                                                        placeholder="HH:MM AM/PM"
-                                                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button type="button" onClick={() => setShowTimeOutPicker(!showTimeOutPicker)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {showTimeOutPicker && (
-                                                        <TimePicker initialTime={timeOut}
-                                                            onTimeSelect={time => { setTimeOut(time); setShowTimeOutPicker(false); }}
-                                                            onClose={() => setShowTimeOutPicker(false)} />
-                                                    )}
+                                                    <input type="text" value={timeOut} onChange={timeChangeHandler(setTimeOut)} onBlur={timeBlurHandler(timeOut, setTimeOut)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <button type="button" onClick={() => setShowTimeOutPicker(!showTimeOutPicker)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-3.5 h-3.5" /></button>
+                                                    {showTimeOutPicker && <TimePicker initialTime={timeOut} onTimeSelect={time => { setTimeOut(time); setShowTimeOutPicker(false); }} onClose={() => setShowTimeOutPicker(false)} />}
                                                 </div>
                                             </div>
 
-                                            {/* ── OT Approved ── */}
+                                            {/* OT Approved */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">OT Approved :</label>
-                                                <input type="checkbox" checked={otApproved}
-                                                    onChange={e => setOtApproved(e.target.checked)}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
+                                                <input type="checkbox" checked={otApproved} onChange={e => setOtApproved(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
                                             </div>
 
-                                            {/* ── Is Late Filing ── */}
+                                            {/* Is Late Filing */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Is Late Filing :</label>
-                                                <input type="checkbox" checked={isLateFiling}
-                                                    onChange={e => setIsLateFiling(e.target.checked)}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
+                                                <input type="checkbox" checked={isLateFiling} onChange={e => setIsLateFiling(e.target.checked)} className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
                                             </div>
 
-                                            {/* ── Remarks ── */}
+                                            {/* Remarks */}
                                             <div className="flex items-start gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0 pt-1">Remarks :</label>
-                                                <textarea value={remarks} onChange={e => setRemarks(e.target.value)}
-                                                    rows={3}
-                                                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none" />
+                                                <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={3} className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none" />
                                             </div>
 
-                                            {/* ── Borrowed Device ── */}
+                                            {/* Borrowed Device */}
                                             <div className="flex items-center gap-3">
                                                 <label className="w-44 text-gray-700 text-sm flex-shrink-0">Borrowed Device :</label>
-                                                <input type="text" value={borrowedDeviceName} readOnly
-                                                    placeholder="Select device..."
+                                                <input type="text" value={borrowedDeviceName} readOnly placeholder="Select device..."
                                                     onClick={() => { setDeviceSearchTerm(''); setShowDeviceModal(true); }}
                                                     className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-gray-50 cursor-pointer" />
-                                                <button onClick={() => { setDeviceSearchTerm(''); setShowDeviceModal(true); }}
-                                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex-shrink-0">
-                                                    <Search className="w-4 h-4" />
-                                                </button>
-                                                <button onClick={() => setBorrowedDeviceName('')}
-                                                    className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex-shrink-0">
-                                                    <X className="w-4 h-4" />
-                                                </button>
+                                                <button onClick={() => { setDeviceSearchTerm(''); setShowDeviceModal(true); }} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex-shrink-0"><Search className="w-4 h-4" /></button>
+                                                <button onClick={() => setBorrowedDeviceName('')} className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex-shrink-0"><X className="w-4 h-4" /></button>
                                             </div>
 
-                                            {/* ── Actions ── */}
+                                            {/* Actions */}
                                             <div className="flex gap-3 pt-2 border-t border-gray-100">
                                                 <button onClick={handleSubmit} disabled={submitLoading}
                                                     className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-60">
                                                     {submitLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                                                     {editingId !== null ? 'Update' : 'Submit'}
                                                 </button>
-                                                <button onClick={() => setShowCreateModal(false)}
-                                                    className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm">
-                                                    Back to List
-                                                </button>
+                                                <button onClick={() => setShowCreateModal(false)} className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm">Back to List</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1622,80 +1224,35 @@ const resetShiftTimes = () => {
                             </>
                         )}
 
-                        {/* ── Employee Search Modal (Create/Edit form) ── */}
-                        <EmployeeSearchModal
-                            isOpen={showEmpCodeModal}
-                            onClose={() => setShowEmpCodeModal(false)}
-                            onSelect={(empCode: string) => {
-                                const found = employeeData.find(e => e.empCode === empCode);
-                                handleEmpCodeSelect(empCode, found?.name ?? '');
-                            }}
-                            employees={employeeData}
-                            loading={loadingEmployees}
-                            error={employeeError}
-                        />
+                        <EmployeeSearchModal isOpen={showEmpCodeModal} onClose={() => setShowEmpCodeModal(false)}
+                            onSelect={(empCode: string) => { const found = employeeData.find(e => e.empCode === empCode); handleEmpCodeSelect(empCode, found?.name ?? ''); }}
+                            employees={employeeData} loading={loadingEmployees} error={employeeError} />
+                        <EmployeeSearchModal isOpen={showSpecificEmpModal} onClose={() => setShowSpecificEmpModal(false)}
+                            onSelect={(empCode: string) => { const found = employeeData.find(e => e.empCode === empCode); handleSpecificEmpSelect(empCode, found?.name ?? ''); }}
+                            employees={employeeData} loading={loadingEmployees} error={employeeError} />
 
-                        {/* ── Employee Search Modal (Specific filter) ── */}
-                        <EmployeeSearchModal
-                            isOpen={showSpecificEmpModal}
-                            onClose={() => setShowSpecificEmpModal(false)}
-                            onSelect={(empCode: string) => {
-                                const found = employeeData.find(e => e.empCode === empCode);
-                                handleSpecificEmpSelect(empCode, found?.name ?? '');
-                            }}
-                            employees={employeeData}
-                            loading={loadingEmployees}
-                            error={employeeError}
-                        />
-
-                    </div>{/* /Content Container */}
+                    </div>
                 </div>
             </div>
 
-            {/* ══════════════════════════════════════════════════════════════════
-                WORKSHIFT SEARCH MODAL — portaled to document.body
-                Fully escapes the main modal's stacking context so it always
-                renders on top regardless of parent z-index / transform.
-            ══════════════════════════════════════════════════════════════════ */}
+            {/* Workshift Modal Portal */}
             {showWorkshiftModal && createPortal(
                 <>
-                    <div
-                        className="fixed inset-0 bg-black/40"
-                        style={{ zIndex: 99998 }}
-                        onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }}
-                    />
-                    <div
-                        className="fixed inset-0 flex items-center justify-center p-4"
-                        style={{ zIndex: 99999 }}
-                    >
+                    <div className="fixed inset-0 bg-black/40" style={{ zIndex: 99998 }} onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }} />
+                    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 99999 }}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
                             <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                                 <h2 className="text-gray-800 text-sm font-semibold">Search</h2>
-                                <button
-                                    onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }}
-                                    className="text-gray-600 hover:text-gray-800"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
+                                <button onClick={() => { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); }} className="text-gray-600 hover:text-gray-800"><X className="w-4 h-4" /></button>
                             </div>
                             <div className="p-3">
                                 <h3 className="text-blue-600 mb-2 text-sm font-semibold">Workshift Code</h3>
                                 <div className="flex items-center gap-2 mb-3">
                                     <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
-                                    <input
-                                        type="text"
-                                        value={workshiftSearchTerm}
-                                        onChange={e => setWorkshiftSearchTerm(e.target.value)}
-                                        autoFocus
-                                        placeholder="Type to filter..."
-                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                    />
+                                    <input type="text" value={workshiftSearchTerm} onChange={e => setWorkshiftSearchTerm(e.target.value)} autoFocus placeholder="Type to filter..."
+                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 </div>
-                                {workshiftError && (
-                                    <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
-                                        <AlertCircle className="w-4 h-4" /> {workshiftError}
-                                    </div>
-                                )}
+                                {workshiftError && <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {workshiftError}</div>}
                                 <div className="border border-gray-200 rounded overflow-hidden" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                                     <table className="w-full border-collapse text-sm">
                                         <thead className="sticky top-0 bg-white z-10">
@@ -1706,27 +1263,15 @@ const resetShiftTimes = () => {
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {loadingWorkshifts ? (
-                                                <tr>
-                                                    <td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic">
-                                                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
-                                                    </td>
-                                                </tr>
+                                                <tr><td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...</td></tr>
                                             ) : filteredWorkshifts.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td>
+                                                <tr><td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td></tr>
+                                            ) : filteredWorkshifts.map(ws => (
+                                                <tr key={ws.code} className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer" onClick={() => handleWorkshiftSelect(ws.code)}>
+                                                    <td className="px-3 py-1.5 text-gray-900 font-medium">{ws.code}</td>
+                                                    <td className="px-3 py-1.5 text-gray-600">{ws.description}</td>
                                                 </tr>
-                                            ) : (
-                                                filteredWorkshifts.map(ws => (
-                                                    <tr
-                                                        key={ws.code}
-                                                        className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                                        onClick={() => handleWorkshiftSelect(ws.code)}
-                                                    >
-                                                        <td className="px-3 py-1.5 text-gray-900 font-medium">{ws.code}</td>
-                                                        <td className="px-3 py-1.5 text-gray-600">{ws.description}</td>
-                                                    </tr>
-                                                ))
-                                            )}
+                                            ))}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1737,48 +1282,24 @@ const resetShiftTimes = () => {
                 document.body
             )}
 
-            {/* ══════════════════════════════════════════════════════════════════
-                BORROWED DEVICE SEARCH MODAL — also portaled to document.body
-            ══════════════════════════════════════════════════════════════════ */}
+            {/* Device Modal Portal */}
             {showDeviceModal && createPortal(
                 <>
-                    <div
-                        className="fixed inset-0 bg-black/40"
-                        style={{ zIndex: 99998 }}
-                        onClick={() => { setShowDeviceModal(false); setDeviceSearchTerm(''); }}
-                    />
-                    <div
-                        className="fixed inset-0 flex items-center justify-center p-4"
-                        style={{ zIndex: 99999 }}
-                    >
+                    <div className="fixed inset-0 bg-black/40" style={{ zIndex: 99998 }} onClick={() => { setShowDeviceModal(false); setDeviceSearchTerm(''); }} />
+                    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 99999 }}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
                             <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl sticky top-0 z-10">
                                 <h2 className="text-gray-800 text-sm font-semibold">Search</h2>
-                                <button
-                                    onClick={() => { setShowDeviceModal(false); setDeviceSearchTerm(''); }}
-                                    className="text-gray-600 hover:text-gray-800"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
+                                <button onClick={() => { setShowDeviceModal(false); setDeviceSearchTerm(''); }} className="text-gray-600 hover:text-gray-800"><X className="w-4 h-4" /></button>
                             </div>
                             <div className="p-3">
                                 <h3 className="text-blue-600 mb-2 text-sm font-semibold">Borrowed Device Name</h3>
                                 <div className="flex items-center gap-2 mb-3">
                                     <label className="text-gray-700 text-sm whitespace-nowrap">Search:</label>
-                                    <input
-                                        type="text"
-                                        value={deviceSearchTerm}
-                                        onChange={e => setDeviceSearchTerm(e.target.value)}
-                                        autoFocus
-                                        placeholder="Type to filter..."
-                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                    />
+                                    <input type="text" value={deviceSearchTerm} onChange={e => setDeviceSearchTerm(e.target.value)} autoFocus placeholder="Type to filter..."
+                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
                                 </div>
-                                {deviceError && (
-                                    <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2">
-                                        <AlertCircle className="w-4 h-4" /> {deviceError}
-                                    </div>
-                                )}
+                                {deviceError && <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {deviceError}</div>}
                                 <div className="border border-gray-200 rounded overflow-hidden" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                                     <table className="w-full border-collapse text-sm">
                                         <thead className="sticky top-0 bg-white z-10">
@@ -1789,27 +1310,15 @@ const resetShiftTimes = () => {
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {loadingDevices ? (
-                                                <tr>
-                                                    <td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic">
-                                                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...
-                                                    </td>
-                                                </tr>
+                                                <tr><td colSpan={2} className="px-4 py-6 text-center text-gray-500 italic"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...</td></tr>
                                             ) : filteredDevices.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td>
+                                                <tr><td colSpan={2} className="px-3 py-8 text-center text-gray-500 italic">No entries found</td></tr>
+                                            ) : filteredDevices.map(d => (
+                                                <tr key={d.id} className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer" onClick={() => handleDeviceSelect(d.description)}>
+                                                    <td className="px-3 py-1.5 text-gray-900 font-medium">{d.code}</td>
+                                                    <td className="px-3 py-1.5 text-gray-600">{d.description}</td>
                                                 </tr>
-                                            ) : (
-                                                filteredDevices.map(d => (
-                                                    <tr
-                                                        key={d.id}
-                                                        className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer"
-                                                        onClick={() => handleDeviceSelect(d.description)}
-                                                    >
-                                                        <td className="px-3 py-1.5 text-gray-900 font-medium">{d.code}</td>
-                                                        <td className="px-3 py-1.5 text-gray-600">{d.description}</td>
-                                                    </tr>
-                                                ))
-                                            )}
+                                            ))}
                                         </tbody>
                                     </table>
                                 </div>

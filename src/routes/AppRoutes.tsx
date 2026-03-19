@@ -159,6 +159,8 @@ import { CreateNewDatabasePage } from '../components/Security/CreateNewDatabaseP
 // ─── Unknown Page Path ─────────────────────────────────────────────────────────────────
 import { NotFoundPage } from '../components/NotFoundPage';
 import { ChangePasswordPage } from '../components/Security/ChangePasswordPage';
+import { ChangePasswordLoginPage } from '../components/ChangePasswordLoginPage';
+// ── add import ────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -175,14 +177,26 @@ export function AppRoutes({ onLogout, onLogin, onForgotPassword, onBackToLogin }
   return (
     <Routes>
       {/* ── Public Routes ─────────────────────────────────────────── */}
-      <Route
-        path="/login"
-        element={token ? <Navigate to="/home" replace /> : <LoginPage onLogin={onLogin} onForgotPassword={onForgotPassword} />}
-      />
-      <Route
-        path="/forgot-password"
-        element={token ? <Navigate to="/home" replace /> : <ForgotPasswordPage onBack={onBackToLogin} />}
-      />
+        <Route
+    path="/login"
+    element={token ? <Navigate to="/home" replace /> : <LoginPage onLogin={onLogin} onForgotPassword={onForgotPassword} />}
+  />
+  <Route
+    path="/forgot-password"
+    element={token ? <Navigate to="/home" replace /> : <ForgotPasswordPage onBack={onBackToLogin} />}
+  />
+
+  {/* ── Policy 4: Forced password change ─────────────────────────────── */}
+  {/* MUST be outside ProtectedLayout — no authToken exists yet           */}
+  {/* Guarded by pendingPasswordChange flag set during login              */}
+  <Route
+    path="/change-password-login"
+    element={
+      localStorage.getItem('pendingPasswordChange') === 'true'
+        ? <ChangePasswordLoginPage onBackToLogin={() => {}} />
+        : <Navigate to="/login" replace />
+    }
+  />
 
       {/* ── Protected Routes (all share Navigation + Footer layout) ── */}
       <Route element={<ProtectedLayout onLogout={onLogout} />}>

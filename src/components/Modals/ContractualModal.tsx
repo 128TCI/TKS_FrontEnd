@@ -1,5 +1,6 @@
-import { X, Check, ArrowLeft } from 'lucide-react';
-import { DatePicker } from '../DateSetup/DatePicker';
+import { useState } from 'react';
+import { X, Calendar } from 'lucide-react';
+import { CalendarPopup } from '../CalendarPopup';
 
 interface ContractualModalProps {
   isOpen: boolean;
@@ -20,75 +21,111 @@ export function ContractualModal({
   onClose,
   onDateFromChange,
   onDateToChange,
-  onSubmit
+  onSubmit,
 }: ContractualModalProps) {
+  const [showDateFromCalendar, setShowDateFromCalendar] = useState(false);
+  const [showDateToCalendar, setShowDateToCalendar] = useState(false);
+
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Modal Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/30 z-10"
-        onClick={onClose}
-      ></div>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
 
-    {/* Modal Dialog */}
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
-            <h2 className="text-gray-800">{isEditMode ? 'Edit Record' : 'Create New'}</h2>
-            <button 
-              onClick={onClose}
-              className="text-gray-600 hover:text-gray-800"
-            >
+      {/* Dialog */}
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+
+          {/* Header */}
+          <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between rounded-t-2xl">
+            <h2 className="text-gray-800 font-semibold text-sm">
+              {isEditMode ? 'Edit Record' : 'Create New'}
+            </h2>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Modal Content */}
+          {/* Content */}
           <div className="p-5">
-            <h3 className="text-blue-600 mb-4">Employee Contractual</h3>
+            <h3 className="text-blue-600 font-medium mb-4">Employee Contractual</h3>
 
-            {/* Form Fields */}
-            <div className="space-y-3">
+            <div className="space-y-4">
+
               {/* Date From */}
-              <div className="flex items-center gap-2 col-span-2">
-                <label className="w-40 text-gray-700">Date From :</label>
-                <DatePicker
-                  value={dateFrom}
-                  onChange={(value) => onDateFromChange(value)}
-                  className="flex-1"
-                />
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-gray-700 text-sm flex-shrink-0">Date From :</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={dateFrom}
+                    onChange={e => onDateFromChange(e.target.value)}
+                    placeholder="MM/DD/YYYY"
+                    className="w-40 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setShowDateFromCalendar(!showDateFromCalendar); setShowDateToCalendar(false); }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                  </button>
+                  {showDateFromCalendar && (
+                    <CalendarPopup
+                      onDateSelect={d => { onDateFromChange(d); setShowDateFromCalendar(false); }}
+                      onClose={() => setShowDateFromCalendar(false)}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* Date To */}
-              <div className="flex items-center gap-2 col-span-2">
-                <label className="w-40 text-gray-700">Date To :</label>
-                <DatePicker
-                  value={dateTo}
-                  onChange={(value) => onDateToChange(value)}
-                  className="flex-1"
-                />
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-gray-700 text-sm flex-shrink-0">Date To :</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={dateTo}
+                    onChange={e => onDateToChange(e.target.value)}
+                    placeholder="MM/DD/YYYY"
+                    className="w-40 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setShowDateToCalendar(!showDateToCalendar); setShowDateFromCalendar(false); }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                  </button>
+                  {showDateToCalendar && (
+                    <CalendarPopup
+                      onDateSelect={d => { onDateToChange(d); setShowDateToCalendar(false); }}
+                      onClose={() => setShowDateToCalendar(false)}
+                    />
+                  )}
+                </div>
               </div>
+
             </div>
 
-            {/* Modal Actions */}
-            <div className="flex gap-3 mt-4">
+            {/* Actions */}
+            <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
               <button
                 onClick={onSubmit}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                className="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm shadow-sm"
               >
                 {isEditMode ? 'Update' : 'Submit'}
               </button>
               <button
                 onClick={onClose}
-                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 shadow-sm text-sm"
+                className="px-5 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors text-sm shadow-sm"
               >
                 Back to List
               </button>
             </div>
           </div>
+
         </div>
       </div>
     </>

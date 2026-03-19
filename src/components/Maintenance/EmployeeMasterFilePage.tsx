@@ -113,6 +113,14 @@ interface JobLevel {
   description: string;
 }
 
+// FIX Issue 1.1: Added Designation interface
+interface Designation {
+  id: string;
+  code: string;
+  description: string;
+  deviceName: string;
+}
+
 interface EmpStatus {
   code: string;
   description: string;
@@ -135,6 +143,8 @@ export function EmployeeMasterFilePage() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showOnlineApprovalModal, setShowOnlineApprovalModal] = useState(false);
   const [showJobLevelModal, setShowJobLevelModal] = useState(false);
+  // FIX Issue 1.1: Added designation modal state
+  const [showDesignationModal, setShowDesignationModal] = useState(false);
   const [groupDescMap, setGroupDescMap] = useState<Map<string, string>>(new Map());
   // Employee data
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -161,6 +171,9 @@ export function EmployeeMasterFilePage() {
   const [onlineApprovalList, setOnlineApprovalList] = useState<OnlineApproval[]>([]);
   const [jobLevelList, setJobLevelList] = useState<JobLevel[]>([]);
   const [empStatusList, setEmpStatusList] = useState<EmpStatus[]>([]);
+  // FIX Issue 1.1: Added designation list state
+  const [designationList, setDesignationList] = useState<Designation[]>([]);
+  const [designationSearchTerm, setDesignationSearchTerm] = useState('');
   
   // Loading states
   const [loadingBranches, setLoadingBranches] = useState(false);
@@ -174,6 +187,8 @@ export function EmployeeMasterFilePage() {
   const [loadingOnlineApprovals, setLoadingOnlineApprovals] = useState(false);
   const [loadingJobLevels, setLoadingJobLevels] = useState(false);
   const [loadingEmpStatuses, setLoadingEmpStatuses] = useState(false);
+  // FIX Issue 1.1: Added designation loading state
+  const [loadingDesignations, setLoadingDesignations] = useState(false);
   
   // Errors
   const [branchError, setBranchError] = useState('');
@@ -187,6 +202,8 @@ export function EmployeeMasterFilePage() {
   const [onlineApprovalError, setOnlineApprovalError] = useState('');
   const [jobLevelError, setJobLevelError] = useState('');
   const [empStatusError, setEmpStatusError] = useState('');
+  // FIX Issue 1.1: Added designation error state
+  const [designationError, setDesignationError] = useState('');
   
   const [formData, setFormData] = useState({
     empID: 0,
@@ -229,7 +246,9 @@ export function EmployeeMasterFilePage() {
     locationCode: '',
     onlineApplication: '',
     onlineAppCode: '',
-    designation: '',
+    // FIX Issue 1.1: Split designation into code + description fields
+    designationCode: '',
+    designationDesc: '',
     jobLevel: '',
     jobLevelCode: '',
     // Personal Information
@@ -255,21 +274,13 @@ export function EmployeeMasterFilePage() {
 
   // ==================== VALIDATION HELPERS ====================
 
-  /**
-   * Validates company paths — mirrors the old C# iFormValid / validateCode checks.
-   * Returns true when the transaction is allowed to proceed.
-   */
   const validateCompanyPaths = async (): Promise<boolean> => {
     try {
       const response = await apiClient.get('/Fs/System/CompanyInformation');
       const companyInfo = Array.isArray(response.data) ? response.data[0] : response.data;
 
       if (!companyInfo) {
-        await Swal.fire({
-          icon: 'error',
-          title: 'Validation Error',
-          text: 'Company Information is not properly set.',
-        });
+        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Company Information is not properly set.' });
         return false;
       }
 
@@ -277,86 +288,40 @@ export function EmployeeMasterFilePage() {
       const payrollPath = (companyInfo.payrollPath ?? '').trim();
 
       if (hrisPath !== '') {
-        await Swal.fire({
-          icon: 'error',
-          title: 'Not Allowed',
-          text: 'You are connected to HRIS. You are not allowed to do any transaction for this setup.',
-        });
+        await Swal.fire({ icon: 'error', title: 'Not Allowed', text: 'You are connected to HRIS. You are not allowed to do any transaction for this setup.' });
         return false;
       }
 
       if (payrollPath !== '') {
-        await Swal.fire({
-          icon: 'error',
-          title: 'Not Allowed',
-          text: 'You are connected to Payroll. You are not allowed to do any transaction for this setup.',
-        });
+        await Swal.fire({ icon: 'error', title: 'Not Allowed', text: 'You are connected to Payroll. You are not allowed to do any transaction for this setup.' });
         return false;
       }
 
       return true;
     } catch (error: any) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.response?.data?.message || error.message || 'Failed to retrieve company information.',
-      });
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to retrieve company information.' });
       return false;
     }
   };
 
-  /**
-   * Validates government ID lengths — mirrors the old validateCode / validateCompenBen logic.
-   * Returns a combined error message string, or '' if all valid.
-   */
-  const validateGovIdLengths = (
-    sss: string,
-    pagibig: string,
-    philhealth: string,
-    tin: string,
-    gsisNo: string
-  ): string => {
+  const validateGovIdLengths = (sss: string, pagibig: string, philhealth: string, tin: string, gsisNo: string): string => {
     const messages: string[] = [];
-
     const sssVal = sss.trim();
     const pagibigVal = pagibig.trim();
     const philhealthVal = philhealth.trim();
     const tinVal = tin.trim();
     const gsisVal = gsisNo.trim();
 
-    if (sssVal && sssVal !== '0' && sssVal.length < 10) {
-      messages.push('SSS must be equal to 10 characters.');
-    }
-    if (pagibigVal && pagibigVal !== '0' && pagibigVal.length < 10) {
-      messages.push('PAG-IBIG must be greater than or equal to 10 characters.');
-    }
-    if (philhealthVal && philhealthVal !== '0' && philhealthVal.length < 12) {
-      messages.push('PHILHEALTH must be equal to 12 characters.');
-    }
-    if (tinVal && tinVal !== '0' && tinVal !== '000-000-000' && tinVal.length < 9) {
-      messages.push('TIN must be greater than or equal to 9 characters.');
-    }
-    if (gsisVal && gsisVal !== '0' && gsisVal.length < 10) {
-      messages.push('GSIS must be equal to 10 characters.');
-    }
+    if (sssVal && sssVal !== '0' && sssVal.length < 10) messages.push('SSS must be equal to 10 characters.');
+    if (pagibigVal && pagibigVal !== '0' && pagibigVal.length < 10) messages.push('PAG-IBIG must be greater than or equal to 10 characters.');
+    if (philhealthVal && philhealthVal !== '0' && philhealthVal.length < 12) messages.push('PHILHEALTH must be equal to 12 characters.');
+    if (tinVal && tinVal !== '0' && tinVal !== '000-000-000' && tinVal.length < 9) messages.push('TIN must be greater than or equal to 9 characters.');
+    if (gsisVal && gsisVal !== '0' && gsisVal.length < 10) messages.push('GSIS must be equal to 10 characters.');
 
     return messages.join('\n');
   };
 
-  /**
-   * Checks for duplicate government IDs across all employees.
-   * On CREATE: checks all employees.
-   * On EDIT:   excludes the current employee (by empCode).
-   * Returns an error message, or '' if no duplicates.
-   */
-  const validateGovIdUniqueness = (
-    sss: string,
-    pagibig: string,
-    philhealth: string,
-    tin: string,
-    gsisNo: string,
-    currentEmpCode: string = '' // empty string means CREATE mode
-  ): string => {
+  const validateGovIdUniqueness = (sss: string, pagibig: string, philhealth: string, tin: string, gsisNo: string, currentEmpCode: string = ''): string => {
     const sssVal = sss.trim();
     const pagibigVal = pagibig.trim();
     const philhealthVal = philhealth.trim();
@@ -367,68 +332,50 @@ export function EmployeeMasterFilePage() {
       ? employees.filter(e => e.empCode.trim().toUpperCase() !== currentEmpCode.trim().toUpperCase())
       : employees;
 
-    if (sssVal && sssVal !== '0' && otherEmployees.some(e => e.sssNo?.trim() === sssVal)) {
-      return 'SSS already exists.';
-    }
-    if (pagibigVal && pagibigVal !== '0' && otherEmployees.some(e => e.pagIbigNo?.trim() === pagibigVal)) {
-      return 'PAG-IBIG already exists.';
-    }
-    if (philhealthVal && philhealthVal !== '0' && otherEmployees.some(e => e.pHilHealthNo?.trim() === philhealthVal)) {
-      return 'PHILHEALTH already exists.';
-    }
-    if (tinVal && tinVal !== '0' && tinVal !== '000-000-000' && otherEmployees.some(e => e.tin?.trim() === tinVal)) {
-      return 'TIN already exists.';
-    }
-    if (gsisVal && gsisVal !== '0' && otherEmployees.some(e => e.gsisNo?.trim() === gsisVal)) {
-      return 'GSIS No already exists.';
-    }
+    if (sssVal && sssVal !== '0' && otherEmployees.some(e => e.sssNo?.trim() === sssVal)) return 'SSS already exists.';
+    if (pagibigVal && pagibigVal !== '0' && otherEmployees.some(e => e.pagIbigNo?.trim() === pagibigVal)) return 'PAG-IBIG already exists.';
+    if (philhealthVal && philhealthVal !== '0' && otherEmployees.some(e => e.pHilHealthNo?.trim() === philhealthVal)) return 'PHILHEALTH already exists.';
+    if (tinVal && tinVal !== '0' && tinVal !== '000-000-000' && otherEmployees.some(e => e.tin?.trim() === tinVal)) return 'TIN already exists.';
+    if (gsisVal && gsisVal !== '0' && otherEmployees.some(e => e.gsisNo?.trim() === gsisVal)) return 'GSIS No already exists.';
 
     return '';
   };
 
-  /**
-   * Runs all pre-delete checks that mirror the old iFormValid("Delete") logic.
-   * Returns an error message if the employee cannot be deleted, otherwise ''.
-   */
   const validateDeleteConstraints = async (empCode: string): Promise<string> => {
     try {
-      // Ask the backend to run the same set of FK / usage checks.
-      // The endpoint should return { canDelete: bool, reason: string }
-      const response = await apiClient.get(
-        `/Maintenance/EmployeeMasterFile/CanDelete/${encodeURIComponent(empCode)}`
-      );
+      const response = await apiClient.get(`/Maintenance/EmployeeMasterFile/CanDelete/${encodeURIComponent(empCode)}`);
       const data = response.data;
-
-      if (data && data.canDelete === false) {
-        return data.reason || 'This employee record is already in use and cannot be deleted.';
-      }
+      if (data && data.canDelete === false) return data.reason || 'This employee record is already in use and cannot be deleted.';
       return '';
     } catch (error: any) {
-      // If no dedicated endpoint exists, fall back to a safe block message
-      return (
-        error.response?.data?.message ||
-        error.message ||
-        'Unable to verify if this employee can be deleted. Please try again.'
-      );
+      return error.response?.data?.message || error.message || 'Unable to verify if this employee can be deleted. Please try again.';
     }
+  };
+
+  // ==================== INPUT HANDLERS ====================
+
+  // FIX Issue 1.2 & Issue 2: Numeric-only handler for gov IDs and phone numbers
+  const handleNumericInput = (value: string, field: string) => {
+    // Strip all non-numeric characters
+    const numericValue = value.replace(/\D/g, '');
+    setFormData(prev => ({ ...prev, [field]: numericValue }));
   };
 
   // ==================== API FUNCTIONS ====================
   
-const fetchEmployees = async () => {
-  setEmployeeLoading(true);
-  setEmployeeError('');
-  try {
-    const { employees, authorizedEmployees } = await fetchEmployeesService();
-    setEmployees(employees);
-    setAuthorizedEmployees(authorizedEmployees);
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-    setEmployeeError(errorMsg);
-  } finally {
-    setEmployeeLoading(false);
-  }
-};
+  const fetchEmployees = async () => {
+    setEmployeeLoading(true);
+    setEmployeeError('');
+    try {
+      const { employees, authorizedEmployees } = await fetchEmployeesService();
+      setEmployees(employees);
+      setAuthorizedEmployees(authorizedEmployees);
+    } catch (error: any) {
+      setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+    } finally {
+      setEmployeeLoading(false);
+    }
+  };
 
   const fetchEmployeeById = async (id: number) => {
     setEmployeeLoading(true);
@@ -440,8 +387,7 @@ const fetchEmployees = async () => {
         return response.data;
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load employee';
-      setEmployeeError(errorMsg);
+      setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employee');
       console.error('Error fetching employee:', error);
     } finally {
       setEmployeeLoading(false);
@@ -452,16 +398,13 @@ const fetchEmployees = async () => {
     setEmployeeLoading(true);
     setEmployeeError('');
     try {
-      const response = await apiClient.get('/Maintenance/EmployeeMasterFile', {
-        params: { search: searchTerm }
-      });
+      const response = await apiClient.get('/Maintenance/EmployeeMasterFile', { params: { search: searchTerm } });
       if (response.status === 200 && response.data) {
         setEmployees(response.data);
         return response.data;
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to search employees';
-      setEmployeeError(errorMsg);
+      setEmployeeError(error.response?.data?.message || error.message || 'Failed to search employees');
       console.error('Error searching employees:', error);
     } finally {
       setEmployeeLoading(false);
@@ -473,37 +416,17 @@ const fetchEmployees = async () => {
     setEmployeeError('');
     try {
       const bodyFormData = new FormData();
-
-      if (photoFile) {
-        bodyFormData.append('Photo', photoFile);
-      }
-
+      if (photoFile) bodyFormData.append('Photo', photoFile);
       Object.keys(employeeData).forEach((key) => {
         const value = employeeData[key];
         if (value !== null && value !== undefined) {
-          if (value instanceof Date) {
-            bodyFormData.append(key, value.toISOString());
-          } else {
-            bodyFormData.append(key, value.toString());
-          }
+          bodyFormData.append(key, value instanceof Date ? value.toISOString() : value.toString());
         }
       });
-
-      const response = await apiClient.post(
-        '/Maintenance/EmployeeMasterFile',
-        bodyFormData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
+      const response = await apiClient.post('/Maintenance/EmployeeMasterFile', bodyFormData, { headers: { 'Content-Type': 'multipart/form-data' } });
       if (response.status === 200 || response.status === 201) {
         await fetchEmployees();
-        await Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Employee created successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Employee created successfully.', timer: 2000, showConfirmButton: false });
         setPhotoFile(null);
         setPhotoPreview('');
         return response.data;
@@ -522,42 +445,21 @@ const fetchEmployees = async () => {
     setEmployeeLoading(true);
     try {
       const bodyFormData = new FormData();
-
-      if (photoFile) {
-        bodyFormData.append('photo', photoFile);
-      }
-
+      if (photoFile) bodyFormData.append('photo', photoFile);
       Object.keys(apiData).forEach((key) => {
         const value = apiData[key];
         if (value !== null && value !== undefined) {
-          if (value instanceof Date) {
-            bodyFormData.append(key, value.toISOString());
-          } else {
-            bodyFormData.append(key, value.toString());
-          }
+          bodyFormData.append(key, value instanceof Date ? value.toISOString() : value.toString());
         }
       });
-
-      const response = await apiClient.put(
-        `/Maintenance/EmployeeMasterFile/${id}`,
-        bodyFormData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
+      const response = await apiClient.put(`/Maintenance/EmployeeMasterFile/${id}`, bodyFormData, { headers: { 'Content-Type': 'multipart/form-data' } });
       if (response.status === 200 || response.status === 204) {
         await fetchEmployees();
-        await Swal.fire({
-          icon: 'success',
-          title: 'Updated!',
-          text: 'Employee record has been updated successfully.',
-          timer: 2000,
-          showConfirmButton: false,
-        });
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Employee record has been updated successfully.', timer: 2000, showConfirmButton: false });
         setPhotoFile(null);
         return response.data;
       }
     } catch (error: any) {
-      console.error('Error updating employee:', error);
       const errorMsg = error.response?.data?.message || error.message || 'An error occurred during update.';
       await Swal.fire({ icon: 'error', title: 'Update Failed', text: errorMsg });
       throw error;
@@ -593,19 +495,17 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/BranchSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((branch: any) => ({
+        setBranchList(response.data.map((branch: any) => ({
           branchId: branch.braID || branch.id || '',
           code: branch.braCode || branch.code || '',
           description: branch.braDesc || branch.description || '',
           branchManager: branch.braMngr || branch.branchManager || '',
           branchManagerCode: branch.braMngrCode || '',
           deviceName: branch.deviceName || branch.DeviceName || '',
-        }));
-        setBranchList(mappedData);
+        })));
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load branches';
-      setBranchError(errorMsg);
+      setBranchError(error.response?.data?.message || error.message || 'Failed to load branches');
     } finally {
       setLoadingBranches(false);
     }
@@ -617,15 +517,14 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/DivisionSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((division: any) => ({
+        setDivisionList(response.data.map((division: any) => ({
           id: division.divID || '',
           code: division.divCode || '',
           description: division.divDesc || '',
           head: division.divHead || '',
           headCode: division.divHeadCode || '',
           deviceName: division.deviceName || '',
-        }));
-        setDivisionList(mappedData);
+        })));
       }
     } catch (error: any) {
       setDivisionError(error.response?.data?.message || error.message || 'Failed to load divisions');
@@ -640,7 +539,7 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/DepartmentSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((dept: any) => ({
+        setDepartmentList(response.data.map((dept: any) => ({
           departmentId: dept.depID || '',
           code: dept.depCode || '',
           departmentCode: dept.depCode || '',
@@ -652,9 +551,8 @@ const fetchEmployees = async () => {
           head1: dept.head1 || '',
           email1: dept.email1 || '',
           head2: dept.head2 || '',
-          email2: dept.email2 || ''
-        }));
-        setDepartmentList(mappedData);
+          email2: dept.email2 || '',
+        })));
       }
     } catch (error: any) {
       setDepartmentError(error.response?.data?.message || error.message || 'Failed to load departments');
@@ -669,15 +567,14 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/SectionSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((section: any) => ({
+        setSectionList(response.data.map((section: any) => ({
           id: section.secID || section.id || '',
           code: section.secCode || section.code || '',
           description: section.secDesc || section.description || '',
           head: section.secHead || section.head || '',
           headCode: section.secHeadCode || section.headCode || '',
           deviceName: section.deviceName || '',
-        }));
-        setSectionList(mappedData);
+        })));
       }
     } catch (error: any) {
       setSectionError(error.response?.data?.message || error.message || 'Failed to load sections');
@@ -692,15 +589,14 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/UnitSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((unit: any) => ({
+        setUnitList(response.data.map((unit: any) => ({
           id: unit.unitID || '',
           code: unit.unitCode || '',
           description: unit.unitDesc || '',
           head: unit.head || '',
           position: unit.position || '',
           deviceName: unit.deviceName || '',
-        }));
-        setUnitList(mappedData);
+        })));
       }
     } catch (error: any) {
       setUnitError(error.response?.data?.message || error.message || 'Failed to load units');
@@ -709,22 +605,23 @@ const fetchEmployees = async () => {
     }
   };
 
+  // FIX Issue 1.3: Fixed PayHouse mapping — API returns lineCode/lineDesc, map them correctly
   const fetchPayHouseData = async () => {
     setLoadingPayHouses(true);
     setPayHouseError('');
     try {
       const response = await apiClient.get('/Fs/Employment/PayHouseSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((payHouse: any) => ({
-          id: payHouse.lineID || '',
-          code: payHouse.lineCode || '',
-          description: payHouse.lineDesc || '',
-          head: payHouse.head || '',
-          headCode: payHouse.headCode || '',
+        setPayHouseList(response.data.map((payHouse: any) => ({
+          id: payHouse.lineID || payHouse.id || '',
+          // Cover all possible field name variants from the API
+          code: payHouse.lineCode || payHouse.payCode || payHouse.code || '',
+          description: payHouse.lineDesc || payHouse.payDesc || payHouse.description || '',
+          head: payHouse.head || payHouse.lineHead || '',
+          headCode: payHouse.headCode || payHouse.lineHeadCode || '',
           position: payHouse.position || '',
           deviceName: payHouse.deviceName || '',
-        }));
-        setPayHouseList(mappedData);
+        })));
       }
     } catch (error: any) {
       setPayHouseError(error.response?.data?.message || error.message || 'Failed to load pay houses');
@@ -739,15 +636,14 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/EmploymentAreaSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((area: any) => ({
+        setAreaList(response.data.map((area: any) => ({
           id: area.id || area.ID || '',
           code: area.areaCode || area.AreaCode || '',
           description: area.areaDesc || area.AreaDesc || '',
           head: area.head || area.Head || '',
           headCode: area.headCode || area.HeadCode || '',
           deviceName: area.deviceName || area.DeviceName || '',
-        }));
-        setAreaList(mappedData);
+        })));
       }
     } catch (error: any) {
       setAreaError(error.response?.data?.message || error.message || 'Failed to load areas');
@@ -762,7 +658,7 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/LocationSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((location: any) => ({
+        setLocationList(response.data.map((location: any) => ({
           id: location.locID || '',
           code: location.locationCode || '',
           description: location.locationDesc || '',
@@ -774,8 +670,7 @@ const fetchEmployees = async () => {
           editedBy: location.editedBy || '',
           editedDate: location.editedDate || '',
           deviceName: location.deviceName || '',
-        }));
-        setLocationList(mappedData);
+        })));
       }
     } catch (error: any) {
       setLocationError(error.response?.data?.message || error.message || 'Failed to load locations');
@@ -790,7 +685,7 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/OnlineApprovalSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((approval: any) => ({
+        setOnlineApprovalList(response.data.map((approval: any) => ({
           id: approval.id || '',
           code: approval.onlineAppCode || '',
           description: approval.onlineAppDesc || '',
@@ -801,8 +696,7 @@ const fetchEmployees = async () => {
           createdDate: approval.createdDate || '',
           editedBy: approval.editedBy || '',
           editedDate: approval.editedDate || '',
-        }));
-        setOnlineApprovalList(mappedData);
+        })));
       }
     } catch (error: any) {
       setOnlineApprovalError(error.response?.data?.message || error.message || 'Failed to load online approvals');
@@ -817,12 +711,11 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/JobLevelSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((jobLevel: any) => ({
+        setJobLevelList(response.data.map((jobLevel: any) => ({
           id: jobLevel.jobLevelID || '',
           code: jobLevel.jobLevelCode || '',
           description: jobLevel.jobLevelDesc || '',
-        }));
-        setJobLevelList(mappedData);
+        })));
       }
     } catch (error: any) {
       setJobLevelError(error.response?.data?.message || error.message || 'Failed to load job levels');
@@ -837,17 +730,37 @@ const fetchEmployees = async () => {
     try {
       const response = await apiClient.get('/Fs/Employment/JobLevelSetUp');
       if (response.status === 200 && response.data) {
-        const mappedData = response.data.map((division: any) => ({
+        setEmpStatusList(response.data.map((division: any) => ({
           id: division.jobLevelID || '',
           code: division.jobLevelCode || '',
           description: division.jobLevelDesc || '',
-        }));
-        setEmpStatusList(mappedData);
+        })));
       }
     } catch (error: any) {
       setEmpStatusError(error.response?.data?.message || error.message || 'Failed to load employee statuses');
     } finally {
       setLoadingEmpStatuses(false);
+    }
+  };
+
+  // FIX Issue 1.1: Added fetch function for Designation data
+  const fetchDesignationData = async () => {
+    setLoadingDesignations(true);
+    setDesignationError('');
+    try {
+      const response = await apiClient.get('/Fs/Employment/DesignationSetUp');
+      if (response.status === 200 && response.data) {
+        setDesignationList(response.data.map((des: any) => ({
+          id: des.desID || des.id || '',
+          code: des.desCode || des.code || '',
+          description: des.desDesc || des.description || '',
+          deviceName: des.deviceName || '',
+        })));
+      }
+    } catch (error: any) {
+      setDesignationError(error.response?.data?.message || error.message || 'Failed to load designations');
+    } finally {
+      setLoadingDesignations(false);
     }
   };
 
@@ -882,11 +795,13 @@ const fetchEmployees = async () => {
       depCode: formData.departmentCode,
       secCode: formData.sectionCode,
       unitCode: formData.unitCode,
+      // FIX Issue 1.3: Use payHouseCode which is correctly populated from lineCode
       payCode: formData.payHouseCode,
       areaCode: formData.areaCode,
       locCode: formData.locationCode,
       onlineAppCode: formData.onlineAppCode,
-      desCode: formData.designation,
+      // FIX Issue 1.1: Send designationCode as desCode (sanitized)
+      desCode: formData.designationCode.trim().replace(/^[_\-]+$/, '') || '',
       grdCode: formData.jobLevelCode,
       hAddress: formData.homeAddress,
       pAddress: formData.presentAddress,
@@ -931,6 +846,10 @@ const fetchEmployees = async () => {
   };
 
   const convertAPIToFormData = (employee: Employee) => {
+    // FIX Issue 1.3: Look up payHouse description using employee.payCode matching against
+    // the correctly mapped payHouseList (which now maps lineCode → code)
+    const payHouseMatch = payHouseList.find(p => p.code?.trim() === employee.payCode?.trim());
+
     setFormData({
       empID: employee.empID,
       empCode: employee.empCode,
@@ -964,7 +883,8 @@ const fetchEmployees = async () => {
       sectionCode: employee.secCode,
       unit: unitList.find(u => u.code === employee.unitCode)?.description || '',
       unitCode: employee.unitCode,
-      payHouse: payHouseList.find(p => p.code === employee.payCode)?.description || '',
+      // FIX Issue 1.3: Use the matched payHouse description, fall back to payCode if no match
+      payHouse: payHouseMatch?.description || employee.payCode || '',
       payHouseCode: employee.payCode,
       area: areaList.find(a => a.code === employee.areaCode)?.description || '',
       areaCode: employee.areaCode,
@@ -972,7 +892,14 @@ const fetchEmployees = async () => {
       locationCode: employee.locCode,
       onlineApplication: onlineApprovalList.find(o => o.code === employee.onlineAppCode)?.description || '',
       onlineAppCode: employee.onlineAppCode,
-      designation: employee.desCode,
+      // FIX Issue 1.1: Map desCode to both code and description fields
+      // Sanitize: treat '_', '-', whitespace-only, null, undefined as empty
+      designationCode: (employee.desCode ?? '').trim().replace(/^[_\-]+$/, ''),
+      designationDesc: (() => {
+        const raw = (employee.desCode ?? '').trim().replace(/^[_\-]+$/, '');
+        if (!raw) return '';
+        return designationList.find(d => d.code === raw)?.description || raw;
+      })(),
       jobLevel: jobLevelList.find(j => j.code === employee.grdCode)?.description || '',
       jobLevelCode: employee.grdCode,
       homeAddress: employee.hAddress,
@@ -997,11 +924,7 @@ const fetchEmployees = async () => {
 
     if (employee.photo || (employee as any).photoBytes) {
       const photoData = (employee as any).photoBytes || employee.photo;
-      if (photoData.startsWith('data:image')) {
-        setPhotoPreview(photoData);
-      } else {
-        setPhotoPreview(`data:image/jpeg;base64,${photoData}`);
-      }
+      setPhotoPreview(photoData.startsWith('data:image') ? photoData : `data:image/jpeg;base64,${photoData}`);
     } else {
       setPhotoPreview('');
     }
@@ -1085,7 +1008,8 @@ const fetchEmployees = async () => {
       locationCode: '',
       onlineApplication: '',
       onlineAppCode: '',
-      designation: '',
+      designationCode: '',
+      designationDesc: '',
       jobLevel: '',
       jobLevelCode: '',
       homeAddress: '',
@@ -1113,9 +1037,7 @@ const fetchEmployees = async () => {
     setIsEditing(true);
   };
 
-  // ── SAVE (Create or Edit) ────────────────────────────────────────────────────
   const handleSave = async () => {
-    // 1. Required field validation
     if (!formData.empCode.trim()) {
       await Swal.fire({ icon: 'warning', title: 'Validation Error', text: 'Employee Code is required.' });
       return;
@@ -1129,50 +1051,29 @@ const fetchEmployees = async () => {
       return;
     }
 
-    // 2. HRIS / Payroll path check
     const pathsValid = await validateCompanyPaths();
     if (!pathsValid) return;
 
-    // 3. Duplicate Employee Code check (CREATE only)
     if (isCreatingNew) {
-      const codeExists = employees.some(
-        e => e.empCode.trim().toUpperCase() === formData.empCode.trim().toUpperCase()
-      );
+      const codeExists = employees.some(e => e.empCode.trim().toUpperCase() === formData.empCode.trim().toUpperCase());
       if (codeExists) {
         await Swal.fire({ icon: 'error', title: 'Duplicate Code', text: 'Employee Code already exists.' });
         return;
       }
     }
 
-    // 4. Government ID length validation
-    const lengthError = validateGovIdLengths(
-      formData.sss,
-      formData.pagibig,
-      formData.philhealth,
-      formData.tin,
-      formData.gsisNo
-    );
+    const lengthError = validateGovIdLengths(formData.sss, formData.pagibig, formData.philhealth, formData.tin, formData.gsisNo);
     if (lengthError) {
       await Swal.fire({ icon: 'warning', title: 'Government ID Error', text: lengthError });
       return;
     }
 
-    // 5. Government ID uniqueness validation
-    //    On EDIT, pass the current empCode to exclude this employee from the check.
-    const uniquenessError = validateGovIdUniqueness(
-      formData.sss,
-      formData.pagibig,
-      formData.philhealth,
-      formData.tin,
-      formData.gsisNo,
-      isCreatingNew ? '' : formData.empCode
-    );
+    const uniquenessError = validateGovIdUniqueness(formData.sss, formData.pagibig, formData.philhealth, formData.tin, formData.gsisNo, isCreatingNew ? '' : formData.empCode);
     if (uniquenessError) {
       await Swal.fire({ icon: 'error', title: 'Duplicate Government ID', text: uniquenessError });
       return;
     }
 
-    // 6. Submit
     try {
       const apiData = convertFormDataToAPI();
       if (isCreatingNew) {
@@ -1199,41 +1100,21 @@ const fetchEmployees = async () => {
     setShowDeleteConfirmModal(true);
   };
 
-  // ── DELETE ───────────────────────────────────────────────────────────────────
   const handleConfirmDelete = async () => {
     setShowDeleteConfirmModal(false);
-
-    // 1. HRIS / Payroll path check
     const pathsValid = await validateCompanyPaths();
     if (!pathsValid) return;
-
-    // 2. Backend usage / FK constraint check
-    //    Mirrors the old iFormValid("Delete") checks (processed records, org setups, etc.)
     const deleteError = await validateDeleteConstraints(formData.empCode);
     if (deleteError) {
       await Swal.fire({ icon: 'error', title: 'Cannot Delete', text: deleteError });
       return;
     }
-
-    // 3. Proceed with deletion
     try {
       await deleteEmployee(formData.empID);
-      await Swal.fire({
-        icon: 'success',
-        title: 'Deleted',
-        text: 'Employee has been deleted successfully.',
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false,
-      });
+      await Swal.fire({ icon: 'success', title: 'Deleted', text: 'Employee has been deleted successfully.', timer: 2000, timerProgressBar: true, showConfirmButton: false });
       handleCreateNew();
     } catch (error) {
-      console.error('Error deleting employee:', error);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Delete Failed',
-        text: 'Failed to delete employee. Please try again.',
-      });
+      await Swal.fire({ icon: 'error', title: 'Delete Failed', text: 'Failed to delete employee. Please try again.' });
     }
   };
 
@@ -1245,28 +1126,27 @@ const fetchEmployees = async () => {
     setShowSearchModal(true);
   };
 
-useEffect(() => {
+  useEffect(() => {
     fetchGroupDescriptions().then(setGroupDescMap);
-}, []);
-const fetchGroupDescriptions = async (): Promise<Map<string, string>> => {
-  try {
-    const { data } = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
-    const groups: { groupCode: string; groupDescription: string }[] = data ?? [];
-    return new Map(groups.map((g) => [String(g.groupCode), g.groupDescription]));
-  } catch {
-    return new Map();
-  }
-};
-const adaptedEmployees = useMemo(() => {
+  }, []);
+
+  const fetchGroupDescriptions = async (): Promise<Map<string, string>> => {
+    try {
+      const { data } = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+      const groups: { groupCode: string; groupDescription: string }[] = data ?? [];
+      return new Map(groups.map((g) => [String(g.groupCode), g.groupDescription]));
+    } catch {
+      return new Map();
+    }
+  };
+
+  const adaptedEmployees = useMemo(() => {
     return employees.map(emp => ({
-        ...emp,
-        name: `${emp.lName}, ${emp.fName}`,
-        groupCode: groupDescMap.get(String((emp as any).tksGroupCode ?? '')) 
-                   ?? (emp as any).tksGroupCode 
-                   ?? emp.grpCode 
-                   ?? ''
+      ...emp,
+      name: `${emp.lName}, ${emp.fName}`,
+      groupCode: groupDescMap.get(String((emp as any).tksGroupCode ?? '')) ?? (emp as any).tksGroupCode ?? emp.grpCode ?? ''
     }));
-}, [employees, groupDescMap]);
+  }, [employees, groupDescMap]);
 
   const handleEmployeeSearchSelect = async (empCode: string, name: string) => {
     try {
@@ -1281,7 +1161,6 @@ const adaptedEmployees = useMemo(() => {
       }
       setShowSearchModal(false);
     } catch (error) {
-      console.error('Error loading employee:', error);
       await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load employee details.' });
     }
   };
@@ -1310,6 +1189,8 @@ const adaptedEmployees = useMemo(() => {
     fetchOnlineApprovalData();
     fetchJobLevelData();
     fetchEmpStatusData();
+    // FIX Issue 1.1: Fetch designation data on mount
+    fetchDesignationData();
   }, []);
 
   useEffect(() => {
@@ -1328,14 +1209,15 @@ const adaptedEmployees = useMemo(() => {
         if (showLocationModal) setShowLocationModal(false);
         if (showOnlineApprovalModal) setShowOnlineApprovalModal(false);
         if (showJobLevelModal) setShowJobLevelModal(false);
+        // FIX Issue 1.1: ESC closes designation modal too
+        if (showDesignationModal) setShowDesignationModal(false);
       }
     };
-
     document.addEventListener('keydown', handleEscKey);
     return () => document.removeEventListener('keydown', handleEscKey);
   }, [showSearchModal, showEmpStatModal, showDeleteConfirmModal, showBranchModal, showDivisionModal,
       showDepartmentModal, showSectionModal, showUnitModal, showPayHouseModal, showAreaModal,
-      showLocationModal, showOnlineApprovalModal, showJobLevelModal]);
+      showLocationModal, showOnlineApprovalModal, showJobLevelModal, showDesignationModal]);
 
   // ==================== FILTERED DATA ====================
   
@@ -1347,6 +1229,12 @@ const adaptedEmployees = useMemo(() => {
   const filteredEmpStatuses = empStatusList.filter(status =>
     status.code.toLowerCase().includes(empStatSearchTerm.toLowerCase()) ||
     status.description.toLowerCase().includes(empStatSearchTerm.toLowerCase())
+  );
+
+  // FIX Issue 1.1: Filtered designations for modal search
+  const filteredDesignations = designationList.filter(des =>
+    des.code.toLowerCase().includes(designationSearchTerm.toLowerCase()) ||
+    des.description.toLowerCase().includes(designationSearchTerm.toLowerCase())
   );
 
   // ==================== RENDER ====================
@@ -1407,38 +1295,23 @@ const adaptedEmployees = useMemo(() => {
             {/* Action Buttons */}
             <div className="flex items-center gap-3 mb-6">
               {!isCreatingNew && !isEditing && (
-                <button
-                  onClick={handleCreateNew}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                >
+                <button onClick={handleCreateNew} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
                   <Plus className="w-4 h-4" />
                   Create New
                 </button>
               )}
               {!isEditing ? (
-                <button
-                  onClick={handleEdit}
-                  disabled={formData.empID === 0}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button onClick={handleEdit} disabled={formData.empID === 0} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                   <Pencil className="w-4 h-4" />
                   Edit
                 </button>
               ) : (
                 <>
-                  <button
-                    onClick={handleSave}
-                    disabled={employeeLoading}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
-                  >
+                  <button onClick={handleSave} disabled={employeeLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
                     <Save className="w-4 h-4" />
                     {employeeLoading ? 'Saving...' : 'Save'}
                   </button>
-                  <button
-                    onClick={handleCancel}
-                    disabled={employeeLoading}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
-                  >
+                  <button onClick={handleCancel} disabled={employeeLoading} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
                     <X className="w-4 h-4" />
                     Cancel
                   </button>
@@ -1446,18 +1319,11 @@ const adaptedEmployees = useMemo(() => {
               )}
               {!isCreatingNew && !isEditing && (
                 <>
-                  <button
-                    onClick={handleDelete}
-                    disabled={formData.empID === 0}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
+                  <button onClick={handleDelete} disabled={formData.empID === 0} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                     <Trash2 className="w-4 h-4" />
                     Delete
                   </button>
-                  <button
-                    onClick={handleSearch}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm"
-                  >
+                  <button onClick={handleSearch} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm">
                     <Search className="w-4 h-4" />
                     Search
                   </button>
@@ -1491,10 +1357,7 @@ const adaptedEmployees = useMemo(() => {
                         className="flex-1 px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                       />
                       {isEditing && (
-                        <button
-                          onClick={() => setShowEmpStatModal(true)}
-                          className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
+                        <button onClick={() => setShowEmpStatModal(true)} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                           <Search className="w-4 h-4" />
                         </button>
                       )}
@@ -1522,43 +1385,19 @@ const adaptedEmployees = useMemo(() => {
                   </div>
                   <div>
                     <label className="block text-gray-700 font-bold text-sm mb-2">Last Name</label>
-                    <input
-                      type="text"
-                      value={formData.lastName}
-                      onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                    />
+                    <input type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} disabled={!isEditing} className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
                   </div>
                   <div>
                     <label className="block text-gray-700 font-bold text-sm mb-2">First Name</label>
-                    <input
-                      type="text"
-                      value={formData.firstName}
-                      onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                    />
+                    <input type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} disabled={!isEditing} className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
                   </div>
                   <div>
                     <label className="block text-gray-700 font-bold text-sm mb-2">Middle Name</label>
-                    <input
-                      type="text"
-                      value={formData.middleName}
-                      onChange={(e) => setFormData({...formData, middleName: e.target.value})}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                    />
+                    <input type="text" value={formData.middleName} onChange={(e) => setFormData({...formData, middleName: e.target.value})} disabled={!isEditing} className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
                   </div>
                   <div>
                     <label className="block text-gray-700 font-bold text-sm mb-2">Suffix</label>
-                    <input
-                      type="text"
-                      value={formData.suffix}
-                      onChange={(e) => setFormData({...formData, suffix: e.target.value})}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                    />
+                    <input type="text" value={formData.suffix} onChange={(e) => setFormData({...formData, suffix: e.target.value})} disabled={!isEditing} className="w-full px-4 py-2 text-blue-700 font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
                   </div>
                 </div>
               </div>
@@ -1569,22 +1408,14 @@ const adaptedEmployees = useMemo(() => {
               <div className="flex gap-1">
                 <button
                   onClick={() => setActiveTab('employment')}
-                  className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${
-                    activeTab === 'employment'
-                      ? 'font-medium bg-blue-600 text-white -mb-px'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  } transition-colors`}
+                  className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${activeTab === 'employment' ? 'font-medium bg-blue-600 text-white -mb-px' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
                   <Briefcase className="w-4 h-4" />
                   Employment Information
                 </button>
                 <button
                   onClick={() => setActiveTab('personal')}
-                  className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${
-                    activeTab === 'personal'
-                      ? 'font-medium bg-blue-600 text-white -mb-px'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  } transition-colors`}
+                  className={`px-4 py-2 text-sm transition-colors flex items-center gap-2 rounded-t-lg ${activeTab === 'personal' ? 'font-medium bg-blue-600 text-white -mb-px' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
                   <User className="w-4 h-4" />
                   Personal Information
@@ -1598,36 +1429,58 @@ const adaptedEmployees = useMemo(() => {
                 {/* Position Section */}
                 <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                   <h3 className="text-gray-900 mb-4">Position</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* FIX Issue 1.1: Designation — description input with search/clear buttons */}
                     <div>
                       <label className="block text-gray-700 font-bold text-sm mb-2">Designation</label>
-                      <input
-                        type="text"
-                        value={formData.designation}
-                        onChange={(e) => setFormData({...formData, designation: e.target.value})}
-                        disabled={!isEditing}
-                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={formData.designationDesc}
+                          readOnly
+                          placeholder="Select designation..."
+                          className="flex-1 min-w-0 px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-default text-gray-700"
+                        />
+                        {isEditing && (
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => { setDesignationSearchTerm(''); setShowDesignationModal(true); }}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              title="Search Designation"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setFormData({...formData, designationCode: '', designationDesc: ''})}
+                              className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                              title="Clear Designation"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {formData.designationCode && !/^[_\-]+$/.test(formData.designationCode) && (
+                        <p className="text-xs text-gray-500 mt-1">Code: <span className="font-medium text-gray-700">{formData.designationCode}</span></p>
+                      )}
                     </div>
+
                     <div>
                       <label className="block text-gray-700 font-bold text-sm mb-2">Job Level</label>
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2">
                         <input
                           type="text"
                           value={formData.jobLevel}
                           onChange={(e) => setFormData({...formData, jobLevel: e.target.value})}
                           disabled={!isEditing}
-                          className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                          className="flex-1 min-w-0 px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                         />
                         {isEditing && (
-                          <>
-                            <button onClick={() => setShowJobLevelModal(true)} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                              <Search className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => setFormData({...formData, jobLevel: '', jobLevelCode: ''})} className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button onClick={() => setShowJobLevelModal(true)} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"><Search className="w-4 h-4" /></button>
+                            <button onClick={() => setFormData({...formData, jobLevel: '', jobLevelCode: ''})} className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"><X className="w-4 h-4" /></button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1654,7 +1507,6 @@ const adaptedEmployees = useMemo(() => {
                         </label>
                       </div>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                       <div>
                         <label className="block text-gray-700 font-bold text-sm mb-2">Probe Start</label>
@@ -1671,7 +1523,6 @@ const adaptedEmployees = useMemo(() => {
                         </label>
                       </div>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                       <div>
                         <label className="block text-gray-700 font-bold text-sm mb-2">Date Resigned</label>
@@ -1692,65 +1543,70 @@ const adaptedEmployees = useMemo(() => {
                 </div>
 
                 {/* Government IDs Section */}
+                {/* FIX Issue 1.2: All gov ID inputs now use handleNumericInput — digits only */}
                 <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                   <h3 className="text-gray-900 mb-4">Government IDs</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-gray-700 font-bold text-sm mb-2">SSS <span className="text-gray-400 font-normal">(10 chars)</span></label>
+                        <label className="block text-gray-700 font-bold text-sm mb-2">SSS <span className="text-gray-400 font-normal">(10 digits)</span></label>
                         <input
                           type="text"
                           value={formData.sss}
-                          onChange={(e) => setFormData({...formData, sss: e.target.value})}
+                          onChange={(e) => handleNumericInput(e.target.value, 'sss')}
                           disabled={!isEditing}
                           maxLength={12}
+                          inputMode="numeric"
                           className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 font-bold text-sm mb-2">PAG-IBIG <span className="text-gray-400 font-normal">(10–15 chars)</span></label>
+                        <label className="block text-gray-700 font-bold text-sm mb-2">PAG-IBIG <span className="text-gray-400 font-normal">(10–15 digits)</span></label>
                         <input
                           type="text"
                           value={formData.pagibig}
-                          onChange={(e) => setFormData({...formData, pagibig: e.target.value})}
+                          onChange={(e) => handleNumericInput(e.target.value, 'pagibig')}
                           disabled={!isEditing}
                           maxLength={15}
+                          inputMode="numeric"
                           className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 font-bold text-sm mb-2">Philhealth <span className="text-gray-400 font-normal">(12 chars)</span></label>
+                        <label className="block text-gray-700 font-bold text-sm mb-2">Philhealth <span className="text-gray-400 font-normal">(12 digits)</span></label>
                         <input
                           type="text"
                           value={formData.philhealth}
-                          onChange={(e) => setFormData({...formData, philhealth: e.target.value})}
+                          onChange={(e) => handleNumericInput(e.target.value, 'philhealth')}
                           disabled={!isEditing}
                           maxLength={14}
+                          inputMode="numeric"
                           className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                         />
                       </div>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-gray-700 font-bold text-sm mb-2">TIN <span className="text-gray-400 font-normal">(9–15 chars)</span></label>
+                        <label className="block text-gray-700 font-bold text-sm mb-2">TIN <span className="text-gray-400 font-normal">(9–15 digits)</span></label>
                         <input
                           type="text"
                           value={formData.tin}
-                          onChange={(e) => setFormData({...formData, tin: e.target.value})}
+                          onChange={(e) => handleNumericInput(e.target.value, 'tin')}
                           disabled={!isEditing}
                           maxLength={15}
+                          inputMode="numeric"
                           className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 font-bold text-sm mb-2">GSIS/No <span className="text-gray-400 font-normal">(10 chars)</span></label>
+                        <label className="block text-gray-700 font-bold text-sm mb-2">GSIS/No <span className="text-gray-400 font-normal">(10 digits)</span></label>
                         <input
                           type="text"
                           value={formData.gsisNo}
-                          onChange={(e) => setFormData({...formData, gsisNo: e.target.value})}
+                          onChange={(e) => handleNumericInput(e.target.value, 'gsisNo')}
                           disabled={!isEditing}
                           maxLength={12}
+                          inputMode="numeric"
                           className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                         />
                       </div>
@@ -1831,6 +1687,7 @@ const adaptedEmployees = useMemo(() => {
                     <div>
                       <label className="block text-gray-700 font-bold text-sm mb-2">Pay House</label>
                       <div className="flex gap-2">
+                        {/* FIX Issue 1.3: Show description (payHouse) which is now properly mapped */}
                         <input type="text" value={formData.payHouse} disabled className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
                         {isEditing && (
                           <>
@@ -1919,20 +1776,42 @@ const adaptedEmployees = useMemo(() => {
                     </div>
 
                     {/* Contact Information Section */}
+                    {/* FIX Issue 2: Phone fields now use handleNumericInput — digits only */}
                     <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                       <h3 className="text-gray-900 mb-4">Contact Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-gray-700 font-bold text-sm mb-2">Mobile Phone</label>
-                          <input type="text" value={formData.mobilePhone} onChange={(e) => setFormData({...formData, mobilePhone: e.target.value})} disabled={!isEditing} className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
+                          <input
+                            type="text"
+                            value={formData.mobilePhone}
+                            onChange={(e) => handleNumericInput(e.target.value, 'mobilePhone')}
+                            disabled={!isEditing}
+                            inputMode="numeric"
+                            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                          />
                         </div>
                         <div>
                           <label className="block text-gray-700 font-bold text-sm mb-2">Present Phone</label>
-                          <input type="text" value={formData.presentPhone} onChange={(e) => setFormData({...formData, presentPhone: e.target.value})} disabled={!isEditing} className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
+                          <input
+                            type="text"
+                            value={formData.presentPhone}
+                            onChange={(e) => handleNumericInput(e.target.value, 'presentPhone')}
+                            disabled={!isEditing}
+                            inputMode="numeric"
+                            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                          />
                         </div>
                         <div>
                           <label className="block text-gray-700 font-bold text-sm mb-2">Home Phone</label>
-                          <input type="text" value={formData.homePhone} onChange={(e) => setFormData({...formData, homePhone: e.target.value})} disabled={!isEditing} className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
+                          <input
+                            type="text"
+                            value={formData.homePhone}
+                            onChange={(e) => handleNumericInput(e.target.value, 'homePhone')}
+                            disabled={!isEditing}
+                            inputMode="numeric"
+                            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                          />
                         </div>
                       </div>
                     </div>
@@ -2106,6 +1985,76 @@ const adaptedEmployees = useMemo(() => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* FIX Issue 1.1: Designation Search Modal */}
+      {showDesignationModal && (
+        <>
+          <div className="fixed inset-0 z-[99] bg-black bg-opacity-50" onClick={() => setShowDesignationModal(false)} />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 pointer-events-none">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden pointer-events-auto">
+              <div className="bg-gray-200 px-4 py-3 flex items-center justify-between border-b border-gray-300">
+                <h2 className="text-gray-800">Search Designation</h2>
+                <button onClick={() => setShowDesignationModal(false)} className="text-gray-600 hover:text-gray-900 transition-colors"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6 max-h-[calc(85vh-60px)] overflow-y-auto">
+                <h3 className="text-blue-600 mb-4">Designation</h3>
+                <div className="flex items-center gap-2 mb-4">
+                  <label className="text-gray-700">Search:</label>
+                  <input
+                    type="text"
+                    value={designationSearchTerm}
+                    onChange={(e) => setDesignationSearchTerm(e.target.value)}
+                    placeholder="Type designation code or description..."
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                </div>
+                {loadingDesignations ? (
+                  <div className="text-center py-8">Loading designations...</div>
+                ) : designationError ? (
+                  <div className="text-center py-8 text-red-600">{designationError}</div>
+                ) : (
+                  <>
+                    <div className="border border-gray-300 rounded overflow-hidden">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-100 border-b border-gray-300">
+                            <th className="px-4 py-2 text-left text-gray-700">Code</th>
+                            <th className="px-4 py-2 text-left text-gray-700">Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredDesignations.length > 0 ? (
+                            filteredDesignations.map((des, index) => (
+                              <tr
+                                key={des.id}
+                                className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                onClick={() => {
+                                  setFormData({...formData, designationCode: des.code, designationDesc: des.description});
+                                  setShowDesignationModal(false);
+                                  setDesignationSearchTerm('');
+                                }}
+                              >
+                                <td className="px-4 py-2 text-gray-800">{des.code}</td>
+                                <td className="px-4 py-2 text-gray-800">{des.description}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr><td colSpan={2} className="px-4 py-8 text-center text-gray-500">No designations found</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex items-center justify-between mt-4 text-sm text-gray-700">
+                      <div>Showing {filteredDesignations.length} designation(s)</div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Branch Modal */}

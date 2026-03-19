@@ -17,7 +17,6 @@ import {
   Check,
   Save,
   Edit,
-  Trash,
   Trash2
 } from 'lucide-react';
 import { LeaveApplicationModal } from '../Modals/LeaveApplicationModal';
@@ -38,16 +37,18 @@ import { WorkshiftCodeSearchModal } from '../Modals/WorkshiftCodeSearchModal';
 import { ClassificationCodeSearchModal } from '../Modals/ClassificationCodeSearchModal';
 import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
 
+type TabType =
+  | 'basic-config'
+  | 'exemptions'
+  | 'device-code'
+  | 'rest-day'
+  | 'workshift'
+  | 'classification'
+  | 'leave-applications'
+  | 'overtime-applications'
+  | 'contractual'
+  | 'suspension';
 
-
-type TabType = 'basic-config' | 'exemptions' | 'device-code' | 'rest-day' | 'workshift' | 'classification' | 'leave-applications' | 'overtime-applications' | 'contractual' | 'suspension';
-
-interface DeviceCodeEntry {
-  effectivityDate: string;
-  expiryDate: string;
-  code: string;
-}
-// Daily Schedule Interface
 interface DailySchedule {
   dailyScheduleID: number;
   referenceNo: string;
@@ -60,7 +61,6 @@ interface DailySchedule {
   sunday: string;
 }
 
-// Workshift Fixed Interface
 interface WorkshiftFixed {
   id: number;
   empCode: string;
@@ -68,7 +68,6 @@ interface WorkshiftFixed {
   isFixed: boolean;
 }
 
-// Workshift Variable Interface
 interface WorkshiftVariable {
   id: number;
   empCode: string;
@@ -80,7 +79,6 @@ interface WorkshiftVariable {
   glCode: string;
 }
 
-// Classification Fixed Interface
 interface ClassificationFixed {
   id: number;
   empCode: string;
@@ -88,7 +86,6 @@ interface ClassificationFixed {
   isFixed: boolean;
 }
 
-// Classification Variable Interface
 interface ClassificationVariable {
   id: number;
   empCode: string;
@@ -96,7 +93,7 @@ interface ClassificationVariable {
   dateTo: string;
   classCode: string;
 }
-// Device Code Interface
+
 interface DeviceCode {
   id: number;
   empCode: string;
@@ -106,7 +103,6 @@ interface DeviceCode {
   timeInAndOutExpiryDate: string;
 }
 
-// Rest Day Fixed Interface
 interface RestDayFixed {
   id: number;
   empCode: string;
@@ -116,7 +112,6 @@ interface RestDayFixed {
   isFixed: boolean;
 }
 
-// Rest Day Variable Interface
 interface RestDayVariable {
   id: number;
   empCode: string;
@@ -126,7 +121,7 @@ interface RestDayVariable {
   restDay2: string;
   restDay3: string;
 }
-// Employee Interface for Search Modal
+
 interface Employee {
   empID: number;
   empCode: string;
@@ -135,7 +130,6 @@ interface Employee {
   grpCode: string;
 }
 
-// Basic Configuration Interface
 interface EmployeeBasicConfig {
   id: number;
   empCode: string;
@@ -148,14 +142,12 @@ interface EmployeeBasicConfig {
   timeAttendanceStatus: boolean;
 }
 
-// Group Schedule Interface
 interface GroupSchedule {
   groupScheduleID: number;
   groupScheduleCode: string;
   groupScheduleDesc: string;
 }
 
-// Employee Exemptions Interface
 interface EmployeeExemptions {
   id: number;
   empCode: string;
@@ -169,7 +161,6 @@ interface EmployeeExemptions {
   unprodWorkHoliday: boolean;
 }
 
-// Leave Application Interface
 interface LeaveApplication {
   id: number;
   empCode: string;
@@ -189,42 +180,42 @@ interface LeaveApplication {
 }
 
 interface PayrollLocation {
-    id: number;
-    locId: number;
-    locCode: string;
-    locName: string;
-    confidential: string;
-    notedBy: string;
-    preparedBy: string;
-    reviewedBy: string;
-    approvedBy: string;
-    nonTaxAccum: number;
-    header: string;
-    desc1: string;
-    desc2: string;
-    desc3: string;
-    desc4: string;
-    contribFormula: string;
-    contribPayPer: number;
-    ins: string;
-    insPayPer: number;
-    pagIbig: string;
-    pagPayPer: number;
-    sssContrib: string;
-    sssPayPer: number;
-    philContrib: string;
-    philPayPer: number;
-    companyCode: string;
-    clsCode: string;
-    payCode: string;
-    rateCode: string;
-    noOfDays: number;
-    noOfHours: number;
-    totalPeriod: number;
-    costCenter1: string;
-    costCenter2: string;
+  id: number;
+  locId: number;
+  locCode: string;
+  locName: string;
+  confidential: string;
+  notedBy: string;
+  preparedBy: string;
+  reviewedBy: string;
+  approvedBy: string;
+  nonTaxAccum: number;
+  header: string;
+  desc1: string;
+  desc2: string;
+  desc3: string;
+  desc4: string;
+  contribFormula: string;
+  contribPayPer: number;
+  ins: string;
+  insPayPer: number;
+  pagIbig: string;
+  pagPayPer: number;
+  sssContrib: string;
+  sssPayPer: number;
+  philContrib: string;
+  philPayPer: number;
+  companyCode: string;
+  clsCode: string;
+  payCode: string;
+  rateCode: string;
+  noOfDays: number;
+  noOfHours: number;
+  totalPeriod: number;
+  costCenter1: string;
+  costCenter2: string;
 }
-// Overtime Application Interface
+
 interface OvertimeApplication {
   id: number;
   empCode: string;
@@ -245,7 +236,6 @@ interface OvertimeApplication {
   isOTBeforeShiftNextDay: boolean;
 }
 
-// Contractual Interface
 interface Contractual {
   id: number;
   empCode: string;
@@ -253,7 +243,6 @@ interface Contractual {
   dateTo: string;
 }
 
-// Suspension Interface
 interface Suspension {
   id: number;
   empCode: string;
@@ -261,62 +250,136 @@ interface Suspension {
   dateTo: string;
 }
 
-// Workshift Code Interface
 interface WorkshiftCode {
   code: string;
   description: string;
 }
 
-// Classification Code Interface
 interface ClassificationCodeItem {
   classId: number;
   classCode: string;
   classDesc: string;
 }
 
-// ── NEW: Leave Code Interface ──────────────────────────────────────────────────
 interface LeaveCode {
   code: string;
   description: string;
 }
+
+// ── Date helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Convert any date string to a local-midnight ISO string (YYYY-MM-DDTHH:mm:ss.000Z
+ * using LOCAL date so no timezone subtraction occurs).
+ * Handles: "yyyy-MM-dd", "M/D/YYYY", ISO strings.
+ */
+const toLocalISOString = (dateStr: string): string | null => {
+  if (!dateStr) return null;
+  try {
+    let y: number, m: number, d: number;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      [y, m, d] = dateStr.split('-').map(Number);
+    } else if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      m = Number(parts[0]);
+      d = Number(parts[1]);
+      y = Number(parts[2]);
+    } else {
+      const dt = new Date(dateStr);
+      y = dt.getFullYear();
+      m = dt.getMonth() + 1;
+      d = dt.getDate();
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${y}-${pad(m)}-${pad(d)}T12:00:00.000Z`;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Format any date string / ISO to "M/D/YYYY" for display.
+ */
+const formatDate = (dateStr: string): string => {
+  if (!dateStr) return 'N/A';
+  try {
+    let y: number, m: number, d: number;
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const parts = dateStr.substring(0, 10).split('-');
+      y = Number(parts[0]);
+      m = Number(parts[1]);
+      d = Number(parts[2]);
+    } else {
+      const dt = new Date(dateStr);
+      if (isNaN(dt.getTime())) return 'N/A';
+      y = dt.getUTCFullYear();
+      m = dt.getUTCMonth() + 1;
+      d = dt.getUTCDate();
+    }
+    return `${m}/${d}/${y}`;
+  } catch {
+    return 'N/A';
+  }
+};
+
+/**
+ * Convert ISO/date string → "yyyy-MM-dd" for <input type="date"> or modal state.
+ */
+const toInputDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  try {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    if (/^\d{4}-\d{2}-\d{2}T/.test(dateStr)) return dateStr.substring(0, 10);
+    if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    const dt = new Date(dateStr);
+    if (isNaN(dt.getTime())) return '';
+    const y = dt.getUTCFullYear();
+    const mo = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const da = String(dt.getUTCDate()).padStart(2, '0');
+    return `${y}-${mo}-${da}`;
+  } catch {
+    return '';
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function EmployeeTimekeepConfigPage() {
   const [activeTab, setActiveTab] = useState<TabType>('basic-config');
   const [empCode, setEmpCode] = useState('');
   const [tksGroup, setTksGroup] = useState('');
   const [tksGroupName, setTksGroupName] = useState('');
-  const [newDeviceCode, setNewDeviceCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newEffectivityDate, setNewEffectivityDate] = useState('');
-  const [newExpiryDate, setNewExpiryDate] = useState('');
   const [originalGroupCode, setOriginalGroupCode] = useState('');
-  // Search modal state
+
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showGroupScheduleModal, setShowGroupScheduleModal] = useState(false);
 
-  // Global Edit Mode
   const [isEditMode, setIsEditMode] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
-  // Employee data for search
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeLoading, setEmployeeLoading] = useState(false);
   const [employeeError, setEmployeeError] = useState('');
 
-  // Basic Configuration data
   const [basicConfigData, setBasicConfigData] = useState<EmployeeBasicConfig | null>(null);
   const [basicConfigLoading, setBasicConfigLoading] = useState(false);
   const [basicConfigError, setBasicConfigError] = useState('');
 
-  // Group Schedule data
   const [groupSchedules, setGroupSchedules] = useState<GroupSchedule[]>([]);
   const [groupScheduleLoading, setGroupScheduleLoading] = useState(false);
 
-  // Exemptions data
   const [exemptionsData, setExemptionsData] = useState<EmployeeExemptions | null>(null);
   const [exemptionsLoading, setExemptionsLoading] = useState(false);
 
-  // Leave Applications Modal States
+  // Leave
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isLeaveEditMode, setIsLeaveEditMode] = useState(false);
   const [currentLeaveId, setCurrentLeaveId] = useState<number>(0);
@@ -329,32 +392,42 @@ export function EmployeeTimekeepConfigPage() {
   const [leaveWithPay, setLeaveWithPay] = useState(false);
   const [leaveSssNotification, setLeaveSssNotification] = useState(false);
   const [leaveIsLateFiling, setLeaveIsLateFiling] = useState(false);
-
-  // ── NEW: Leave Code lookup state ───────────────────────────────────────────
   const [leaveCodes, setLeaveCodes] = useState<LeaveCode[]>([]);
   const [leaveCodesLoading, setLeaveCodesLoading] = useState(false);
 
-  // Overtime Applications Modal States
+  // Overtime
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [isOvertimeEditMode, setIsOvertimeEditMode] = useState(false);
   const [currentOvertimeId, setCurrentOvertimeId] = useState<number | null>(null);
-
+  const [overtimeDate, setOvertimeDate] = useState('');
+  const [overtimeNumOTHoursApproved, setOvertimeNumOTHoursApproved] = useState('');
+  const [overtimeEarlyOTStartTime, setOvertimeEarlyOTStartTime] = useState('');
+  const [overtimeEarlyTimeIn, setOvertimeEarlyTimeIn] = useState('');
+  const [overtimeStartOTPM, setOvertimeStartOTPM] = useState('');
+  const [overtimeMinHRSOTBreak, setOvertimeMinHRSOTBreak] = useState('');
+  const [overtimeEarlyOTStartTimeRestHol, setOvertimeEarlyOTStartTimeRestHol] = useState('');
+  const [overtimeReason, setOvertimeReason] = useState('');
+  const [overtimeRemarks, setOvertimeRemarks] = useState('');
+  const [overtimeApprovedOTBreaksHrs, setOvertimeApprovedOTBreaksHrs] = useState('');
+  const [overtimeStotats, setOvertimeStotats] = useState('');
+  const [overtimeIsLateFiling, setOvertimeIsLateFiling] = useState(false);
+  const [overtimeAppliedBeforeShiftDate, setOvertimeAppliedBeforeShiftDate] = useState('');
+  const [overtimeIsOTBeforeShiftNextDay, setOvertimeIsOTBeforeShiftNextDay] = useState(false);
   const [overtimeHoursApproved, setOvertimeHoursApproved] = useState('');
   const [overtimeActualDateInOTBefore, setOvertimeActualDateInOTBefore] = useState('');
   const [overtimeStartTimeBefore, setOvertimeStartTimeBefore] = useState('');
   const [overtimeStartOvertimeDate, setOvertimeStartOvertimeDate] = useState('');
   const [overtimeStartOvertimeTime, setOvertimeStartOvertimeTime] = useState('');
   const [overtimeApprovedBreak, setOvertimeApprovedBreak] = useState('');
-  
 
-  // Contractual Modal States
+  // Contractual
   const [showContractualModal, setShowContractualModal] = useState(false);
   const [isContractualEditMode, setIsContractualEditMode] = useState(false);
   const [currentContractualId, setCurrentContractualId] = useState<number | null>(null);
   const [contractualDateFrom, setContractualDateFrom] = useState('');
   const [contractualDateTo, setContractualDateTo] = useState('');
 
-  // Suspension Modal States
+  // Suspension
   const [showSuspensionModal, setShowSuspensionModal] = useState(false);
   const [isSuspensionEditMode, setIsSuspensionEditMode] = useState(false);
   const [currentSuspensionId, setCurrentSuspensionId] = useState<number | null>(null);
@@ -365,7 +438,7 @@ export function EmployeeTimekeepConfigPage() {
   const [leaveApplicationsData, setLeaveApplicationsData] = useState<LeaveApplication[]>([]);
   const [leaveApplicationsLoading, setLeaveApplicationsLoading] = useState(false);
 
-  // Device Code Data
+  // Device Code
   const [deviceCodeEntries, setDeviceCodeEntries] = useState<DeviceCode[]>([]);
   const [deviceCodeLoading, setDeviceCodeLoading] = useState(false);
   const [showDeviceCodeModal, setShowDeviceCodeModal] = useState(false);
@@ -376,7 +449,7 @@ export function EmployeeTimekeepConfigPage() {
   const [deviceEffectivityDate, setDeviceEffectivityDate] = useState('');
   const [deviceExpiryDate, setDeviceExpiryDate] = useState('');
 
- // Rest Day Data
+  // Rest Day
   const [restDayLoading, setRestDayLoading] = useState(false);
   const [restDayMode, setRestDayMode] = useState<'fixed' | 'variable'>('variable');
   const [restDayFixedData, setRestDayFixedData] = useState<RestDayFixed | null>(null);
@@ -390,156 +463,135 @@ export function EmployeeTimekeepConfigPage() {
   const [restDay2, setRestDay2] = useState('');
   const [restDay3, setRestDay3] = useState('');
 
-// Workshift Data
-const [workshiftLoading, setWorkshiftLoading] = useState(false);
-const [workshiftMode, setWorkshiftMode] = useState<'fixed' | 'variable'>('variable');
-const [workshiftFixedData, setWorkshiftFixedData] = useState<WorkshiftFixed | null>(null);
-const [workshiftVariableData, setWorkshiftVariableData] = useState<WorkshiftVariable[]>([]);
-const [showWorkshiftModal, setShowWorkshiftModal] = useState(false);
-const [isWorkshiftEditMode, setIsWorkshiftEditMode] = useState(false);
-const [currentWorkshiftId, setCurrentWorkshiftId] = useState<number | null>(null);
-const [workshiftDateFrom, setWorkshiftDateFrom] = useState('');
-const [workshiftDateTo, setWorkshiftDateTo] = useState('');
-const [workshiftShiftCode, setWorkshiftShiftCode] = useState('');
-const [workshiftDailyScheduleCode, setWorkshiftDailyScheduleCode] = useState('');
-const [workshiftGLCode, setWorkshiftGLCode] = useState('');
-const [fixedDailySched, setFixedDailySched] = useState('');
+  // Workshift
+  const [workshiftLoading, setWorkshiftLoading] = useState(false);
+  const [workshiftMode, setWorkshiftMode] = useState<'fixed' | 'variable'>('variable');
+  const [workshiftFixedData, setWorkshiftFixedData] = useState<WorkshiftFixed | null>(null);
+  const [workshiftVariableData, setWorkshiftVariableData] = useState<WorkshiftVariable[]>([]);
+  const [showWorkshiftModal, setShowWorkshiftModal] = useState(false);
+  const [isWorkshiftEditMode, setIsWorkshiftEditMode] = useState(false);
+  const [currentWorkshiftId, setCurrentWorkshiftId] = useState<number | null>(null);
+  const [workshiftDateFrom, setWorkshiftDateFrom] = useState('');
+  const [workshiftDateTo, setWorkshiftDateTo] = useState('');
+  const [workshiftShiftCode, setWorkshiftShiftCode] = useState('');
+  const [fixedDailySched, setFixedDailySched] = useState('');
+  const [workshiftCodes, setWorkshiftCodes] = useState<WorkshiftCode[]>([]);
+  const [workshiftCodesLoading, setWorkshiftCodesLoading] = useState(false);
+  const [showWorkshiftCodeModal, setShowWorkshiftCodeModal] = useState(false);
 
-// Workshift Code dialog state
-const [workshiftCodes, setWorkshiftCodes] = useState<WorkshiftCode[]>([]);
-const [workshiftCodesLoading, setWorkshiftCodesLoading] = useState(false);
-const [showWorkshiftCodeModal, setShowWorkshiftCodeModal] = useState(false);
+  // Daily Schedule
+  const [dailySchedules, setDailySchedules] = useState<DailySchedule[]>([]);
+  const [dailyScheduleLoading, setDailyScheduleLoading] = useState(false);
+  const [showDailyScheduleModal, setShowDailyScheduleModal] = useState(false);
 
-// Daily Schedule Data
-const [dailySchedules, setDailySchedules] = useState<DailySchedule[]>([]);
-const [dailyScheduleLoading, setDailyScheduleLoading] = useState(false);
-const [showDailyScheduleModal, setShowDailyScheduleModal] = useState(false);
+  // Classification
+  const [classificationLoading, setClassificationLoading] = useState(false);
+  const [classificationMode, setClassificationMode] = useState<'fixed' | 'variable'>('variable');
+  const [classificationFixedData, setClassificationFixedData] = useState<ClassificationFixed | null>(null);
+  const [classificationVariableData, setClassificationVariableData] = useState<ClassificationVariable[]>([]);
+  const [showClassificationModal, setShowClassificationModal] = useState(false);
+  const [isClassificationEditMode, setIsClassificationEditMode] = useState(false);
+  const [currentClassificationId, setCurrentClassificationId] = useState<number | null>(null);
+  const [classificationDateFrom, setClassificationDateFrom] = useState('');
+  const [classificationDateTo, setClassificationDateTo] = useState('');
+  const [fixedClassCode, setFixedClassCode] = useState('');
+  const [variableClassCode, setVariableClassCode] = useState('');
+  const [classificationCodes, setClassificationCodes] = useState<ClassificationCodeItem[]>([]);
+  const [classificationCodesLoading, setClassificationCodesLoading] = useState(false);
+  const [showClassificationCodeModal, setShowClassificationCodeModal] = useState(false);
+  // true = search was opened from Fixed panel; false = from Variable modal
+  const [isFixedCodeSearch, setIsFixedCodeSearch] = useState(false);
 
-// Classification Data
-const [classificationLoading, setClassificationLoading] = useState(false);
-const [classificationMode, setClassificationMode] = useState<'fixed' | 'variable'>('variable');
-const [classificationFixedData, setClassificationFixedData] = useState<ClassificationFixed | null>(null);
-const [classificationVariableData, setClassificationVariableData] = useState<ClassificationVariable[]>([]);
-const [showClassificationModal, setShowClassificationModal] = useState(false);
-const [isClassificationEditMode, setIsClassificationEditMode] = useState(false);
-const [currentClassificationId, setCurrentClassificationId] = useState<number | null>(null);
-const [classificationDateFrom, setClassificationDateFrom] = useState('');
-const [classificationDateTo, setClassificationDateTo] = useState('');
-const [fixedClassCode, setFixedClassCode] = useState('');
-const [variableClassCode, setVariableClassCode] = useState('');
-
-// Classification Code dialog state
-const [classificationCodes, setClassificationCodes] = useState<ClassificationCodeItem[]>([]);
-const [classificationCodesLoading, setClassificationCodesLoading] = useState(false);
-const [showClassificationCodeModal, setShowClassificationCodeModal] = useState(false);
-
-  // Overtime Data
+  // Overtime data
   const [overtimeApplicationsData, setOvertimeApplicationsData] = useState<any[]>([]);
   const [overtimeLoading, setOvertimeLoading] = useState(false);
 
-  // Contractual Data
+  // Contractual data
   const [contractualData, setContractualData] = useState<{ id: number; dateFrom: string; dateTo: string }[]>([]);
   const [contractualLoading, setContractualLoading] = useState(false);
 
-  // Suspension Data
+  // Suspension data
   const [suspensionData, setSuspensionData] = useState<{ id: number; dateFrom: string; dateTo: string }[]>([]);
   const [suspensionLoading, setSuspensionLoading] = useState(false);
 
-  // Mock data
   const employeeName = 'Last122, First A';
   const payPeriod = 'Main Monthly';
 
-  // TKS Group Modal States
+  // TKS Group Modal
   const [showTKSGroupModal, setShowTKSGroupModal] = useState(false);
   const [tksGroupSearchTerm, setTksGroupSearchTerm] = useState('');
   const [payrollLocationData, setPayrollLocationData] = useState<PayrollLocation[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-const [overtimeDate, setOvertimeDate] = useState('');
-const [overtimeNumOTHoursApproved, setOvertimeNumOTHoursApproved] = useState('');
-const [overtimeEarlyOTStartTime, setOvertimeEarlyOTStartTime] = useState('');
-const [overtimeEarlyTimeIn, setOvertimeEarlyTimeIn] = useState('');
-const [overtimeStartOTPM, setOvertimeStartOTPM] = useState('');
-const [overtimeMinHRSOTBreak, setOvertimeMinHRSOTBreak] = useState('');
-const [overtimeEarlyOTStartTimeRestHol, setOvertimeEarlyOTStartTimeRestHol] = useState('');
-const [overtimeReason, setOvertimeReason] = useState('');
-const [overtimeRemarks, setOvertimeRemarks] = useState('');
-const [overtimeApprovedOTBreaksHrs, setOvertimeApprovedOTBreaksHrs] = useState('');
-const [overtimeStotats, setOvertimeStotats] = useState('');
-const [overtimeIsLateFiling, setOvertimeIsLateFiling] = useState(false);
-const [overtimeAppliedBeforeShiftDate, setOvertimeAppliedBeforeShiftDate] = useState('');
-const [overtimeIsOTBeforeShiftNextDay, setOvertimeIsOTBeforeShiftNextDay] = useState(false);
-const [groupDescMap, setGroupDescMap] = useState<Map<string, string>>(new Map());
+  const [groupDescMap, setGroupDescMap] = useState<Map<string, string>>(new Map());
+
+  // ── Per-tab pagination (20 rows per page) ──────────────────────────────────
+  const TAB_PAGE_SIZE = 20;
+  const [deviceCodePage, setDeviceCodePage]           = useState(1);
+  const [restDayVarPage, setRestDayVarPage]           = useState(1);
+  const [workshiftVarPage, setWorkshiftVarPage]       = useState(1);
+  const [classVarPage, setClassVarPage]               = useState(1);
+  const [leavePage, setLeavePage]                     = useState(1);
+  const [overtimePage, setOvertimePage]               = useState(1);
+  const [contractualPage, setContractualPage]         = useState(1);
+  const [suspensionPage, setSuspensionPage]           = useState(1);
+
   // ==================== API FUNCTIONS ====================
+
   const fetchGroupDescriptions = async (): Promise<Map<string, string>> => {
-  try {
-    const { data } = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
-    const groups: { groupCode: string; groupDescription: string }[] = data ?? [];
-    return new Map(groups.map((g) => [String(g.groupCode), g.groupDescription]));
-  } catch {
-    return new Map();
-  }
-};
-  const fetchData = async () => {
-    setLoading(true);
     try {
-        const response = await apiClient.get('/Fs/Process/PayRollLocationSetUp');
-        if (response.status === 200 && response.data) {
-            setPayrollLocationData(response.data);
-        }
-    } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to load payroll locations';
-        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-        setLoading(false);
+      const { data } = await apiClient.get('/Fs/Process/TimeKeepGroupSetUp');
+      const groups: { groupCode: string; groupDescription: string }[] = data ?? [];
+      return new Map(groups.map((g) => [String(g.groupCode), g.groupDescription]));
+    } catch {
+      return new Map();
     }
   };
 
-  // Fetch Group Schedules
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.get('/Fs/Process/PayRollLocationSetUp');
+      if (response.status === 200 && response.data) setPayrollLocationData(response.data);
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to load payroll locations' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchGroupSchedules = async () => {
     setGroupScheduleLoading(true);
     try {
       const response = await apiClient.get('/Fs/Process/GroupScheduleSetUp');
-      if (response.status === 200 && response.data) {
-        setGroupSchedules(response.data);
-      }
+      if (response.status === 200 && response.data) setGroupSchedules(response.data);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load group schedules';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to load group schedules' });
     } finally {
       setGroupScheduleLoading(false);
     }
   };
 
-  // Fetch Employees for Search Modal
-const fetchEmployees = async () => {
-  setEmployeeLoading(true);
-  setEmployeeError('');
-  try {
-    const { employees } = await fetchEmployeesService();
-    setEmployees(employees);
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-    setEmployeeError(errorMsg);
-  } finally {
-    setEmployeeLoading(false);
-  }
-};
-  // Fetch Workshift Codes
+  const fetchEmployees = async () => {
+    setEmployeeLoading(true);
+    setEmployeeError('');
+    try {
+      const { employees } = await fetchEmployeesService();
+      setEmployees(employees);
+    } catch (error: any) {
+      setEmployeeError(error.response?.data?.message || error.message || 'Failed to load employees');
+    } finally {
+      setEmployeeLoading(false);
+    }
+  };
+
   const fetchWorkshiftCodes = async () => {
     setWorkshiftCodesLoading(true);
     try {
       const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
       if (response.status === 200 && response.data) {
-        const workshifts = response.data.data;
-        const mappedData = workshifts.map((workshift: any) => ({
-          code: workshift.code || '',
-          description: workshift.description || '',
-        }));
-        setWorkshiftCodes(mappedData);
+        setWorkshiftCodes((response.data.data || []).map((w: any) => ({ code: w.code || '', description: w.description || '' })));
       }
     } catch (err) {
       console.error('Error fetching workshift codes:', err);
@@ -548,14 +600,12 @@ const fetchEmployees = async () => {
     }
   };
 
-  // Fetch Classification Codes
   const fetchClassificationCodes = async () => {
     setClassificationCodesLoading(true);
     try {
       const response = await apiClient.get('/Fs/Process/AllowanceAndEarnings/ClassificationSetUp');
       if (response.status === 200 && response.data) {
-        const allItems = Array.isArray(response.data) ? response.data : (response.data.data || []);
-        setClassificationCodes(allItems);
+        setClassificationCodes(Array.isArray(response.data) ? response.data : (response.data.data || []));
       }
     } catch (err) {
       console.error('Error fetching classification codes:', err);
@@ -564,986 +614,869 @@ const fetchEmployees = async () => {
     }
   };
 
-  // ── NEW: Fetch Leave Codes ─────────────────────────────────────────────────
-const fetchLeaveCodes = async () => {
-  setLeaveCodesLoading(true);
-  try {
-    const response = await apiClient.get('/Fs/Process/LeaveTypeSetUp');
-    if (response.status === 200 && response.data) {
-      console.log(response.data);
-      const leaveCodes = response.data; // array is at the top level
-      const mappedData = leaveCodes.map((item: any) => ({
-        code: item.leaveCode || '',
-        description: item.leaveDesc || '',
-      }));
-      console.log(mappedData);
-      setLeaveCodes(mappedData);
+  const fetchLeaveCodes = async () => {
+    setLeaveCodesLoading(true);
+    try {
+      const response = await apiClient.get('/Fs/Process/LeaveTypeSetUp');
+      if (response.status === 200 && response.data) {
+        setLeaveCodes(response.data.map((item: any) => ({ code: item.leaveCode || '', description: item.leaveDesc || '' })));
+      }
+    } catch (err) {
+      console.error('Error fetching leave codes:', err);
+    } finally {
+      setLeaveCodesLoading(false);
     }
-  } catch (err) {
-    console.error('Error fetching leave codes:', err);
-  } finally {
-    setLeaveCodesLoading(false);
-  }
-};
+  };
 
-  // Fetch Basic Configuration by Employee Code
-const fetchBasicConfigByEmpCode = async (empCodeParam: string) => {
+  const fetchBasicConfigByEmpCode = async (empCodeParam: string) => {
     if (!empCodeParam) return;
-    
     setBasicConfigLoading(true);
     setBasicConfigError('');
     try {
-        const response = await apiClient.get('/Maintenance/EmployeeBasicConfiguration', {
-            params: { empCode: empCodeParam }
-        });
-        
-        if (response.status === 200 && response.data) {
-            if (response.data.items && response.data.items.length > 0) {
-                const config = response.data.items[0];
-                setBasicConfigData(config);
-                setOriginalGroupCode(config.groupCode ?? ''); // ✅ store original
-                setIsCreatingNew(false);
-            } else {
-                setBasicConfigData(null);
-                setOriginalGroupCode('');                     // ✅ reset if no config
-                setIsCreatingNew(true);
-            }
+      const response = await apiClient.get('/Maintenance/EmployeeBasicConfiguration', { params: { empCode: empCodeParam } });
+      if (response.status === 200 && response.data) {
+        if (response.data.items && response.data.items.length > 0) {
+          const config = response.data.items[0];
+          setBasicConfigData(config);
+          setOriginalGroupCode(config.groupCode ?? '');
+          setIsCreatingNew(false);
+        } else {
+          setBasicConfigData(null);
+          setOriginalGroupCode('');
+          setIsCreatingNew(true);
         }
-    } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to load basic configuration';
-        setBasicConfigError(errorMsg);
-        if (error.response?.status === 404) {
-            setBasicConfigData(null);
-            setOriginalGroupCode('');                         // ✅ reset on 404
-            setIsCreatingNew(true);
-        }
-    } finally {
-        setBasicConfigLoading(false);
-    }
-};
-
-  // Fetch Exemptions by Employee Code
- const fetchExemptionsByEmpCode = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  
-  setExemptionsLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeExemptions');
-    
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      
-      const found = allItems.find((item: any) =>
-        (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase()
-      );
-      
-      if (found) {
-        setExemptionsData(found);
-      } else {
-        setExemptionsData({
-          id: 0,
-          empCode: empCodeParam,
-          tardiness: false,
-          undertime: false,
-          nightDiffBasic: false,
-          overtime: false,
-          absences: false,
-          otherEarnAndAllow: false,
-          holidayPay: false,
-          unprodWorkHoliday: false
-        });
       }
+    } catch (error: any) {
+      setBasicConfigError(error.response?.data?.message || error.message || 'Failed to load basic configuration');
+      if (error.response?.status === 404) { setBasicConfigData(null); setOriginalGroupCode(''); setIsCreatingNew(true); }
+    } finally {
+      setBasicConfigLoading(false);
     }
-  } catch (error: any) {
-    setExemptionsData({
-      id: 0,
-      empCode: empCodeParam,
-      tardiness: false,
-      undertime: false,
-      nightDiffBasic: false,
-      overtime: false,
-      absences: false,
-      otherEarnAndAllow: false,
-      holidayPay: false,
-      unprodWorkHoliday: false
-    });
-  } finally {
-    setExemptionsLoading(false);
-  }
-};
+  };
 
-  // Fetch Leave Applications by Employee Code
-const fetchLeaveApplicationsByEmpCode = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-
-  setLeaveApplicationsLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeLeaveApplication');
-
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-
-      const filtered = allItems
-        .filter((item: any) =>
-          (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()
-        )
-        .map((item: any) => ({
-          id:               item.id,
-          empCode:          item.empCode?.trim() ?? '',
-          date:             item.date ?? '',           // ✅ keep raw, format in table
-          hoursApprovedNum: item.hoursApprovedNum ?? 0,
-          leaveCode:        item.leaveCode?.trim() ?? '',
-          period:           item.period ?? '',
-          reason:           item.reason ?? '',
-          remarks:          item.remarks ?? '',
-          withPay:          item.withPay ?? false,
-          sssNotif:         item.sssNotif ?? false,
-          isProcSSSNotif:   item.isProcSSSNotif ?? false,
-          balanceID:        item.balanceID ?? '',
-          isLateFiling:     item.isLateFiling ?? false,
-          isLateFilingProcessed: item.isLateFilingProcessed ?? false,
-          exemptAllowFlag:  item.exemptAllowFlag ?? false,
-        }));
-
-      setLeaveApplicationsData(filtered);
+  const fetchExemptionsByEmpCode = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
+    setExemptionsLoading(true);
+    try {
+      const response = await apiClient.get('/Maintenance/EmployeeExemptions');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        const found = allItems.find((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase());
+        setExemptionsData(found || { id: 0, empCode: empCodeParam, tardiness: false, undertime: false, nightDiffBasic: false, overtime: false, absences: false, otherEarnAndAllow: false, holidayPay: false, unprodWorkHoliday: false });
+      }
+    } catch {
+      setExemptionsData({ id: 0, empCode: empCodeParam, tardiness: false, undertime: false, nightDiffBasic: false, overtime: false, absences: false, otherEarnAndAllow: false, holidayPay: false, unprodWorkHoliday: false });
+    } finally {
+      setExemptionsLoading(false);
     }
-  } catch (error: any) {
-    setLeaveApplicationsData([]);
-  } finally {
-    setLeaveApplicationsLoading(false);
-  }
-};
+  };
 
-  // Fetch Device Codes by Employee Code
-const fetchDeviceCodeByEmpCode = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  
-  setDeviceCodeLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeDeviceCode');
-    
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      const filteredData = allItems.filter((item: any) => 
-        (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()
-      );
-      setDeviceCodeEntries(filteredData);
-    }
-  } catch (error: any) {
-    setDeviceCodeEntries([]);
-  } finally {
-    setDeviceCodeLoading(false);
-  }
-};
+  const fetchLeaveApplicationsByEmpCode = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
+    setLeaveApplicationsLoading(true);
+    try {
+      const response = await apiClient.get('/Maintenance/EmployeeLeaveApplication');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setLeaveApplicationsData(
+          allItems
+            .filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase())
+            .map((item: any) => ({
+              id: item.id, empCode: item.empCode?.trim() ?? '', date: item.date ?? '',
+              hoursApprovedNum: item.hoursApprovedNum ?? 0, leaveCode: item.leaveCode?.trim() ?? '',
+              period: item.period ?? '', reason: item.reason ?? '', remarks: item.remarks ?? '',
+              withPay: item.withPay ?? false, sssNotif: item.sssNotif ?? false,
+              isProcSSSNotif: item.isProcSSSNotif ?? false, balanceID: item.balanceID ?? '',
+              isLateFiling: item.isLateFiling ?? false, isLateFilingProcessed: item.isLateFilingProcessed ?? false,
+              exemptAllowFlag: item.exemptAllowFlag ?? false,
+            }))
+        );
+      }
+    } catch { setLeaveApplicationsData([]); } finally { setLeaveApplicationsLoading(false); }
+  };
 
-const createDeviceCode = async (deviceCodeData: Partial<DeviceCode>) => {
-  setDeviceCodeLoading(true);
-  try {
-    const response = await apiClient.post('/Maintenance/EmployeeDeviceCode', deviceCodeData);
-    if (response.status === 200 || response.status === 201) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Device code created successfully.', timer: 2000, showConfirmButton: false });
-      await fetchDeviceCodeByEmpCode(empCode);
-      setShowDeviceCodeModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to create device code';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setDeviceCodeLoading(false);
-  }
-};
-
-const updateDeviceCode = async (id: number, deviceCodeData: Partial<DeviceCode>) => {
-  setDeviceCodeLoading(true);
-  try {
-    const response = await apiClient.put(`/Maintenance/EmployeeDeviceCode/${id}`, deviceCodeData);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Device code updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchDeviceCodeByEmpCode(empCode);
-      setShowDeviceCodeModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update device code';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setDeviceCodeLoading(false);
-  }
-};
-
-const deleteDeviceCode = async (id: number) => {
-  const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
-  if (result.isConfirmed) {
+  const fetchDeviceCodeByEmpCode = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
     setDeviceCodeLoading(true);
     try {
-      const response = await apiClient.delete(`/Maintenance/EmployeeDeviceCode/${id}`);
-      if (response.status === 200 || response.status === 204) {
-        await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Device code has been deleted.', timer: 2000, showConfirmButton: false });
+      const response = await apiClient.get('/Maintenance/EmployeeDeviceCode');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setDeviceCodeEntries(allItems.filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase()));
+      }
+    } catch { setDeviceCodeEntries([]); } finally { setDeviceCodeLoading(false); }
+  };
+
+  const createDeviceCode = async (data: Partial<DeviceCode>) => {
+    setDeviceCodeLoading(true);
+    try {
+      const response = await apiClient.post('/Maintenance/EmployeeDeviceCode', data);
+      if (response.status === 200 || response.status === 201) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Device code created successfully.', timer: 2000, showConfirmButton: false });
         await fetchDeviceCodeByEmpCode(empCode);
+        setShowDeviceCodeModal(false);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete device code';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-      setDeviceCodeLoading(false);
-    }
-  }
-};
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create device code' });
+      throw error;
+    } finally { setDeviceCodeLoading(false); }
+  };
 
-const handleDeviceCodeSubmit = async () => {
-  try {
-    const deviceCodeData: Partial<DeviceCode> = {
-      empCode: empCode,
-      timeInAndOutCode: deviceCode,
-      timeInAndOutPass: devicePassword,
-      timeInAndOutEffectDate: deviceEffectivityDate,
-      timeInAndOutExpiryDate: deviceExpiryDate
-    };
-    if (isDeviceCodeEditMode && currentDeviceCodeId !== null) {
-      await updateDeviceCode(currentDeviceCodeId, deviceCodeData);
-    } else {
-      await createDeviceCode(deviceCodeData);
-    }
-  } catch (error) {
-    console.error('Error submitting device code:', error);
-  }
-};
-
-const fetchRestDayFixed = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setRestDayLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeRestDay/Fixed');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      const found = allItems.find((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase());
-      if (found) {
-        setRestDayFixedData(found);
-        setRestDayMode(found.isFixed === true ? 'fixed' : 'variable');
-        setRestDay1(found.fixedRestDay1?.trim() ?? '');
-        setRestDay2(found.fixedRestDay2?.trim() ?? '');
-        setRestDay3(found.fixedRestDay3?.trim() ?? '');
+  const updateDeviceCode = async (id: number, data: Partial<DeviceCode>) => {
+    setDeviceCodeLoading(true);
+    try {
+      const response = await apiClient.put(`/Maintenance/EmployeeDeviceCode/${id}`, data);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Device code updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchDeviceCodeByEmpCode(empCode);
+        setShowDeviceCodeModal(false);
       }
-    }
-  } catch (error: any) {
-    setRestDayFixedData(null);
-  } finally {
-    setRestDayLoading(false);
-  }
-};
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update device code' });
+      throw error;
+    } finally { setDeviceCodeLoading(false); }
+  };
 
-const fetchRestDayVariable = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setRestDayLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeRestDay/Variable');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      setRestDayVariableData(allItems.filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()));
+  const deleteDeviceCode = async (id: number) => {
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
+    if (result.isConfirmed) {
+      setDeviceCodeLoading(true);
+      try {
+        const response = await apiClient.delete(`/Maintenance/EmployeeDeviceCode/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Device code has been deleted.', timer: 2000, showConfirmButton: false });
+          await fetchDeviceCodeByEmpCode(empCode);
+        }
+      } catch (error: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete device code' });
+      } finally { setDeviceCodeLoading(false); }
     }
-  } catch (error: any) {
-    setRestDayVariableData([]);
-  } finally {
-    setRestDayLoading(false);
-  }
-};
+  };
 
-const fetchRestDayByEmpCode = async (empCodeParam: string) => {
-  await Promise.all([fetchRestDayFixed(empCodeParam), fetchRestDayVariable(empCodeParam)]);
-};
-
-const saveRestDayFixed = async () => {
-  const data: Partial<RestDayFixed> = { id: restDayFixedData?.id || 0, empCode: empCode, fixedRestDay1: restDay1, fixedRestDay2: restDay2, fixedRestDay3: restDay3, isFixed: true };
-  setRestDayLoading(true);
-  try {
-    let response;
-    if (data.id === 0 || !data.id) {
-      response = await apiClient.post('/Maintenance/EmployeeRestDay/Fixed', data);
-    } else {
-      response = await apiClient.put(`/Maintenance/EmployeeRestDay/Fixed/${data.id}`, data);
+  const handleDeviceCodeSubmit = async () => {
+    try {
+      const payload: Partial<DeviceCode> = {
+        id: isDeviceCodeEditMode && currentDeviceCodeId !== null ? currentDeviceCodeId : 0,
+        empCode,
+        timeInAndOutCode: deviceCode,
+        timeInAndOutPass: devicePassword,
+        timeInAndOutEffectDate: toLocalISOString(deviceEffectivityDate) ?? '',
+        timeInAndOutExpiryDate: toLocalISOString(deviceExpiryDate) ?? '',
+      };
+      if (isDeviceCodeEditMode && currentDeviceCodeId !== null) {
+        await updateDeviceCode(currentDeviceCodeId, payload);
+      } else {
+        await createDeviceCode(payload);
+      }
+    } catch (error) {
+      console.error('Error submitting device code:', error);
     }
-    if (response.status === 200 || response.status === 201 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Fixed rest day saved successfully.', timer: 2000, showConfirmButton: false });
-      await fetchRestDayFixed(empCode);
-      setIsEditMode(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to save fixed rest day';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setRestDayLoading(false);
-  }
-};
+  };
 
-const createRestDayVariable = async (data: Partial<RestDayVariable>) => {
-  setRestDayLoading(true);
-  try {
-    const response = await apiClient.post('/Maintenance/EmployeeRestDay/Variable', data);
-    if (response.status === 200 || response.status === 201) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Variable rest day created successfully.', timer: 2000, showConfirmButton: false });
-      await fetchRestDayVariable(empCode);
-      setShowRestDayModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to create variable rest day';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setRestDayLoading(false);
-  }
-};
+  // ── Rest Day ────────────────────────────────────────────────────────────────
 
-const updateRestDayVariable = async (id: number, data: Partial<RestDayVariable>) => {
-  setRestDayLoading(true);
-  try {
-    const response = await apiClient.put(`/Maintenance/EmployeeRestDay/Variable/${id}`, data);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Variable rest day updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchRestDayVariable(empCode);
-      setShowRestDayModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update variable rest day';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setRestDayLoading(false);
-  }
-};
-
-const deleteRestDayVariable = async (id: number) => {
-  const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
-  if (result.isConfirmed) {
+  const fetchRestDayFixed = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
     setRestDayLoading(true);
     try {
-      const response = await apiClient.delete(`/Maintenance/EmployeeRestDay/Variable/${id}`);
-      if (response.status === 200 || response.status === 204) {
-        await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Variable rest day has been deleted.', timer: 2000, showConfirmButton: false });
-        await fetchRestDayVariable(empCode);
+      const response = await apiClient.get('/Maintenance/EmployeeRestDay/Fixed');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        const found = allItems.find((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase());
+        if (found) {
+          setRestDayFixedData(found);
+          setRestDayMode(found.isFixed === true ? 'fixed' : 'variable');
+          setRestDay1(found.fixedRestDay1?.trim() ?? '');
+          setRestDay2(found.fixedRestDay2?.trim() ?? '');
+          setRestDay3(found.fixedRestDay3?.trim() ?? '');
+        }
+      }
+    } catch { setRestDayFixedData(null); } finally { setRestDayLoading(false); }
+  };
+
+  const fetchRestDayVariable = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
+    setRestDayLoading(true);
+    try {
+      const response = await apiClient.get('/Maintenance/EmployeeRestDay/Variable');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setRestDayVariableData(allItems.filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase()));
+      }
+    } catch { setRestDayVariableData([]); } finally { setRestDayLoading(false); }
+  };
+
+  const fetchRestDayByEmpCode = async (empCodeParam: string) => {
+    await Promise.all([fetchRestDayFixed(empCodeParam), fetchRestDayVariable(empCodeParam)]);
+  };
+
+  const saveRestDayFixed = async () => {
+    const data: Partial<RestDayFixed> = { id: restDayFixedData?.id || 0, empCode, fixedRestDay1: restDay1, fixedRestDay2: restDay2, fixedRestDay3: restDay3, isFixed: true };
+    setRestDayLoading(true);
+    try {
+      const response = data.id === 0 || !data.id
+        ? await apiClient.post('/Maintenance/EmployeeRestDay/Fixed', data)
+        : await apiClient.put(`/Maintenance/EmployeeRestDay/Fixed/${data.id}`, data);
+      if (response.status === 200 || response.status === 201 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Fixed rest day saved successfully.', timer: 2000, showConfirmButton: false });
+        await fetchRestDayFixed(empCode);
+        setIsEditMode(false);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete variable rest day';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-      setRestDayLoading(false);
-    }
-  }
-};
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to save fixed rest day' });
+    } finally { setRestDayLoading(false); }
+  };
 
-const handleRestDaySubmit = async () => {
-  try {
-    const data: Partial<RestDayVariable> = { empCode: empCode, datefrom: restDayDateFrom, dateTo: restDayDateTo, restDay1: restDay1, restDay2: restDay2, restDay3: restDay3 };
-    if (isRestDayEditMode && currentRestDayId !== null) {
-      await updateRestDayVariable(currentRestDayId, data);
-    } else {
-      await createRestDayVariable(data);
-    }
-  } catch (error) {
-    console.error('Error submitting rest day:', error);
-  }
-};
-
-const fetchDailySchedules = async () => {
-  setDailyScheduleLoading(true);
-  try {
-    const response = await apiClient.get('/Fs/Process/DailyScheduleSetUp');
-    if (response.status === 200 && response.data) {
-      console.log(response.data);
-      const schedules = response.data.data;
-      const mappedData = schedules.map((schedule: any) => ({
-        dailyScheduleID: schedule.dailyScheduleID || 0,
-        referenceNo: schedule.referenceNo || '',
-        monday: schedule.monday || '',
-        tuesday: schedule.tuesday || '',
-        wednesday: schedule.wednesday || '',
-        thursday: schedule.thursday || '',
-        friday: schedule.friday || '',
-        saturday: schedule.saturday || '',
-        sunday: schedule.sunday || '',
-      }));
-      setDailySchedules(mappedData);
-    }
-  } catch (error: any) {
-    console.error('Error fetching daily schedules:', error);
-  } finally {
-    setDailyScheduleLoading(false);
-  }
-};
-
-const fetchWorkshiftFixed = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setWorkshiftLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeWorkshiftFixed');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      const found = allItems.find((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase());
-      if (found) {
-        setWorkshiftFixedData(found);
-        setWorkshiftMode(found.isFixed === true ? 'fixed' : 'variable');
-        setFixedDailySched(found.dailySched || '');
+  // ── FIX: RestDay Variable — flat body, no { dto } wrapper.
+  //   Field names match Swagger exactly: datefrom (lowercase), dateTo (camelCase).
+  //   Dates sent as ISO strings via toLocalISOString to prevent 400.
+  const createRestDayVariable = async (data: Partial<RestDayVariable>) => {
+    setRestDayLoading(true);
+    try {
+      const payload = {
+        id: 0,
+        empCode: data.empCode,
+        datefrom: toLocalISOString(data.datefrom ?? '') ?? null,
+        dateTo:   toLocalISOString(data.dateTo   ?? '') ?? null,
+        restDay1: data.restDay1 || null,
+        restDay2: data.restDay2 || null,
+        restDay3: data.restDay3 || null,
+      };
+      const response = await apiClient.post('/Maintenance/EmployeeRestDay/Variable', payload);
+      if (response.status === 200 || response.status === 201) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Variable rest day created successfully.', timer: 2000, showConfirmButton: false });
+        await fetchRestDayVariable(empCode);
+        setShowRestDayModal(false);
       }
-    }
-  } catch (error: any) {
-    setWorkshiftFixedData(null);
-  } finally {
-    setWorkshiftLoading(false);
-  }
-};
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create variable rest day' });
+    } finally { setRestDayLoading(false); }
+  };
 
-const fetchWorkshiftVariable = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setWorkshiftLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeWorkshiftVariable');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      setWorkshiftVariableData(allItems.filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()));
-    }
-  } catch (error: any) {
-    setWorkshiftVariableData([]);
-  } finally {
-    setWorkshiftLoading(false);
-  }
-};
+  // ── FIX: RestDay Variable UPDATE — flat body, no { dto } wrapper.
+  const updateRestDayVariable = async (id: number, data: Partial<RestDayVariable>) => {
+    setRestDayLoading(true);
+    try {
+      const payload = {
+        id,
+        empCode: data.empCode,
+        datefrom: toLocalISOString(data.datefrom ?? '') ?? null,
+        dateTo:   toLocalISOString(data.dateTo   ?? '') ?? null,
+        restDay1: data.restDay1 || null,
+        restDay2: data.restDay2 || null,
+        restDay3: data.restDay3 || null,
+      };
+      const response = await apiClient.put(`/Maintenance/EmployeeRestDay/Variable/${id}`, payload);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Variable rest day updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchRestDayVariable(empCode);
+        setShowRestDayModal(false);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update variable rest day' });
+    } finally { setRestDayLoading(false); }
+  };
 
-const fetchWorkshiftByEmpCode = async (empCodeParam: string) => {
-  await Promise.all([fetchWorkshiftFixed(empCodeParam), fetchWorkshiftVariable(empCodeParam)]);
-};
-
-const saveWorkshiftFixed = async () => {
-  const data: Partial<WorkshiftFixed> = { id: workshiftFixedData?.id || 0, empCode: empCode, dailySched: fixedDailySched, isFixed: true };
-  setWorkshiftLoading(true);
-  try {
-    let response;
-    if (data.id === 0 || !data.id) {
-      response = await apiClient.post('/Maintenance/EmployeeWorkshiftFixed', data);
-    } else {
-      response = await apiClient.put(`/Maintenance/EmployeeWorkshiftFixed/${data.id}`, data);
+  const deleteRestDayVariable = async (id: number) => {
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
+    if (result.isConfirmed) {
+      setRestDayLoading(true);
+      try {
+        const response = await apiClient.delete(`/Maintenance/EmployeeRestDay/Variable/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Variable rest day has been deleted.', timer: 2000, showConfirmButton: false });
+          await fetchRestDayVariable(empCode);
+        }
+      } catch (error: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete variable rest day' });
+      } finally { setRestDayLoading(false); }
     }
-    if (response.status === 200 || response.status === 201 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Fixed workshift saved successfully.', timer: 2000, showConfirmButton: false });
-      await fetchWorkshiftFixed(empCode);
-      setIsEditMode(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to save fixed workshift';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setWorkshiftLoading(false);
-  }
-};
+  };
 
-const createWorkshiftVariable = async (data: Partial<WorkshiftVariable>) => {
-  setWorkshiftLoading(true);
-  try {
-    const response = await apiClient.post('/Maintenance/EmployeeWorkshiftVariable', data);
-    if (response.status === 200 || response.status === 201) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Variable workshift created successfully.', timer: 2000, showConfirmButton: false });
-      await fetchWorkshiftVariable(empCode);
-      setShowWorkshiftModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to create variable workshift';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setWorkshiftLoading(false);
-  }
-};
+  const handleRestDaySubmit = async () => {
+    try {
+      const data: Partial<RestDayVariable> = {
+        empCode,
+        datefrom: restDayDateFrom,
+        dateTo: restDayDateTo,
+        restDay1,
+        restDay2,
+        restDay3,
+      };
+      if (isRestDayEditMode && currentRestDayId !== null) {
+        await updateRestDayVariable(currentRestDayId, data);
+      } else {
+        await createRestDayVariable(data);
+      }
+    } catch (error) { console.error('Error submitting rest day:', error); }
+  };
 
-const updateWorkshiftVariable = async (id: number, data: Partial<WorkshiftVariable>) => {
-  setWorkshiftLoading(true);
-  try {
-    const response = await apiClient.put(`/Maintenance/EmployeeWorkshiftVariable/${id}`, data);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Variable workshift updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchWorkshiftVariable(empCode);
-      setShowWorkshiftModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update variable workshift';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setWorkshiftLoading(false);
-  }
-};
+  // ── Daily Schedules ─────────────────────────────────────────────────────────
 
-const deleteWorkshiftVariable = async (id: number) => {
-  const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
-  if (result.isConfirmed) {
+  const fetchDailySchedules = async () => {
+    setDailyScheduleLoading(true);
+    try {
+      const response = await apiClient.get('/Fs/Process/DailyScheduleSetUp');
+      if (response.status === 200 && response.data) {
+        setDailySchedules((response.data.data || []).map((s: any) => ({
+          dailyScheduleID: s.dailyScheduleID || 0, referenceNo: s.referenceNo || '',
+          monday: s.monday || '', tuesday: s.tuesday || '', wednesday: s.wednesday || '',
+          thursday: s.thursday || '', friday: s.friday || '', saturday: s.saturday || '', sunday: s.sunday || '',
+        })));
+      }
+    } catch (error: any) { console.error('Error fetching daily schedules:', error); } finally { setDailyScheduleLoading(false); }
+  };
+
+  // ── Workshift ───────────────────────────────────────────────────────────────
+
+  const fetchWorkshiftFixed = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
     setWorkshiftLoading(true);
     try {
-      const response = await apiClient.delete(`/Maintenance/EmployeeWorkshiftVariable/${id}`);
-      if (response.status === 200 || response.status === 204) {
-        await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Variable workshift has been deleted.', timer: 2000, showConfirmButton: false });
-        await fetchWorkshiftVariable(empCode);
+      const response = await apiClient.get('/Maintenance/EmployeeWorkshiftFixed');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        const found = allItems.find((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase());
+        if (found) { setWorkshiftFixedData(found); setWorkshiftMode(found.isFixed === true ? 'fixed' : 'variable'); setFixedDailySched(found.dailySched || ''); }
+      }
+    } catch { setWorkshiftFixedData(null); } finally { setWorkshiftLoading(false); }
+  };
+
+  const fetchWorkshiftVariable = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
+    setWorkshiftLoading(true);
+    try {
+      const response = await apiClient.get('/Maintenance/EmployeeWorkshiftVariable');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setWorkshiftVariableData(allItems.filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase()));
+      }
+    } catch { setWorkshiftVariableData([]); } finally { setWorkshiftLoading(false); }
+  };
+
+  const fetchWorkshiftByEmpCode = async (empCodeParam: string) => {
+    await Promise.all([fetchWorkshiftFixed(empCodeParam), fetchWorkshiftVariable(empCodeParam)]);
+  };
+
+  const saveWorkshiftFixed = async () => {
+    const data: Partial<WorkshiftFixed> = { id: workshiftFixedData?.id || 0, empCode, dailySched: fixedDailySched, isFixed: true };
+    setWorkshiftLoading(true);
+    try {
+      const response = data.id === 0 || !data.id
+        ? await apiClient.post('/Maintenance/EmployeeWorkshiftFixed', data)
+        : await apiClient.put(`/Maintenance/EmployeeWorkshiftFixed/${data.id}`, data);
+      if (response.status === 200 || response.status === 201 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Fixed workshift saved successfully.', timer: 2000, showConfirmButton: false });
+        await fetchWorkshiftFixed(empCode);
+        setIsEditMode(false);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete variable workshift';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-      setWorkshiftLoading(false);
-    }
-  }
-};
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to save fixed workshift' });
+    } finally { setWorkshiftLoading(false); }
+  };
 
-const handleWorkshiftSubmit = async () => {
-  try {
-    const data: Partial<WorkshiftVariable> = {
-      empCode: empCode,
-      dateFrom: workshiftDateFrom,
-      dateTo: workshiftDateTo,
-      shiftCode: workshiftShiftCode,
-      dailyScheduleCode: workshiftDailyScheduleCode,
-      glCode: workshiftGLCode,
-      updateDate: new Date().toISOString()
-    };
-    if (isWorkshiftEditMode && currentWorkshiftId !== null) {
-      await updateWorkshiftVariable(currentWorkshiftId, data);
-    } else {
-      await createWorkshiftVariable(data);
-    }
-  } catch (error) {
-    console.error('Error submitting workshift:', error);
-  }
-};
-
-const fetchClassificationFixed = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setClassificationLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeClassification/Fixed');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      const found = allItems.find((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase());
-      if (found) {
-        setClassificationFixedData(found);
-        setClassificationMode(found.isFixed === true ? 'fixed' : 'variable');
-        setFixedClassCode(found.classCode || '');
+  // ── FIX: Workshift Variable CREATE — flat body, dates as ISO strings.
+  //   Field names: dateFrom, dateTo (both camelCase matching Workshift DTO).
+  const createWorkshiftVariable = async (data: Partial<WorkshiftVariable>) => {
+    setWorkshiftLoading(true);
+    try {
+      const payload = {
+        id: 0,
+        empCode: data.empCode,
+        dateFrom:   toLocalISOString(data.dateFrom   ?? '') ?? null,
+        dateTo:     toLocalISOString(data.dateTo     ?? '') ?? null,
+        shiftCode:  data.shiftCode  || null,
+        updateDate: new Date().toISOString(),
+      };
+      const response = await apiClient.post('/Maintenance/EmployeeWorkshiftVariable', payload);
+      if (response.status === 200 || response.status === 201) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Variable workshift created successfully.', timer: 2000, showConfirmButton: false });
+        await fetchWorkshiftVariable(empCode);
+        setShowWorkshiftModal(false);
       }
-    }
-  } catch (error: any) {
-    setClassificationFixedData(null);
-  } finally {
-    setClassificationLoading(false);
-  }
-};
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create variable workshift' });
+    } finally { setWorkshiftLoading(false); }
+  };
 
-const fetchClassificationVariable = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setClassificationLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeClassification/Variable');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      setClassificationVariableData(allItems.filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase()));
-    }
-  } catch (error: any) {
-    setClassificationVariableData([]);
-  } finally {
-    setClassificationLoading(false);
-  }
-};
+  // ── FIX: Workshift Variable UPDATE — flat body, dates as ISO strings.
+  const updateWorkshiftVariable = async (id: number, data: Partial<WorkshiftVariable>) => {
+    setWorkshiftLoading(true);
+    try {
+      const payload = {
+        id,
+        empCode: data.empCode,
+        dateFrom:   toLocalISOString(data.dateFrom   ?? '') ?? null,
+        dateTo:     toLocalISOString(data.dateTo     ?? '') ?? null,
+        shiftCode:  data.shiftCode  || null,
+        updateDate: new Date().toISOString(),
+      };
+      const response = await apiClient.put(`/Maintenance/EmployeeWorkshiftVariable/${id}`, payload);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Variable workshift updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchWorkshiftVariable(empCode);
+        setShowWorkshiftModal(false);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update variable workshift' });
+    } finally { setWorkshiftLoading(false); }
+  };
 
-const fetchClassificationByEmpCode = async (empCodeParam: string) => {
-  await Promise.all([fetchClassificationFixed(empCodeParam), fetchClassificationVariable(empCodeParam)]);
-};
-
-const saveClassificationFixed = async () => {
-  const data: Partial<ClassificationFixed> = { id: classificationFixedData?.id || 0, empCode: empCode, classCode: fixedClassCode, isFixed: true };
-  setClassificationLoading(true);
-  try {
-    let response;
-    if (data.id === 0 || !data.id) {
-      response = await apiClient.post('/Maintenance/EmployeeClassification/Fixed', data);
-    } else {
-      response = await apiClient.put(`/Maintenance/EmployeeClassification/Fixed/${data.id}`, data);
+  const deleteWorkshiftVariable = async (id: number) => {
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
+    if (result.isConfirmed) {
+      setWorkshiftLoading(true);
+      try {
+        const response = await apiClient.delete(`/Maintenance/EmployeeWorkshiftVariable/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Variable workshift has been deleted.', timer: 2000, showConfirmButton: false });
+          await fetchWorkshiftVariable(empCode);
+        }
+      } catch (error: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete variable workshift' });
+      } finally { setWorkshiftLoading(false); }
     }
-    if (response.status === 200 || response.status === 201 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Fixed classification saved successfully.', timer: 2000, showConfirmButton: false });
-      await fetchClassificationFixed(empCode);
-      setIsEditMode(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to save fixed classification';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setClassificationLoading(false);
-  }
-};
+  };
 
-const createClassificationVariable = async (data: Partial<ClassificationVariable>) => {
-  setClassificationLoading(true);
-  try {
-    const response = await apiClient.post('/Maintenance/EmployeeClassification/Variable', data);
-    if (response.status === 200 || response.status === 201) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Variable classification created successfully.', timer: 2000, showConfirmButton: false });
-      await fetchClassificationVariable(empCode);
-      setShowClassificationModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to create variable classification';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setClassificationLoading(false);
-  }
-};
+  const handleWorkshiftSubmit = async () => {
+    try {
+      const data: Partial<WorkshiftVariable> = {
+        empCode,
+        dateFrom:  workshiftDateFrom,
+        dateTo:    workshiftDateTo,
+        shiftCode: workshiftShiftCode,
+      };
+      if (isWorkshiftEditMode && currentWorkshiftId !== null) {
+        await updateWorkshiftVariable(currentWorkshiftId, data);
+      } else {
+        await createWorkshiftVariable(data);
+      }
+    } catch (error) { console.error('Error submitting workshift:', error); }
+  };
 
-const updateClassificationVariable = async (id: number, data: Partial<ClassificationVariable>) => {
-  setClassificationLoading(true);
-  try {
-    const response = await apiClient.put(`/Maintenance/EmployeeClassification/Variable/${id}`, data);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Variable classification updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchClassificationVariable(empCode);
-      setShowClassificationModal(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update variable classification';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setClassificationLoading(false);
-  }
-};
+  // ── Classification ──────────────────────────────────────────────────────────
 
-const deleteClassificationVariable = async (id: number) => {
-  const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
-  if (result.isConfirmed) {
+  const fetchClassificationFixed = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
     setClassificationLoading(true);
     try {
-      const response = await apiClient.delete(`/Maintenance/EmployeeClassification/Variable/${id}`);
-      if (response.status === 200 || response.status === 204) {
-        await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Variable classification has been deleted.', timer: 2000, showConfirmButton: false });
-        await fetchClassificationVariable(empCode);
+      const response = await apiClient.get('/Maintenance/EmployeeClassification/Fixed');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        const found = allItems.find((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase());
+        if (found) { setClassificationFixedData(found); setClassificationMode(found.isFixed === true ? 'fixed' : 'variable'); setFixedClassCode(found.classCode || ''); }
+      }
+    } catch { setClassificationFixedData(null); } finally { setClassificationLoading(false); }
+  };
+
+  const fetchClassificationVariable = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
+    setClassificationLoading(true);
+    try {
+      const response = await apiClient.get('/Maintenance/EmployeeClassification/Variable');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setClassificationVariableData(allItems.filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase()));
+      }
+    } catch { setClassificationVariableData([]); } finally { setClassificationLoading(false); }
+  };
+
+  const fetchClassificationByEmpCode = async (empCodeParam: string) => {
+    await Promise.all([fetchClassificationFixed(empCodeParam), fetchClassificationVariable(empCodeParam)]);
+  };
+
+  const saveClassificationFixed = async () => {
+    const data: Partial<ClassificationFixed> = { id: classificationFixedData?.id || 0, empCode, classCode: fixedClassCode, isFixed: true };
+    setClassificationLoading(true);
+    try {
+      const response = data.id === 0 || !data.id
+        ? await apiClient.post('/Maintenance/EmployeeClassification/Fixed', data)
+        : await apiClient.put(`/Maintenance/EmployeeClassification/Fixed/${data.id}`, data);
+      if (response.status === 200 || response.status === 201 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Fixed classification saved successfully.', timer: 2000, showConfirmButton: false });
+        await fetchClassificationFixed(empCode);
+        setIsEditMode(false);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete variable classification';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-      setClassificationLoading(false);
-    }
-  }
-};
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to save fixed classification' });
+    } finally { setClassificationLoading(false); }
+  };
 
-const handleClassificationSubmit = async () => {
-  try {
-    const data: Partial<ClassificationVariable> = { empCode: empCode, dateFrom: classificationDateFrom, dateTo: classificationDateTo, classCode: variableClassCode };
-    if (isClassificationEditMode && currentClassificationId !== null) {
-      await updateClassificationVariable(currentClassificationId, data);
-    } else {
-      await createClassificationVariable(data);
-    }
-  } catch (error) {
-    console.error('Error submitting classification:', error);
-  }
-};
+  // ── FIX: Classification Variable CREATE — flat body, dates as ISO strings.
+  //   Field names: dateFrom, dateTo (both camelCase matching Classification DTO).
+  const createClassificationVariable = async (data: Partial<ClassificationVariable>) => {
+    setClassificationLoading(true);
+    try {
+      const payload = {
+        id: 0,
+        empCode: data.empCode,
+        dateFrom:  toLocalISOString(data.dateFrom  ?? '') ?? null,
+        dateTo:    toLocalISOString(data.dateTo    ?? '') ?? null,
+        classCode: data.classCode || null,
+      };
+      const response = await apiClient.post('/Maintenance/EmployeeClassification/Variable', payload);
+      if (response.status === 200 || response.status === 201) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Variable classification created successfully.', timer: 2000, showConfirmButton: false });
+        await fetchClassificationVariable(empCode);
+        setShowClassificationModal(false);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create variable classification' });
+    } finally { setClassificationLoading(false); }
+  };
 
-const fetchOvertimeApplicationsByEmpCode = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setOvertimeLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeOvertimeApplication');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      const filtered = allItems
-        .filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase())
-        .map((item: any) => ({
-          id:                      item.id,
-          empCode:                 item.empCode ?? '',
-          date:                    item.date ?? '',
-          numOTHoursApproved:      item.numOTHoursApproved ?? 0,
-          earlyOTStartTime:        item.earlyOTStartTime ?? '',
-          earlyTimeIn:             item.earlyTimeIn ?? '',
-          startOTPM:               item.startOTPM ?? '',
-          minHRSOTBreak:           item.minHRSOTBreak ?? 0,
-          earlyOTStartTimeRestHol: item.earlyOTStartTimeRestHol ?? '',
-          reason:                  item.reason ?? '',
-          remarks:                 item.remarks ?? '',
-          approvedOTBreaksHrs:     item.approvedOTBreaksHrs ?? 0,
-          stotats:                 item.stotats ?? '',
-          isLateFiling:            item.isLateFiling ?? false,
-          isLateFilingProcessed:   item.isLateFilingProcessed ?? false,
-          appliedBeforeShiftDate:  item.appliedBeforeShiftDate ?? '',
-          isOTBeforeShiftNextDay:  item.isOTBeforeShiftNextDay ?? false,
-        }));
-      setOvertimeApplicationsData(filtered);
-    }
-  } catch (error: any) {
-    setOvertimeApplicationsData([]);
-  } finally {
-    setOvertimeLoading(false);
-  }
-};
+  // ── FIX: Classification Variable UPDATE — flat body, dates as ISO strings.
+  const updateClassificationVariable = async (id: number, data: Partial<ClassificationVariable>) => {
+    setClassificationLoading(true);
+    try {
+      const payload = {
+        id,
+        empCode: data.empCode,
+        dateFrom:  toLocalISOString(data.dateFrom  ?? '') ?? null,
+        dateTo:    toLocalISOString(data.dateTo    ?? '') ?? null,
+        classCode: data.classCode || null,
+      };
+      const response = await apiClient.put(`/Maintenance/EmployeeClassification/Variable/${id}`, payload);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Variable classification updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchClassificationVariable(empCode);
+        setShowClassificationModal(false);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update variable classification' });
+    } finally { setClassificationLoading(false); }
+  };
 
-const createOvertimeApplication = async (overtimeData: Partial<OvertimeApplication>) => {
-  setOvertimeLoading(true);
-  try {
-    const response = await apiClient.post('/Maintenance/EmployeeOvertimeApplication', overtimeData);
-    if (response.status === 200 || response.status === 201) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Overtime application created successfully.', timer: 2000, showConfirmButton: false });
-      await fetchOvertimeApplicationsByEmpCode(empCode);
+  const deleteClassificationVariable = async (id: number) => {
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
+    if (result.isConfirmed) {
+      setClassificationLoading(true);
+      try {
+        const response = await apiClient.delete(`/Maintenance/EmployeeClassification/Variable/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Variable classification has been deleted.', timer: 2000, showConfirmButton: false });
+          await fetchClassificationVariable(empCode);
+        }
+      } catch (error: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete variable classification' });
+      } finally { setClassificationLoading(false); }
     }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to create overtime application';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setOvertimeLoading(false);
-  }
-};
+  };
 
-const updateOvertimeApplication = async (id: number, overtimeData: Partial<OvertimeApplication>) => {
-  setOvertimeLoading(true);
-  try {
-    const response = await apiClient.put(`/Maintenance/EmployeeOvertimeApplication/${id}`, overtimeData);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Overtime application updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchOvertimeApplicationsByEmpCode(empCode);
+  const handleClassificationSubmit = async () => {
+    if (!variableClassCode || variableClassCode.trim() === '') {
+      await Swal.fire({ icon: 'warning', title: 'Validation', text: 'Please select a Classification Code before saving.' });
+      return;
     }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update overtime application';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setOvertimeLoading(false);
-  }
-};
+    try {
+      const data: Partial<ClassificationVariable> = {
+        empCode,
+        dateFrom: classificationDateFrom,
+        dateTo:   classificationDateTo,
+        classCode: variableClassCode,
+      };
+      if (isClassificationEditMode && currentClassificationId !== null) {
+        await updateClassificationVariable(currentClassificationId, data);
+      } else {
+        await createClassificationVariable(data);
+      }
+    } catch (error) { console.error('Error submitting classification:', error); }
+  };
 
-const deleteOvertimeApplication = async (id: number) => {
-  const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
-  if (result.isConfirmed) {
+  // ── Overtime ────────────────────────────────────────────────────────────────
+
+  const fetchOvertimeApplicationsByEmpCode = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
     setOvertimeLoading(true);
     try {
-      const response = await apiClient.delete(`/Maintenance/EmployeeOvertimeApplication/${id}`);
-      if (response.status === 200 || response.status === 204) {
-        await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Overtime application has been deleted.', timer: 2000, showConfirmButton: false });
+      const response = await apiClient.get('/Maintenance/EmployeeOvertimeApplication');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setOvertimeApplicationsData(
+          allItems
+            .filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase())
+            .map((item: any) => ({
+              id: item.id, empCode: item.empCode ?? '', date: item.date ?? '',
+              numOTHoursApproved: item.numOTHoursApproved ?? 0, earlyOTStartTime: item.earlyOTStartTime ?? '',
+              earlyTimeIn: item.earlyTimeIn ?? '', startOTPM: item.startOTPM ?? '',
+              minHRSOTBreak: item.minHRSOTBreak ?? 0, earlyOTStartTimeRestHol: item.earlyOTStartTimeRestHol ?? '',
+              reason: item.reason ?? '', remarks: item.remarks ?? '',
+              approvedOTBreaksHrs: item.approvedOTBreaksHrs ?? 0, stotats: item.stotats ?? '',
+              isLateFiling: item.isLateFiling ?? false, isLateFilingProcessed: item.isLateFilingProcessed ?? false,
+              appliedBeforeShiftDate: item.appliedBeforeShiftDate ?? '', isOTBeforeShiftNextDay: item.isOTBeforeShiftNextDay ?? false,
+            }))
+        );
+      }
+    } catch { setOvertimeApplicationsData([]); } finally { setOvertimeLoading(false); }
+  };
+
+  const createOvertimeApplication = async (data: Partial<OvertimeApplication>) => {
+    setOvertimeLoading(true);
+    try {
+      const response = await apiClient.post('/Maintenance/EmployeeOvertimeApplication', data);
+      if (response.status === 200 || response.status === 201) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Overtime application created successfully.', timer: 2000, showConfirmButton: false });
         await fetchOvertimeApplicationsByEmpCode(empCode);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete overtime application';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-      setOvertimeLoading(false);
-    }
-  }
-};
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create overtime application' });
+      throw error;
+    } finally { setOvertimeLoading(false); }
+  };
 
-const handleOvertimeSubmit = async () => {
-  try {
-    const overtimeData: Partial<OvertimeApplication> = {
-      empCode: empCode,
-      date: overtimeDate,
-      numOTHoursApproved: parseFloat(overtimeNumOTHoursApproved) || 0,
-      earlyOTStartTime: overtimeEarlyOTStartTime,
-      earlyTimeIn: overtimeEarlyTimeIn,
-      startOTPM: overtimeStartOTPM,
-      minHRSOTBreak: parseFloat(overtimeMinHRSOTBreak) || 0,
-      earlyOTStartTimeRestHol: overtimeEarlyOTStartTimeRestHol,
-      reason: overtimeReason,
-      remarks: overtimeRemarks,
-      approvedOTBreaksHrs: parseFloat(overtimeApprovedOTBreaksHrs) || 0,
-      stotats: overtimeStotats,
-      isLateFiling: overtimeIsLateFiling,
-      isLateFilingProcessed: false,
-      appliedBeforeShiftDate: overtimeAppliedBeforeShiftDate,
-      isOTBeforeShiftNextDay: overtimeIsOTBeforeShiftNextDay
-    };
-    if (isOvertimeEditMode && currentOvertimeId !== null) {
-      await updateOvertimeApplication(currentOvertimeId, overtimeData);
-    } else {
-      await createOvertimeApplication(overtimeData);
-    }
-    setShowOvertimeModal(false);
-  } catch (error) {
-    console.error('Error submitting overtime application:', error);
-  }
-};
+  const updateOvertimeApplication = async (id: number, data: Partial<OvertimeApplication>) => {
+    setOvertimeLoading(true);
+    try {
+      const response = await apiClient.put(`/Maintenance/EmployeeOvertimeApplication/${id}`, data);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Overtime application updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchOvertimeApplicationsByEmpCode(empCode);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update overtime application' });
+      throw error;
+    } finally { setOvertimeLoading(false); }
+  };
 
-const fetchContractualByEmpCode = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setContractualLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeContractual');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      const filtered = allItems
-        .filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase())
-        .map((item: any) => ({
-          id: item.id,
-          dateFrom: item.dateFr || item.dateFrom || '',   // ✅ handle both field names
-          dateTo:   item.dateTo || '',
-        }));
-      setContractualData(filtered);
+  const deleteOvertimeApplication = async (id: number) => {
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
+    if (result.isConfirmed) {
+      setOvertimeLoading(true);
+      try {
+        const response = await apiClient.delete(`/Maintenance/EmployeeOvertimeApplication/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Overtime application has been deleted.', timer: 2000, showConfirmButton: false });
+          await fetchOvertimeApplicationsByEmpCode(empCode);
+        }
+      } catch (error: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete overtime application' });
+      } finally { setOvertimeLoading(false); }
     }
-  } catch (error: any) {
-    setContractualData([]);
-  } finally {
-    setContractualLoading(false);
-  }
-};
+  };
 
-const createContractual = async (contractualData: Partial<Contractual>) => {
-  setContractualLoading(true);
-  try {
-    const payload = { id: 0, empCode: contractualData.empCode, dateFr: contractualData.dateFr ? new Date(contractualData.dateFr).toISOString() : null, dateTo: contractualData.dateTo ? new Date(contractualData.dateTo).toISOString() : null };
-    const response = await apiClient.post('/Maintenance/EmployeeContractual', payload);
-    if (response.status === 200 || response.status === 201) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Contractual record created successfully.', timer: 2000, showConfirmButton: false });
-      await fetchContractualByEmpCode(empCode);
+  const timeToISOString = (timeStr: string): string | null => {
+    if (!timeStr || timeStr.trim() === '') return null;
+    try {
+      if (timeStr.includes('T')) return timeStr;
+      const today = new Date();
+      const base = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const dt = new Date(`${base}T${timeStr}`);
+      return isNaN(dt.getTime()) ? null : dt.toISOString();
+    } catch {
+      return null;
     }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to create contractual record';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setContractualLoading(false);
-  }
-};
+  };
 
-const updateContractual = async (id: number, contractualData: Partial<Contractual>) => {
-  setContractualLoading(true);
-  try {
-    const response = await apiClient.put(`/Maintenance/EmployeeContractual/${id}`, contractualData);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Contractual record updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchContractualByEmpCode(empCode);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update contractual record';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setContractualLoading(false);
-  }
-};
+  const handleOvertimeSubmit = async () => {
+    try {
+      const payload = {
+        id:                      isOvertimeEditMode && currentOvertimeId !== null ? currentOvertimeId : 0,
+        empCode,
+        date:                    toLocalISOString(overtimeDate) ?? new Date().toISOString(),
+        numOTHoursApproved:      parseFloat(overtimeNumOTHoursApproved) || 0,
+        earlyOTStartTime:        timeToISOString(overtimeEarlyOTStartTime),
+        earlyTimeIn:             timeToISOString(overtimeEarlyTimeIn),
+        startOTPM:               timeToISOString(overtimeStartOTPM),
+        minHRSOTBreak:           parseFloat(overtimeMinHRSOTBreak) || 0,
+        earlyOTStartTimeRestHol: timeToISOString(overtimeEarlyOTStartTimeRestHol),
+        reason:                  overtimeReason  || '',
+        remarks:                 overtimeRemarks || '',
+        approvedOTBreaksHrs:     parseFloat(overtimeApprovedOTBreaksHrs) || 0,
+        stotats:                 timeToISOString(overtimeStotats),
+        isLateFiling:            overtimeIsLateFiling          ?? false,
+        isLateFilingProcessed:   false,
+        appliedBeforeShiftDate:  overtimeAppliedBeforeShiftDate
+          ? (toLocalISOString(overtimeAppliedBeforeShiftDate) ?? null)
+          : null,
+        isOTBeforeShiftNextDay:  overtimeIsOTBeforeShiftNextDay ?? false,
+      };
 
-const deleteContractual = async (id: number) => {
-  const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
-  if (result.isConfirmed) {
+      if (isOvertimeEditMode && currentOvertimeId !== null) {
+        await updateOvertimeApplication(currentOvertimeId, payload as any);
+      } else {
+        await createOvertimeApplication(payload as any);
+      }
+      setShowOvertimeModal(false);
+    } catch (error) { console.error('Error submitting overtime application:', error); }
+  };
+
+  // ── Contractual ─────────────────────────────────────────────────────────────
+
+  const fetchContractualByEmpCode = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
     setContractualLoading(true);
     try {
-      const response = await apiClient.delete(`/Maintenance/EmployeeContractual/${id}`);
-      if (response.status === 200 || response.status === 204) {
-        await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Contractual record has been deleted.', timer: 2000, showConfirmButton: false });
+      const response = await apiClient.get('/Maintenance/EmployeeContractual');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setContractualData(
+          allItems
+            .filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase())
+            .map((item: any) => ({
+              id: item.id,
+              dateFrom: item.dateFr || item.dateFrom || '',
+              dateTo: item.dateTo || '',
+            }))
+        );
+      }
+    } catch { setContractualData([]); } finally { setContractualLoading(false); }
+  };
+
+  const createContractual = async (data: Partial<Contractual>) => {
+    setContractualLoading(true);
+    try {
+      const payload = {
+        id: 0,
+        empCode: data.empCode,
+        dateFr: data.dateFr ? toLocalISOString(data.dateFr) : null,
+        dateTo: data.dateTo ? toLocalISOString(data.dateTo) : null,
+      };
+      const response = await apiClient.post('/Maintenance/EmployeeContractual', payload);
+      if (response.status === 200 || response.status === 201) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Contractual record created successfully.', timer: 2000, showConfirmButton: false });
         await fetchContractualByEmpCode(empCode);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete contractual record';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-      setContractualLoading(false);
-    }
-  }
-};
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create contractual record' });
+      throw error;
+    } finally { setContractualLoading(false); }
+  };
 
-const handleContractualSubmit = async () => {
-  try {
-    const contractualData: Partial<Contractual> = { empCode: empCode, dateFr: contractualDateFrom, dateTo: contractualDateTo };
-    if (isContractualEditMode && currentContractualId !== null) {
-      await updateContractual(currentContractualId, contractualData);
-    } else {
-      await createContractual(contractualData);
-    }
-    setShowContractualModal(false);
-  } catch (error) {
-    console.error('Error submitting contractual:', error);
-  }
-};
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return 'N/A';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return 'N/A';
-  return d.toLocaleDateString();
-};
-const fetchSuspensionByEmpCode = async (empCodeParam: string) => {
-  if (!empCodeParam) return;
-  setSuspensionLoading(true);
-  try {
-    const response = await apiClient.get('/Maintenance/EmployeeSuspension');
-    if (response.status === 200 && response.data) {
-      const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
-      const filtered = allItems
-        .filter((item: any) => (item.empCode?.trim() || "").toLowerCase() === empCodeParam.trim().toLowerCase())
-        .map((item: any) => ({
-          id: item.id,
-          dateFrom: item.dateFrom || '',
-          dateTo:   item.dateTo   || '',
-        }));
-      setSuspensionData(filtered);
-    }
-  } catch (error: any) {
-    setSuspensionData([]);
-  } finally {
-    setSuspensionLoading(false);
-  }
-};
+  const updateContractual = async (id: number, data: Partial<Contractual>) => {
+    setContractualLoading(true);
+    try {
+      const payload = {
+        id,
+        empCode: data.empCode,
+        dateFr: data.dateFr ? toLocalISOString(data.dateFr) : null,
+        dateTo: data.dateTo ? toLocalISOString(data.dateTo) : null,
+      };
+      const response = await apiClient.put(`/Maintenance/EmployeeContractual/${id}`, payload);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Contractual record updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchContractualByEmpCode(empCode);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update contractual record' });
+      throw error;
+    } finally { setContractualLoading(false); }
+  };
 
-const createSuspension = async (suspensionData: Partial<Suspension>) => {
-  setSuspensionLoading(true);
-  try {
-    const payload = { id: 0, empCode: suspensionData.empCode, dateFrom: suspensionData.dateFrom ? new Date(suspensionData.dateFrom).toISOString() : null, dateTo: suspensionData.dateTo ? new Date(suspensionData.dateTo).toISOString() : null };
-    const response = await apiClient.post('/Maintenance/EmployeeSuspension', payload);
-    if (response.status === 200 || response.status === 201) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Suspension record created successfully.', timer: 2000, showConfirmButton: false });
-      await fetchSuspensionByEmpCode(empCode);
+  const deleteContractual = async (id: number) => {
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
+    if (result.isConfirmed) {
+      setContractualLoading(true);
+      try {
+        const response = await apiClient.delete(`/Maintenance/EmployeeContractual/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Contractual record has been deleted.', timer: 2000, showConfirmButton: false });
+          await fetchContractualByEmpCode(empCode);
+        }
+      } catch (error: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete contractual record' });
+      } finally { setContractualLoading(false); }
     }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to create suspension record';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setSuspensionLoading(false);
-  }
-};
+  };
 
-const updateSuspension = async (id: number, suspensionData: Partial<Suspension>) => {
-  setSuspensionLoading(true);
-  try {
-    const response = await apiClient.put(`/Maintenance/EmployeeSuspension/${id}`, suspensionData);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Suspension record updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchSuspensionByEmpCode(empCode);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update suspension record';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setSuspensionLoading(false);
-  }
-};
+  const handleContractualSubmit = async () => {
+    try {
+      const data: Partial<Contractual> = { empCode, dateFr: contractualDateFrom, dateTo: contractualDateTo };
+      if (isContractualEditMode && currentContractualId !== null) {
+        await updateContractual(currentContractualId, data);
+      } else {
+        await createContractual(data);
+      }
+      setShowContractualModal(false);
+    } catch (error) { console.error('Error submitting contractual:', error); }
+  };
 
-const deleteSuspension = async (id: number) => {
-  const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
-  if (result.isConfirmed) {
+  // ── Suspension ──────────────────────────────────────────────────────────────
+
+  const fetchSuspensionByEmpCode = async (empCodeParam: string) => {
+    if (!empCodeParam) return;
     setSuspensionLoading(true);
     try {
-      const response = await apiClient.delete(`/Maintenance/EmployeeSuspension/${id}`);
-      if (response.status === 200 || response.status === 204) {
-        await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Suspension record has been deleted.', timer: 2000, showConfirmButton: false });
+      const response = await apiClient.get('/Maintenance/EmployeeSuspension');
+      if (response.status === 200 && response.data) {
+        const allItems = Array.isArray(response.data) ? response.data : (response.data.items || []);
+        setSuspensionData(
+          allItems
+            .filter((item: any) => (item.empCode?.trim() || '').toLowerCase() === empCodeParam.trim().toLowerCase())
+            .map((item: any) => ({ id: item.id, dateFrom: item.dateFrom || '', dateTo: item.dateTo || '' }))
+        );
+      }
+    } catch { setSuspensionData([]); } finally { setSuspensionLoading(false); }
+  };
+
+  const createSuspension = async (data: Partial<Suspension>) => {
+    setSuspensionLoading(true);
+    try {
+      const payload = {
+        id: 0,
+        empCode: data.empCode,
+        dateFrom: data.dateFrom ? toLocalISOString(data.dateFrom) : null,
+        dateTo: data.dateTo ? toLocalISOString(data.dateTo) : null,
+      };
+      const response = await apiClient.post('/Maintenance/EmployeeSuspension', payload);
+      if (response.status === 200 || response.status === 201) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Suspension record created successfully.', timer: 2000, showConfirmButton: false });
         await fetchSuspensionByEmpCode(empCode);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to delete suspension record';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    } finally {
-      setSuspensionLoading(false);
-    }
-  }
-};
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create suspension record' });
+      throw error;
+    } finally { setSuspensionLoading(false); }
+  };
 
-const handleSuspensionSubmit = async () => {
-  try {
-    const suspensionData: Partial<Suspension> = { empCode: empCode, dateFrom: suspensionDateFrom, dateTo: suspensionDateTo };
-    if (isSuspensionEditMode && currentSuspensionId !== null) {
-      await updateSuspension(currentSuspensionId, suspensionData);
-    } else {
-      await createSuspension(suspensionData);
+  const updateSuspension = async (id: number, data: Partial<Suspension>) => {
+    setSuspensionLoading(true);
+    try {
+      const payload = {
+        id,
+        empCode: data.empCode,
+        dateFrom: data.dateFrom ? toLocalISOString(data.dateFrom) : null,
+        dateTo: data.dateTo ? toLocalISOString(data.dateTo) : null,
+      };
+      const response = await apiClient.put(`/Maintenance/EmployeeSuspension/${id}`, payload);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Suspension record updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchSuspensionByEmpCode(empCode);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update suspension record' });
+      throw error;
+    } finally { setSuspensionLoading(false); }
+  };
+
+  const deleteSuspension = async (id: number) => {
+    const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
+    if (result.isConfirmed) {
+      setSuspensionLoading(true);
+      try {
+        const response = await apiClient.delete(`/Maintenance/EmployeeSuspension/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          await Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Suspension record has been deleted.', timer: 2000, showConfirmButton: false });
+          await fetchSuspensionByEmpCode(empCode);
+        }
+      } catch (error: any) {
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete suspension record' });
+      } finally { setSuspensionLoading(false); }
     }
-    setShowSuspensionModal(false);
-  } catch (error) {
-    console.error('Error submitting suspension:', error);
-  }
-};
+  };
+
+  const handleSuspensionSubmit = async () => {
+    try {
+      const data: Partial<Suspension> = { empCode, dateFrom: suspensionDateFrom, dateTo: suspensionDateTo };
+      if (isSuspensionEditMode && currentSuspensionId !== null) {
+        await updateSuspension(currentSuspensionId, data);
+      } else {
+        await createSuspension(data);
+      }
+      setShowSuspensionModal(false);
+    } catch (error) { console.error('Error submitting suspension:', error); }
+  };
+
+  // ── Basic Config Save/Update ────────────────────────────────────────────────
 
   const createBasicConfig = async (configData: Partial<EmployeeBasicConfig>) => {
     setBasicConfigLoading(true);
@@ -1556,12 +1489,9 @@ const handleSuspensionSubmit = async () => {
         setIsCreatingNew(false);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to create basic configuration';
-      await Swal.fire({ icon: 'error', title: 'Oops...', text: errorMsg });
+      await Swal.fire({ icon: 'error', title: 'Oops...', text: error.response?.data?.message || error.message || 'Failed to create basic configuration' });
       throw error;
-    } finally {
-      setBasicConfigLoading(false);
-    }
+    } finally { setBasicConfigLoading(false); }
   };
 
   const updateBasicConfig = async (id: number, configData: Partial<EmployeeBasicConfig>) => {
@@ -1574,36 +1504,32 @@ const handleSuspensionSubmit = async () => {
         setIsEditMode(false);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to update basic configuration';
-      await Swal.fire({ icon: 'error', title: 'Update Failed', text: errorMsg });
+      await Swal.fire({ icon: 'error', title: 'Update Failed', text: error.response?.data?.message || error.message || 'Failed to update basic configuration' });
       throw error;
-    } finally {
-      setBasicConfigLoading(false);
-    }
+    } finally { setBasicConfigLoading(false); }
   };
 
- const saveExemptions = async () => {
-  if (!exemptionsData) return;
-  setExemptionsLoading(true);
-  try {
-    let response;
-    if (exemptionsData.id === 0) {
-      response = await apiClient.post('/Maintenance/EmployeeExemptions', exemptionsData);
-    } else {
-      response = await apiClient.put(`/Maintenance/EmployeeExemptions/${exemptionsData.id}`, { id: exemptionsData.id, empCode: exemptionsData.empCode, tardiness: exemptionsData.tardiness, undertime: exemptionsData.undertime, nightDiffBasic: exemptionsData.nightDiffBasic, overtime: exemptionsData.overtime, absences: exemptionsData.absences, otherEarnAndAllow: exemptionsData.otherEarnAndAllow, holidayPay: exemptionsData.holidayPay, unprodWorkHoliday: exemptionsData.unprodWorkHoliday });
-    }
-    if (response.status === 200 || response.status === 201 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Success', text: 'Exemptions saved successfully.', timer: 2000, showConfirmButton: false });
-      await fetchExemptionsByEmpCode(empCode);
-      setIsEditMode(false);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to save exemptions';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-  } finally {
-    setExemptionsLoading(false);
-  }
-};
+  const saveExemptions = async () => {
+    if (!exemptionsData) return;
+    setExemptionsLoading(true);
+    try {
+      let response;
+      if (exemptionsData.id === 0) {
+        response = await apiClient.post('/Maintenance/EmployeeExemptions', exemptionsData);
+      } else {
+        response = await apiClient.put(`/Maintenance/EmployeeExemptions/${exemptionsData.id}`, { ...exemptionsData });
+      }
+      if (response.status === 200 || response.status === 201 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Success', text: 'Exemptions saved successfully.', timer: 2000, showConfirmButton: false });
+        await fetchExemptionsByEmpCode(empCode);
+        setIsEditMode(false);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to save exemptions' });
+    } finally { setExemptionsLoading(false); }
+  };
+
+  // ── Leave Application ───────────────────────────────────────────────────────
 
   const createLeaveApplication = async (leaveData: Partial<LeaveApplication>) => {
     setLeaveApplicationsLoading(true);
@@ -1614,31 +1540,25 @@ const handleSuspensionSubmit = async () => {
         await fetchLeaveApplicationsByEmpCode(empCode);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to create leave application';
-      await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to create leave application' });
       throw error;
-    } finally {
-      setLeaveApplicationsLoading(false);
-    }
+    } finally { setLeaveApplicationsLoading(false); }
   };
 
- const updateLeaveApplication = async (id: number, leaveData: Partial<LeaveApplication>) => {
-  setLeaveApplicationsLoading(true);
-  try {
-    const payload = { ...leaveData, id: id, balanceID: leaveData.balanceID === "" ? null : leaveData.balanceID, date: leaveData.date ? new Date(leaveData.date).toISOString() : null };
-    const response = await apiClient.put(`/Maintenance/EmployeeLeaveApplication/${id}`, payload);
-    if (response.status === 200 || response.status === 204) {
-      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Leave application updated successfully.', timer: 2000, showConfirmButton: false });
-      await fetchLeaveApplicationsByEmpCode(empCode);
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.message || error.message || 'Failed to update leave application';
-    await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-    throw error;
-  } finally {
-    setLeaveApplicationsLoading(false);
-  }
-};
+  const updateLeaveApplication = async (id: number, leaveData: Partial<LeaveApplication>) => {
+    setLeaveApplicationsLoading(true);
+    try {
+      const payload = { ...leaveData, id, balanceID: leaveData.balanceID === '' ? null : leaveData.balanceID, date: leaveData.date ? toLocalISOString(leaveData.date) : null };
+      const response = await apiClient.put(`/Maintenance/EmployeeLeaveApplication/${id}`, payload);
+      if (response.status === 200 || response.status === 204) {
+        await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Leave application updated successfully.', timer: 2000, showConfirmButton: false });
+        await fetchLeaveApplicationsByEmpCode(empCode);
+      }
+    } catch (error: any) {
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to update leave application' });
+      throw error;
+    } finally { setLeaveApplicationsLoading(false); }
+  };
 
   const deleteLeaveApplication = async (id: number) => {
     const result = await Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#3085d6', cancelButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' });
@@ -1651,16 +1571,40 @@ const handleSuspensionSubmit = async () => {
           await fetchLeaveApplicationsByEmpCode(empCode);
         }
       } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to delete leave application';
-        await Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
-      } finally {
-        setLeaveApplicationsLoading(false);
-      }
+        await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to delete leave application' });
+      } finally { setLeaveApplicationsLoading(false); }
     }
   };
 
-  // ==================== Pagination Functions ====================
-  
+  const handleLeaveSubmit = async () => {
+    try {
+      const leaveData: Partial<LeaveApplication> = {
+        empCode,
+        date: toLocalISOString(leaveDate) ?? '',
+        hoursApprovedNum: parseFloat(leaveHoursApproved) || 0,
+        leaveCode,
+        period: leavePeriod && leavePeriod.trim() !== '' ? leavePeriod : null as any,
+        reason: leaveReason,
+        remarks: leaveRemarks,
+        withPay: leaveWithPay,
+        sssNotif: leaveSssNotification,
+        isProcSSSNotif: false,
+        balanceID: null as any,
+        isLateFiling: leaveIsLateFiling,
+        isLateFilingProcessed: false,
+        exemptAllowFlag: false,
+      };
+      if (isLeaveEditMode && currentLeaveId !== 0) {
+        await updateLeaveApplication(currentLeaveId, leaveData);
+      } else {
+        await createLeaveApplication(leaveData);
+      }
+      setShowLeaveModal(false);
+    } catch (error) { console.error('Error submitting leave application:', error); }
+  };
+
+  // ── Pagination ─────────────────────────────────────────────────────────────
+
   const filteredPayrollLocations = payrollLocationData.filter(loc =>
     (loc.locCode?.toLowerCase() || '').includes(tksGroupSearchTerm.toLowerCase()) ||
     (loc.locName?.toLowerCase() || '').includes(tksGroupSearchTerm.toLowerCase())
@@ -1672,28 +1616,20 @@ const handleSuspensionSubmit = async () => {
   const currentPayrollLocations = filteredPayrollLocations.slice(startIndex, endIndex);
 
   const getPageNumbers = () => {
-    const pages = [];
+    const pages: (number | string)[] = [];
     const maxPagesToShow = 5;
     if (totalPages <= maxPagesToShow) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else if (currentPage <= 3) {
+      for (let i = 1; i <= 4; i++) pages.push(i);
+      pages.push('...'); pages.push(totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pages.push(1); pages.push('...');
+      for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
     } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) pages.push(i);
-        pages.push('...');
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1);
-        pages.push('...');
-        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push('...');
-        pages.push(currentPage - 1);
-        pages.push(currentPage);
-        pages.push(currentPage + 1);
-        pages.push('...');
-        pages.push(totalPages);
-      }
+      pages.push(1); pages.push('...');
+      pages.push(currentPage - 1); pages.push(currentPage); pages.push(currentPage + 1);
+      pages.push('...'); pages.push(totalPages);
     }
     return pages;
   };
@@ -1710,16 +1646,103 @@ const handleSuspensionSubmit = async () => {
   const handlePreviousPage = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
   const handleNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
 
-const adaptedEmployees = useMemo(() => {
+  const adaptedEmployees = useMemo(() => {
     return employees.map(emp => ({
-        ...emp,
-        name: `${emp.lName}, ${emp.fName}`,
-        groupCode: groupDescMap.get(String((emp as any).tksGroupCode ?? ''))
-                   ?? (emp as any).tksGroupCode
-                   ?? emp.grpCode
-                   ?? ''
+      ...emp,
+      name: `${emp.lName}, ${emp.fName}`,
+      groupCode: groupDescMap.get(String((emp as any).tksGroupCode ?? '')) ?? (emp as any).tksGroupCode ?? emp.grpCode ?? '',
     }));
-}, [employees, groupDescMap]);
+  }, [employees, groupDescMap]);
+
+  // Reset all tab pages when employee changes
+  useEffect(() => {
+    setDeviceCodePage(1);
+    setRestDayVarPage(1);
+    setWorkshiftVarPage(1);
+    setClassVarPage(1);
+    setLeavePage(1);
+    setOvertimePage(1);
+    setContractualPage(1);
+    setSuspensionPage(1);
+  }, [empCode]);
+
+  // ── Reusable pagination helper ─────────────────────────────────────────────
+  const paginate = <T,>(data: T[], page: number): T[] => {
+    const start = (page - 1) * TAB_PAGE_SIZE;
+    return data.slice(start, start + TAB_PAGE_SIZE);
+  };
+
+  const PaginationBar = ({
+    total,
+    page,
+    onPage,
+  }: {
+    total: number;
+    page: number;
+    onPage: (p: number) => void;
+  }) => {
+    const totalPg = Math.ceil(total / TAB_PAGE_SIZE);
+    if (totalPg <= 1) return null;
+
+    const pages: (number | string)[] = [];
+    if (totalPg <= 7) {
+      for (let i = 1; i <= totalPg; i++) pages.push(i);
+    } else if (page <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...'); pages.push(totalPg);
+    } else if (page >= totalPg - 3) {
+      pages.push(1); pages.push('...');
+      for (let i = totalPg - 4; i <= totalPg; i++) pages.push(i);
+    } else {
+      pages.push(1); pages.push('...');
+      pages.push(page - 1); pages.push(page); pages.push(page + 1);
+      pages.push('...'); pages.push(totalPg);
+    }
+
+    const start = (page - 1) * TAB_PAGE_SIZE + 1;
+    const end   = Math.min(page * TAB_PAGE_SIZE, total);
+
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+        <span className="text-xs text-gray-500">
+          Showing {total > 0 ? start : 0}–{end} of {total} entries
+        </span>
+        <div className="flex gap-1">
+          <button
+            onClick={() => onPage(page - 1)}
+            disabled={page === 1}
+            className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          {pages.map((p, i) =>
+            typeof p === 'number' ? (
+              <button
+                key={i}
+                onClick={() => onPage(p)}
+                className={`px-2 py-1 text-xs rounded ${
+                  page === p
+                    ? 'bg-blue-600 text-white'
+                    : 'border border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                {p}
+              </button>
+            ) : (
+              <span key={i} className="px-2 py-1 text-xs text-gray-400">…</span>
+            )
+          )}
+          <button
+            onClick={() => onPage(page + 1)}
+            disabled={page === totalPg}
+            className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const handleEmployeeSearchSelect = async (empCodeValue: string, name: string) => {
     try {
@@ -1728,8 +1751,22 @@ const adaptedEmployees = useMemo(() => {
         await Swal.fire({ icon: 'error', title: 'Error', text: 'Employee not found' });
         return;
       }
+
       setEmpCode(empCodeValue);
-      setTksGroup(employee.grpCode);
+
+      const empTksGroup: string =
+        (employee as any).tksGroupCode?.trim() ||
+        employee.grpCode?.trim() ||
+        '';
+
+      if (empTksGroup) {
+        setTksGroup(empTksGroup);
+        const matchedLoc = payrollLocationData.find(
+          loc => (loc.locCode?.trim() || '').toLowerCase() === empTksGroup.toLowerCase()
+        );
+        setTksGroupName(matchedLoc?.locName ?? '');
+      }
+
       setShowSearchModal(false);
       await Promise.all([
         fetchBasicConfigByEmpCode(empCodeValue),
@@ -1747,122 +1784,83 @@ const adaptedEmployees = useMemo(() => {
       await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load employee details' });
     }
   };
-// ─── Company Info Validation (HRIS / Payroll Path) ────────────────────────────
-const validateCompanyPaths = async (): Promise<boolean> => {
+
+  const validateCompanyPaths = async (): Promise<boolean> => {
     try {
-        const response = await apiClient.get("/Fs/System/CompanyInformation");
-        const companyInfo =
-            Array.isArray(response.data) ? response.data[0] : response.data;
-
-        if (!companyInfo) {
-            await Swal.fire({
-                icon: "error",
-                title: "Validation Error",
-                text: "Company Information is not properly set.",
-            });
-            return false;
-        }
-
-        const hrisPath    = (companyInfo.hrisPath    ?? "").trim();
-
-        if (hrisPath !== "") {
-            await Swal.fire({
-                icon: "error",
-                title: "Not Allowed",
-                text: "You are connected to HRIS. you are not allowed to do any transaction for this setup.",
-            });
-            return false;
-        }
-
-      
-
-        return true;
+      const response = await apiClient.get('/Fs/System/CompanyInformation');
+      const companyInfo = Array.isArray(response.data) ? response.data[0] : response.data;
+      if (!companyInfo) { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Company Information is not properly set.' }); return false; }
+      const hrisPath = (companyInfo.hrisPath ?? '').trim();
+      if (hrisPath !== '') { await Swal.fire({ icon: 'error', title: 'Not Allowed', text: 'You are connected to HRIS. you are not allowed to do any transaction for this setup.' }); return false; }
+      return true;
     } catch (error: any) {
-        await Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: error.response?.data?.message || error.message || "Failed to retrieve company information.",
-        });
-        return false;
+      await Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || error.message || 'Failed to retrieve company information.' });
+      return false;
     }
-};
-// ──────────────────────────────────────────────────────────────────────────────
+  };
+
   const handleSave = async () => {
     try {
-      if (!empCode) {
-        await Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select an employee first' });
-        return;
-      }
-if (activeTab === 'basic-config') {
+      if (!empCode) { await Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select an employee first' }); return; }
 
-            // ✅ 1. HRIS / Payroll path check
-            const companyPathsValid = await validateCompanyPaths();
-            if (!companyPathsValid) return;
+      if (activeTab === 'basic-config') {
+        const companyPathsValid = await validateCompanyPaths();
+        if (!companyPathsValid) return;
 
-            // ✅ 2. Validate GroupScheduleCode exists if provided
-            if (basicConfigData?.groupScheduleCode && basicConfigData.groupScheduleCode.trim() !== '') {
-                const groupScheduleExists = groupSchedules.some(
-                    (gs) => gs.groupScheduleCode.trim() === basicConfigData.groupScheduleCode.trim()
-                );
-                if (!groupScheduleExists) {
-                    await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Group Schedule does not exist in Group Schedule SetUp.' });
-                    return;
-                }
-            }
-
-            // ✅ 3. On Edit — check if TKS Group (GroupCode) was changed (HRIS restriction)
-            if (!isCreatingNew && basicConfigData) {
-                const orig    = originalGroupCode.trim().toUpperCase();
-                const current = tksGroup.trim().toUpperCase();
-
-                if (orig !== current) {
-                    await Swal.fire({
-                        icon: 'error',
-                        title: 'Not Allowed',
-                        text: 'You are connected to HRIS. You are not allowed to change TK Group.'
-                    });
-                    return;
-                }
-            }
-
-            // ✅ 4. Validate EmpCode and TKS Group are selected
-            if (!empCode.trim() || !tksGroup.trim()) {
-                await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Employee Code / Group Code does not exist in Setup.' });
-                return;
-            }
-
-            const configData: Partial<EmployeeBasicConfig> = {
-                id:                   basicConfigData?.id,   // ✅ add this
-                empCode:              empCode,
-                groupCode:            tksGroup,
-                groupScheduleCode:    basicConfigData?.groupScheduleCode || '',
-                allowOTDefault:       basicConfigData?.allowOTDefault || false,
-                active:               basicConfigData?.active ?? true,
-                compAllowFrRDExmpOT:  basicConfigData?.compAllowFrRDExmpOT || false,
-                compAllowFrHolExmpOT: basicConfigData?.compAllowFrHolExmpOT || false,
-                timeAttendanceStatus: basicConfigData?.timeAttendanceStatus || false
-            };
-
-            if (isCreatingNew || !basicConfigData) {
-                await createBasicConfig(configData);
-            } else {
-                await updateBasicConfig(basicConfigData.id, configData);
-            }
-
-        } else if (activeTab === 'exemptions') {
-            await saveExemptions();
-        } else if (activeTab === 'rest-day' && restDayMode === 'fixed') {
-            await saveRestDayFixed();
-        } else if (activeTab === 'workshift' && workshiftMode === 'fixed') {
-            await saveWorkshiftFixed();
-        } else if (activeTab === 'classification' && classificationMode === 'fixed') {
-            await saveClassificationFixed();
+        if (basicConfigData?.groupScheduleCode && basicConfigData.groupScheduleCode.trim() !== '') {
+          const groupScheduleExists = groupSchedules.some(gs => gs.groupScheduleCode.trim() === basicConfigData.groupScheduleCode.trim());
+          if (!groupScheduleExists) { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Group Schedule does not exist in Group Schedule SetUp.' }); return; }
         }
 
-    } catch (error) {
-        console.error('Error saving:', error);
-    }
-};
+        if (!isCreatingNew && basicConfigData) {
+          const orig = originalGroupCode.trim().toUpperCase();
+          const current = tksGroup.trim().toUpperCase();
+          if (orig !== current) { await Swal.fire({ icon: 'error', title: 'Not Allowed', text: 'You are connected to HRIS. You are not allowed to change TK Group.' }); return; }
+        }
+
+        if (!empCode.trim() || !tksGroup.trim()) { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Employee Code / Group Code does not exist in Setup.' }); return; }
+
+        const configData: Partial<EmployeeBasicConfig> = {
+          id: basicConfigData?.id,
+          empCode,
+          groupCode: tksGroup,
+          groupScheduleCode: basicConfigData?.groupScheduleCode || '',
+          allowOTDefault: basicConfigData?.allowOTDefault || false,
+          active: basicConfigData?.active ?? true,
+          compAllowFrRDExmpOT: basicConfigData?.compAllowFrRDExmpOT || false,
+          compAllowFrHolExmpOT: basicConfigData?.compAllowFrHolExmpOT || false,
+          timeAttendanceStatus: basicConfigData?.timeAttendanceStatus || false,
+        };
+
+        if (isCreatingNew || !basicConfigData) {
+          await createBasicConfig(configData);
+        } else {
+          await updateBasicConfig(basicConfigData.id, configData);
+        }
+
+      } else if (activeTab === 'exemptions') {
+        await saveExemptions();
+      } else if (activeTab === 'rest-day') {
+        if (restDayMode === 'fixed') {
+          await saveRestDayFixed();
+        } else {
+          await Swal.fire({ icon: 'info', title: 'Variable Mode', text: 'Use the Add/Edit buttons in the table to manage variable rest day entries.' });
+        }
+      } else if (activeTab === 'workshift') {
+        if (workshiftMode === 'fixed') {
+          await saveWorkshiftFixed();
+        } else {
+          await Swal.fire({ icon: 'info', title: 'Variable Mode', text: 'Use the Add/Edit buttons in the table to manage variable workshift entries.' });
+        }
+      } else if (activeTab === 'classification') {
+        if (classificationMode === 'fixed') {
+          await saveClassificationFixed();
+        } else {
+          await Swal.fire({ icon: 'info', title: 'Variable Mode', text: 'Use the Add/Edit buttons in the table to manage variable classification entries.' });
+        }
+      }
+    } catch (error) { console.error('Error saving:', error); }
+  };
 
   const handleCancel = () => {
     setIsEditMode(false);
@@ -1879,29 +1877,13 @@ if (activeTab === 'basic-config') {
 
   const handleFieldChange = (field: keyof EmployeeBasicConfig, value: any) => {
     setBasicConfigData(prev => {
-      if (!prev) {
-        return { id: 0, empCode: empCode, groupCode: tksGroup, groupScheduleCode: '', allowOTDefault: false, active: true, compAllowFrRDExmpOT: false, compAllowFrHolExmpOT: false, timeAttendanceStatus: false, [field]: value };
-      }
+      if (!prev) return { id: 0, empCode, groupCode: tksGroup, groupScheduleCode: '', allowOTDefault: false, active: true, compAllowFrRDExmpOT: false, compAllowFrHolExmpOT: false, timeAttendanceStatus: false, [field]: value };
       return { ...prev, [field]: value };
     });
   };
 
   const handleExemptionChange = (field: keyof EmployeeExemptions, value: boolean) => {
     setExemptionsData(prev => { if (!prev) return null; return { ...prev, [field]: value }; });
-  };
-
-  const handleLeaveSubmit = async () => {
-    try {
-      const leaveData: Partial<LeaveApplication> = { empCode: empCode, date: leaveDate, hoursApprovedNum: parseFloat(leaveHoursApproved) || 0, leaveCode: leaveCode, period: leavePeriod, reason: leaveReason, remarks: leaveRemarks, withPay: leaveWithPay, sssNotif: leaveSssNotification, isProcSSSNotif: false, balanceID: '', isLateFiling: leaveIsLateFiling, isLateFilingProcessed: false, exemptAllowFlag: false };
-      if (isLeaveEditMode && currentLeaveId !== 0) {
-        await updateLeaveApplication(currentLeaveId, leaveData);
-      } else {
-        await createLeaveApplication(leaveData);
-      }
-      setShowLeaveModal(false);
-    } catch (error) {
-      console.error('Error submitting leave application:', error);
-    }
   };
 
   const handleLeaveDelete = async (id: number) => await deleteLeaveApplication(id);
@@ -1918,8 +1900,8 @@ if (activeTab === 'basic-config') {
     fetchDailySchedules();
     fetchWorkshiftCodes();
     fetchClassificationCodes();
-    fetchLeaveCodes(); // ── NEW ─────────────────────────────────────────────────
-     fetchGroupDescriptions().then(setGroupDescMap);
+    fetchLeaveCodes();
+    fetchGroupDescriptions().then(setGroupDescMap);
   }, []);
 
   useEffect(() => {
@@ -1964,6 +1946,8 @@ if (activeTab === 'basic-config') {
     return () => document.removeEventListener('keydown', handleEscKey);
   }, [showSearchModal, showTKSGroupModal, showGroupScheduleModal, showDeviceCodeModal, showRestDayModal, showOvertimeModal, showContractualModal, showSuspensionModal, showWorkshiftCodeModal, showClassificationCodeModal]);
 
+  // ==================== TABS ====================
+
   const tabs = [
     { id: 'basic-config', label: 'Basic Configuration', icon: Settings },
     { id: 'exemptions', label: 'Exemptions', icon: FileX },
@@ -1974,7 +1958,7 @@ if (activeTab === 'basic-config') {
     { id: 'leave-applications', label: 'Leave Applications', icon: FileText },
     { id: 'overtime-applications', label: 'Overtime Applications', icon: ClipboardList },
     { id: 'contractual', label: 'Contractual', icon: FileSignature },
-    { id: 'suspension', label: 'Suspension', icon: PauseCircle }
+    { id: 'suspension', label: 'Suspension', icon: PauseCircle },
   ];
 
   const getHeaderTitle = () => {
@@ -1992,6 +1976,8 @@ if (activeTab === 'basic-config') {
       default: return 'Employee Timekeep Configuration';
     }
   };
+
+  // ==================== TAB CONTENT ====================
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -2013,26 +1999,18 @@ if (activeTab === 'basic-config') {
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 w-80">AllowOTDefault</label>
-                  <input type="checkbox" checked={basicConfigData?.allowOTDefault || false} onChange={(e) => handleFieldChange('allowOTDefault', e.target.checked)} disabled={!isEditMode} className="w-4 h-4 accent-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-100" />
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 w-80">Active</label>
-                  <input type="checkbox" checked={basicConfigData?.active ?? true} onChange={(e) => handleFieldChange('active', e.target.checked)} disabled={!isEditMode} className="w-4 h-4 accent-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-100" />
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 w-80">Worked Rest Day Allowance Not based on Computed OT</label>
-                  <input type="checkbox" checked={basicConfigData?.compAllowFrRDExmpOT || false} onChange={(e) => handleFieldChange('compAllowFrRDExmpOT', e.target.checked)} disabled={!isEditMode} className="w-4 h-4 accent-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-100" />
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 w-80">Worked Holiday Allowance Not based on Computed OT</label>
-                  <input type="checkbox" checked={basicConfigData?.compAllowFrHolExmpOT || false} onChange={(e) => handleFieldChange('compAllowFrHolExmpOT', e.target.checked)} disabled={!isEditMode} className="w-4 h-4 accent-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-100" />
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-gray-700 w-80">TimeAttendanceStatus</label>
-                  <input type="checkbox" checked={basicConfigData?.timeAttendanceStatus || false} onChange={(e) => handleFieldChange('timeAttendanceStatus', e.target.checked)} disabled={!isEditMode} className="w-4 h-4 accent-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-100" />
-                </div>
+                {[
+                  { field: 'allowOTDefault', label: 'AllowOTDefault' },
+                  { field: 'active', label: 'Active' },
+                  { field: 'compAllowFrRDExmpOT', label: 'Worked Rest Day Allowance Not based on Computed OT' },
+                  { field: 'compAllowFrHolExmpOT', label: 'Worked Holiday Allowance Not based on Computed OT' },
+                  { field: 'timeAttendanceStatus', label: 'TimeAttendanceStatus' },
+                ].map(({ field, label }) => (
+                  <div key={field} className="flex items-center gap-3">
+                    <label className="text-gray-700 w-80">{label}</label>
+                    <input type="checkbox" checked={(basicConfigData as any)?.[field] ?? (field === 'active')} onChange={(e) => handleFieldChange(field as keyof EmployeeBasicConfig, e.target.checked)} disabled={!isEditMode} className="w-4 h-4 accent-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-100" />
+                  </div>
+                ))}
                 {isCreatingNew && (
                   <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-yellow-800 text-sm">No configuration found for this employee. Click Save to create a new configuration.</p>
@@ -2083,71 +2061,46 @@ if (activeTab === 'basic-config') {
                 {leaveApplicationsLoading ? (
                   <div className="text-center py-8">Loading leave applications...</div>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-100 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-gray-700">Date</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Hours Approved</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Leave Code</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Period</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Reason</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Remarks</th>
-                        <th className="px-6 py-3 text-left text-gray-700">With Pay</th>
-                        <th className="px-6 py-3 text-left text-gray-700">SSS Notification</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Late Filing</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leaveApplicationsData.length === 0 ? (
-                        <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No leave applications found</td></tr>
-                      ) : (
-                        leaveApplicationsData.map((entry) => (
-  <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-    <td className="px-6 py-3 text-gray-900">{formatDate(entry.date)}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.hoursApprovedNum}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.leaveCode}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.period}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.withPay ? 'Yes' : 'No'}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.sssNotif ? 'Yes' : 'No'}</td>
-    <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
-    <td className="px-6 py-3">
-      <div className="flex items-center justify-center gap-2">
-        <button
-          onClick={() => {
-            setIsLeaveEditMode(true);
-            setCurrentLeaveId(entry.id);
-            setLeaveDate(entry.date ? new Date(entry.date).toISOString().split('T')[0] : '');
-            setLeaveHoursApproved(entry.hoursApprovedNum?.toString() ?? '0');
-            setLeaveCode(entry.leaveCode?.trim() ?? '');
-            setLeavePeriod(entry.period ?? '');
-            setLeaveReason(entry.reason ?? '');
-            setLeaveRemarks(entry.remarks ?? '');
-            setLeaveWithPay(entry.withPay ?? false);
-            setLeaveSssNotification(entry.sssNotif ?? false);
-            setLeaveIsLateFiling(entry.isLateFiling ?? false);
-            setShowLeaveModal(true);
-          }}
-          className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-        >
-          <Edit className="w-4 h-4" />
-        </button>
-        <span className="text-gray-300">|</span>
-        <button
-          onClick={() => handleLeaveDelete(entry.id)}
-          className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    </td>
-  </tr>
-))
-                      )}
-                    </tbody>
-                  </table>
+                  <>
+                    <table className="w-full">
+                      <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>
+                          {['Date','Hours Approved','Leave Code','Period','Reason','Remarks','With Pay','SSS Notification','Late Filing','Actions'].map(h => (
+                            <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leaveApplicationsData.length === 0 ? (
+                          <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No leave applications found</td></tr>
+                        ) : paginate(leaveApplicationsData, leavePage).map((entry) => (
+                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.date)}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.hoursApprovedNum}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.leaveCode}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.period}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.withPay ? 'Yes' : 'No'}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.sssNotif ? 'Yes' : 'No'}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
+                            <td className="px-6 py-3">
+                              <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => { setIsLeaveEditMode(true); setCurrentLeaveId(entry.id); setLeaveDate(toInputDate(entry.date)); setLeaveHoursApproved(entry.hoursApprovedNum?.toString() ?? '0'); setLeaveCode(entry.leaveCode?.trim() ?? ''); setLeavePeriod(entry.period ?? ''); setLeaveReason(entry.reason ?? ''); setLeaveRemarks(entry.remarks ?? ''); setLeaveWithPay(entry.withPay ?? false); setLeaveSssNotification(entry.sssNotif ?? false); setLeaveIsLateFiling(entry.isLateFiling ?? false); setShowLeaveModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <span className="text-gray-300">|</span>
+                                <button onClick={() => handleLeaveDelete(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <PaginationBar total={leaveApplicationsData.length} page={leavePage} onPage={setLeavePage} />
+                  </>
                 )}
               </div>
             </div>
@@ -2170,37 +2123,33 @@ if (activeTab === 'basic-config') {
                   <table className="w-full">
                     <thead className="bg-gray-100 border-b border-gray-200">
                       <tr>
-                        <th className="px-6 py-3 text-left text-gray-700">Date From</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Date To</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Code</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Actions</th>
+                        {['Date From','Date To','Code','Actions'].map(h => <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
                       {deviceCodeEntries.length === 0 ? (
                         <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No device codes found</td></tr>
-                      ) : (
-                        deviceCodeEntries.map((entry) => (
-                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-6 py-3 text-gray-900">{entry.timeInAndOutEffectDate ? new Date(entry.timeInAndOutEffectDate).toLocaleDateString() : 'N/A'}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.timeInAndOutExpiryDate ? new Date(entry.timeInAndOutExpiryDate).toLocaleDateString() : 'N/A'}</td>
-                            <td className="px-6 py-3 text-gray-900">{entry.timeInAndOutCode}</td>
-                            <td className="px-6 py-3">
-                              <div className="flex gap-2">
-                                <button onClick={() => { setIsDeviceCodeEditMode(true); setCurrentDeviceCodeId(entry.id); setDeviceCode(entry.timeInAndOutCode || ''); setDevicePassword(entry.timeInAndOutPass || ''); setDeviceEffectivityDate(entry.timeInAndOutEffectDate ? new Date(entry.timeInAndOutEffectDate).toISOString().split('T')[0] : ''); setDeviceExpiryDate(entry.timeInAndOutExpiryDate ? new Date(entry.timeInAndOutExpiryDate).toISOString().split('T')[0] : ''); setShowDeviceCodeModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <span className="text-gray-300">|</span>
-                                <button onClick={() => deleteDeviceCode(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
+                      ) : paginate(deviceCodeEntries, deviceCodePage).map((entry) => (
+                        <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="px-6 py-3 text-gray-900">{formatDate(entry.timeInAndOutEffectDate)}</td>
+                          <td className="px-6 py-3 text-gray-900">{formatDate(entry.timeInAndOutExpiryDate)}</td>
+                          <td className="px-6 py-3 text-gray-900">{entry.timeInAndOutCode}</td>
+                          <td className="px-6 py-3">
+                            <div className="flex gap-2">
+                              <button onClick={() => { setIsDeviceCodeEditMode(true); setCurrentDeviceCodeId(entry.id); setDeviceCode(entry.timeInAndOutCode || ''); setDevicePassword(entry.timeInAndOutPass || ''); setDeviceEffectivityDate(toInputDate(entry.timeInAndOutEffectDate)); setDeviceExpiryDate(toInputDate(entry.timeInAndOutExpiryDate)); setShowDeviceCodeModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button onClick={() => deleteDeviceCode(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
+                  <PaginationBar total={deviceCodeEntries.length} page={deviceCodePage} onPage={setDeviceCodePage} />
                 </div>
               </div>
             )}
@@ -2242,50 +2191,40 @@ if (activeTab === 'basic-config') {
                   </div>
                   {restDayMode === 'variable' && (
                     <div className="ml-7 space-y-4">
-                      <div>
-                        <button onClick={() => { setIsRestDayEditMode(false); setCurrentRestDayId(null); setRestDayDateFrom(''); setRestDayDateTo(''); setRestDay1(''); setRestDay2(''); setRestDay3(''); setShowRestDayModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                          <Plus className="w-4 h-4" />Add
-                        </button>
-                      </div>
+                      <button onClick={() => { setIsRestDayEditMode(false); setCurrentRestDayId(null); setRestDayDateFrom(''); setRestDayDateTo(''); setRestDay1(''); setRestDay2(''); setRestDay3(''); setShowRestDayModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                        <Plus className="w-4 h-4" />Add
+                      </button>
                       <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
                         <table className="w-full">
                           <thead className="bg-gray-100 border-b border-gray-200">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-gray-700">From</th>
-                              <th className="px-6 py-3 text-left text-gray-700">To</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Rest Day 1</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Rest Day 2</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Rest Day 3</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                            </tr>
+                            <tr>{['From','To','Rest Day 1','Rest Day 2','Rest Day 3','Actions'].map(h => <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>)}</tr>
                           </thead>
                           <tbody>
                             {restDayVariableData.length === 0 ? (
                               <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-500">No variable rest day records found</td></tr>
-                            ) : (
-                              restDayVariableData.map((entry) => (
-                                <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                  <td className="px-6 py-3 text-gray-900">{entry.datefrom ? new Date(entry.datefrom).toLocaleDateString() : 'N/A'}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.dateTo ? new Date(entry.dateTo).toLocaleDateString() : 'N/A'}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.restDay1}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.restDay2}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.restDay3}</td>
-                                  <td className="px-6 py-3">
-                                    <div className="flex gap-2">
-                                      <button onClick={() => { setIsRestDayEditMode(true); setCurrentRestDayId(entry.id); setRestDayDateFrom(entry.datefrom ? new Date(entry.datefrom).toISOString().split('T')[0] : ''); setRestDayDateTo(entry.dateTo ? new Date(entry.dateTo).toISOString().split('T')[0] : ''); setRestDay1(entry.restDay1 || ''); setRestDay2(entry.restDay2 || ''); setRestDay3(entry.restDay3 || ''); setShowRestDayModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
-                                        <Edit className="w-4 h-4" />
-                                      </button>
-                                      <span className="text-gray-300">|</span>
-                                      <button onClick={() => deleteRestDayVariable(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
+                            ) : paginate(restDayVariableData, restDayVarPage).map((entry) => (
+                              <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                <td className="px-6 py-3 text-gray-900">{formatDate(entry.datefrom)}</td>
+                                <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td>
+                                <td className="px-6 py-3 text-gray-900">{entry.restDay1}</td>
+                                <td className="px-6 py-3 text-gray-900">{entry.restDay2}</td>
+                                <td className="px-6 py-3 text-gray-900">{entry.restDay3}</td>
+                                <td className="px-6 py-3">
+                                  <div className="flex gap-2">
+                                    <button onClick={() => { setIsRestDayEditMode(true); setCurrentRestDayId(entry.id); setRestDayDateFrom(toInputDate(entry.datefrom)); setRestDayDateTo(toInputDate(entry.dateTo)); setRestDay1(entry.restDay1 || ''); setRestDay2(entry.restDay2 || ''); setRestDay3(entry.restDay3 || ''); setShowRestDayModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-gray-300">|</span>
+                                    <button onClick={() => deleteRestDayVariable(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
+                        <PaginationBar total={restDayVariableData.length} page={restDayVarPage} onPage={setRestDayVarPage} />
                       </div>
                     </div>
                   )}
@@ -2311,7 +2250,7 @@ if (activeTab === 'basic-config') {
                     <div className="ml-7 bg-gray-50 rounded-lg border border-gray-200 p-6">
                       <div className="flex items-center gap-3 max-w-md">
                         <label className="text-gray-700 w-32">Daily Schedule</label>
-                        <input type="text" value={fixedDailySched} disabled className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-pointer" onClick={() => isEditMode && setShowDailyScheduleModal(true)} />
+                        <input type="text" value={fixedDailySched} disabled className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-pointer" onClick={() => isEditMode && setShowDailyScheduleModal(true)} />
                         {isEditMode && (
                           <button onClick={() => setShowDailyScheduleModal(true)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
                             <Search className="w-4 h-4" />Search
@@ -2328,50 +2267,38 @@ if (activeTab === 'basic-config') {
                   </div>
                   {workshiftMode === 'variable' && (
                     <div className="ml-7 space-y-4">
-                      <div>
-                        <button onClick={() => { setIsWorkshiftEditMode(false); setCurrentWorkshiftId(null); setWorkshiftDateFrom(''); setWorkshiftDateTo(''); setWorkshiftShiftCode(''); setWorkshiftDailyScheduleCode(''); setWorkshiftGLCode(''); setShowWorkshiftModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                          <Plus className="w-4 h-4" />Add
-                        </button>
-                      </div>
+                      <button onClick={() => { setIsWorkshiftEditMode(false); setCurrentWorkshiftId(null); setWorkshiftDateFrom(''); setWorkshiftDateTo(''); setWorkshiftShiftCode(''); setShowWorkshiftModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                        <Plus className="w-4 h-4" />Add
+                      </button>
                       <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
                         <table className="w-full">
                           <thead className="bg-gray-100 border-b border-gray-200">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-gray-700">Date From</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Date To</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Shift Code</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Daily Schedule Code</th>
-                              <th className="px-6 py-3 text-left text-gray-700">GL Code</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                            </tr>
+                            <tr>{['Date From','Date To','Shift Code','Actions'].map(h => <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>)}</tr>
                           </thead>
                           <tbody>
                             {workshiftVariableData.length === 0 ? (
-                              <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-500">No variable workshift records found</td></tr>
-                            ) : (
-                              workshiftVariableData.map((entry) => (
-                                <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                  <td className="px-6 py-3 text-gray-900">{entry.dateFrom ? new Date(entry.dateFrom).toLocaleDateString() : 'N/A'}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.dateTo ? new Date(entry.dateTo).toLocaleDateString() : 'N/A'}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.shiftCode}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.dailyScheduleCode}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.glCode}</td>
-                                  <td className="px-6 py-3">
-                                    <div className="flex gap-2">
-                                      <button onClick={() => { setIsWorkshiftEditMode(true); setCurrentWorkshiftId(entry.id); setWorkshiftDateFrom(entry.dateFrom ? new Date(entry.dateFrom).toISOString().split('T')[0] : ''); setWorkshiftDateTo(entry.dateTo ? new Date(entry.dateTo).toISOString().split('T')[0] : ''); setWorkshiftShiftCode(entry.shiftCode || ''); setWorkshiftDailyScheduleCode(entry.dailyScheduleCode || ''); setWorkshiftGLCode(entry.glCode || ''); setShowWorkshiftModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
-                                        <Edit className="w-4 h-4" />
-                                      </button>
-                                      <span className="text-gray-300">|</span>
-                                      <button onClick={() => deleteWorkshiftVariable(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
+                              <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No variable workshift records found</td></tr>
+                            ) : paginate(workshiftVariableData, workshiftVarPage).map((entry) => (
+                              <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateFrom)}</td>
+                                <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td>
+                                <td className="px-6 py-3 text-gray-900">{entry.shiftCode}</td>
+                                <td className="px-6 py-3">
+                                  <div className="flex gap-2">
+                                    <button onClick={() => { setIsWorkshiftEditMode(true); setCurrentWorkshiftId(entry.id); setWorkshiftDateFrom(toInputDate(entry.dateFrom)); setWorkshiftDateTo(toInputDate(entry.dateTo)); setWorkshiftShiftCode(entry.shiftCode || ''); setShowWorkshiftModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-gray-300">|</span>
+                                    <button onClick={() => deleteWorkshiftVariable(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
+                        <PaginationBar total={workshiftVariableData.length} page={workshiftVarPage} onPage={setWorkshiftVarPage} />
                       </div>
                     </div>
                   )}
@@ -2397,9 +2324,9 @@ if (activeTab === 'basic-config') {
                     <div className="ml-7 bg-gray-50 rounded-lg border border-gray-200 p-6">
                       <div className="flex items-center gap-3 max-w-lg">
                         <label className="text-gray-700 w-40 flex-shrink-0">Classification Code</label>
-                        <input type="text" value={fixedClassCode} disabled className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-pointer" onClick={() => isEditMode && setShowClassificationCodeModal(true)} />
+                        <input type="text" value={fixedClassCode} disabled className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-pointer" onClick={() => { if (isEditMode) { fetchClassificationCodes(); setIsFixedCodeSearch(true); setShowClassificationCodeModal(true); } }} />
                         {isEditMode && (
-                          <button onClick={() => { fetchClassificationCodes(); setShowClassificationCodeModal(true); }} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 flex-shrink-0">
+                          <button onClick={() => { fetchClassificationCodes(); setIsFixedCodeSearch(true); setShowClassificationCodeModal(true); }} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 flex-shrink-0">
                             <Search className="w-4 h-4" />Browse
                           </button>
                         )}
@@ -2414,46 +2341,38 @@ if (activeTab === 'basic-config') {
                   </div>
                   {classificationMode === 'variable' && (
                     <div className="ml-7 space-y-4">
-                      <div>
-                        <button onClick={() => { setIsClassificationEditMode(false); setCurrentClassificationId(null); setClassificationDateFrom(''); setClassificationDateTo(''); setVariableClassCode(''); setShowClassificationModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                          <Plus className="w-4 h-4" />Add
-                        </button>
-                      </div>
+                      <button onClick={() => { setIsClassificationEditMode(false); setCurrentClassificationId(null); setClassificationDateFrom(''); setClassificationDateTo(''); setVariableClassCode(''); setShowClassificationModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                        <Plus className="w-4 h-4" />Add
+                      </button>
                       <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
                         <table className="w-full">
                           <thead className="bg-gray-100 border-b border-gray-200">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-gray-700">Date From</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Date To</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Classification Code</th>
-                              <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                            </tr>
+                            <tr>{['Date From','Date To','Classification Code','Actions'].map(h => <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>)}</tr>
                           </thead>
                           <tbody>
                             {classificationVariableData.length === 0 ? (
                               <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No variable classification records found</td></tr>
-                            ) : (
-                              classificationVariableData.map((entry) => (
-                                <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                  <td className="px-6 py-3 text-gray-900">{entry.dateFrom ? new Date(entry.dateFrom).toLocaleDateString() : 'N/A'}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.dateTo ? new Date(entry.dateTo).toLocaleDateString() : 'N/A'}</td>
-                                  <td className="px-6 py-3 text-gray-900">{entry.classCode}</td>
-                                  <td className="px-6 py-3">
-                                    <div className="flex gap-2">
-                                      <button onClick={() => { setIsClassificationEditMode(true); setCurrentClassificationId(entry.id); setClassificationDateFrom(entry.dateFrom ? new Date(entry.dateFrom).toISOString().split('T')[0] : ''); setClassificationDateTo(entry.dateTo ? new Date(entry.dateTo).toISOString().split('T')[0] : ''); setVariableClassCode(entry.classCode || ''); setShowClassificationModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
-                                        <Edit className="w-4 h-4" />
-                                      </button>
-                                      <span className="text-gray-300">|</span>
-                                      <button onClick={() => deleteClassificationVariable(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
+                            ) : paginate(classificationVariableData, classVarPage).map((entry) => (
+                              <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateFrom)}</td>
+                                <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td>
+                                <td className="px-6 py-3 text-gray-900">{entry.classCode}</td>
+                                <td className="px-6 py-3">
+                                  <div className="flex gap-2">
+                                    <button onClick={() => { setIsClassificationEditMode(true); setCurrentClassificationId(entry.id); setClassificationDateFrom(toInputDate(entry.dateFrom)); setClassificationDateTo(toInputDate(entry.dateTo)); setVariableClassCode(entry.classCode || ''); setShowClassificationModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-gray-300">|</span>
+                                    <button onClick={() => deleteClassificationVariable(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
+                        <PaginationBar total={classificationVariableData.length} page={classVarPage} onPage={setClassVarPage} />
                       </div>
                     </div>
                   )}
@@ -2463,119 +2382,60 @@ if (activeTab === 'basic-config') {
           </div>
         );
 
-     case 'overtime-applications':
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <div className="space-y-6">
-        <div>
-          <button
-            onClick={() => {
-              setIsOvertimeEditMode(false);
-              setCurrentOvertimeId(null);
-              setOvertimeDate('');
-              setOvertimeNumOTHoursApproved('');
-              setOvertimeEarlyOTStartTime('');
-              setOvertimeEarlyTimeIn('');
-              setOvertimeStartOTPM('');
-              setOvertimeMinHRSOTBreak('');
-              setOvertimeEarlyOTStartTimeRestHol('');
-              setOvertimeReason('');
-              setOvertimeRemarks('');
-              setOvertimeApprovedOTBreaksHrs('');
-              setOvertimeStotats('');
-              setOvertimeIsLateFiling(false);
-              setOvertimeAppliedBeforeShiftDate('');
-              setOvertimeIsOTBeforeShiftNextDay(false);
-              setShowOvertimeModal(true);
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-          >
-            <Plus className="w-4 h-4" />Create New
-          </button>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {overtimeLoading ? (
-            <div className="text-center py-8">Loading overtime applications...</div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-gray-700">Date</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Hours Approved</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Early OT Start</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Early Time In</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Start OT PM</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Approved OT Breaks Hrs</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Reason</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Remarks</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Late Filing</th>
-                  <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overtimeApplicationsData.length === 0 ? (
-                  <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No overtime applications found</td></tr>
+      case 'overtime-applications':
+        return (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="space-y-6">
+              <div>
+                <button onClick={() => { setIsOvertimeEditMode(false); setCurrentOvertimeId(null); setOvertimeDate(''); setOvertimeNumOTHoursApproved(''); setOvertimeEarlyOTStartTime(''); setOvertimeEarlyTimeIn(''); setOvertimeStartOTPM(''); setOvertimeMinHRSOTBreak(''); setOvertimeEarlyOTStartTimeRestHol(''); setOvertimeReason(''); setOvertimeRemarks(''); setOvertimeApprovedOTBreaksHrs(''); setOvertimeStotats(''); setOvertimeIsLateFiling(false); setOvertimeAppliedBeforeShiftDate(''); setOvertimeIsOTBeforeShiftNextDay(false); setShowOvertimeModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                  <Plus className="w-4 h-4" />Create New
+                </button>
+              </div>
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                {overtimeLoading ? (
+                  <div className="text-center py-8">Loading overtime applications...</div>
                 ) : (
-                  overtimeApplicationsData.map((entry) => (
-                    <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-6 py-3 text-gray-900">{formatDate(entry.date)}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.numOTHoursApproved}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.earlyOTStartTime}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.earlyTimeIn}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.startOTPM}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.approvedOTBreaksHrs}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
-                      <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
-                      <td className="px-6 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setIsOvertimeEditMode(true);
-                              setCurrentOvertimeId(entry.id);
-                              setOvertimeDate(entry.date ? new Date(entry.date).toISOString().split('T')[0] : '');
-                              setOvertimeNumOTHoursApproved(entry.numOTHoursApproved?.toString() ?? '');
-                              setOvertimeEarlyOTStartTime(entry.earlyOTStartTime ?? '');
-                              setOvertimeEarlyTimeIn(entry.earlyTimeIn ?? '');
-                              setOvertimeStartOTPM(entry.startOTPM ?? '');
-                              setOvertimeMinHRSOTBreak(entry.minHRSOTBreak?.toString() ?? '');
-                              setOvertimeEarlyOTStartTimeRestHol(entry.earlyOTStartTimeRestHol ?? '');
-                              setOvertimeReason(entry.reason ?? '');
-                              setOvertimeRemarks(entry.remarks ?? '');
-                              setOvertimeApprovedOTBreaksHrs(entry.approvedOTBreaksHrs?.toString() ?? '');
-                              setOvertimeStotats(entry.stotats ?? '');
-                              setOvertimeIsLateFiling(entry.isLateFiling ?? false);
-                              setOvertimeAppliedBeforeShiftDate(
-                                entry.appliedBeforeShiftDate
-                                  ? new Date(entry.appliedBeforeShiftDate).toISOString().split('T')[0]
-                                  : ''
-                              );
-                              setOvertimeIsOTBeforeShiftNextDay(entry.isOTBeforeShiftNextDay ?? false);
-                              setShowOvertimeModal(true);
-                            }}
-                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <span className="text-gray-300">|</span>
-                          <button
-                            onClick={() => handleOvertimeDelete(entry.id)}
-                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  <>
+                    <table className="w-full">
+                      <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>{['Date','Hours Approved','Early OT Start','Early Time In','Start OT PM','Approved OT Breaks Hrs','Reason','Remarks','Late Filing','Actions'].map(h => <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {overtimeApplicationsData.length === 0 ? (
+                          <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No overtime applications found</td></tr>
+                        ) : paginate(overtimeApplicationsData, overtimePage).map((entry) => (
+                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.date)}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.numOTHoursApproved}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.earlyOTStartTime}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.earlyTimeIn}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.startOTPM}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.approvedOTBreaksHrs}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.reason}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.remarks}</td>
+                            <td className="px-6 py-3 text-gray-900">{entry.isLateFiling ? 'Yes' : 'No'}</td>
+                            <td className="px-6 py-3">
+                              <div className="flex gap-2">
+                                <button onClick={() => { setIsOvertimeEditMode(true); setCurrentOvertimeId(entry.id); setOvertimeDate(toInputDate(entry.date)); setOvertimeNumOTHoursApproved(entry.numOTHoursApproved?.toString() ?? ''); setOvertimeEarlyOTStartTime(entry.earlyOTStartTime ?? ''); setOvertimeEarlyTimeIn(entry.earlyTimeIn ?? ''); setOvertimeStartOTPM(entry.startOTPM ?? ''); setOvertimeMinHRSOTBreak(entry.minHRSOTBreak?.toString() ?? ''); setOvertimeEarlyOTStartTimeRestHol(entry.earlyOTStartTimeRestHol ?? ''); setOvertimeReason(entry.reason ?? ''); setOvertimeRemarks(entry.remarks ?? ''); setOvertimeApprovedOTBreaksHrs(entry.approvedOTBreaksHrs?.toString() ?? ''); setOvertimeStotats(entry.stotats ?? ''); setOvertimeIsLateFiling(entry.isLateFiling ?? false); setOvertimeAppliedBeforeShiftDate(toInputDate(entry.appliedBeforeShiftDate)); setOvertimeIsOTBeforeShiftNextDay(entry.isOTBeforeShiftNextDay ?? false); setShowOvertimeModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <span className="text-gray-300">|</span>
+                                <button onClick={() => handleOvertimeDelete(entry.id)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <PaginationBar total={overtimeApplicationsData.length} page={overtimePage} onPage={setOvertimePage} />
+                  </>
                 )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+              </div>
+            </div>
+          </div>
+        );
 
       case 'contractual':
         return (
@@ -2590,25 +2450,21 @@ if (activeTab === 'basic-config') {
                 {contractualLoading ? (
                   <div className="text-center py-8">Loading contractual records...</div>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-100 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-gray-700">Date From</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Date To</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {contractualData.length === 0 ? (
-                        <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500">No contractual records found</td></tr>
-                      ) : (
-                        contractualData.map((entry) => (
+                  <>
+                    <table className="w-full">
+                      <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>{['Date From','Date To','Actions'].map(h => <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {contractualData.length === 0 ? (
+                          <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500">No contractual records found</td></tr>
+                        ) : paginate(contractualData, contractualPage).map((entry) => (
                           <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateFrom)}</td>
                             <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td>
                             <td className="px-6 py-3">
                               <div className="flex gap-2">
-                                <button onClick={() => { setIsContractualEditMode(true); setCurrentContractualId(entry.id); setContractualDateFrom(entry.dateFrom); setContractualDateTo(entry.dateTo); setShowContractualModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                <button onClick={() => { setIsContractualEditMode(true); setCurrentContractualId(entry.id); setContractualDateFrom(toInputDate(entry.dateFrom)); setContractualDateTo(toInputDate(entry.dateTo)); setShowContractualModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <span className="text-gray-300">|</span>
@@ -2618,10 +2474,11 @@ if (activeTab === 'basic-config') {
                               </div>
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                    <PaginationBar total={contractualData.length} page={contractualPage} onPage={setContractualPage} />
+                  </>
                 )}
               </div>
             </div>
@@ -2641,25 +2498,21 @@ if (activeTab === 'basic-config') {
                 {suspensionLoading ? (
                   <div className="text-center py-8">Loading suspension records...</div>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-100 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-gray-700">Date From</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Date To</th>
-                        <th className="px-6 py-3 text-left text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {suspensionData.length === 0 ? (
-                        <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500">No suspension records found</td></tr>
-                      ) : (
-                        suspensionData.map((entry) => (
+                  <>
+                    <table className="w-full">
+                      <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>{['Date From','Date To','Actions'].map(h => <th key={h} className="px-6 py-3 text-left text-gray-700">{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {suspensionData.length === 0 ? (
+                          <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500">No suspension records found</td></tr>
+                        ) : paginate(suspensionData, suspensionPage).map((entry) => (
                           <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateFrom)}</td>
-                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td> 
+                            <td className="px-6 py-3 text-gray-900">{formatDate(entry.dateTo)}</td>
                             <td className="px-6 py-3">
                               <div className="flex gap-2">
-                                <button onClick={() => { setIsSuspensionEditMode(true); setCurrentSuspensionId(entry.id); setSuspensionDateFrom(entry.dateFrom); setSuspensionDateTo(entry.dateTo); setShowSuspensionModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
+                                <button onClick={() => { setIsSuspensionEditMode(true); setCurrentSuspensionId(entry.id); setSuspensionDateFrom(toInputDate(entry.dateFrom)); setSuspensionDateTo(toInputDate(entry.dateTo)); setShowSuspensionModal(true); }} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors">
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <span className="text-gray-300">|</span>
@@ -2669,10 +2522,11 @@ if (activeTab === 'basic-config') {
                               </div>
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                    <PaginationBar total={suspensionData.length} page={suspensionPage} onPage={setSuspensionPage} />
+                  </>
                 )}
               </div>
             </div>
@@ -2684,16 +2538,20 @@ if (activeTab === 'basic-config') {
     }
   };
 
+  // ==================== RENDER ====================
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
+
           {/* Page Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg shadow-lg">
             <h1 className="text-white">{getHeaderTitle()}</h1>
           </div>
 
           <div className="bg-white rounded-b-lg shadow-lg p-6 relative">
+
             {/* Info Banner */}
             <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -2719,7 +2577,7 @@ if (activeTab === 'basic-config') {
             {/* Action Buttons */}
             <div className="mb-6 space-y-4">
               <div className="flex items-center gap-4">
-                {!['leave-applications', 'overtime-applications', 'contractual', 'suspension'].includes(activeTab) && (
+                {!['leave-applications','overtime-applications','contractual','suspension'].includes(activeTab) && (
                   <>
                     {!isEditMode ? (
                       <button onClick={handleEdit} disabled={!empCode || (!basicConfigData && !isCreatingNew && activeTab === 'basic-config') || (activeTab === 'exemptions' && !exemptionsData)} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
@@ -2737,7 +2595,7 @@ if (activeTab === 'basic-config') {
                     )}
                   </>
                 )}
-                {['leave-applications', 'overtime-applications', 'contractual', 'suspension'].includes(activeTab) && <div className="px-4 py-2">&nbsp;</div>}
+                {['leave-applications','overtime-applications','contractual','suspension'].includes(activeTab) && <div className="px-4 py-2">&nbsp;</div>}
               </div>
 
               {/* Employee Search Section */}
@@ -2745,10 +2603,15 @@ if (activeTab === 'basic-config') {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
                     <label className="text-gray-700 font-bold w-32 flex-shrink-0">TKS Group</label>
-                    <div onClick={() => setShowTKSGroupModal(true)} className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                    <div className={`flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg bg-white ${isEditMode ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed bg-gray-100'} transition-colors`}
+                      onClick={() => isEditMode && setShowTKSGroupModal(true)}>
                       {tksGroup ? <span className="text-sm font-medium text-gray-900 truncate block">{tksGroup}</span> : <span className="text-gray-400 text-sm">Select...</span>}
                     </div>
-                    <button onClick={() => setShowTKSGroupModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => setShowTKSGroupModal(true)}
+                      disabled={!isEditMode}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       <Search className="w-4 h-4" />Browse
                     </button>
                   </div>
@@ -2786,7 +2649,7 @@ if (activeTab === 'basic-config') {
             {/* TKS Group Modal */}
             {showTKSGroupModal && (
               <>
-                <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowTKSGroupModal(false)}></div>
+                <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowTKSGroupModal(false)} />
                 <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-3xl max-h-[90vh] overflow-hidden">
                     <div className="bg-gray-200 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
@@ -2805,7 +2668,7 @@ if (activeTab === 'basic-config') {
                         <>
                           <div className="border border-gray-200 rounded overflow-hidden">
                             <table className="w-full border-collapse text-sm">
-                              <thead className="bg-white">
+                              <thead>
                                 <tr className="bg-gray-100 border-b-2 border-gray-300">
                                   <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Location Code</th>
                                   <th className="px-3 py-1.5 text-left text-gray-700 text-sm">Location Name</th>
@@ -2815,15 +2678,13 @@ if (activeTab === 'basic-config') {
                               <tbody>
                                 {currentPayrollLocations.length === 0 ? (
                                   <tr><td colSpan={3} className="px-3 py-8 text-center text-gray-500">No payroll locations found</td></tr>
-                                ) : (
-                                  currentPayrollLocations.map((loc) => (
-                                    <tr key={loc.id} className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer" onClick={() => handleTKSGroupSelect(loc.locCode, loc.locName)}>
-                                      <td className="px-3 py-1.5">{loc.locCode}</td>
-                                      <td className="px-3 py-1.5">{loc.locName}</td>
-                                      <td className="px-3 py-1.5">{loc.companyCode}</td>
-                                    </tr>
-                                  ))
-                                )}
+                                ) : currentPayrollLocations.map((loc) => (
+                                  <tr key={loc.id} className="border-b border-gray-200 hover:bg-blue-50 cursor-pointer" onClick={() => handleTKSGroupSelect(loc.locCode, loc.locName)}>
+                                    <td className="px-3 py-1.5">{loc.locCode}</td>
+                                    <td className="px-3 py-1.5">{loc.locName}</td>
+                                    <td className="px-3 py-1.5">{loc.companyCode}</td>
+                                  </tr>
+                                ))}
                               </tbody>
                             </table>
                           </div>
@@ -2861,7 +2722,6 @@ if (activeTab === 'basic-config') {
 
       <GroupScheduleSearchModal isOpen={showGroupScheduleModal} onClose={() => setShowGroupScheduleModal(false)} onSelect={(code) => handleFieldChange('groupScheduleCode', code)} groupSchedules={groupSchedules} loading={groupScheduleLoading} />
 
-      {/* ── UPDATED: LeaveApplicationModal now receives leaveCodes + leaveCodesLoading ── */}
       <LeaveApplicationModal
         isOpen={showLeaveModal}
         isEditMode={isLeaveEditMode}
@@ -2886,21 +2746,101 @@ if (activeTab === 'basic-config') {
         onSssNotificationChange={setLeaveSssNotification}
         onIsLateFilingChange={setLeaveIsLateFiling}
         onSubmit={handleLeaveSubmit}
-        leaveCodes={leaveCodes}           // ── NEW ──
-        leaveCodesLoading={leaveCodesLoading} // ── NEW ──
+        leaveCodes={leaveCodes}
+        leaveCodesLoading={leaveCodesLoading}
       />
 
-      <OvertimeApplicationModal isOpen={showOvertimeModal} isEditMode={isOvertimeEditMode} empCode={empCode} date={overtimeDate} hoursApproved={overtimeHoursApproved} actualDateInOTBefore={overtimeActualDateInOTBefore} startTimeBefore={overtimeStartTimeBefore} startOvertimeDate={overtimeStartOvertimeDate} startOvertimeTime={overtimeStartOvertimeTime} approvedBreak={overtimeApprovedBreak} reason={overtimeReason} remarks={overtimeRemarks} isLateFiling={overtimeIsLateFiling} onClose={() => setShowOvertimeModal(false)} onDateChange={setOvertimeDate} onHoursApprovedChange={setOvertimeHoursApproved} onActualDateInOTBeforeChange={setOvertimeActualDateInOTBefore} onStartTimeBeforeChange={setOvertimeStartTimeBefore} onStartOvertimeDateChange={setOvertimeStartOvertimeDate} onStartOvertimeTimeChange={setOvertimeStartOvertimeTime} onApprovedBreakChange={setOvertimeApprovedBreak} onReasonChange={setOvertimeReason} onRemarksChange={setOvertimeRemarks} onIsLateFilingChange={setOvertimeIsLateFiling} onSubmit={handleOvertimeSubmit} />
+      <OvertimeApplicationModal
+        isOpen={showOvertimeModal}
+        isEditMode={isOvertimeEditMode}
+        empCode={empCode}
+        date={overtimeDate}
+        hoursApproved={overtimeHoursApproved}
+        actualDateInOTBefore={overtimeActualDateInOTBefore}
+        startTimeBefore={overtimeStartTimeBefore}
+        startOvertimeDate={overtimeStartOvertimeDate}
+        startOvertimeTime={overtimeStartOvertimeTime}
+        approvedBreak={overtimeApprovedBreak}
+        reason={overtimeReason}
+        remarks={overtimeRemarks}
+        isLateFiling={overtimeIsLateFiling}
+        onClose={() => setShowOvertimeModal(false)}
+        onDateChange={setOvertimeDate}
+        onHoursApprovedChange={setOvertimeHoursApproved}
+        onActualDateInOTBeforeChange={setOvertimeActualDateInOTBefore}
+        onStartTimeBeforeChange={setOvertimeStartTimeBefore}
+        onStartOvertimeDateChange={setOvertimeStartOvertimeDate}
+        onStartOvertimeTimeChange={setOvertimeStartOvertimeTime}
+        onApprovedBreakChange={setOvertimeApprovedBreak}
+        onReasonChange={setOvertimeReason}
+        onRemarksChange={setOvertimeRemarks}
+        onIsLateFilingChange={setOvertimeIsLateFiling}
+        onSubmit={handleOvertimeSubmit}
+      />
 
-      <ContractualModal isOpen={showContractualModal} isEditMode={isContractualEditMode} dateFrom={contractualDateFrom} dateTo={contractualDateTo} onClose={() => setShowContractualModal(false)} onDateFromChange={setContractualDateFrom} onDateToChange={setContractualDateTo} onSubmit={handleContractualSubmit} />
+      <ContractualModal
+        isOpen={showContractualModal}
+        isEditMode={isContractualEditMode}
+        dateFrom={contractualDateFrom}
+        dateTo={contractualDateTo}
+        onClose={() => setShowContractualModal(false)}
+        onDateFromChange={setContractualDateFrom}
+        onDateToChange={setContractualDateTo}
+        onSubmit={handleContractualSubmit}
+      />
 
-      <SuspensionModal isOpen={showSuspensionModal} isEditMode={isSuspensionEditMode} dateFrom={suspensionDateFrom} dateTo={suspensionDateTo} onClose={() => setShowSuspensionModal(false)} onDateFromChange={setSuspensionDateFrom} onDateToChange={setSuspensionDateTo} onSubmit={handleSuspensionSubmit} />
+      <SuspensionModal
+        isOpen={showSuspensionModal}
+        isEditMode={isSuspensionEditMode}
+        dateFrom={suspensionDateFrom}
+        dateTo={suspensionDateTo}
+        onClose={() => setShowSuspensionModal(false)}
+        onDateFromChange={setSuspensionDateFrom}
+        onDateToChange={setSuspensionDateTo}
+        onSubmit={handleSuspensionSubmit}
+      />
 
-      <DeviceCodeModal isOpen={showDeviceCodeModal} isEditMode={isDeviceCodeEditMode} empCode={empCode} code={deviceCode} password={devicePassword} effectivityDate={deviceEffectivityDate} expiryDate={deviceExpiryDate} onClose={() => setShowDeviceCodeModal(false)} onCodeChange={setDeviceCode} onPasswordChange={setDevicePassword} onEffectivityDateChange={setDeviceEffectivityDate} onExpiryDateChange={setDeviceExpiryDate} onSubmit={handleDeviceCodeSubmit} />
+      <DeviceCodeModal
+        isOpen={showDeviceCodeModal}
+        isEditMode={isDeviceCodeEditMode}
+        empCode={empCode}
+        code={deviceCode}
+        password={devicePassword}
+        effectivityDate={deviceEffectivityDate}
+        expiryDate={deviceExpiryDate}
+        onClose={() => setShowDeviceCodeModal(false)}
+        onCodeChange={setDeviceCode}
+        onPasswordChange={setDevicePassword}
+        onEffectivityDateChange={setDeviceEffectivityDate}
+        onExpiryDateChange={setDeviceExpiryDate}
+        onSubmit={handleDeviceCodeSubmit}
+      />
 
-      <RestDayVariableModal isOpen={showRestDayModal} isEditMode={isRestDayEditMode} empCode={empCode} dateFrom={restDayDateFrom} dateTo={restDayDateTo} restDay1={restDay1} restDay2={restDay2} restDay3={restDay3} onClose={() => setShowRestDayModal(false)} onDateFromChange={setRestDayDateFrom} onDateToChange={setRestDayDateTo} onRestDay1Change={setRestDay1} onRestDay2Change={setRestDay2} onRestDay3Change={setRestDay3} onSubmit={handleRestDaySubmit} />
+      <RestDayVariableModal
+        isOpen={showRestDayModal}
+        isEditMode={isRestDayEditMode}
+        empCode={empCode}
+        dateFrom={restDayDateFrom}
+        dateTo={restDayDateTo}
+        restDay1={restDay1}
+        restDay2={restDay2}
+        restDay3={restDay3}
+        onClose={() => setShowRestDayModal(false)}
+        onDateFromChange={setRestDayDateFrom}
+        onDateToChange={setRestDayDateTo}
+        onRestDay1Change={setRestDay1}
+        onRestDay2Change={setRestDay2}
+        onRestDay3Change={setRestDay3}
+        onSubmit={handleRestDaySubmit}
+      />
 
-      <DailyScheduleSearchModal isOpen={showDailyScheduleModal} onClose={() => setShowDailyScheduleModal(false)} onSelect={(referenceNo) => setFixedDailySched(referenceNo)} dailySchedules={dailySchedules} loading={dailyScheduleLoading} />
+      <DailyScheduleSearchModal
+        isOpen={showDailyScheduleModal}
+        onClose={() => setShowDailyScheduleModal(false)}
+        onSelect={(referenceNo) => setFixedDailySched(referenceNo)}
+        dailySchedules={dailySchedules}
+        loading={dailyScheduleLoading}
+      />
 
       <WorkshiftVariableModal
         isOpen={showWorkshiftModal}
@@ -2909,14 +2849,10 @@ if (activeTab === 'basic-config') {
         dateFrom={workshiftDateFrom}
         dateTo={workshiftDateTo}
         shiftCode={workshiftShiftCode}
-        dailyScheduleCode={workshiftDailyScheduleCode}
-        glCode={workshiftGLCode}
         onClose={() => setShowWorkshiftModal(false)}
         onDateFromChange={setWorkshiftDateFrom}
         onDateToChange={setWorkshiftDateTo}
         onShiftCodeChange={setWorkshiftShiftCode}
-        onDailyScheduleCodeChange={setWorkshiftDailyScheduleCode}
-        onGLCodeChange={setWorkshiftGLCode}
         onSubmit={handleWorkshiftSubmit}
         workshiftCodes={workshiftCodes}
         workshiftCodesLoading={workshiftCodesLoading}
@@ -2942,12 +2878,15 @@ if (activeTab === 'basic-config') {
         onDateToChange={setClassificationDateTo}
         onClassificationCodeChange={setVariableClassCode}
         onSubmit={handleClassificationSubmit}
+        onOpenCodeSearch={() => { fetchClassificationCodes(); setIsFixedCodeSearch(false); setShowClassificationCodeModal(true); }}
+        classificationCodes={classificationCodes}
+        classificationCodesLoading={classificationCodesLoading}
       />
 
       <ClassificationCodeSearchModal
         isOpen={showClassificationCodeModal}
         onClose={() => setShowClassificationCodeModal(false)}
-        onSelect={(code) => { setFixedClassCode(code); setShowClassificationCodeModal(false); }}
+        onSelect={(code) => { if (isFixedCodeSearch) { setFixedClassCode(code); } else { setVariableClassCode(code); } setShowClassificationCodeModal(false); }}
         classificationCodes={classificationCodes}
         loading={classificationCodesLoading}
       />

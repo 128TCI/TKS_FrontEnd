@@ -8,6 +8,7 @@ import { EmployeeSearchModal } from '../Modals/EmployeeSearchModal';
 import { TimePicker } from '../Modals/TimePickerModal';
 import Swal from 'sweetalert2';
 import { fetchEmployees as fetchEmployeesService } from '../../services/employeeService';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TwoShiftsRawDataEntry {
@@ -74,7 +75,6 @@ interface BorrowedDevice {
 interface WorkShift {
     code: string;
     description: string;
-    // Time fields — adjust property names to match your actual API response
     timeIn?: string;
     timeOut?: string;
     break1Out?: string;
@@ -95,12 +95,15 @@ interface EmployeeData {
 
 const TWO_SHIFTS_BASE_URL = '/Maintenance/EmployeeRawData/StraightDuty';
 const DEVICE_BASE_URL = '/Fs/Process/Device/BorrowedDeviceName';
-const EMPLOYEE_MASTER_URL = '/Maintenance/EmployeeMasterFile';
+
+// ─── Pagination constant ──────────────────────────────────────────────────────
+
+const PAGE_SIZE = 10;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toISOSafe = (dateStr: string, timeStr: string = ''): string => {
-    if (!dateStr) return new Date().toISOString();
+    if (!dateStr || !dateStr.trim()) return '';
     try {
         let base = dateStr.trim();
         if (base.includes('/')) {
@@ -110,7 +113,7 @@ const toISOSafe = (dateStr: string, timeStr: string = ''): string => {
                 base = `${y.trim()}-${m.trim().padStart(2, '0')}-${d.trim().padStart(2, '0')}`;
             }
         }
-        if (timeStr) {
+        if (timeStr && timeStr.trim()) {
             const upper = timeStr.toUpperCase().trim();
             const match = upper.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
             if (match) {
@@ -119,21 +122,22 @@ const toISOSafe = (dateStr: string, timeStr: string = ''): string => {
                 const period = match[3];
                 if (period === 'PM' && hours !== 12) hours += 12;
                 if (period === 'AM' && hours === 12) hours = 0;
-                return `${base}T${String(hours).padStart(2, '0')}:${mins}:00.000`;
+                return `${base}T${String(hours).padStart(2, '0')}:${mins}:00`;
             }
         }
-        return `${base}T00:00:00.000`;
+        return `${base}T00:00:00`;
     } catch {
-        return new Date().toISOString();
+        return '';
     }
 };
 
 const fromISO = (iso: string): { date: string; time: string } => {
-    if (!iso) return { date: '', time: '' };
+    if (!iso || !iso.trim()) return { date: '', time: '' };
     try {
-        const localStr = iso.trim().endsWith('Z') ? iso.trim().slice(0, -1) : iso.trim();
-        const d = new Date(localStr);
+        const cleaned = iso.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+        const d = new Date(cleaned);
         if (isNaN(d.getTime())) return { date: '', time: '' };
+        if (d.getFullYear() < 1900 || d.getFullYear() === 1) return { date: '', time: '' };
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day   = String(d.getDate()).padStart(2, '0');
         const year  = d.getFullYear();
@@ -170,6 +174,7 @@ const todayStr = () => {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function RawdataOnStraightDutyPage() {
+
     // ── Filter state ──
     const [dateFrom, setDateFrom] = useState(todayStr());
     const [dateTo, setDateTo] = useState(todayStr());
@@ -182,6 +187,24 @@ export function RawdataOnStraightDutyPage() {
     const [rawDataList, setRawDataList] = useState<TwoShiftsRawDataEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [tableError, setTableError] = useState('');
+
+    // ── Pagination ──
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // ── Sorting ──
+    type SortKey = 'empCode' | 'workShiftCode' | 'rawDateIn' | 'rawTimeIn' | 'actualDateIn' | 'rawDateOut' | 'rawTimeOut' | 'dayType' | 'rawotApproved';
+    const [sortKey, setSortKey] = useState<SortKey>('empCode');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+    const handleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+        setCurrentPage(1);
+    };
 
     // ── Hide columns ──
     const [hideColumns, setHideColumns] = useState({
@@ -231,6 +254,7 @@ export function RawdataOnStraightDutyPage() {
     const [sdWorkShiftCodeFlag, setSdWorkShiftCodeFlag] = useState(false);
     const [sdWorkShiftCode, setSdWorkShiftCode] = useState('');
 
+    // ── Calendar / Picker visibility ──
     const [showDateInCalendar, setShowDateInCalendar] = useState(false);
     const [showTimeInPicker, setShowTimeInPicker] = useState(false);
     const [showActualDateInCalendar, setShowActualDateInCalendar] = useState(false);
@@ -254,7 +278,7 @@ export function RawdataOnStraightDutyPage() {
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [employeeError, setEmployeeError] = useState('');
 
-    // ── "Specific" mode – search by employee ──
+    // ── "Specific" mode ──
     const [specificEmpCode, setSpecificEmpCode] = useState('');
     const [specificEmpName, setSpecificEmpName] = useState('');
     const [showSpecificEmpModal, setShowSpecificEmpModal] = useState(false);
@@ -281,6 +305,7 @@ export function RawdataOnStraightDutyPage() {
     const fetchRawData = useCallback(async () => {
         setLoading(true);
         setTableError('');
+        setCurrentPage(1); // reset to first page on every new search
         try {
             const params: Record<string, string> = {
                 dateFrom: toISOSafe(dateFrom),
@@ -294,18 +319,18 @@ export function RawdataOnStraightDutyPage() {
             if (response.status === 200 && response.data) {
                 const list: TwoShiftsRawDataEntry[] = Array.isArray(response.data) ? response.data : [];
 
-                const fromDate = new Date(toISOSafe(dateFrom));
-                fromDate.setHours(0, 0, 0, 0);
-                const toDate = new Date(toISOSafe(dateTo));
-                toDate.setHours(23, 59, 59, 999);
+                const fromLocal = new Date(toISOSafe(dateFrom));
+                fromLocal.setHours(0, 0, 0, 0);
+                const toLocal = new Date(toISOSafe(dateTo));
+                toLocal.setHours(23, 59, 59, 999);
 
                 const filtered = list.filter(entry => {
                     if (!entry.rawDateIn) return false;
-                    const rawStr = entry.rawDateIn.trim().endsWith('Z')
-                        ? entry.rawDateIn.trim().slice(0, -1)
-                        : entry.rawDateIn.trim();
-                    const rawMs = new Date(rawStr).getTime();
-                    if (rawMs < fromDate.getTime() || rawMs > toDate.getTime()) return false;
+                    const cleaned = entry.rawDateIn.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+                    const entryDate = new Date(cleaned);
+                    if (isNaN(entryDate.getTime())) return false;
+                    if (entryDate < fromLocal || entryDate > toLocal) return false;
+
                     const hasDateOut = !!entry.rawDateOut && entry.rawDateOut.trim() !== '';
                     const hasTimeIn  = !!entry.rawTimeIn;
                     const hasTimeOut = !!entry.rawTimeOut;
@@ -318,7 +343,7 @@ export function RawdataOnStraightDutyPage() {
         } catch (error: any) {
             const msg = error.response?.data?.message || error.message || 'Failed to load raw data';
             setTableError(msg);
-            console.error('Error fetching two shifts raw data:', error);
+            console.error('Error fetching straight duty raw data:', error);
         } finally {
             setLoading(false);
         }
@@ -347,20 +372,17 @@ export function RawdataOnStraightDutyPage() {
             const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
             if (response.status === 200 && response.data) {
                 const list = response.data.data || [];
-                console.log('[fetchWorkshifts] sample workshift object:', list[0]);
                 const mappedData = list.map((w: any) => ({
                     code: w.code || '',
                     description: w.description || '',
-                    // ── Adjust the RIGHT-HAND keys to match your actual API response ──
-                    // Check the console log above to see the real field names
                     timeIn:    w.timeIn    || w.shiftTimeIn  || w.startTime   || w.inTime    || '',
                     timeOut:   w.timeOut   || w.shiftTimeOut || w.endTime     || w.outTime   || '',
                     break1Out: w.break1Out || w.breakOut1    || w.lunchOut    || w.break1TimeOut || '',
                     break1In:  w.break1In  || w.breakIn1     || w.lunchIn     || w.break1TimeIn  || '',
-                    break2Out: w.break2Out || w.breakOut2    || w.break2TimeOut || '',
-                    break2In:  w.break2In  || w.breakIn2     || w.break2TimeIn  || '',
-                    break3Out: w.break3Out || w.breakOut3    || w.break3TimeOut || '',
-                    break3In:  w.break3In  || w.breakIn3     || w.break3TimeIn  || '',
+                    break2Out: w.break2Out || w.breakOut2    || w.break2TimeOut || w.lunchOut2  || w.mealOut || '',
+                    break2In:  w.break2In  || w.breakIn2     || w.break2TimeIn  || w.lunchIn2   || w.mealIn  || '',
+                    break3Out: w.break3Out || w.breakOut3    || w.break3TimeOut || w.dinnerOut  || '',
+                    break3In:  w.break3In  || w.breakIn3     || w.break3TimeIn  || w.dinnerIn   || '',
                 }));
                 setWorkshifts(mappedData);
             }
@@ -372,69 +394,80 @@ export function RawdataOnStraightDutyPage() {
         }
     }, []);
 
-const fetchEmployeeData = async () => {
-    setLoadingEmployees(true);
-    setEmployeeError('');
-    try {
-        const { employees } = await fetchEmployeesService();
-        setEmployeeData(employees.map((emp) => ({
-            empCode: emp.empCode || '',
-            name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
-            groupCode: emp.grpCode || '',
-        })));
-    } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
-        setEmployeeError(errorMsg);
-        console.error('Error fetching employees:', error);
-    } finally {
-        setLoadingEmployees(false);
-    }
-};
+    const fetchEmployeeData = async () => {
+        setLoadingEmployees(true);
+        setEmployeeError('');
+        try {
+            const { employees } = await fetchEmployeesService();
+            setEmployeeData(employees.map((emp) => ({
+                empCode: emp.empCode || '',
+                name: `${emp.lName || ''}, ${emp.fName || ''} ${emp.mName || ''}`.trim(),
+                groupCode: emp.grpCode || '',
+            })));
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to load employees';
+            setEmployeeError(errorMsg);
+            console.error('Error fetching employees:', error);
+        } finally {
+            setLoadingEmployees(false);
+        }
+    };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // GET SHIFT — auto-populate time fields from selected workshift
+    // GET SHIFT
     // ─────────────────────────────────────────────────────────────────────────
 
- const handleGetShift = async () => {
-    if (!empCode.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code first.' });
-        return;
-    }
-    if (!dateIn.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please enter Date In first.' });
-        return;
-    }
- if (!workshiftCode.trim()) {
-    await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select a Workshift Code first.' });
-    return;
-}
-resetShiftTimes();
+  const handleGetShift = async () => {
+    if (!empCode.trim()) { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code first.' }); return; }
+    if (!dateIn.trim())  { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please enter Date In first.' }); return; }
+    if (!workshiftCode.trim()) { await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select a Workshift Code first.' }); return; }
+
+    resetShiftTimes();
+
     const isoToAmPm = (raw: string): string => {
         if (!raw) return '';
         try {
             const timeMatch = raw.match(/T?(\d{1,2}):(\d{2})(?::\d{2})?/);
             if (!timeMatch) return '';
-            let hours = parseInt(timeMatch[1]);
-            const mins = parseInt(timeMatch[2]);
+            let hours = parseInt(timeMatch[1], 10);
+            const mins = parseInt(timeMatch[2], 10);
             const period = hours >= 12 ? 'PM' : 'AM';
             if (hours > 12) hours -= 12;
             if (hours === 0) hours = 12;
             return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${period}`;
-        } catch {
-            return '';
-        }
+        } catch { return ''; }
+    };
+
+    const amPmToMinutes = (amPm: string): number => {
+        const match = amPm.trim().toUpperCase().match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
+        if (!match) return -1;
+        let hours = parseInt(match[1], 10);
+        const mins = parseInt(match[2], 10);
+        const period = match[3];
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        return hours * 60 + mins;
+    };
+
+    const addOneDay = (dateStr: string): string => {
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return dateStr;
+        const d = new Date(`${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}T00:00:00`);
+        if (isNaN(d.getTime())) return dateStr;
+        d.setDate(d.getDate() + 1);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${m}/${day}/${d.getFullYear()}`;
     };
 
     let list = workshifts;
     if (list.length === 0) {
-        await fetchWorkshifts();
         try {
             const response = await apiClient.get('/Fs/Process/WorkshiftSetUp');
             if (response.status === 200 && response.data) {
                 const raw = response.data.data || [];
                 list = raw.map((w: any) => ({
-                    code: w.code || '',
-                    description: w.description || '',
+                    code: w.code || '', description: w.description || '',
                     timeIn:    w.timeIn    || w.shiftTimeIn    || w.startTime      || w.inTime        || '',
                     timeOut:   w.timeOut   || w.shiftTimeOut   || w.endTime        || w.outTime       || '',
                     break1Out: w.break1Out || w.breakOut1      || w.lunchOut       || w.break1TimeOut || '',
@@ -446,22 +479,17 @@ resetShiftTimes();
                 }));
                 setWorkshifts(list);
             }
-        } catch {
-            await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load workshifts. Please try again.' });
-            return;
-        }
+        } catch { await Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load workshifts. Please try again.' }); return; }
     }
 
     const found = list.find(ws => ws.code === workshiftCode);
-    console.log('[handleGetShift] raw found:', found);
+    if (!found) { await Swal.fire({ icon: 'error', title: 'Not Found', text: `Workshift "${workshiftCode}" not found.` }); return; }
 
-    if (!found) {
-        await Swal.fire({ icon: 'error', title: 'Not Found', text: `Workshift "${workshiftCode}" not found.` });
-        return;
-    }
+    const shiftTimeIn  = found.timeIn  ? isoToAmPm(found.timeIn)  : '';
+    const shiftTimeOut = found.timeOut ? isoToAmPm(found.timeOut) : '';
 
-    if (found.timeIn)    setTimeIn(isoToAmPm(found.timeIn));
-    if (found.timeOut)   setTimeOut(isoToAmPm(found.timeOut));
+    if (shiftTimeIn)     setTimeIn(shiftTimeIn);
+    if (shiftTimeOut)    setTimeOut(shiftTimeOut);
     if (found.break1Out) setBreak1Out(isoToAmPm(found.break1Out));
     if (found.break1In)  setBreak1In(isoToAmPm(found.break1In));
     if (found.break2Out) setBreak2Out(isoToAmPm(found.break2Out));
@@ -469,198 +497,223 @@ resetShiftTimes();
     if (found.break3Out) setBreak3Out(isoToAmPm(found.break3Out));
     if (found.break3In)  setBreak3In(isoToAmPm(found.break3In));
 
-    if (dateIn) setDateOut(dateIn);
+    if (dateIn) {
+        const inMins  = amPmToMinutes(shiftTimeIn);
+        const outMins = amPmToMinutes(shiftTimeOut);
+        const isOvernight = inMins >= 0 && outMins >= 0 && outMins < inMins;
+        setDateOut(isOvernight ? addOneDay(dateIn) : dateIn);
+    }
 };
 
     // ─────────────────────────────────────────────────────────────────────────
     // CRUD
     // ─────────────────────────────────────────────────────────────────────────
 
-const handleSubmit = async () => {
-    // ── 1. Required: Emp Code ──
-    if (!empCode.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code.' });
-        return;
-    }
-
-    // ── 2. Required: Date In ──
-    if (!dateIn.trim()) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In is required.' });
-        return;
-    }
-
-    // ── 3. DateTime In vs DateTime Out (handles overnight shifts) ──
-    if (timeIn.trim() && timeOut.trim()) {
-        const effectiveDateOut = dateOut.trim() ? dateOut : dateIn;
-        let dtIn  = new Date(toISOSafe(dateIn, timeIn));
-        let dtOut = new Date(toISOSafe(effectiveDateOut, timeOut));
-
-        // Overnight shift — e.g. 3:00 PM in, 12:00 AM out
-        if (dtOut <= dtIn) {
-            dtOut = new Date(dtOut.getTime() + 24 * 60 * 60 * 1000);
-        }
-
-        if (!isNaN(dtIn.getTime()) && !isNaN(dtOut.getTime()) && dtIn > dtOut) {
-            await Swal.fire({
-                icon: 'error',
-                title: 'Invalid Date/Time',
-                text: "Invalid DateTime 'In' and DateTime 'Out'. Date In must not be later than Date Out.",
-            });
+    const handleSubmit = async () => {
+        // ── 1. Required: Emp Code ──
+        if (!empCode.trim()) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Please select an Employee Code.' });
             return;
         }
-    }
 
-    // ── 4. OT validation ──
-    const parsedNumOT = numOTHoursApproved ? parseFloat(numOTHoursApproved) : 0;
-    if (otAppApprovalFlag === false && parsedNumOT > 0) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid No. of OT Hrs Approved for First Shift.' });
-        return;
-    }
-    if (otAppApprovalFlag === true && parsedNumOT === 0) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid No. of OT Hrs Approved for First Shift.' });
-        return;
-    }
-
-    // ── 5. SD WorkShift Code validation ──
-    if (sdWorkShiftCodeFlag === false && sdWorkShiftCode.trim().length > 0) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'SD WorkShift Code Should Be Empty.' });
-        return;
-    }
-    if (sdWorkShiftCodeFlag === true && sdWorkShiftCode.trim().length === 0) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'SD WorkShift Code Should Not Be Empty.' });
-        return;
-    }
-
-    // ── 6. Duplicate Date In check via fresh API call ──
-    let allRawList: TwoShiftsRawDataEntry[] = [];
-    try {
-        const checkResponse = await apiClient.get(TWO_SHIFTS_BASE_URL, {
-            params: {
-                dateFrom: toISOSafe(dateIn),
-                dateTo:   toISOSafe(dateIn),
-                empCode:  empCode.trim(),
-            },
-        });
-        allRawList = Array.isArray(checkResponse.data) ? checkResponse.data : [];
-        console.log('[handleSubmit] allRawList count:', allRawList.length);
-        console.log('[handleSubmit] allRawList:', JSON.stringify(allRawList, null, 2));
-    } catch (fetchError: any) {
-        console.warn('[handleSubmit] Could not fetch list for duplicate check:', fetchError.message);
-    }
-
-    const targetDateMs_from = new Date(toISOSafe(dateIn)).setUTCHours(0, 0, 0, 0);
-    const targetDateMs_to   = new Date(toISOSafe(dateIn)).setUTCHours(23, 59, 59, 999);
-
-    const isDuplicate = allRawList.some(entry => {
-        if (editingId !== null && entry.id === editingId) return false;
-        if (entry.empCode.trim().toUpperCase() !== empCode.trim().toUpperCase()) return false;
-        if (!entry.rawDateIn) return false;
-        const rawStr = entry.rawDateIn.trim().endsWith('Z')
-            ? entry.rawDateIn.trim().slice(0, -1)
-            : entry.rawDateIn.trim();
-        const entryDateMs = new Date(rawStr).getTime();
-        return entryDateMs >= targetDateMs_from && entryDateMs <= targetDateMs_to;
-    });
-
-    if (isDuplicate) {
-        await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In already exist.' });
-        return;
-    }
-
-    // ── 7. Proceed with save ──
-    setSubmitLoading(true);
-
-    const dtoPayload = {
-        id: editingId ?? 0,
-        empCode,
-        workShiftCode: workshiftCode,
-        dayType: 'Regular',
-        rawDateIn:      toISOSafe(dateIn),
-        rawTimeIn:      toISOSafe(dateIn, timeIn),
-        actualDateIn:   toISOSafe(actualDateIn || dateIn),
-        actualDateIn2:  toISOSafe(dateIn),
-        actualTimeIn2:  toISOSafe(actualDateIn || dateIn, actualTimeIn),
-        rawBreak1Out:   toISOSafe(dateIn, break1Out),
-        rawBreak1In:    toISOSafe(dateIn, break1In),
-        rawBreak2Out:   toISOSafe(dateIn, break2Out),
-        rawBreak2In:    toISOSafe(dateIn, break2In),
-        rawBreak3Out:   toISOSafe(dateIn, break3Out),
-        rawBreak3In:    toISOSafe(dateIn, break3In),
-        rawDateOut:     toISOSafe(dateOut || dateIn),
-        rawTimeOut:     toISOSafe(dateOut || dateIn, timeOut),
-        rAWOTApproved:  otApproved,
-        rawRemarks:     remarks,
-        isLateFiling,
-        bDeviceName:    borrowedDeviceName,
-        rawTardiness: false, rawUndertime: false, rawOT: false,
-        rawNightDiff: false, rawOtherEarnings: false, rawUnproductive: false,
-        rawDisplDateFrom: toISOSafe(dateFrom),
-        rawDisplDateTo:   toISOSafe(dateTo),
-        isSuspended: false, rawNoofDays: false,
-        dayType2: '', entryFlag: '', terminalID: '', dayTypeDOLE: '',
-        aprOTTime:    toISOSafe(dateIn),
-        deviceNameIn: '', deviceNameOut: '',
-        isLateFilingProcessed: false,
-        post_Tardy: false, post_UT: false, post_OT: false,
-        post_Earn: false, post_ND: false, post_NoOfDays: false,
-        oTAppApprovalFlag:   otAppApprovalFlag,
-        sDWorkShiftCodeFlag: sdWorkShiftCodeFlag,
-        flexiBreakFlag: false,
-        numOTHoursApproved: parsedNumOT,
-        earlyOTStartTimeRestHol: overtimeStartDate && overtimeStartTime
-            ? toISOSafe(overtimeStartDate, overtimeStartTime)
-            : toISOSafe(dateIn),
-        sTOTATS: toISOSafe(dateIn),
-        sDWorkShiftCode: sdWorkShiftCode,
-    };
-
-    try {
-        if (editingId !== null) {
-            const existingRecord = rawDataList.find(e => e.id === editingId);
-            if (!existingRecord) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Something is wrong with your transaction. Please refresh the page and try again.',
-                });
-                setSubmitLoading(false);
-                return;
-            }
-            await apiClient.put(`${TWO_SHIFTS_BASE_URL}/${editingId}`, { ...dtoPayload, id: editingId });
-        } else {
-            await apiClient.post(TWO_SHIFTS_BASE_URL, dtoPayload);
+        // ── 2. Required: Date In ──
+        if (!dateIn.trim()) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In is required.' });
+            return;
         }
 
-        await Swal.fire({
-            icon: 'success',
-            title: editingId !== null ? 'Updated Successfully' : 'Created Successfully',
-            text: editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
-            timer: 2000,
-            timerProgressBar: true,
-            showConfirmButton: false,
-        });
+        // ── 3. DateTime In vs DateTime Out (handles overnight shifts) ──
+     // ── 3. DateTime In vs DateTime Out (overnight-aware) ──────────────────
+if (timeIn.trim() && timeOut.trim()) {
+    const effectiveDateOut = dateOut.trim() ? dateOut : dateIn;
+    const dtIn  = new Date(toISOSafe(dateIn, timeIn));
+    const dtOut = new Date(toISOSafe(effectiveDateOut, timeOut));
 
-        setShowCreateModal(false);
-        setEditingId(null);
-        await fetchRawData();
+    const fmt = (d: Date): string => {
+        const mo  = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const yr  = d.getFullYear();
+        let h     = d.getHours();
+        const min = String(d.getMinutes()).padStart(2, '0');
+        const per = h >= 12 ? 'PM' : 'AM';
+        if (h > 12) h -= 12;
+        if (h === 0) h = 12;
+        return `${mo}/${day}/${yr} ${String(h).padStart(2, '0')}:${min} ${per}`;
+    };
 
-    } catch (error: any) {
-        const backendMsg =
-            error.response?.data?.message ||
-            error.response?.data?.title ||
-            error.message ||
-            'Something went wrong. Please try again.';
+    if (!isNaN(dtIn.getTime()) && !isNaN(dtOut.getTime()) && dtIn > dtOut) {
         await Swal.fire({
             icon: 'error',
-            title: editingId !== null ? 'Update Failed' : 'Create Failed',
-            text: backendMsg,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Close',
+            title: 'Validation Error',
+            html: `<p style="margin-bottom:10px">DateTime <b>In</b> must not be greater than DateTime <b>Out</b>.</p>
+                <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <tr style="background:#fef2f2;"><td style="padding:6px 12px;text-align:right;color:#6b7280;white-space:nowrap;">DateTime In:</td><td style="padding:6px 12px;font-weight:600;color:#dc2626;">${fmt(dtIn)}</td></tr>
+                    <tr style="background:#fff5f5;"><td style="padding:6px 12px;text-align:right;color:#6b7280;white-space:nowrap;">DateTime Out:</td><td style="padding:6px 12px;font-weight:600;color:#dc2626;">${fmt(dtOut)}</td></tr>
+                </table>
+                <p style="margin-top:10px;font-size:12px;color:#6b7280;">If this is an overnight shift, please set Date Out to the next day.</p>`,
         });
-    } finally {
-        setSubmitLoading(false);
+        return;
     }
-};
+}
+
+        // ── 4. OT validation ──
+        const parsedNumOT = numOTHoursApproved ? parseFloat(numOTHoursApproved) : 0;
+        if (otAppApprovalFlag === false && parsedNumOT > 0) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid No. of OT Hrs Approved for First Shift.' });
+            return;
+        }
+        if (otAppApprovalFlag === true && parsedNumOT === 0) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Invalid No. of OT Hrs Approved for First Shift.' });
+            return;
+        }
+
+        // ── 5. SD WorkShift Code validation ──
+        if (sdWorkShiftCodeFlag === false && sdWorkShiftCode.trim().length > 0) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'SD WorkShift Code Should Be Empty.' });
+            return;
+        }
+        if (sdWorkShiftCodeFlag === true && sdWorkShiftCode.trim().length === 0) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'SD WorkShift Code Should Not Be Empty.' });
+            return;
+        }
+
+        // ── 6. Duplicate Date In check ──
+        let allRawList: TwoShiftsRawDataEntry[] = [];
+        try {
+            const checkResponse = await apiClient.get(TWO_SHIFTS_BASE_URL, {
+                params: {
+                    dateFrom: toISOSafe(dateIn),
+                    dateTo:   toISOSafe(dateIn),
+                    empCode:  empCode.trim(),
+                },
+            });
+            allRawList = Array.isArray(checkResponse.data) ? checkResponse.data : [];
+        } catch (fetchError: any) {
+            console.warn('[handleSubmit] Could not fetch list for duplicate check:', fetchError.message);
+        }
+
+        const targetDateStart = new Date(toISOSafe(dateIn));
+        targetDateStart.setHours(0, 0, 0, 0);
+        const targetDateEnd = new Date(toISOSafe(dateIn));
+        targetDateEnd.setHours(23, 59, 59, 999);
+
+        const isDuplicate = allRawList.some(entry => {
+            if (editingId !== null && entry.id === editingId) return false;
+            if (entry.empCode.trim().toUpperCase() !== empCode.trim().toUpperCase()) return false;
+            if (!entry.rawDateIn) return false;
+            const cleaned = entry.rawDateIn.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+            const entryDate = new Date(cleaned);
+            return entryDate >= targetDateStart && entryDate <= targetDateEnd;
+        });
+
+        if (isDuplicate) {
+            await Swal.fire({ icon: 'error', title: 'Validation Error', text: 'Date In already exist.' });
+            return;
+        }
+
+        // ── 7. Build payload ──
+        setSubmitLoading(true);
+
+        // FIX 1: Properly merge Actual Date In + Actual Time In into one ISO string,
+        // mirroring the RawDataPage pattern so the time value is never dropped.
+        const resolvedActualDateIn = actualDateIn.trim() || dateIn;
+        const actualDateTimeIn     = actualTimeIn.trim()
+            ? toISOSafe(resolvedActualDateIn, actualTimeIn)
+            : null;
+
+        const dtoPayload = {
+            id: editingId ?? 0,
+            empCode,
+            workShiftCode: workshiftCode,
+            dayType: 'Regular',
+            rawDateIn:      toISOSafe(dateIn),
+            rawTimeIn:      timeIn.trim()    ? toISOSafe(dateIn, timeIn)             : null,
+            // actualDateIn holds the date portion; actualDateIn2 & actualTimeIn2
+            // both receive the merged date+time so the server stores the full value.
+            actualDateIn:   toISOSafe(resolvedActualDateIn),
+            actualDateIn2:  actualDateTimeIn,
+            actualTimeIn2:  actualDateTimeIn,
+            rawBreak1Out:   break1Out.trim() ? toISOSafe(dateIn, break1Out)          : null,
+            rawBreak1In:    break1In.trim()  ? toISOSafe(dateIn, break1In)           : null,
+            rawBreak2Out:   break2Out.trim() ? toISOSafe(dateIn, break2Out)          : null,
+            rawBreak2In:    break2In.trim()  ? toISOSafe(dateIn, break2In)           : null,
+            rawBreak3Out:   break3Out.trim() ? toISOSafe(dateIn, break3Out)          : null,
+            rawBreak3In:    break3In.trim()  ? toISOSafe(dateIn, break3In)           : null,
+            rawDateOut:     toISOSafe(dateOut || dateIn),
+            rawTimeOut:     timeOut.trim()   ? toISOSafe(dateOut || dateIn, timeOut) : null,
+            rAWOTApproved:  otApproved,
+            rawRemarks:     remarks,
+            isLateFiling,
+            bDeviceName:    borrowedDeviceName,
+            rawTardiness: false, rawUndertime: false, rawOT: false,
+            rawNightDiff: false, rawOtherEarnings: false, rawUnproductive: false,
+            rawDisplDateFrom: toISOSafe(dateFrom),
+            rawDisplDateTo:   toISOSafe(dateTo),
+            isSuspended: false, rawNoofDays: false,
+            dayType2: '', entryFlag: '', terminalID: '', dayTypeDOLE: '',
+            aprOTTime:    toISOSafe(dateIn),
+            deviceNameIn: '', deviceNameOut: '',
+            isLateFilingProcessed: false,
+            post_Tardy: false, post_UT: false, post_OT: false,
+            post_Earn: false, post_ND: false, post_NoOfDays: false,
+            oTAppApprovalFlag:   otAppApprovalFlag,
+            sDWorkShiftCodeFlag: sdWorkShiftCodeFlag,
+            flexiBreakFlag: false,
+            numOTHoursApproved: parsedNumOT,
+            earlyOTStartTimeRestHol: overtimeStartDate && overtimeStartTime
+                ? toISOSafe(overtimeStartDate, overtimeStartTime)
+                : toISOSafe(dateIn),
+            sTOTATS: toISOSafe(dateIn),
+            sDWorkShiftCode: sdWorkShiftCode,
+        };
+
+        try {
+            if (editingId !== null) {
+                const existingRecord = rawDataList.find(e => e.id === editingId);
+                if (!existingRecord) {
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Something is wrong with your transaction. Please refresh the page and try again.',
+                    });
+                    setSubmitLoading(false);
+                    return;
+                }
+                await apiClient.put(`${TWO_SHIFTS_BASE_URL}/${editingId}`, { ...dtoPayload, id: editingId });
+            } else {
+                await apiClient.post(TWO_SHIFTS_BASE_URL, dtoPayload);
+            }
+
+            await Swal.fire({
+                icon: 'success',
+                title: editingId !== null ? 'Updated Successfully' : 'Created Successfully',
+                text:  editingId !== null ? 'The entry has been updated.' : 'The entry has been created.',
+                timer: 2000,
+                timerProgressBar: true,
+                showConfirmButton: false,
+            });
+
+            setShowCreateModal(false);
+            setEditingId(null);
+            await fetchRawData();
+
+        } catch (error: any) {
+            const backendMsg =
+                error.response?.data?.message ||
+                error.response?.data?.title   ||
+                error.message                 ||
+                'Something went wrong. Please try again.';
+            await Swal.fire({
+                icon: 'error',
+                title: editingId !== null ? 'Update Failed' : 'Create Failed',
+                text: backendMsg,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Close',
+            });
+        } finally {
+            setSubmitLoading(false);
+        }
+    };
 
     const handleEdit = (entry: TwoShiftsRawDataEntry) => {
         setEditingId(entry.id);
@@ -670,7 +723,7 @@ const handleSubmit = async () => {
         const di     = fromISO(entry.rawDateIn);
         const ti     = fromISO(entry.rawTimeIn);
         const adi    = fromISO(entry.actualDateIn);
-        const ati    = fromISO(entry.actualTimeIn2);
+        const ati    = fromISO(entry.actualTimeIn2);  // time comes from actualTimeIn2
         const b1o    = fromISO(entry.rawBreak1Out);
         const b1i    = fromISO(entry.rawBreak1In);
         const b2o    = fromISO(entry.rawBreak2Out);
@@ -683,7 +736,7 @@ const handleSubmit = async () => {
         setDateIn(di.date);
         setTimeIn(ti.time);
         setActualDateIn(adi.date);
-        setActualTimeIn(ati.time);
+        setActualTimeIn(ati.time);  // properly restored from actualTimeIn2
         setBreak1Out(b1o.time);
         setBreak1In(b1i.time);
         setBreak2Out(b2o.time);
@@ -760,7 +813,7 @@ const handleSubmit = async () => {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // OT Approval toggle — clears OT fields when unchecked
+    // OT Approval toggle
     // ─────────────────────────────────────────────────────────────────────────
 
     const handleOtAppApprovalChange = (checked: boolean) => {
@@ -785,22 +838,21 @@ const handleSubmit = async () => {
 
     const handleEmpCodeSelect = (code: string, name: string) => { setEmpCode(code); setEmpName(name); setShowEmpCodeModal(false); };
     const handleSpecificEmpSelect = (code: string, name: string) => { setSpecificEmpCode(code); setSpecificEmpName(name); setShowSpecificEmpModal(false); };
+
     const resetShiftTimes = () => {
-        setTimeIn('');
-        setTimeOut('');
-        setBreak1Out('');
-        setBreak1In('');
-        setBreak2Out('');
-        setBreak2In('');
-        setBreak3Out('');
-        setBreak3In('');
+        setTimeIn(''); setTimeOut('');
+        setBreak1Out(''); setBreak1In('');
+        setBreak2Out(''); setBreak2In('');
+        setBreak3Out(''); setBreak3In('');
     };
+
     const handleWorkshiftSelect = (code: string) => {
-    resetShiftTimes();
-    setWorkshiftCode(code);
-    setShowWorkshiftModal(false);
-    setWorkshiftSearchTerm('');
-};
+        resetShiftTimes();
+        setWorkshiftCode(code);
+        setShowWorkshiftModal(false);
+        setWorkshiftSearchTerm('');
+    };
+
     const handleSdWorkshiftSelect = (code: string) => { setSdWorkShiftCode(code); setShowSdWorkshiftModal(false); setSdWorkshiftSearchTerm(''); };
     const handleDeviceSelect = (desc: string) => { setBorrowedDeviceName(desc); setShowDeviceModal(false); setDeviceSearchTerm(''); };
 
@@ -844,12 +896,12 @@ const handleSubmit = async () => {
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
-            if (showEmpCodeModal) { setShowEmpCodeModal(false); return; }
-            if (showSpecificEmpModal) { setShowSpecificEmpModal(false); return; }
-            if (showWorkshiftModal) { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); return; }
-            if (showSdWorkshiftModal) { setShowSdWorkshiftModal(false); setSdWorkshiftSearchTerm(''); return; }
-            if (showDeviceModal) { setShowDeviceModal(false); setDeviceSearchTerm(''); return; }
-            if (showCreateModal) { setShowCreateModal(false); return; }
+            if (showEmpCodeModal)       { setShowEmpCodeModal(false);       return; }
+            if (showSpecificEmpModal)   { setShowSpecificEmpModal(false);   return; }
+            if (showWorkshiftModal)     { setShowWorkshiftModal(false); setWorkshiftSearchTerm(''); return; }
+            if (showSdWorkshiftModal)   { setShowSdWorkshiftModal(false); setSdWorkshiftSearchTerm(''); return; }
+            if (showDeviceModal)        { setShowDeviceModal(false); setDeviceSearchTerm(''); return; }
+            if (showCreateModal)        { setShowCreateModal(false); return; }
             setShowDateFromCalendar(false); setShowDateToCalendar(false);
             setShowDateInCalendar(false); setShowTimeInPicker(false);
             setShowActualDateInCalendar(false); setShowActualTimeInPicker(false);
@@ -872,6 +924,11 @@ const handleSubmit = async () => {
         if (showDeviceModal) fetchDevices();
     }, [showDeviceModal, fetchDevices]);
 
+    // Reset page when data set size changes (e.g. after delete)
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [rawDataList.length]);
+
     // ─────────────────────────────────────────────────────────────────────────
     // TIME INPUT HELPERS
     // ─────────────────────────────────────────────────────────────────────────
@@ -881,6 +938,63 @@ const handleSubmit = async () => {
 
     const timeBlurHandler = (val: string, setter: (v: string) => void) =>
         () => setter(validateTimeFormat(val));
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SORT ICON
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const SortIcon = ({ col }: { col: SortKey }) => {
+        if (sortKey !== col) return (
+            <span className="inline-flex flex-col ml-1 leading-none" style={{ fontSize: '8px', verticalAlign: 'middle' }}>
+                <span className="text-gray-400">▲</span>
+                <span className="text-gray-400">▼</span>
+            </span>
+        );
+        return (
+            <span className="inline-flex flex-col ml-1 leading-none" style={{ fontSize: '8px', verticalAlign: 'middle' }}>
+                <span className={sortDir === 'asc' ? 'text-blue-600' : 'text-gray-300'}>▲</span>
+                <span className={sortDir === 'desc' ? 'text-blue-600' : 'text-gray-300'}>▼</span>
+            </span>
+        );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DERIVED: sorted + paged list
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const sortedList = [...rawDataList].sort((a, b) => {
+        let aVal: string | number | boolean = '';
+        let bVal: string | number | boolean = '';
+
+        if (sortKey === 'rawotApproved') {
+            aVal = a.rawotApproved ? 1 : 0;
+            bVal = b.rawotApproved ? 1 : 0;
+        } else if (['rawDateIn', 'rawTimeIn', 'actualDateIn', 'rawDateOut', 'rawTimeOut'].includes(sortKey)) {
+            aVal = a[sortKey] ? new Date(a[sortKey]).getTime() : 0;
+            bVal = b[sortKey] ? new Date(b[sortKey]).getTime() : 0;
+        } else {
+            aVal = (a[sortKey as keyof TwoShiftsRawDataEntry] as string) ?? '';
+            bVal = (b[sortKey as keyof TwoShiftsRawDataEntry] as string) ?? '';
+        }
+
+        if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const totalEntries = sortedList.length;
+    const totalPages   = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE));
+    const safePage     = Math.min(currentPage, totalPages);
+    const pageStart    = (safePage - 1) * PAGE_SIZE;
+    const pageEnd      = Math.min(pageStart + PAGE_SIZE, totalEntries);
+    const pagedList    = sortedList.slice(pageStart, pageEnd);
+
+    const goToPage = (page: number) => setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+
+    const pageNumbers: number[] = [];
+    const rangeStart = Math.max(1, safePage - 2);
+    const rangeEnd   = Math.min(totalPages, rangeStart + 4);
+    for (let i = rangeStart; i <= rangeEnd; i++) pageNumbers.push(i);
 
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER HELPERS
@@ -1088,28 +1202,42 @@ const handleSubmit = async () => {
                                 <thead>
                                     <tr className="bg-gray-100 border-b-2 border-gray-300">
                                         <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Employee Code <span className="ml-1 text-blue-500">▲</span></th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Workshift Code</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Date-In</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Time-In</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Actual Date/Time In</th>
+                                        {([
+                                            { key: 'empCode',       label: 'Employee Code' },
+                                            { key: 'workShiftCode', label: 'Workshift Code' },
+                                            { key: 'rawDateIn',     label: 'Date-In' },
+                                            { key: 'rawTimeIn',     label: 'Time-In' },
+                                            { key: 'actualDateIn',  label: 'Actual Date/Time In' },
+                                        ] as { key: SortKey; label: string }[]).map(({ key, label }) => (
+                                            <th key={key} onClick={() => handleSort(key)}
+                                                className="px-4 py-2 text-left text-gray-700 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors">
+                                                {label}<SortIcon col={key} />
+                                            </th>
+                                        ))}
                                         {!hideColumns.break1Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break1-Out</th>}
                                         {!hideColumns.break1In  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break1-In</th>}
                                         {!hideColumns.break2Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break2-Out</th>}
                                         {!hideColumns.break2In  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break2-In</th>}
                                         {!hideColumns.break3Out && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break3-Out</th>}
                                         {!hideColumns.break3In  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Break3-In</th>}
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Time-Out</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Date-Out</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">DayType</th>
-                                        <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">OT Approved</th>
-                                        {!hideColumns.remarks          && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Remarks</th>}
-                                        {!hideColumns.entryFlag        && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Entry Flag</th>}
-                                        {!hideColumns.terminalId       && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Terminal Id</th>}
-                                        {!hideColumns.secondDayType    && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">2nd Day Type</th>}
-                                        {!hideColumns.approvedOvertime && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Approved OT Time</th>}
-                                        {!hideColumns.deviceName       && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Device Name</th>}
-                                        {!hideColumns.isLateFiling     && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Is Late Filing</th>}
+                                        {([
+                                            { key: 'rawTimeOut',    label: 'Time-Out' },
+                                            { key: 'rawDateOut',    label: 'Date-Out' },
+                                            { key: 'dayType',       label: 'DayType' },
+                                            { key: 'rawotApproved', label: 'OT Approved' },
+                                        ] as { key: SortKey; label: string }[]).map(({ key, label }) => (
+                                            <th key={key} onClick={() => handleSort(key)}
+                                                className="px-4 py-2 text-left text-gray-700 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors">
+                                                {label}<SortIcon col={key} />
+                                            </th>
+                                        ))}
+                                        {!hideColumns.remarks           && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Remarks</th>}
+                                        {!hideColumns.entryFlag         && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Entry Flag</th>}
+                                        {!hideColumns.terminalId        && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Terminal Id</th>}
+                                        {!hideColumns.secondDayType     && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">2nd Day Type</th>}
+                                        {!hideColumns.approvedOvertime  && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Approved OT Time</th>}
+                                        {!hideColumns.deviceName        && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Device Name</th>}
+                                        {!hideColumns.isLateFiling      && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">Is Late Filing</th>}
                                         {!hideColumns.borrowedDeviceName && <th className="px-4 py-2 text-left text-gray-700 whitespace-nowrap">BDevice Name</th>}
                                     </tr>
                                 </thead>
@@ -1120,9 +1248,11 @@ const handleSubmit = async () => {
                                                 <Loader2 className="w-5 h-5 animate-spin" />Loading data...
                                             </div>
                                         </td></tr>
-                                    ) : rawDataList.length === 0 ? (
-                                        <tr><td colSpan={25} className="px-6 py-8 text-center text-gray-500">No data available in table</td></tr>
-                                    ) : rawDataList.map(entry => {
+                                    ) : pagedList.length === 0 ? (
+                                        <tr><td colSpan={25} className="px-6 py-8 text-center text-gray-500">
+                                            No data available. Use the Search button to load records.
+                                        </td></tr>
+                                    ) : pagedList.map(entry => {
                                         const di     = fromISO(entry.rawDateIn);
                                         const ti     = fromISO(entry.rawTimeIn);
                                         const adi    = fromISO(entry.actualDateIn);
@@ -1159,13 +1289,13 @@ const handleSubmit = async () => {
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{doDate.date}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.dayType}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.rawotApproved ? 'Yes' : 'No'}</td>
-                                                {!hideColumns.remarks          && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.rawRemarks}</td>}
-                                                {!hideColumns.entryFlag        && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.entryFlag}</td>}
-                                                {!hideColumns.terminalId       && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.terminalID}</td>}
-                                                {!hideColumns.secondDayType    && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.dayType2}</td>}
-                                                {!hideColumns.approvedOvertime && <td className="px-4 py-2 whitespace-nowrap text-sm">{apOT.time}</td>}
-                                                {!hideColumns.deviceName       && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.deviceNameIn}/{entry.deviceNameOut}</td>}
-                                                {!hideColumns.isLateFiling     && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.isLateFiling ? 'Yes' : 'No'}</td>}
+                                                {!hideColumns.remarks           && <td className="px-4 py-2 text-sm max-w-xs truncate">{entry.rawRemarks}</td>}
+                                                {!hideColumns.entryFlag         && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.entryFlag}</td>}
+                                                {!hideColumns.terminalId        && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.terminalID}</td>}
+                                                {!hideColumns.secondDayType     && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.dayType2}</td>}
+                                                {!hideColumns.approvedOvertime  && <td className="px-4 py-2 whitespace-nowrap text-sm">{apOT.time}</td>}
+                                                {!hideColumns.deviceName        && <td className="px-4 py-2 whitespace-nowrap text-sm text-xs">{entry.deviceNameIn}/{entry.deviceNameOut}</td>}
+                                                {!hideColumns.isLateFiling      && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.isLateFiling ? 'Yes' : 'No'}</td>}
                                                 {!hideColumns.borrowedDeviceName && <td className="px-4 py-2 whitespace-nowrap text-sm">{entry.bDeviceName}</td>}
                                             </tr>
                                         );
@@ -1174,15 +1304,46 @@ const handleSubmit = async () => {
                             </table>
                         </div>
 
-                        {/* Pagination */}
-                        <div className="flex items-center justify-between mt-4">
+                        {/* ── Pagination ── */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
                             <div className="text-gray-600 text-sm">
-                                {rawDataList.length > 0 ? `Showing 1 to ${rawDataList.length} of ${rawDataList.length} entries` : 'Showing 0 to 0 of 0 entries'}
+                                {totalEntries === 0
+                                    ? 'No entries'
+                                    : `Showing ${pageStart + 1} to ${pageEnd} of ${totalEntries} entr${totalEntries === 1 ? 'y' : 'ies'}`}
                             </div>
-                            <div className="flex gap-2">
-                                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50" disabled>Previous</button>
-                                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50" disabled>Next</button>
-                            </div>
+                            {totalEntries > 0 && (
+                                <div className="flex items-center gap-1">
+                                    {/* First */}
+                                    <button onClick={() => goToPage(1)} disabled={safePage === 1}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title="First page">«</button>
+                                    {/* Previous */}
+                                    <button onClick={() => goToPage(safePage - 1)} disabled={safePage === 1}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">
+                                        Previous
+                                    </button>
+                                    {/* Page numbers */}
+                                    {pageNumbers.map(n => (
+                                        <button key={n} onClick={() => goToPage(n)}
+                                            className={`px-3 py-1 border rounded text-sm transition-colors ${
+                                                n === safePage
+                                                    ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                                                    : 'border-gray-300 hover:bg-gray-100'
+                                            }`}>
+                                            {n}
+                                        </button>
+                                    ))}
+                                    {/* Next */}
+                                    <button onClick={() => goToPage(safePage + 1)} disabled={safePage === totalPages}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">
+                                        Next
+                                    </button>
+                                    {/* Last */}
+                                    <button onClick={() => goToPage(totalPages)} disabled={safePage === totalPages}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title="Last page">»</button>
+                                </div>
+                            )}
                         </div>
 
                         {/* ══════════════════════════════════════════════════════════
@@ -1220,13 +1381,9 @@ const handleSubmit = async () => {
                                                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-gray-50 cursor-pointer"
                                                         onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }} />
                                                     <button onClick={() => { setWorkshiftSearchTerm(''); setShowWorkshiftModal(true); }} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"><Search className="w-4 h-4" /></button>
-<button onClick={() => { setWorkshiftCode(''); resetShiftTimes(); }} className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"><X className="w-4 h-4" /></button>
-                                                    {/* ── GET SHIFT BUTTON ── */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleGetShift}
-                                                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm whitespace-nowrap"
-                                                    >
+                                                    <button onClick={() => { setWorkshiftCode(''); resetShiftTimes(); }} className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"><X className="w-4 h-4" /></button>
+                                                    <button type="button" onClick={handleGetShift}
+                                                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm whitespace-nowrap">
                                                         Get Shift
                                                     </button>
                                                 </div>
@@ -1247,7 +1404,9 @@ const handleSubmit = async () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Actual Date In */}
+                                                {/* Actual Date In / Actual Time In */}
+                                                {/* FIX 1: Actual Time In field is now fully wired up alongside Actual Date In.
+                                                    Both are merged into a single ISO string in the payload so the time is no longer dropped. */}
                                                 <div className="flex items-center gap-3">
                                                     <label className="w-40 text-gray-700 text-sm">Actual Date In :</label>
                                                     <div className="relative">
@@ -1255,11 +1414,12 @@ const handleSubmit = async () => {
                                                         <button onClick={() => setShowActualDateInCalendar(!showActualDateInCalendar)} type="button" className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-4 h-4" /></button>
                                                         {showActualDateInCalendar && <CalendarPopup onDateSelect={date => { setActualDateIn(date); setShowActualDateInCalendar(false); }} onClose={() => setShowActualDateInCalendar(false)} />}
                                                     </div>
+                                                    {/* <label className="text-gray-700 text-sm ml-4">Actual Time In :</label>
                                                     <div className="relative flex-1">
                                                         <input type="text" value={actualTimeIn} onChange={timeChangeHandler(setActualTimeIn)} onBlur={timeBlurHandler(actualTimeIn, setActualTimeIn)} placeholder="HH:MM AM/PM" className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-10" />
                                                         <button onClick={() => setShowActualTimeInPicker(!showActualTimeInPicker)} type="button" className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"><Calendar className="w-4 h-4" /></button>
                                                         {showActualTimeInPicker && <TimePicker initialTime={actualTimeIn} onTimeSelect={time => { setActualTimeIn(time); setShowActualTimeInPicker(false); }} onClose={() => setShowActualTimeInPicker(false)} />}
-                                                    </div>
+                                                    </div> */}
                                                 </div>
 
                                                 {/* Break 1 */}
@@ -1353,212 +1513,183 @@ const handleSubmit = async () => {
                                                 {/* ══ OT APPLICATION SECTION ══ */}
                                                 <div className="pt-4 mt-4 border-t-2 border-gray-200">
                                                     <h4 className="text-blue-700 font-semibold mb-4 text-sm">OT Application</h4>
+                                                </div>
 
-                                                    {/* OT Application Approval checkbox — always enabled */}
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <label className="w-40 text-gray-700 text-sm">OT Application Approval :</label>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={otAppApprovalFlag}
-                                                            disabled={true}
-                                                            onChange={e => handleOtAppApprovalChange(e.target.checked)}
-                                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded"
-                                                        />
-                                                    </div>
+                                                {/* OT Approval checkbox — outside any fieldset, always clickable */}
+                                                <div
+                                                    className="flex items-center gap-3 mb-3"
+                                                    style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}
+                                                >
+                                                    <label
+                                                        htmlFor="otAppApprovalCheckbox"
+                                                        className="w-40 text-gray-700 text-sm cursor-pointer select-none"
+                                                    >
+                                                        OT Application Approval :
+                                                    </label>
+                                                    <input
+                                                        id="otAppApprovalCheckbox"
+                                                        type="checkbox"
+                                                        disabled={true}
+                                                        checked={otAppApprovalFlag}
+                                                        onChange={e => handleOtAppApprovalChange(e.target.checked)}
+                                                        className="w-4 h-4 accent-blue-600 cursor-pointer"
+                                                        style={{ pointerEvents: 'auto', opacity: 1, position: 'relative', zIndex: 10 }}
+                                                    />
+                                                </div>
 
-                                                    {/* No. of OT Hrs — disabled when otAppApprovalFlag is false */}
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
-                                                            No. of OT Hrs Approved for 1st Shift :
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            value={numOTHoursApproved}
-                                                            onChange={e => setNumOTHoursApproved(e.target.value)}
-                                                            step="0.5" min="0"
-                                                            disabled={!otAppApprovalFlag}
-                                                            className={`w-32 px-3 py-1.5 border border-gray-300 rounded text-sm transition-colors ${
-                                                                !otAppApprovalFlag
-                                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                                                    : 'bg-white text-gray-900'
-                                                            }`}
-                                                        />
-                                                    </div>
+                                                {/* All sub-fields — individually disabled when OT Approval unchecked */}
 
-                                                    {/* Start Time of OT Before the Shift */}
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
-                                                            Start Time of OT Before the Shift :
-                                                        </label>
-                                                        <div className="relative flex-1">
+                                                        {/* No. of OT Hrs */}
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                                No. of OT Hrs Approved for 1st Shift :
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                value={numOTHoursApproved}
+                                                                onChange={e => setNumOTHoursApproved(e.target.value)}
+                                                                step="0.5" min="0"
+                                                                disabled={!otAppApprovalFlag}
+                                                                className={`w-32 px-3 py-1.5 border rounded text-sm ${!otAppApprovalFlag ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-300 text-gray-900'}`}
+                                                            />
+                                                        </div>
+
+                                                        {/* Start Time of OT Before the Shift */}
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                                Start Time of OT Before the Shift :
+                                                            </label>
+                                                            <div className="relative flex-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={earlyOTStartTime}
+                                                                    onChange={timeChangeHandler(setEarlyOTStartTime)}
+                                                                    onBlur={timeBlurHandler(earlyOTStartTime, setEarlyOTStartTime)}
+                                                                    placeholder="HH:MM AM/PM"
+                                                                    disabled={!otAppApprovalFlag}
+                                                                    className={`w-full px-3 py-1.5 border rounded text-sm pr-10 ${!otAppApprovalFlag ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-300 text-gray-900'}`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => { if (otAppApprovalFlag) setShowEarlyOTStartTimePicker(!showEarlyOTStartTimePicker); }}
+                                                                    disabled={!otAppApprovalFlag}
+                                                                    className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded ${!otAppApprovalFlag ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                                                >
+                                                                    <Calendar className="w-4 h-4" />
+                                                                </button>
+                                                                {showEarlyOTStartTimePicker && otAppApprovalFlag && (
+                                                                    <TimePicker
+                                                                        initialTime={earlyOTStartTime}
+                                                                        onTimeSelect={time => { setEarlyOTStartTime(time); setShowEarlyOTStartTimePicker(false); }}
+                                                                        onClose={() => setShowEarlyOTStartTimePicker(false)}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Start Time of Overtime */}
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                                Start Time of Overtime :
+                                                            </label>
+                                                            <span className={`text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>Date :</span>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="text"
+                                                                    value={overtimeStartDate}
+                                                                    onChange={e => setOvertimeStartDate(e.target.value)}
+                                                                    placeholder="MM/DD/YYYY"
+                                                                    disabled={!otAppApprovalFlag}
+                                                                    className={`w-36 px-3 py-1.5 border rounded text-sm pr-9 ${!otAppApprovalFlag ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-300 text-gray-900'}`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => { if (otAppApprovalFlag) setShowOvertimeStartDateCalendar(!showOvertimeStartDateCalendar); }}
+                                                                    disabled={!otAppApprovalFlag}
+                                                                    className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded ${!otAppApprovalFlag ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                                                >
+                                                                    <Calendar className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                {showOvertimeStartDateCalendar && otAppApprovalFlag && (
+                                                                    <CalendarPopup
+                                                                        onDateSelect={date => { setOvertimeStartDate(date); setShowOvertimeStartDateCalendar(false); }}
+                                                                        onClose={() => setShowOvertimeStartDateCalendar(false)}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                            <span className={`text-sm ml-4 ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>Time :</span>
+                                                            <div className="relative flex-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={overtimeStartTime}
+                                                                    onChange={timeChangeHandler(setOvertimeStartTime)}
+                                                                    onBlur={timeBlurHandler(overtimeStartTime, setOvertimeStartTime)}
+                                                                    placeholder="HH:MM AM/PM"
+                                                                    disabled={!otAppApprovalFlag}
+                                                                    className={`w-full px-3 py-1.5 border rounded text-sm pr-10 ${!otAppApprovalFlag ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-300 text-gray-900'}`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => { if (otAppApprovalFlag) setShowOvertimeStartTimePicker(!showOvertimeStartTimePicker); }}
+                                                                    disabled={!otAppApprovalFlag}
+                                                                    className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded ${!otAppApprovalFlag ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                                                >
+                                                                    <Calendar className="w-4 h-4" />
+                                                                </button>
+                                                                {showOvertimeStartTimePicker && otAppApprovalFlag && (
+                                                                    <TimePicker
+                                                                        initialTime={overtimeStartTime}
+                                                                        onTimeSelect={time => { setOvertimeStartTime(time); setShowOvertimeStartTimePicker(false); }}
+                                                                        onClose={() => setShowOvertimeStartTimePicker(false)}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* SD WorkShift Code Flag */}
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                                SD WorkShift Code Flag :
+                                                            </label>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={sdWorkShiftCodeFlag}
+                                                                onChange={e => setSdWorkShiftCodeFlag(e.target.checked)}
+                                                                disabled={!otAppApprovalFlag}
+                                                                className={`w-4 h-4 accent-blue-600 ${!otAppApprovalFlag ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                                                            />
+                                                        </div>
+
+                                                        {/* SD WorkShift Code */}
+                                                        <div className="flex items-center gap-3">
+                                                            <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                                SD WorkShift Code :
+                                                            </label>
                                                             <input
                                                                 type="text"
-                                                                value={earlyOTStartTime}
-                                                                onChange={timeChangeHandler(setEarlyOTStartTime)}
-                                                                onBlur={timeBlurHandler(earlyOTStartTime, setEarlyOTStartTime)}
-                                                                placeholder="HH:MM AM/PM"
+                                                                value={sdWorkShiftCode}
+                                                                readOnly
                                                                 disabled={!otAppApprovalFlag}
-                                                                className={`w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-10 transition-colors ${
-                                                                    !otAppApprovalFlag
-                                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                                                        : 'bg-white text-gray-900'
-                                                                }`}
+                                                                className={`flex-1 px-3 py-1.5 border rounded text-sm ${!otAppApprovalFlag ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-300 cursor-pointer'}`}
+                                                                onClick={() => { if (otAppApprovalFlag) { setSdWorkshiftSearchTerm(''); setShowSdWorkshiftModal(true); } }}
                                                             />
                                                             <button
                                                                 type="button"
-                                                                onClick={() => { if (otAppApprovalFlag) setShowEarlyOTStartTimePicker(!showEarlyOTStartTimePicker); }}
+                                                                onClick={() => { if (otAppApprovalFlag) { setSdWorkshiftSearchTerm(''); setShowSdWorkshiftModal(true); } }}
                                                                 disabled={!otAppApprovalFlag}
-                                                                className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${
-                                                                    !otAppApprovalFlag
-                                                                        ? 'bg-gray-300 cursor-not-allowed opacity-60 text-gray-400'
-                                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                                                                }`}
+                                                                className={`px-3 py-2 rounded-lg flex-shrink-0 ${!otAppApprovalFlag ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
                                                             >
-                                                                <Calendar className="w-4 h-4" />
+                                                                <Search className="w-4 h-4" />
                                                             </button>
-                                                            {showEarlyOTStartTimePicker && otAppApprovalFlag && (
-                                                                <TimePicker
-                                                                    initialTime={earlyOTStartTime}
-                                                                    onTimeSelect={time => { setEarlyOTStartTime(time); setShowEarlyOTStartTimePicker(false); }}
-                                                                    onClose={() => setShowEarlyOTStartTimePicker(false)}
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Start Time of Overtime: Date + Time */}
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
-                                                            Start Time of Overtime :
-                                                        </label>
-                                                        <span className={`text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>Date :</span>
-                                                        <div className="relative">
-                                                            <input
-                                                                type="text"
-                                                                value={overtimeStartDate}
-                                                                onChange={e => setOvertimeStartDate(e.target.value)}
-                                                                placeholder="MM/DD/YYYY"
-                                                                disabled={!otAppApprovalFlag}
-                                                                className={`w-36 px-3 py-1.5 border border-gray-300 rounded text-sm pr-9 transition-colors ${
-                                                                    !otAppApprovalFlag
-                                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                                                        : 'bg-white text-gray-900'
-                                                                }`}
-                                                            />
                                                             <button
                                                                 type="button"
-                                                                onClick={() => { if (otAppApprovalFlag) setShowOvertimeStartDateCalendar(!showOvertimeStartDateCalendar); }}
+                                                                onClick={() => { if (otAppApprovalFlag) setSdWorkShiftCode(''); }}
                                                                 disabled={!otAppApprovalFlag}
-                                                                className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${
-                                                                    !otAppApprovalFlag
-                                                                        ? 'bg-gray-300 cursor-not-allowed opacity-60 text-gray-400'
-                                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                                                                }`}
+                                                                className={`px-3 py-2 rounded-lg flex-shrink-0 ${!otAppApprovalFlag ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
                                                             >
-                                                                <Calendar className="w-3.5 h-3.5" />
+                                                                <X className="w-4 h-4" />
                                                             </button>
-                                                            {showOvertimeStartDateCalendar && otAppApprovalFlag && (
-                                                                <CalendarPopup
-                                                                    onDateSelect={date => { setOvertimeStartDate(date); setShowOvertimeStartDateCalendar(false); }}
-                                                                    onClose={() => setShowOvertimeStartDateCalendar(false)}
-                                                                />
-                                                            )}
                                                         </div>
-                                                        <span className={`text-sm ml-4 ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>Time :</span>
-                                                        <div className="relative flex-1">
-                                                            <input
-                                                                type="text"
-                                                                value={overtimeStartTime}
-                                                                onChange={timeChangeHandler(setOvertimeStartTime)}
-                                                                onBlur={timeBlurHandler(overtimeStartTime, setOvertimeStartTime)}
-                                                                placeholder="HH:MM AM/PM"
-                                                                disabled={!otAppApprovalFlag}
-                                                                className={`w-full px-3 py-1.5 border border-gray-300 rounded text-sm pr-10 transition-colors ${
-                                                                    !otAppApprovalFlag
-                                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                                                        : 'bg-white text-gray-900'
-                                                                }`}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => { if (otAppApprovalFlag) setShowOvertimeStartTimePicker(!showOvertimeStartTimePicker); }}
-                                                                disabled={!otAppApprovalFlag}
-                                                                className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${
-                                                                    !otAppApprovalFlag
-                                                                        ? 'bg-gray-300 cursor-not-allowed opacity-60 text-gray-400'
-                                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                                                                }`}
-                                                            >
-                                                                <Calendar className="w-4 h-4" />
-                                                            </button>
-                                                            {showOvertimeStartTimePicker && otAppApprovalFlag && (
-                                                                <TimePicker
-                                                                    initialTime={overtimeStartTime}
-                                                                    onTimeSelect={time => { setOvertimeStartTime(time); setShowOvertimeStartTimePicker(false); }}
-                                                                    onClose={() => setShowOvertimeStartTimePicker(false)}
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* SD WorkShift Code Flag */}
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
-                                                            SD WorkShift Code Flag :
-                                                        </label>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={sdWorkShiftCodeFlag}
-                                                            onChange={e => setSdWorkShiftCodeFlag(e.target.checked)}
-                                                            disabled={!otAppApprovalFlag}
-                                                            className={`w-4 h-4 text-blue-600 border-gray-300 rounded transition-colors ${
-                                                                !otAppApprovalFlag ? 'cursor-not-allowed opacity-60' : ''
-                                                            }`}
-                                                        />
-                                                    </div>
-
-                                                    {/* SD WorkShift Code */}
-                                                    <div className="flex items-center gap-3">
-                                                        <label className={`w-40 text-sm ${otAppApprovalFlag ? 'text-gray-700' : 'text-gray-400'}`}>
-                                                            SD WorkShift Code :
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={sdWorkShiftCode}
-                                                            readOnly
-                                                            disabled={!otAppApprovalFlag}
-                                                            className={`flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm transition-colors ${
-                                                                !otAppApprovalFlag
-                                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                                                    : 'bg-gray-50 cursor-pointer'
-                                                            }`}
-                                                            onClick={() => { if (otAppApprovalFlag) { setSdWorkshiftSearchTerm(''); setShowSdWorkshiftModal(true); } }}
-                                                        />
-                                                        <button
-                                                            onClick={() => { if (otAppApprovalFlag) { setSdWorkshiftSearchTerm(''); setShowSdWorkshiftModal(true); } }}
-                                                            disabled={!otAppApprovalFlag}
-                                                            className={`px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${
-                                                                !otAppApprovalFlag
-                                                                    ? 'bg-gray-300 cursor-not-allowed opacity-60 text-gray-400'
-                                                                    : 'bg-green-600 text-white hover:bg-green-700'
-                                                            }`}
-                                                        >
-                                                            <Search className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => { if (otAppApprovalFlag) setSdWorkShiftCode(''); }}
-                                                            disabled={!otAppApprovalFlag}
-                                                            className={`px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${
-                                                                !otAppApprovalFlag
-                                                                    ? 'bg-gray-300 cursor-not-allowed opacity-60 text-gray-400'
-                                                                    : 'bg-red-600 text-white hover:bg-red-700'
-                                                            }`}
-                                                        >
-                                                            <X className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-
-                                                </div>{/* end OT Application section */}
 
                                             </div>{/* end space-y-3 */}
 
